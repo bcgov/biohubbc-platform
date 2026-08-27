@@ -146,6 +146,30 @@ spec:
               value: "/etc/pg-ssl/{{ .Values.app.database.caSecretKey }}"
             {{- end }}
             # Keycloak
+            {{- if .Values.app.martin.enabled }}
+            # Vector tile tokens. The api holds the PRIVATE signing key; the Martin Gateway holds only
+            # the matching public key, so it can verify tokens but never mint one.
+            - name: MARTIN_TOKEN_PRIVATE_KEY_PATH
+              value: "/etc/martin-keys/{{ .Values.app.martin.privateKeySecretKey }}"
+            # Single source of truth: global.martin.keyId, shared with the gateway that verifies
+            # what this key signs. The chart-local value is only a standalone-rendering fallback.
+            - name: MARTIN_TOKEN_KID
+              value: {{ ((.Values.global).martin).keyId | default .Values.app.martin.keyId | quote }}
+            - name: MARTIN_TOKEN_AUD
+              value: {{ .Values.app.martin.audience }}
+            - name: MARTIN_TOKEN_ISS
+              value: {{ .Values.app.martin.issuer }}
+            - name: MARTIN_TOKEN_TTL_SECONDS
+              value: {{ .Values.app.martin.tokenTtlSeconds | quote }}
+            # Relative, so tiles are same origin: the Martin Gateway is exposed on /martin of this
+            # environment's app hostname.
+            - name: MARTIN_EXTERNAL_URL
+              value: {{ .Values.app.martin.externalUrl | quote }}
+            - name: MARTIN_MINT_RATE_LIMIT
+              value: {{ .Values.app.martin.mintRateLimit | quote }}
+            - name: MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES
+              value: {{ .Values.app.martin.mintRateLimitWindowMinutes | quote }}
+            {{- end }}
             - name: KEYCLOAK_HOST
               value: {{ .Values.app.keycloak.host }}
             - name: KEYCLOAK_REALM
@@ -318,6 +342,11 @@ spec:
               mountPath: /etc/pg-ssl
               readOnly: true
             {{- end }}
+            {{- if .Values.app.martin.enabled }}
+            - name: martin-token-private
+              mountPath: /etc/martin-keys
+              readOnly: true
+            {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -334,4 +363,10 @@ spec:
             items:
               - key: {{ .Values.app.database.caSecretKey }}
                 path: {{ .Values.app.database.caSecretKey }}
+        {{- end }}
+        {{- if .Values.app.martin.enabled }}
+        # PRIVATE signing key. Mounted only here, never in the Martin Gateway pod.
+        - name: martin-token-private
+          secret:
+            secretName: {{ .Values.app.martin.privateKeySecretName }}
         {{- end }}

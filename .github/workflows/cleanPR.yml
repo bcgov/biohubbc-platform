@@ -89,5 +89,8 @@ jobs:
 
           echo "Removing DB Setup image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
           oc tag -d biohub-platform-db-setup:${{ env.IMAGE_TAG }}  --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
+
+          echo "Removing Martin Gateway image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
+          oc tag -d biohub-platform-martin-gateway:${{ env.IMAGE_TAG }} --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
           
           echo "Cleanup completed for PR $PR_NUMBER"

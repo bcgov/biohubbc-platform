@@ -137,9 +137,7 @@ spec:
             - name: DATABASE_URL
               value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode={{ .Values.app.database.sslMode | default "prefer" }}"
             {{- end }}
-          ports:
-            - containerPort: {{ .Values.service.port }}
-              protocol: TCP
+          # No containerPort: Martin listens on loopback and is not reachable from outside the pod.
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu }}
@@ -147,6 +145,114 @@ spec:
             limits:
               cpu: {{ .Values.resources.limits.cpu }}
               memory: {{ .Values.resources.limits.memory }}
+          # NOTE: exec probes, not httpGet. The kubelet dials the pod IP, which Martin no longer
+          # listens on, so an httpGet probe would fail permanently. The official image is Alpine
+          # based, so busybox wget is available.
+          # Startup gates on every CONFIGURED source being PUBLISHED, not just on /health. Martin
+          # starts with on_invalid: warn (see the ConfigMap) and only reads its sources once, so a
+          # source that failed to resolve would otherwise leave the pod happily ready and serving no
+          # tiles; failing the probe restarts the container until the catalog is complete.
+          #
+          # This is defence in depth, not the ordering mechanism: the wait-for-tile-functions
+          # initContainer is what actually holds Martin back until the database-setup seeds have run.
+          # What is left for the probe to catch is a source that exists but still fails to publish.
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                {{- if .Values.app.martin.functions }}
+                - >-
+                  body="$(wget --quiet --output-document=- http://127.0.0.1:{{ .Values.app.martin.port }}/catalog)"
+                  {{- range $id, $source := .Values.app.martin.functions }}
+                  && printf '%s' "$body" | grep -q '"{{ $id }}"'
+                  {{- end }}
+                {{- else }}
+                - wget --quiet --spider http://127.0.0.1:{{ .Values.app.martin.port }}/health
+                {{- end }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            # 30 x 5s = 2.5 minutes. The initContainer already absorbed the wait for database-setup,
+            # so by the time this runs the sources exist and publishing is fast.
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - wget --quiet --spider http://127.0.0.1:{{ .Values.app.martin.port }}/health
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: martin-config
+              mountPath: /etc/martin
+              readOnly: true
+            {{- if .Values.app.database.useCrunchy }}
+            - name: pg-root-ca
+              mountPath: /etc/pg-ssl
+              readOnly: true
+            {{- end }}
+
+        # Authenticating gateway. The ONLY container in this pod exposed by the Service and Route.
+        - name: martin-gateway
+          image: "{{ .Values.gateway.image.registry }}/{{ .Values.gateway.image.image }}:{{ include "app.imageTag" . }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.gateway.nodeEnv }}
+            - name: MARTIN_GATEWAY_PORT
+              value: {{ .Values.service.port | quote }}
+            # Loopback: the gateway and Martin share a network namespace.
+            - name: MARTIN_URL
+              value: "http://127.0.0.1:{{ .Values.app.martin.port }}"
+            # Only PUBLIC keys are mounted here. The gateway can verify tokens but never mint one.
+            - name: MARTIN_TOKEN_PUBLIC_KEY_DIR
+              value: /etc/martin-keys
+            # The kid the api signs with; startup asserts a matching public key file is present.
+            # Read from global.martin.keyId, the same value the api signs with, so the two cannot
+            # drift. The chart-local value is only a standalone-rendering fallback.
+            - name: MARTIN_TOKEN_KID
+              value: {{ ((.Values.global).martin).keyId | default .Values.gateway.token.expectedKeyId | quote }}
+            - name: MARTIN_TOKEN_AUD
+              value: {{ .Values.gateway.token.audience }}
+            - name: MARTIN_TOKEN_ISS
+              value: {{ .Values.gateway.token.issuer }}
+            - name: MARTIN_ALLOWED_SOURCES
+              value: {{ .Values.gateway.allowedSources | quote }}
+            - name: MARTIN_MIN_ZOOM
+              value: {{ .Values.gateway.minZoom | quote }}
+            - name: MARTIN_MAX_ZOOM
+              value: {{ .Values.gateway.maxZoom | quote }}
+            # Bump to invalidate every tile Martin has cached at deploy time: the gateway appends
+            # it to the upstream URL, and Martin's cache keys include the query string.
+            - name: MARTIN_SOURCE_VERSION
+              value: {{ .Values.gateway.sourceVersion | quote }}
+            - name: RATE_LIMIT_JTI_PER_MIN
+              value: {{ .Values.gateway.rateLimit.perTokenPerMinute | quote }}
+            - name: RATE_LIMIT_IP_PER_MIN
+              value: {{ .Values.gateway.rateLimit.perIpPerMinute | quote }}
+            # Same origin in OpenShift (the Route serves /martin on the app host), so CORS is a no-op.
+            - name: ALLOWED_ORIGIN
+              value: {{ .Values.gateway.allowedOrigin | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.gateway.logLevel }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            requests:
+              cpu: {{ .Values.gateway.resources.requests.cpu }}
+              memory: {{ .Values.gateway.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.gateway.resources.limits.cpu }}
+              memory: {{ .Values.gateway.resources.limits.memory }}
           startupProbe:
             httpGet:
               path: /health
@@ -180,18 +286,18 @@ spec:
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
-            - name: martin-config
-              mountPath: /etc/martin
+            - name: martin-token-public
+              mountPath: /etc/martin-keys
               readOnly: true
-            {{- if .Values.app.database.useCrunchy }}
-            - name: pg-root-ca
-              mountPath: /etc/pg-ssl
-              readOnly: true
-            {{- end }}
       volumes:
         - name: martin-config
           configMap:
             name: {{ include "app.fullname" . }}-config
+        # Public verification keys only. One file per accepted key id, which is what allows a
+        # rotation window: publish the new key alongside the old, cut the API over, then remove it.
+        - name: martin-token-public
+          secret:
+            secretName: {{ .Values.gateway.token.publicKeySecretName }}
         {{- if .Values.app.database.useCrunchy }}
         - name: pg-root-ca
           secret:

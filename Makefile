@@ -32,8 +32,9 @@ db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to ru
 clamav: | build-clamav run-clamav ## Pulls and runs clamav locally
 minio: | run-minio ## Starts MinIO object storage for local S3
 martin: | build-martin run-martin ## Pulls and runs the Martin vector tile server locally
+martin-gateway: | build-martin-gateway run-martin-gateway ## Runs the full Martin stack (martin + Martin Gateway + signing keys)
 
-all: | web queue clamav minio martin ## Performs all commands necessary to run the full stack (web, queue, clamav, minio, martin) in docker
+all: | web queue clamav minio martin-gateway ## Performs all commands necessary to run the full stack (web, queue, clamav, minio, martin-gateway) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -232,6 +233,29 @@ run-martin: ## Run martin
 	@docker compose up -d martin
 
 ## ------------------------------------------------------------------------------
+## Martin Gateway commands (authenticated vector tiles)
+## ------------------------------------------------------------------------------
+
+build-martin-gateway: ## Pull/build the Martin stack images (martin + Martin Gateway)
+	@echo "==============================================="
+	@echo "Make: build-martin-gateway - building the Martin stack"
+	@echo "==============================================="
+	@docker compose pull martin
+	@docker compose build martin_gateway
+
+run-martin-gateway: ## Run the Martin stack (signing keys, martin, Martin Gateway)
+	@echo "==============================================="
+	@echo "Make: run-martin-gateway - running the Martin stack"
+	@echo "==============================================="
+	@docker compose up -d martin_gateway
+
+test-martin-gateway: ## Runs the Martin Gateway integration tests (needs the Martin stack running)
+	@echo "==============================================="
+	@echo "Make: test-martin-gateway - running Martin Gateway integration tests"
+	@echo "==============================================="
+	@docker compose exec martin_gateway npm run test:integration
+
+## ------------------------------------------------------------------------------
 ## MinIO commands (S3-compatible object storage for local development)
 ## ------------------------------------------------------------------------------
 
@@ -258,6 +282,10 @@ install: ## Runs `npm install` for all projects
 	@echo "Running /database install"
 	@echo "==============================================="
 	@cd database && npm install && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway install"
+	@echo "==============================================="
+	@cd martin-gateway && npm install && cd ..
 
 test: ## Runs `npm test` for api, and app projects
 	@echo "==============================================="
@@ -268,6 +296,10 @@ test: ## Runs `npm test` for api, and app projects
 	@echo "Running /app tests"
 	@echo "==============================================="
 	@cd app && npm test && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway tests"
+	@echo "==============================================="
+	@cd martin-gateway && npm test && cd ..
 
 test-db: ## Runs DB integration tests (transaction/rollback, only needs database)
 	@echo "==============================================="
@@ -316,6 +348,14 @@ lint: ## Runs `npm typecheck` and `npm lint` for all projects
 	@echo "Running /database lint"
 	@echo "==============================================="
 	@cd database && npm run lint && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway typecheck"
+	@echo "==============================================="
+	@cd martin-gateway && npm run typecheck && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway lint"
+	@echo "==============================================="
+	@cd martin-gateway && npm run lint && cd ..
 
 lint-fix: ## Runs `npm typecheck` and `npm run lint-fix ` for all projects
 	@echo "==============================================="
@@ -338,6 +378,10 @@ lint-fix: ## Runs `npm typecheck` and `npm run lint-fix ` for all projects
 	@echo "Running /database lint-fix"
 	@echo "==============================================="
 	@cd database && npm run lint-fix && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway lint-fix"
+	@echo "==============================================="
+	@cd martin-gateway && npm run lint-fix && cd ..
 
 format: ## Runs `npm run format` for all projects
 	@echo "==============================================="
@@ -352,6 +396,10 @@ format: ## Runs `npm run format` for all projects
 	@echo "Running /database format"
 	@echo "==============================================="
 	@cd database && npm run format && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway format"
+	@echo "==============================================="
+	@cd martin-gateway && npm run format && cd ..
 
 format-fix: ## Runs `npm run format-fix` for all projects
 	@echo "==============================================="
@@ -366,6 +414,10 @@ format-fix: ## Runs `npm run format-fix` for all projects
 	@echo "Running /database format-fix"
 	@echo "==============================================="
 	@cd database && npm run format-fix && cd ..
+	@echo "==============================================="
+	@echo "Running /martin-gateway format-fix"
+	@echo "==============================================="
+	@cd martin-gateway && npm run format-fix && cd ..
 
 ## ------------------------------------------------------------------------------
 ## Run `docker logs <container> -f` commands for all projects
@@ -407,6 +459,12 @@ log-martin: ## Runs `docker logs <container> -f` for the martin container
 	@echo "Running docker logs for the martin container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-martin-$(DOCKER_NAMESPACE)-container -f $(args)
+
+log-martin-gateway: ## Runs `docker logs <container> -f` for the Martin Gateway container
+	@echo "==============================================="
+	@echo "Running docker logs for the martin-gateway container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-martin-gateway-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Typescript Trace Commands

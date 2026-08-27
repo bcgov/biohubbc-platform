@@ -40,7 +40,35 @@ app:
     caSecretName: "pgo-root-cacert"
     caSecretKey: "root.crt"
 
-  # Keycloak
+  # Martin tile token minting (SIMSBIOHUB-1102)
+  martin:
+    # Disabled by default: enabling mounts the martin-token-private secret, which is created
+    # manually per namespace (see infrastructure/martin/README.md), and a missing secret would
+    # leave the whole api pod stuck in ContainerCreating. Each environment opts in explicitly in
+    # the umbrella chart's values-{dev,test,prod,pr}.yaml once its secret exists.
+    enabled: false
+    # Secret holding the RS256 PRIVATE signing key. Created manually per namespace; see
+    # infrastructure/martin/README.md for the generation and rotation runbook.
+    privateKeySecretName: martin-token-private
+    privateKeySecretKey: private.pem
+    # Key id embedded in the token header, so the gateway can pick the right public key. It must
+    # match a `<kid>.pem` in the martin-token-public secret, and the kid the gateway verifies with.
+    #
+    # FALLBACK ONLY. In the umbrella chart this is overridden by `global.martin.keyId`, which the
+    # gateway reads too - one value, so the two cannot drift. Change it there, not here; this exists
+    # so the api chart still renders standalone.
+    keyId: "2026-07"
+    audience: biohub-tiles
+    issuer: biohub-api
+    tokenTtlSeconds: 900
+    # Relative: the Martin Gateway is served on /martin of this environment's app hostname, so tiles
+    # are same origin and no per-environment host has to be threaded through.
+    externalUrl: /martin
+    # Per IP budget for the unauthenticated mint endpoint. Coarse on purpose: BC government
+    # networks NAT heavily.
+    mintRateLimit: 60
+    mintRateLimitWindowMinutes: 5
+
   keycloak:
     host: "" # Keycloak login url
     realm: standard # Realm identifier or name
