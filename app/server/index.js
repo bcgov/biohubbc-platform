@@ -44,7 +44,11 @@ import { fileURLToPath } from 'url';
       MAX_UPLOAD_NUM_FILES: Number(process.env.VITE_MAX_UPLOAD_NUM_FILES),
       MAX_UPLOAD_FILE_SIZE: Number(process.env.VITE_MAX_UPLOAD_FILE_SIZE),
       MAX_UPLOAD_TARBALL_SIZE: Number(process.env.VITE_MAX_UPLOAD_TARBALL_SIZE),
-      MAX_TICKET_ATTACHMENT_FILE_SIZE: Number(process.env.VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE)
+      MAX_TICKET_ATTACHMENT_FILE_SIZE: Number(process.env.VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE),
+      BASEMAP_URL:
+        process.env.VITE_BASEMAP_URL ||
+        'https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}',
+      BASEMAP_ATTRIBUTION: process.env.VITE_BASEMAP_ATTRIBUTION || '© Province of British Columbia'
     };
     resp.status(200).json(config);
   });

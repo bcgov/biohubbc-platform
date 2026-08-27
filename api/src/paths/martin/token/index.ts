@@ -103,6 +103,7 @@ export function createMartinSession(): RequestHandler {
         token_expires_in: expiresIn,
         context_expires_in: context.expiresInSeconds,
         source: MARTIN_SOURCE.SEARCH,
+        martin_context_id: context.martinContextId,
         martin_url_template: tokenService.getMartinUrlTemplate(MARTIN_SOURCE.SEARCH),
         has_more_secured_features: context.hasMoreSecuredFeatures
       });
