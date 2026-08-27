@@ -7,7 +7,7 @@ export interface CodePropertyValueLinkProps {
   /** Structured code value from the indexed-property read model. */
   value: CodePropertyValue;
   /** Submission the referencing feature belongs to. */
-  submissionId: string | number;
+  submissionId: number;
   /** Submission route base, e.g. `/submission` or `/portal/submission`. */
   featureRouteBasePath: string;
 }
@@ -34,7 +34,6 @@ export const CodePropertyValueLink = ({ value, submissionId, featureRouteBasePat
       )}
       label={value.label}
       title={`${value.codeset_label} / ${value.code_label}`}
-      dataAttributes={{ 'data-codeset-key': value.codeset_key, 'data-code-key': value.code_key }}
     />
   );
 };

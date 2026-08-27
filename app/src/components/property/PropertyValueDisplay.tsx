@@ -39,9 +39,7 @@ export const PropertyValueDisplay = ({ value, submissionId, featureRouteBasePath
   }
 
   if (isCodePropertyValue(value)) {
-    return submissionId === undefined ? (
-      <>{value.label}</>
-    ) : (
+    return (
       <CodePropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
     );
   }

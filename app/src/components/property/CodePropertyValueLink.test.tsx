@@ -12,7 +12,7 @@ const code: CodePropertyValue = {
 };
 
 interface RenderOptions {
-  submissionId?: string | number;
+  submissionId?: number;
   featureRouteBasePath?: string;
   initialEntry?: string;
 }
@@ -33,12 +33,10 @@ describe('CodePropertyValueLink', () => {
 
     const link = getByRole('link', { name: 'Track' });
     expect(link).toHaveAttribute('href', '/submission/3/code/sign/track?view=table');
-    expect(link).toHaveAttribute('data-codeset-key', 'sign');
-    expect(link).toHaveAttribute('data-code-key', 'track');
   });
 
   it('uses the portal route base when given', () => {
-    const { getByRole } = renderLink(code, { submissionId: '3', featureRouteBasePath: '/portal/submission' });
+    const { getByRole } = renderLink(code, { submissionId: 3, featureRouteBasePath: '/portal/submission' });
 
     expect(getByRole('link', { name: 'Track' })).toHaveAttribute('href', '/portal/submission/3/code/sign/track');
   });

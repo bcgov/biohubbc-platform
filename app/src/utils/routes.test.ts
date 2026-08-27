@@ -53,7 +53,7 @@ describe('parseRouteId', () => {
 describe('buildSubmissionCodePath', () => {
   it('builds the code path under the given submission route base', () => {
     expect(buildSubmissionCodePath('/submission', 18, 'sign', 'track')).toBe('/submission/18/code/sign/track');
-    expect(buildSubmissionCodePath('/portal/submission', '18', 'sign', 'track', '?view=table')).toBe(
+    expect(buildSubmissionCodePath('/portal/submission', 18, 'sign', 'track', '?view=table')).toBe(
       '/portal/submission/18/code/sign/track?view=table'
     );
   });

@@ -108,7 +108,7 @@ export const buildSubmissionTaxonPath = (
  * Codeset and code keys are contributor-supplied text, so each is URL-encoded as its own path segment.
  *
  * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
- * @param {string | number} submissionId - Submission the referencing feature belongs to.
+ * @param {number} submissionId - Submission the referencing feature belongs to.
  * @param {string} codesetKey - Machine-readable key of the codeset.
  * @param {string} codeKey - Machine-readable key of the code within the codeset.
  * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
@@ -116,7 +116,7 @@ export const buildSubmissionTaxonPath = (
  */
 export const buildSubmissionCodePath = (
   basePath: string,
-  submissionId: string | number,
+  submissionId: number,
   codesetKey: string,
   codeKey: string,
   search = ''
