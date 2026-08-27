@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import {
+  codePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
   isSubmissionFeatureActive,
@@ -123,6 +124,30 @@ describe('sql-fragments', () => {
 
     it('contains zero bound placeholders', () => {
       const sql = taxonPropertyValueJson('t');
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
+    });
+  });
+
+  describe('codePropertyValueJson', () => {
+    it('builds the code value object from the aliased code and codeset rows', () => {
+      const sql = codePropertyValueJson('ccc', 'cs');
+
+      expect(sql).to.include('jsonb_build_object(');
+      expect(sql).to.include("'codeset_key', cs.key");
+      expect(sql).to.include("'codeset_label', cs.label");
+      expect(sql).to.include("'code_key', ccc.key");
+      expect(sql).to.include("'code_label', ccc.label");
+    });
+
+    it('labels with the code label', () => {
+      const sql = codePropertyValueJson('code', 'codeset');
+
+      expect(sql).to.include("'label', code.label");
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = codePropertyValueJson('ccc', 'cs');
 
       expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
     });

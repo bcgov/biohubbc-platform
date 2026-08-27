@@ -36,12 +36,26 @@ export const TaxonPropertyValue = z.object({
 export type TaxonPropertyValue = z.infer<typeof TaxonPropertyValue>;
 
 /**
+ * Structured value of a code-valued submitted property: the codeset and code keys and labels, with the
+ * code label as the display `label`.
+ */
+export const CodePropertyValue = z.object({
+  codeset_key: z.string(),
+  codeset_label: z.string(),
+  code_key: z.string(),
+  code_label: z.string(),
+  label: z.string()
+});
+
+export type CodePropertyValue = z.infer<typeof CodePropertyValue>;
+
+/**
  * Value of an indexed submitted property as read by the feature-detail properties list.
  *
  * Scalar-typed values are plain strings; reference-typed values are structured objects that
  * always carry a `label` and are told apart by their identifier keys.
  */
-export const SubmissionFeaturePropertyValue = z.union([z.string(), TaxonPropertyValue]);
+export const SubmissionFeaturePropertyValue = z.union([z.string(), TaxonPropertyValue, CodePropertyValue]);
 
 export type SubmissionFeaturePropertyValue = z.infer<typeof SubmissionFeaturePropertyValue>;
 

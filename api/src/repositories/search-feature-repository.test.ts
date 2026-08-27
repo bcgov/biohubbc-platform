@@ -5,7 +5,7 @@ import { getKnex } from '../database/db';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { SearchFeatureRepository } from './search-feature-repository';
-import { taxonPropertyValueJson } from './sql-fragments';
+import { codePropertyValueJson, taxonPropertyValueJson } from './sql-fragments';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -149,6 +149,22 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.not.include('to_jsonb(t.itis_scientific_name)');
       // ...and hides end-dated taxa, so search and feature detail agree on which rows exist
       expect(sql).to.include('t.record_end_date IS NULL');
+    });
+
+    it('should hydrate code-valued properties as structured values with their codeset', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include(codePropertyValueJson('ccc', 'cs'));
+      expect(sql).to.include('JOIN contributor_codeset cs');
+      expect(sql).to.include('ON cs.contributor_codeset_id = ccc.contributor_codeset_id');
+      expect(sql).to.not.include('to_jsonb(ccc.label)');
+      // ...and hides end-dated codes, so search and feature detail agree on which rows exist
+      expect(sql).to.include('ccc.record_end_date IS NULL');
     });
   });
 

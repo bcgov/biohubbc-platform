@@ -14,7 +14,12 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeaturePropertyRepository } from '../../repositories/submission-feature-property-repository';
-import { addTaxonProperty, createTaxon } from '../helpers/test-feature-property-helpers';
+import {
+  addCodeProperty,
+  addTaxonProperty,
+  createCodesetCode,
+  createTaxon
+} from '../helpers/test-feature-property-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 // Deterministic token: no seeded value contains it, so label searches can't match pre-existing data.
@@ -160,6 +165,80 @@ describe('Indexed property value read paths (integration)', function () {
         .map((row) => (typeof row.value === 'string' ? row.value : row.value.label));
 
       expect(labels).to.deep.equal([`Alces ${TOKEN}`, `Zapus ${TOKEN}`]);
+    });
+  });
+
+  describe('code values', () => {
+    const featureTypeName = 'survey';
+    const propertyName = 'site_select_strategy';
+
+    it('returns the same structured code value from the search row and the properties list', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
+      const codeId = await createCodesetCode(connection, 'random', `Random ${TOKEN}`, null, {
+        key: `site_select_strategies_${TOKEN}`,
+        label: 'Site Selection Strategies'
+      });
+      await addCodeProperty(connection, featureId, featureTypeName, propertyName, codeId);
+
+      const expected = {
+        codeset_key: `site_select_strategies_${TOKEN}`,
+        codeset_label: 'Site Selection Strategies',
+        code_key: 'random',
+        code_label: `Random ${TOKEN}`,
+        label: `Random ${TOKEN}`
+      };
+
+      const rows = await propertyRepository.getSubmissionFeatureProperties(featureId, { page: 1, limit: 25 });
+      const codeRow = rows.find((row) => row.id.startsWith('code:'));
+      expect(codeRow).to.not.be.undefined;
+      expect(codeRow?.value).to.deep.equal(expected);
+
+      const searchRow = await findSearchRow(featureTypeName, featureId);
+      const searchValue = searchRow.properties[propertyName];
+      expect(Array.isArray(searchValue) ? searchValue[0] : searchValue).to.deep.equal(expected);
+    });
+
+    it('omits codes that have been end-dated, on both read paths', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
+      const codeId = await createCodesetCode(connection, 'stratified', `Stratified ${TOKEN}`, null, {
+        key: `strategies_ended_${TOKEN}`
+      });
+      await addCodeProperty(connection, featureId, featureTypeName, propertyName, codeId);
+      await connection.sql(SQL`
+        UPDATE contributor_codeset_code SET record_end_date = now() - interval '1 day'
+        WHERE contributor_codeset_code_id = ${codeId};
+      `);
+
+      const rows = await propertyRepository.getSubmissionFeatureProperties(featureId, { page: 1, limit: 25 });
+      expect(rows.filter((row) => row.id.startsWith('code:'))).to.be.empty;
+
+      const searchRow = await findSearchRow(featureTypeName, featureId);
+      expect(searchRow.properties[propertyName]).to.be.undefined;
+    });
+
+    it('searches the properties list by the code label, not by the codeset key', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
+      const codeId = await createCodesetCode(connection, 'systematic', `Systematic ${TOKEN}`, null, {
+        key: `strategies_${TOKEN}`
+      });
+      await addCodeProperty(connection, featureId, featureTypeName, propertyName, codeId);
+
+      const byLabel = await propertyRepository.getSubmissionFeatureProperties(
+        featureId,
+        { page: 1, limit: 25 },
+        { search: `systematic ${TOKEN.toLowerCase()}` }
+      );
+      expect(byLabel.map((row) => row.id.split(':')[0])).to.deep.equal(['code']);
+
+      const byCodesetKey = await propertyRepository.getSubmissionFeatureProperties(
+        featureId,
+        { page: 1, limit: 25 },
+        { search: `strategies_${TOKEN.toLowerCase()}` }
+      );
+      expect(byCodesetKey).to.be.empty;
     });
   });
 });

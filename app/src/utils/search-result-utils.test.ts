@@ -35,6 +35,15 @@ describe('formatSubmissionPropertyValue', () => {
     expect(
       formatSubmissionPropertyValue({ taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' })
     ).toBe('Ursus americanus');
+    expect(
+      formatSubmissionPropertyValue({
+        codeset_key: 'sign',
+        codeset_label: 'Sign',
+        code_key: 'track',
+        code_label: 'Track',
+        label: 'Track'
+      })
+    ).toBe('Track');
   });
 
   it('flattens arrays of reference values into their labels', () => {

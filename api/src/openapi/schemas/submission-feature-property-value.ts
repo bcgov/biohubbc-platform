@@ -40,9 +40,41 @@ export const taxonPropertyValueSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Schema for a code-valued property: `{ codeset_key, codeset_label, code_key, code_label, label }`.
+ */
+export const codePropertyValueSchema: OpenAPIV3.SchemaObject = {
+  title: 'CodePropertyValue',
+  type: 'object',
+  required: ['codeset_key', 'codeset_label', 'code_key', 'code_label', 'label'],
+  additionalProperties: false,
+  properties: {
+    codeset_key: {
+      type: 'string',
+      description: 'Machine-readable key of the codeset the code belongs to'
+    },
+    codeset_label: {
+      type: 'string',
+      description: 'Display label of the codeset'
+    },
+    code_key: {
+      type: 'string',
+      description: 'Machine-readable key of the code; with the codeset key, identifies the code a link targets'
+    },
+    code_label: {
+      type: 'string',
+      description: 'Display label of the code'
+    },
+    label: {
+      type: 'string',
+      description: 'Display text: the code label'
+    }
+  }
+};
+
+/**
  * Schema for the `value` of an indexed submitted property: a string for scalar-typed properties, or
  * one of the structured reference-value objects.
  */
 export const submissionFeaturePropertyValueSchema: OpenAPIV3.SchemaObject = {
-  oneOf: [{ type: 'string' }, taxonPropertyValueSchema]
+  oneOf: [{ type: 'string' }, taxonPropertyValueSchema, codePropertyValueSchema]
 };

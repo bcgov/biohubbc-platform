@@ -215,6 +215,38 @@ describe('SearchResultTableLayout', () => {
     expect(cell.querySelector('.MuiTypography-root')).toHaveAttribute('title', 'Ursus americanus');
   });
 
+  it('renders code values as links to the code page under the row submission', () => {
+    const codeProperty: FeatureTypeProperty = {
+      feature_type_property_id: 6,
+      name: 'sign',
+      display_name: 'Sign',
+      description: null,
+      type_name: 'code',
+      required_value: false,
+      calculated_value: false,
+      allow_multiple: false
+    };
+    const result = {
+      ...createMockSearchFeature(1, 'Observation', false),
+      properties: {
+        sign: { codeset_key: 'sign', codeset_label: 'Sign', code_key: 'track', code_label: 'Track', label: 'Track' }
+      }
+    };
+
+    const { getByTestId } = render(
+      <MemoryRouter>
+        <SearchResultTableLayout results={[result]} featureTypeProperties={[codeProperty]} />
+      </MemoryRouter>
+    );
+
+    const cell = getByTestId(`cell-${codeProperty.feature_type_property_id}`);
+    expect(within(cell).getByRole('link', { name: 'Track' })).toHaveAttribute(
+      'href',
+      '/submission/101/code/sign/track'
+    );
+    expect(within(cell).getByRole('link')).toHaveAttribute('title', 'Sign / Track');
+  });
+
   it('renders multi-value taxon properties as a comma-separated list of links', () => {
     const taxonProperty: FeatureTypeProperty = {
       feature_type_property_id: 5,

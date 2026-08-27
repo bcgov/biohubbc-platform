@@ -1,4 +1,4 @@
-import { TaxonPropertyValue } from 'interfaces/property-value.interface';
+import { CodePropertyValue, StructuredPropertyValue, TaxonPropertyValue } from 'interfaces/property-value.interface';
 import { JsonValue } from 'types/json';
 import { safeJSONStringify } from './Utils';
 
@@ -24,12 +24,27 @@ export const isTaxonPropertyValue = (value: unknown): value is TaxonPropertyValu
   isPlainObject(value) && typeof value.label === 'string' && typeof value.taxon_id === 'number';
 
 /**
+ * Determines whether a property value is a structured code reference.
+ *
+ * Code values are recognised by their identifiers (`codeset_key`, `code_key`) alongside the display `label`.
+ *
+ * @param {unknown} value - Any property value.
+ * @returns {boolean} `true` when the value is a code reference.
+ */
+export const isCodePropertyValue = (value: unknown): value is CodePropertyValue =>
+  isPlainObject(value) &&
+  typeof value.label === 'string' &&
+  typeof value.codeset_key === 'string' &&
+  typeof value.code_key === 'string';
+
+/**
  * Determines whether a property value is a structured reference value of any supported type.
  *
  * @param {unknown} value - Any property value.
  * @returns {boolean} `true` when the value is a structured reference value.
  */
-export const isStructuredPropertyValue = (value: unknown): value is TaxonPropertyValue => isTaxonPropertyValue(value);
+export const isStructuredPropertyValue = (value: unknown): value is StructuredPropertyValue =>
+  isTaxonPropertyValue(value) || isCodePropertyValue(value);
 
 /**
  * Builds a content-derived key for a property value rendered in a list, so that React keys do not
@@ -43,6 +58,10 @@ export const isStructuredPropertyValue = (value: unknown): value is TaxonPropert
 export const getPropertyValueKey = (value: JsonValue): string => {
   if (isTaxonPropertyValue(value)) {
     return `taxon:${value.taxon_id}`;
+  }
+
+  if (isCodePropertyValue(value)) {
+    return `code:${value.codeset_key}:${value.code_key}`;
   }
 
   return `scalar:${safeJSONStringify(value)}`;

@@ -101,3 +101,24 @@ export const buildSubmissionTaxonPath = (
   taxonId: number,
   search = ''
 ): string => `${basePath}/${submissionId}/taxon/${taxonId}${search}`;
+
+/**
+ * Builds the path of the code page for a codeset code referenced from a submission's features.
+ *
+ * Codeset and code keys are contributor-supplied text, so each is URL-encoded as its own path segment.
+ *
+ * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {number} submissionId - Submission the referencing feature belongs to.
+ * @param {string} codesetKey - Machine-readable key of the codeset.
+ * @param {string} codeKey - Machine-readable key of the code within the codeset.
+ * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
+ * @returns {string} Code page path.
+ */
+export const buildSubmissionCodePath = (
+  basePath: string,
+  submissionId: number,
+  codesetKey: string,
+  codeKey: string,
+  search = ''
+): string =>
+  `${basePath}/${submissionId}/code/${encodeURIComponent(codesetKey)}/${encodeURIComponent(codeKey)}${search}`;

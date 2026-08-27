@@ -39,6 +39,18 @@ describe('PropertyValueDisplay', () => {
     expect(getByRole('link', { name: 'Ursus americanus' })).toHaveAttribute('href', '/submission/3/taxon/180543');
   });
 
+  it('renders a code value as a link to the code page', () => {
+    const { getByRole } = renderValue({
+      codeset_key: 'sign',
+      codeset_label: 'Sign',
+      code_key: 'track',
+      code_label: 'Track',
+      label: 'Track'
+    });
+
+    expect(getByRole('link', { name: 'Track' })).toHaveAttribute('href', '/submission/3/code/sign/track');
+  });
+
   it('renders multi-value properties inline, comma-separated', () => {
     const { container, getAllByRole } = renderValue([taxon, { ...taxon, taxon_id: 2, label: 'Canis lupus' }, 'x']);
 

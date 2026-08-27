@@ -16,7 +16,29 @@ export type TaxonPropertyValue = {
 };
 
 /**
- * Value of an indexed submitted property: a plain string for scalar-typed properties, or a structured
- * reference value carrying a display `label` plus the stable identifiers the UI links with.
+ * Structured value of a code-valued submitted property, as returned by the indexed-property read paths.
  */
-export type SubmissionPropertyValue = string | TaxonPropertyValue;
+export type CodePropertyValue = {
+  /** Machine-readable key of the codeset the code belongs to. */
+  codeset_key: string;
+  /** Display label of the codeset. */
+  codeset_label: string;
+  /** Machine-readable key of the code; with `codeset_key`, identifies the code a link targets. */
+  code_key: string;
+  /** Display label of the code. */
+  code_label: string;
+  /** Display text: the code label. */
+  label: string;
+};
+
+/**
+ * Reference-typed submitted property values. Every member carries a display `label` plus the stable
+ * identifiers the UI links with, and is told apart by its identifier keys.
+ */
+export type StructuredPropertyValue = TaxonPropertyValue | CodePropertyValue;
+
+/**
+ * Value of an indexed submitted property: a plain string for scalar-typed properties, or a structured
+ * reference value.
+ */
+export type SubmissionPropertyValue = string | StructuredPropertyValue;

@@ -215,3 +215,30 @@ export function taxonPropertyValueJson(alias: string): string {
     'label', ${alias}.itis_scientific_name
   )`;
 }
+
+/**
+ * Structured value for a code-valued submitted property, built from a `contributor_codeset_code` row
+ * and its parent `contributor_codeset` row.
+ *
+ * The object is the read-model shape returned for code references by every indexed-property read
+ * path (search result rows and the feature-detail properties list), so the label and the identifiers
+ * are defined once here:
+ * - `codeset_key` / `codeset_label` — the codeset the code belongs to (machine key, display label)
+ * - `code_key` / `code_label` — the code itself (machine key, display label)
+ * - `label` — display text: the code label
+ *
+ * Returns a `jsonb_build_object(...)` expression with zero placeholders.
+ *
+ * @param codeAlias SQL alias for the joined `contributor_codeset_code` row (e.g. 'ccc').
+ * @param codesetAlias SQL alias for the joined `contributor_codeset` row (e.g. 'cs').
+ * @returns SQL expression producing the code value object.
+ */
+export function codePropertyValueJson(codeAlias: string, codesetAlias: string): string {
+  return `jsonb_build_object(
+    'codeset_key', ${codesetAlias}.key,
+    'codeset_label', ${codesetAlias}.label,
+    'code_key', ${codeAlias}.key,
+    'code_label', ${codeAlias}.label,
+    'label', ${codeAlias}.label
+  )`;
+}
