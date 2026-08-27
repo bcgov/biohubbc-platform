@@ -298,6 +298,34 @@ services:
     networks:
       - biohubbc-network
 
+  ## Martin vector tile server (serves vector tiles directly from PostGIS)
+  martin:
+    image: ghcr.io/maplibre/martin:${MARTIN_VERSION}
+    container_name: ${DOCKER_PROJECT_NAME}-martin-${DOCKER_NAMESPACE}-container
+    ports:
+      - ${MARTIN_PORT}:3000
+    command: ["--config", "/etc/martin/config.yaml"]
+    environment:
+      # Martin expands ${DATABASE_URL} itself, inside the config file
+      - DATABASE_URL=postgresql://${DB_USER_MARTIN}:${DB_USER_MARTIN_PASS}@${DB_HOST}:5432/${DB_DATABASE}
+    configs:
+      - source: martin-config
+        target: /etc/martin/config.yaml
+    networks:
+      - biohubbc-network
+    depends_on:
+      db:
+        condition: service_healthy
+      # The martin role is created by the migrations
+      db_setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   ## Run the database migrations and seeding
   db_setup:
     image: ${DOCKER_PROJECT_NAME}-db-setup-${DOCKER_NAMESPACE}-img
@@ -315,6 +343,9 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - DB_USER_API=${DB_USER_API}
       - DB_USER_API_PASS=${DB_USER_API_PASS}
+      # Used to create the least-privilege Martin tile server role
+      - DB_USER_MARTIN=${DB_USER_MARTIN}
+      - DB_USER_MARTIN_PASS=${DB_USER_MARTIN_PASS}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
       - CONTRIBUTOR_SYSTEM_USER_GUID=${CONTRIBUTOR_SYSTEM_USER_GUID}
       - ENABLE_MOCK_FEATURE_SEEDING=${ENABLE_MOCK_FEATURE_SEEDING}
@@ -327,6 +358,52 @@ services:
       db:
         condition: service_healthy
     command: ["npm", "run", "setup"]
+
+configs:
+  ## Martin vector tile server configuration (local development).
+  ##
+  ## Martin serves vector tiles directly from PostGIS; tile bytes never pass through the BioHub API:
+  ##
+  ##   MapLibre -> Martin Gateway (auth) -> Martin -> PostGIS
+  ##
+  ## IMPORTANT: keep this in sync with the Helm ConfigMap that renders the same configuration for
+  ## OpenShift: infrastructure/martin/templates/configmap.yaml
+  ##
+  ## Config reference (pinned version): https://maplibre.org/martin/config-file/
+  ## Schema: https://github.com/maplibre/martin/blob/main/schemas/config.json
+  ##
+  ## NOTE: `$$` escapes the `$` so Compose does NOT interpolate it. The literal `${DATABASE_URL}` is
+  ## written into the container, and Martin expands it from the service environment at startup.
+  martin-config:
+    content: |
+      # Bind on all interfaces so the port can be published to the host for local development.
+      listen_addresses: 0.0.0.0:3000
+
+      worker_processes: 2
+
+      # Warn rather than abort when a configured source is invalid at startup. Keeps parity with the
+      # OpenShift config, where Martin can start before the database-setup Job has created the tile
+      # functions; locally compose ordering usually prevents this, but a stale db_setup image can
+      # produce the same missing-function state.
+      on_invalid: warn
+
+      # Martin's built-in tile cache is enabled by default (512 MB) but holds entries with NO
+      # expiry, only size-pressure eviction. Tiles are security filtered at render time, so an
+      # unbounded entry lifetime would let a newly secured feature keep appearing in cached tiles
+      # indefinitely. The expiry bounds that takedown window. Cache keys include the full query
+      # string, so entries never leak across `context` values.
+      cache:
+        expiry: "5m"
+
+      postgres:
+        # Expanded by Martin from the DATABASE_URL environment variable set on the compose service.
+        connection_string: $${DATABASE_URL}
+
+        pool_size: 5
+
+        # CRITICAL: disable automatic discovery. Left enabled, Martin publishes every table and
+        # function its database role can read. Only sources explicitly listed here are served.
+        auto_publish: false
 
 networks:
   biohubbc-network:

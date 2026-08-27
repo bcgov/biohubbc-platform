@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "app.fullname" . }}-config
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+data:
+  # Keep in sync with the local development config: the `martin-config` entry in compose.yml
+  config.yaml: |
+    listen_addresses: 0.0.0.0:{{ .Values.service.port }}
+
+    worker_processes: {{ .Values.app.martin.workerProcesses }}
+
+    # Warn rather than abort when a configured source is invalid at startup. The tile functions are
+    # created by database-setup seeds, and Helm applies this Deployment and that Job in the same
+    # pass, so on a first deploy Martin can start before the functions exist. Aborting (the Martin
+    # default) would crashloop the pod and fail the deploy; warning lets it start degraded, and the
+    # startup probe holds the pod not-ready and restarts it until every configured source resolves.
+    on_invalid: warn
+
+    # Martin's built-in tile cache is enabled by default (512 MB) but holds entries with NO
+    # expiry, only size-pressure eviction. Tiles are security filtered at render time, so an
+    # unbounded entry lifetime would let a newly secured feature keep appearing in cached tiles
+    # indefinitely. The expiry bounds that takedown window. Cache keys include the full query
+    # string, so entries never leak across `context` values.
+    cache:
+      expiry: "{{ .Values.app.martin.cacheExpiry }}"
+
+    postgres:
+      # Expanded by Martin from the DATABASE_URL environment variable set on the container.
+      connection_string: ${DATABASE_URL}
+
+      pool_size: {{ .Values.app.martin.poolSize }}
+      {{- if .Values.app.database.useCrunchy }}
+
+      # Crunchy Postgres serves TLS signed by the PGO root CA, mounted from the same secret the api uses.
+      ssl_root_cert: /etc/pg-ssl/{{ .Values.app.database.caSecretKey }}
+      {{- end }}
+
+      # CRITICAL: disable automatic discovery. Left enabled, Martin publishes every table and
+      # function its database role can read. Only the sources listed below are served.
+      auto_publish: false
+      {{- if .Values.app.martin.functions }}
+
+      functions:
+        {{- range $id, $source := .Values.app.martin.functions }}
+        {{ $id }}:
+          schema: {{ $source.schema }}
+          function: {{ $source.function }}
+          minzoom: {{ $source.minzoom }}
+          maxzoom: {{ $source.maxzoom }}
+          bounds: {{ toJson $source.bounds }}
+        {{- end }}
+      {{- end }}

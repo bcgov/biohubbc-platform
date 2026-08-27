@@ -346,6 +346,8 @@ jobs:
             --set-string biohub-platform-db.app.postgresUserPassword=${{ secrets.DATABASE_USER_PASSWORD }} \
             --set-string biohub-platform-db.app.postgresUserApi=${{ secrets.DATABASE_USER_API }} \
             --set-string biohub-platform-db.app.postgresUserApiPassword=${{ secrets.DATABASE_USER_API_PASSWORD }} \
+            --set-string biohub-platform-db.app.postgresUserMartin=${{ secrets.DATABASE_USER_MARTIN }} \
+            --set-string biohub-platform-db.app.postgresUserMartinPassword=${{ secrets.DATABASE_USER_MARTIN_PASSWORD }} \
             --set-string biohub-platform-db.app.postgresDb=${{ secrets.DATABASE_NAME }} \
             --set-string biohub-platform-db-setup.environment.ts=$TS \
             --set-string biohub-platform-db-setup.environment.changeId=$BUILD_TAG \
@@ -353,6 +355,8 @@ jobs:
             --set-string biohub-platform-api.environment.changeId=$BUILD_TAG \
             --set-string biohub-platform-queue.environment.ts=$TS \
             --set-string biohub-platform-queue.environment.changeId=$BUILD_TAG \
+            --set-string biohub-platform-martin.environment.ts=$TS \
+            --set-string biohub-platform-martin.environment.changeId=$BUILD_TAG \
             --wait --timeout=600s
           
           echo "Helm chart deployment completed for branch $BRANCH"

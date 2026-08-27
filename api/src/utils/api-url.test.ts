@@ -33,10 +33,10 @@ describe('getApiBaseUrl', () => {
     expect(getApiBaseUrl()).to.equal('https://api.biohub.example.com');
   });
 
-  it('falls back to localhost:6100 when env vars are unset', () => {
+  it('falls back to localhost:6200 when env vars are unset', () => {
     delete process.env.API_HOST;
     delete process.env.API_PORT;
 
-    expect(getApiBaseUrl()).to.equal('http://localhost:6100');
+    expect(getApiBaseUrl()).to.equal('http://localhost:6200');
   });
 });

@@ -190,3 +190,26 @@ biohub-platform-queue:
     limits:
       cpu: 200m
       memory: 512Mi
+
+# Values passed to biohub-platform-martin subchart
+biohub-platform-martin:
+  environment:
+    licensePlate: "a0ec71"
+    name: test
+    id: deploy
+    ts: ""
+  app:
+    database:
+      useCrunchy: true
+      host: biohub-platform-db-test-primary
+      martinSecretName: biohub-platform-db-test-pguser-martin
+      dbNameSecretName: biohub-platform-db-test-pguser-biohub-platform-db-test
+  # Openshift Resources
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
