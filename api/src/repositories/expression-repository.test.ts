@@ -24,7 +24,22 @@ describe('ExpressionRepository', () => {
       const result = await repository.insertExpressionAnchor('AND', 'hash-1');
       expect(result).to.eql({ ...expressionRow, inserted: true });
       expect(knexStub.callCount).to.equal(1);
-      expect(knexStub.firstCall.args[0].toString()).to.not.include('ON CONFLICT');
+      // The conflict target is what turns a concurrent duplicate write into a no-op instead of an
+      // aborted transaction.
+      expect(knexStub.firstCall.args[0].toString().toLowerCase()).to.include('on conflict');
+    });
+
+    it('adopts the concurrent winner row when the insert conflicts', async () => {
+      const knexStub = sinon.stub();
+      // First call: the conflicting insert returns no rows. Second call: the re-read by hash.
+      knexStub.onFirstCall().resolves(mockQueryResult([], 0));
+      knexStub.onSecondCall().resolves(mockQueryResult([expressionRow], 1));
+      const repository = new ExpressionRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.insertExpressionAnchor('AND', 'hash-1');
+
+      expect(result).to.eql({ ...expressionRow, inserted: false });
+      expect(knexStub.callCount).to.equal(2);
     });
   });
 

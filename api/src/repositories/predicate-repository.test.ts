@@ -32,7 +32,27 @@ describe('PredicateRepository', () => {
 
       expect(result).to.eql({ ...predicateRow, inserted: true });
       expect(knexStub.callCount).to.equal(1);
-      expect(knexStub.firstCall.args[0].toString()).to.not.include('ON CONFLICT');
+      // The conflict target is what turns a concurrent duplicate write into a no-op instead of an
+      // aborted transaction.
+      expect(knexStub.firstCall.args[0].toString().toLowerCase()).to.include('on conflict');
+    });
+
+    it('adopts the concurrent winner row when the insert conflicts', async () => {
+      const knexStub = sinon.stub();
+      // First call: the conflicting insert returns no rows. Second call: the re-read by hash.
+      knexStub.onFirstCall().resolves(mockQueryResult([], 0));
+      knexStub.onSecondCall().resolves(mockQueryResult([predicateRow], 1));
+      const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.insertPredicateAnchor({
+        feature_property_id: 11,
+        feature_type_property_id: 22,
+        feature_property_type_id: 3,
+        predicate_hash: 'hash-1'
+      });
+
+      expect(result).to.eql({ ...predicateRow, inserted: false });
+      expect(knexStub.callCount).to.equal(2);
     });
   });
 

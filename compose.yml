@@ -113,6 +113,8 @@ services:
       - MARTIN_EXTERNAL_URL=${MARTIN_EXTERNAL_URL}
       - MARTIN_MINT_RATE_LIMIT=${MARTIN_MINT_RATE_LIMIT}
       - MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES=${MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES}
+      - MARTIN_CONTEXT_TTL_SECONDS=${MARTIN_CONTEXT_TTL_SECONDS}
+      - MARTIN_CONTEXT_MAX_LIVE=${MARTIN_CONTEXT_MAX_LIVE}
       # Clamav
       - CLAMAV_PORT=${CLAMAV_PORT}
       - CLAMAV_HOST=${CLAMAV_HOST}
@@ -483,6 +485,19 @@ configs:
         # CRITICAL: disable automatic discovery. Left enabled, Martin publishes every table and
         # function its database role can read. Only sources explicitly listed here are served.
         auto_publish: false
+
+        functions:
+          # Authorized search-result tiles. Resolves the opaque context id the gateway forwards and
+          # applies the feature security predicate at serve time.
+          # See database/src/procedures/03_martin_search.ts
+          search:
+            schema: biohub
+            function: martin_search
+            minzoom: 0
+            # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+            maxzoom: 15
+            # [west, south, east, north] - British Columbia
+            bounds: [-139.06, 48.30, -114.03, 60.00]
 
 networks:
   biohubbc-network:

@@ -128,8 +128,10 @@ the Martin Gateway (SIMSBIOHUB-1102) verifies them and proxies the request to Ma
 - The gateway is exposed by a **path based `Route` on the app's own hostname** (`/martin`), so tile
   requests are same origin with the frontend and need no CORS handling.
 - Automatic publication of PostgreSQL tables and functions is disabled. Only explicitly configured
-  function sources are served — none in this ticket; the search-result source arrives in
-  SIMSBIOHUB-1103.
+  function sources are served: `search` (authorized search-result tiles).
+- Data visibility is enforced in SQL when a tile is generated, not by the gateway. A tile token
+  carries only an opaque context id; the access class, security scopes and matching feature ids stay
+  server-side, so a client cannot widen its own access by editing a token.
 - Connects as a dedicated least-privilege `martin` role with no table privileges.
 - Tile tokens are RS256. The api mounts the **private** signing key (`martin-token-private`); the
   gateway mounts only the **public** verification keys (`martin-token-public`). Both secrets are created

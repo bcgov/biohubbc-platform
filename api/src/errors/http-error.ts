@@ -8,7 +8,8 @@ export enum HTTPErrorType {
   FORBIDDEN = 'Forbidden',
   NOT_FOUND = 'Not Found',
   CONFLICT = 'Conflict',
-  INTERNAL_SERVER_ERROR = 'Internal Server Error'
+  INTERNAL_SERVER_ERROR = 'Internal Server Error',
+  SERVICE_UNAVAILABLE = 'Service Unavailable'
 }
 
 export enum HTTPCustomErrorType {
@@ -144,6 +145,33 @@ export class HTTP500 extends HTTPError {
 
   static fromApiError(apiError: ApiError) {
     return new HTTP500(apiError.message, apiError.errors, apiError.stack);
+  }
+}
+
+/**
+ * HTTP `503 Service Unavailable` error.
+ *
+ * @export
+ * @class HTTP503
+ * @extends {HTTPError}
+ */
+export class HTTP503 extends HTTPError {
+  static readonly brand: symbol = Symbol.for('@biohub/error/HTTP503');
+
+  constructor(message: string, errors?: (string | object)[], stack?: string) {
+    super(HTTPErrorType.SERVICE_UNAVAILABLE, 503, message, errors, stack);
+  }
+
+  /**
+   * Wrap an `ApiError` as a 503, preserving its message, errors and stack.
+   *
+   * @static
+   * @param {ApiError} apiError - The error to wrap.
+   * @return {*}  {HTTP503}
+   * @memberof HTTP503
+   */
+  static fromApiError(apiError: ApiError) {
+    return new HTTP503(apiError.message, apiError.errors, apiError.stack);
   }
 }
 

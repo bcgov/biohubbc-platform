@@ -91,11 +91,8 @@ export class ExpressionTreeService extends DBService {
    * the semantic validator resolve property metadata and build typed internal
    * predicates, then the write path hashes and persists that normalized tree.
    *
-   * Flow:
-   * 1. Validate metadata and normalize predicate values.
-   * 2. Compute deterministic hashes for all nodes in the tree.
-   * 3. Load existing expression/predicate ids by those hashes in bulk.
-   * 4. Resolve recursively, inserting only missing anchors/clauses.
+   * Validation and the write are separate steps, so a caller holding an already-normalized tree can
+   * enter at `writeNormalizedExpressionTree` instead and validate only once.
    *
    * @param {ExpressionTree} tree - Root expression tree payload to persist.
    * @return {Promise<{ expression_id: string }>} Resolved root expression id.
@@ -103,6 +100,28 @@ export class ExpressionTreeService extends DBService {
    */
   async writeExpressionTree(tree: ExpressionTree): Promise<{ expression_id: string }> {
     const normalizedTree = await this.semanticValidator.validateExpressionTree(tree);
+    return this.writeNormalizedExpressionTree(normalizedTree);
+  }
+
+  /**
+   * Persist an already-validated expression tree and return the resolved root expression id.
+   *
+   * The write path proper, without the validation step. A caller that has already normalized the
+   * tree for its own use enters here rather than through `writeExpressionTree`, which would resolve
+   * the same property metadata a second time.
+   *
+   * Flow:
+   * 1. Compute deterministic hashes for all nodes in the tree.
+   * 2. Load existing expression/predicate ids by those hashes in bulk.
+   * 3. Resolve recursively, inserting only missing anchors/clauses.
+   *
+   * @param {NormalizedExpressionTreeExpression} normalizedTree - Validated root expression tree.
+   * @return {Promise<{ expression_id: string }>} Resolved root expression id.
+   * @memberof ExpressionTreeService
+   */
+  async writeNormalizedExpressionTree(
+    normalizedTree: NormalizedExpressionTreeExpression
+  ): Promise<{ expression_id: string }> {
     const hashedTree = this.buildHashedTreeFromExpression(normalizedTree);
     const { predicateIdsByHash, expressionIdsByHash } = await this.loadExistingIdsByHash(hashedTree);
     const expressionId = await this.resolveExpressionNode(hashedTree, predicateIdsByHash, expressionIdsByHash);

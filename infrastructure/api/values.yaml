@@ -60,6 +60,9 @@ app:
     keyId: "2026-07"
     audience: biohub-tiles
     issuer: biohub-api
+    # Tile token lifetime, seconds. Must not exceed contextTtlSeconds below: a token outliving its
+    # context would still verify against tiles the database has stopped generating. The API
+    # validates the pair on startup.
     tokenTtlSeconds: 900
     # Relative: the Martin Gateway is served on /martin of this environment's app hostname, so tiles
     # are same origin and no per-environment host has to be threaded through.
@@ -68,6 +71,14 @@ app:
     # networks NAT heavily.
     mintRateLimit: 60
     mintRateLimitWindowMinutes: 5
+    # Context lifetime, seconds. Enforced by the tile function on every tile and never extended by
+    # reuse. Must be at least tokenTtlSeconds, since a session stops re-minting once it holds a
+    # token.
+    contextTtlSeconds: 1800
+    # Maximum live (unexpired) contexts. Bounds the database growth an anonymous caller can force by
+    # varying the search per mint. At the cap a new context evicts the one closest to expiry rather
+    # than being refused, so no caller can lock the others out of new searches.
+    contextMaxLive: 200
 
   keycloak:
     host: "" # Keycloak login url
