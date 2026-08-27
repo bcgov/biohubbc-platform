@@ -20,10 +20,11 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { IRelatedSubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { parseRouteId } from 'utils/routes';
 
 interface IPortalFeatureRelatedSectionProps {
-  submissionId?: string;
+  submissionId: number;
   relatedFeatures: IRelatedSubmissionFeature[];
 }
 
@@ -51,10 +52,6 @@ const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalF
   ];
 
   const handleRowClick = (params: GridRowParams<IRelatedSubmissionFeature>) => {
-    if (!submissionId) {
-      return;
-    }
-
     navigate(`/portal/submission/${submissionId}/feature/${params.row.submission_feature_id}${location.search}`);
   };
 
@@ -82,7 +79,9 @@ const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalF
 export const PortalSubmissionFeaturePage = () => {
   const navigate = useNavigate();
   const api = useApi();
-  const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
+  const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
+  const submissionId = parseRouteId(params.submissionId);
+  const submissionFeatureId = parseRouteId(params.submissionFeatureId);
 
   const featureDataLoader = useDataLoader(
     (id, featureId) => api.features.getSubmissionFeatureById(id, featureId),
@@ -95,7 +94,7 @@ export const PortalSubmissionFeaturePage = () => {
   );
 
   useEffect(() => {
-    if (!submissionId || !submissionFeatureId) {
+    if (submissionId === null || submissionFeatureId === null) {
       return;
     }
 
@@ -107,6 +106,10 @@ export const PortalSubmissionFeaturePage = () => {
     () => featureDataLoader.data ?? { feature: undefined, relatedFeatures: undefined },
     [featureDataLoader.data]
   );
+
+  if (submissionId === null || submissionFeatureId === null) {
+    return <Navigate to="/page-not-found" replace />;
+  }
 
   return (
     <LoadingGuard

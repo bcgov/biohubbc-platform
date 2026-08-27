@@ -12,7 +12,6 @@ describe('PropertyValueLink', () => {
           label="Ursus americanus"
           title="TSN 180543 · Species"
           italic
-          dataAttributes={{ 'data-taxon-id': 180543, 'data-tsn': 180543 }}
         />
       </MemoryRouter>
     );
@@ -20,8 +19,6 @@ describe('PropertyValueLink', () => {
     const link = getByRole('link', { name: 'Ursus americanus' });
     expect(link).toHaveAttribute('href', '/submission/1/taxon/180543');
     expect(link).toHaveAttribute('title', 'TSN 180543 · Species');
-    expect(link).toHaveAttribute('data-taxon-id', '180543');
-    expect(link).toHaveAttribute('data-tsn', '180543');
     expect(link.querySelector('i')).toHaveTextContent('Ursus americanus');
   });
 

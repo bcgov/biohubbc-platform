@@ -11,8 +11,6 @@ export interface PropertyValueLinkProps {
   title?: string;
   /** Renders the label in an `<i>` element (scientific-name style, e.g. genus and species names). */
   italic?: boolean;
-  /** `data-*` attributes exposing the structured identifiers behind the link. */
-  dataAttributes?: Record<`data-${string}`, string | number>;
 }
 
 /**
@@ -24,13 +22,13 @@ export interface PropertyValueLinkProps {
  * @param {PropertyValueLinkProps} props
  * @returns {JSX.Element}
  */
-export const PropertyValueLink = ({ to, label, title, italic = false, dataAttributes }: PropertyValueLinkProps) => {
+export const PropertyValueLink = ({ to, label, title, italic = false }: PropertyValueLinkProps) => {
   const stopPropagation = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     event.stopPropagation();
   }, []);
 
   return (
-    <Link component={RouterLink} to={to} underline="hover" title={title} onClick={stopPropagation} {...dataAttributes}>
+    <Link component={RouterLink} to={to} underline="hover" title={title} onClick={stopPropagation}>
       {italic ? <i>{label}</i> : label}
     </Link>
   );

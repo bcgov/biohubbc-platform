@@ -51,14 +51,15 @@ const mockRelatedFeatures = [
   }
 ];
 
-const renderPage = () =>
+const renderPage = (initialPath = '/portal/submission/1/feature/10') =>
   render(
-    <MemoryRouter initialEntries={['/portal/submission/1/feature/10']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route
           path="/portal/submission/:submissionId/feature/:submissionFeatureId"
           element={<PortalSubmissionFeaturePage />}
         />
+        <Route path="/page-not-found" element={<div>Page Not Found</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -102,7 +103,7 @@ describe('PortalSubmissionFeaturePage', () => {
 
     expect(await findByText('Properties')).toBeVisible();
     await waitFor(() => {
-      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith('1', '10', expect.any(Object));
+      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object));
     });
     expect(await findByText('Wolf')).toBeVisible();
   });
@@ -114,6 +115,13 @@ describe('PortalSubmissionFeaturePage', () => {
       'href',
       '/portal/submission/1/taxon/180543'
     );
+  });
+
+  it('redirects to the not found page when a route param is not a record id', async () => {
+    const { findByText } = renderPage('/portal/submission/abc/feature/10');
+
+    expect(await findByText('Page Not Found')).toBeVisible();
+    expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();
   });
 
   it('uses portal route for related feature links', async () => {

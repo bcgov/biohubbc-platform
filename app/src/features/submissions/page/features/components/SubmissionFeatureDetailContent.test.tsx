@@ -37,7 +37,8 @@ const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   isLoading: false,
   feature: mockFeature,
   relatedFeatures: [],
-  submissionId: '1',
+  submissionId: 1,
+  submissionFeatureId: 10,
   rootBreadcrumbLabel: 'Submissions',
   rootBreadcrumbTo: '/submissions',
   submissionDetailBasePath: '/submission'

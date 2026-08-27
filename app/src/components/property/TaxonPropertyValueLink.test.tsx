@@ -6,7 +6,7 @@ import { TaxonPropertyValueLink } from './TaxonPropertyValueLink';
 const taxon: TaxonPropertyValue = { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' };
 
 interface RenderOptions {
-  submissionId?: string | number;
+  submissionId?: number;
   featureRouteBasePath?: string;
   initialEntry?: string;
 }
@@ -27,12 +27,10 @@ describe('TaxonPropertyValueLink', () => {
 
     const link = getByRole('link', { name: 'Ursus americanus' });
     expect(link).toHaveAttribute('href', '/submission/3/taxon/180543?view=table');
-    expect(link).toHaveAttribute('data-taxon-id', '180543');
-    expect(link).toHaveAttribute('data-tsn', '180543');
   });
 
   it('uses the portal route base when given', () => {
-    const { getByRole } = renderLink(taxon, { submissionId: '3', featureRouteBasePath: '/portal/submission' });
+    const { getByRole } = renderLink(taxon, { submissionId: 3, featureRouteBasePath: '/portal/submission' });
 
     expect(getByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
       'href',

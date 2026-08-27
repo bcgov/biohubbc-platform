@@ -24,9 +24,9 @@ interface SubmissionFeatureDetailContentProps {
   isLoading: boolean;
   feature?: ISubmissionFeature;
   relatedFeatures: IRelatedSubmissionFeature[];
-  submissionId?: string;
+  submissionId: number;
   /** Feature whose indexed properties the Properties section lists. */
-  submissionFeatureId?: string;
+  submissionFeatureId: number;
   rootBreadcrumbLabel: string;
   rootBreadcrumbTo: string;
   submissionDetailBasePath: string;

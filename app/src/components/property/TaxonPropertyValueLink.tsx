@@ -8,7 +8,7 @@ export interface TaxonPropertyValueLinkProps {
   /** Structured taxon value from the indexed-property read model. */
   value: TaxonPropertyValue;
   /** Submission the referencing feature belongs to. */
-  submissionId: string | number;
+  submissionId: number;
   /** Submission route base, e.g. `/submission` or `/portal/submission`. */
   featureRouteBasePath: string;
 }
@@ -34,7 +34,6 @@ export const TaxonPropertyValueLink = ({ value, submissionId, featureRouteBasePa
       label={value.label}
       title={title}
       italic={italic}
-      dataAttributes={{ 'data-taxon-id': value.taxon_id, 'data-tsn': value.tsn }}
     />
   );
 };

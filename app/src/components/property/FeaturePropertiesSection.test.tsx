@@ -14,8 +14,8 @@ const renderSection = (props: Partial<Parameters<typeof FeaturePropertiesSection
   render(
     <MemoryRouter>
       <FeaturePropertiesSection
-        submissionId="1"
-        submissionFeatureId="10"
+        submissionId={1}
+        submissionFeatureId={10}
         featureRouteBasePath="/submission"
         {...props}
       />
@@ -51,8 +51,8 @@ describe('FeaturePropertiesSection', () => {
     expect(await findByText('Properties')).toBeVisible();
     await waitFor(() => {
       expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(
-        '1',
-        '10',
+        1,
+        10,
         expect.objectContaining({ page: 1, limit: 10, sort: 'property', order: 'asc' })
       );
     });
@@ -66,12 +66,5 @@ describe('FeaturePropertiesSection', () => {
       'href',
       '/portal/submission/1/taxon/180543'
     );
-  });
-
-  it('does not request properties without a submission and feature id', async () => {
-    const { findByText } = renderSection({ submissionId: undefined, submissionFeatureId: undefined });
-
-    expect(await findByText('No properties')).toBeVisible();
-    expect(mockGetSubmissionFeatureProperties).not.toHaveBeenCalled();
   });
 });

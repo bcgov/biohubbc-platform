@@ -16,9 +16,9 @@ import { PropertyValueDisplay } from './PropertyValueDisplay';
 
 export interface FeaturePropertiesSectionProps {
   /** Submission the feature belongs to; with `submissionFeatureId`, selects the properties to load. */
-  submissionId?: string;
+  submissionId: number;
   /** Feature whose indexed properties are listed. */
-  submissionFeatureId?: string;
+  submissionFeatureId: number;
   /** Submission route base for reference-value links, e.g. `/submission` or `/portal/submission`. */
   featureRouteBasePath: string;
 }
@@ -71,24 +71,11 @@ export const FeaturePropertiesSection = ({
   );
 
   const propertyGrid = useServerPaginatedDataGrid<IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse>({
-    fetcher: async (search, pagination) => {
-      if (!submissionId || !submissionFeatureId) {
-        return {
-          properties: [],
-          pagination: {
-            total: 0,
-            current_page: 1,
-            last_page: 1,
-            per_page: pagination.limit
-          }
-        };
-      }
-
-      return api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, {
+    fetcher: async (search, pagination) =>
+      api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, {
         search,
         ...pagination
-      });
-    },
+      }),
     extractData: (response) => response.properties,
     extractTotal: (response) => response.pagination.total,
     defaultSort: { field: 'property', sort: 'asc' },

@@ -2,7 +2,8 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { parseRouteId } from 'utils/routes';
 import { SubmissionFeatureDetailContent } from './components/SubmissionFeatureDetailContent';
 
 export const SubmissionFeaturePage = () => {
@@ -10,7 +11,9 @@ export const SubmissionFeaturePage = () => {
   const location = useLocation();
   const biohubApi = useApi();
 
-  const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
+  const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
+  const submissionId = parseRouteId(params.submissionId);
+  const submissionFeatureId = parseRouteId(params.submissionFeatureId);
 
   const featureDataLoader = useDataLoader(
     (submissionId, submissionFeatureId) =>
@@ -23,6 +26,10 @@ export const SubmissionFeaturePage = () => {
     }
   );
   useEffect(() => {
+    if (submissionId === null || submissionFeatureId === null) {
+      return;
+    }
+
     featureDataLoader.refresh(submissionId, submissionFeatureId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
@@ -32,6 +39,10 @@ export const SubmissionFeaturePage = () => {
     [featureDataLoader.data]
   );
   const isLoading = featureDataLoader.isLoading;
+
+  if (submissionId === null || submissionFeatureId === null) {
+    return <Navigate to="/page-not-found" replace />;
+  }
 
   return (
     <SubmissionFeatureDetailContent

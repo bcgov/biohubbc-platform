@@ -8,7 +8,7 @@ export interface PropertyValueDisplayProps {
   /** Raw property value: a scalar, a structured reference value, GeoJSON, or an array of these. */
   value: JsonValue | undefined;
   /** Submission the owning feature belongs to (link context for reference values). */
-  submissionId?: string | number;
+  submissionId: number;
   /** Submission route base, e.g. `/submission` or `/portal/submission`. */
   featureRouteBasePath: string;
 }
@@ -31,12 +31,8 @@ export const PropertyValueDisplay = ({ value, submissionId, featureRouteBasePath
     return <PropertyValueList values={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />;
   }
 
-  // Route params are typed as possibly-undefined, so the link target is only buildable once a submission
-  // is known; the label still renders without one.
   if (isTaxonPropertyValue(value)) {
-    return submissionId === undefined ? (
-      <>{value.label}</>
-    ) : (
+    return (
       <TaxonPropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
     );
   }

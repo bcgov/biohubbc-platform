@@ -40,6 +40,7 @@ const renderPage = (initialPath = '/submission/1/feature/10') =>
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/submission/:submissionId/feature/:submissionFeatureId" element={<SubmissionFeaturePage />} />
+        <Route path="/page-not-found" element={<div>Page Not Found</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -80,7 +81,7 @@ describe('SubmissionFeaturePage', () => {
     expect(await findByText('Properties')).toBeVisible();
     expect(await findByText('Wolf')).toBeVisible();
     expect(await findByText('5')).toBeVisible();
-    expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith('1', '10', expect.any(Object));
+    expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object));
   });
 
   it('links taxon property values to the taxon page under the submission', async () => {
@@ -90,6 +91,13 @@ describe('SubmissionFeaturePage', () => {
       'href',
       '/submission/1/taxon/180543?view=table'
     );
+  });
+
+  it('redirects to the not found page when a route param is not a record id', async () => {
+    const { findByText } = renderPage('/submission/abc/feature/10');
+
+    expect(await findByText('Page Not Found')).toBeVisible();
+    expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();
   });
 
   it('renders Secured chip when feature is secured', async () => {

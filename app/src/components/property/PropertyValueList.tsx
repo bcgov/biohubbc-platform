@@ -7,7 +7,7 @@ export interface PropertyValueListProps {
   /** Values of a multi-value property. */
   values: JsonValue[];
   /** Submission the owning feature belongs to (link context for reference values). */
-  submissionId?: string | number;
+  submissionId: number;
   /** Submission route base, e.g. `/submission` or `/portal/submission`. */
   featureRouteBasePath: string;
 }

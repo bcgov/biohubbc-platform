@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSubmissionTaxonPath, getSearchFeatureTypeRouteConfig } from './routes';
+import { buildSubmissionTaxonPath, getSearchFeatureTypeRouteConfig, parseRouteId } from './routes';
 
 describe('getSearchFeatureTypeRouteConfig', () => {
   const featureTypes = [
@@ -22,8 +22,25 @@ describe('getSearchFeatureTypeRouteConfig', () => {
 describe('buildSubmissionTaxonPath', () => {
   it('builds the taxon path under the given submission route base', () => {
     expect(buildSubmissionTaxonPath('/submission', 18, 180543)).toBe('/submission/18/taxon/180543');
-    expect(buildSubmissionTaxonPath('/portal/submission', '18', 180543, '?view=table')).toBe(
+    expect(buildSubmissionTaxonPath('/portal/submission', 18, 180543, '?view=table')).toBe(
       '/portal/submission/18/taxon/180543?view=table'
     );
+  });
+});
+
+describe('parseRouteId', () => {
+  it('parses a positive integer route parameter', () => {
+    expect(parseRouteId('18')).toBe(18);
+    expect(parseRouteId('1')).toBe(1);
+  });
+
+  it('returns null for parameters that do not identify a record', () => {
+    expect(parseRouteId(undefined)).toBeNull();
+    expect(parseRouteId('')).toBeNull();
+    expect(parseRouteId('abc')).toBeNull();
+    expect(parseRouteId('0')).toBeNull();
+    expect(parseRouteId('-1')).toBeNull();
+    expect(parseRouteId('1.5')).toBeNull();
+    expect(parseRouteId('12abc')).toBeNull();
   });
 });
