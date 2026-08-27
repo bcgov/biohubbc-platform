@@ -1,8 +1,9 @@
 import type { Feature, Polygon } from 'geojson';
+import { createRef } from 'react';
 import type { GeoJSONStoreFeatures } from 'terra-draw';
 import { act, cleanup, fireEvent, render } from 'test-helpers/test-utils';
 import { SlippyMap } from './SlippyMap';
-import type { ISlippyMapProps } from './SlippyMap.interface';
+import type { ISlippyMapLayer, ISlippyMapProps, SlippyMapHandle } from './SlippyMap.interface';
 import { SLIPPY_MAP_DEFAULT_STYLE } from './SlippyMap.utils';
 
 const mocks = vi.hoisted(() => {
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => {
 
     resize = vi.fn();
     remove = vi.fn();
+    easeTo = vi.fn();
+    getZoom = vi.fn(() => 7);
 
     // Sources/layers currently on the map, so tests can assert what was applied and in what order.
     sources = new Map<string, unknown>();
@@ -76,6 +79,15 @@ const mocks = vi.hoisted(() => {
     getStyle = vi.fn(() => ({ layers: this.layerOrder.map((id) => this.layers.get(id)) }));
 
     queryRenderedFeatures = vi.fn(() => this.renderedFeatures);
+
+    // Stand-in projection: a fixed pan offset applied to the coordinates, enough to assert that a popup is placed
+    // from its geography and re-placed when the camera moves.
+    panOffset = 0;
+
+    project = vi.fn((lngLat: [number, number]) => ({
+      x: lngLat[0] + this.panOffset,
+      y: lngLat[1] + this.panOffset
+    }));
 
     getCanvas = vi.fn(() => this.canvas);
 
@@ -844,12 +856,19 @@ describe('SlippyMap', () => {
      */
     const interactiveLayers = (onClick: () => void) => [{ ...layers[0], onClick }];
 
-    it('routes the clicked feature to the handler of the layer that rendered it', () => {
+    it('routes the clicked feature to the handler of the layer that rendered it, with screen and geographic coordinates', () => {
       const onClick = vi.fn();
       const { map } = renderSlippyMap({ tileSources, layers: interactiveLayers(onClick) });
       loadMap(map);
 
-      const feature = { layer: { id: 'search-points' }, properties: { feature_count: 7 } };
+      // The payload is whatever the map's hit test returns: id, properties, and source/layer information.
+      const feature = {
+        id: 7,
+        source: 'search-results',
+        sourceLayer: 'features',
+        layer: { id: 'search-points' },
+        properties: { location_count: 7 }
+      };
       map.renderedFeatures = [feature];
 
       act(() => {
@@ -858,12 +877,16 @@ describe('SlippyMap', () => {
 
       // Only layers that declared a handler take part in hit testing.
       expect(map.queryRenderedFeatures).toHaveBeenCalledWith({ x: 10, y: 10 }, { layers: ['search-points'] });
-      expect(onClick).toHaveBeenCalledWith(feature);
+      expect(onClick).toHaveBeenCalledWith(feature, {
+        point: { x: 10, y: 10 },
+        lngLat: { lng: -123, lat: 48 }
+      });
     });
 
-    it('ignores clicks that hit no feature', () => {
+    it('reports an empty-map click instead of the layer handler when nothing interactive is hit', () => {
       const onClick = vi.fn();
-      const { map } = renderSlippyMap({ tileSources, layers: interactiveLayers(onClick) });
+      const onEmptyMapClick = vi.fn();
+      const { map } = renderSlippyMap({ tileSources, layers: interactiveLayers(onClick), onEmptyMapClick });
       loadMap(map);
 
       map.renderedFeatures = [];
@@ -873,11 +896,13 @@ describe('SlippyMap', () => {
       });
 
       expect(onClick).not.toHaveBeenCalled();
+      expect(onEmptyMapClick).toHaveBeenCalledWith({ point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
     });
 
-    it('ignores clicks on a display-only layer', () => {
+    it('reports an empty-map click when the only layers are display-only', () => {
       // A layer with no handler is not hit tested at all, so a click over it falls through.
-      const { map } = renderSlippyMap({ tileSources, layers });
+      const onEmptyMapClick = vi.fn();
+      const { map } = renderSlippyMap({ tileSources, layers, onEmptyMapClick });
       loadMap(map);
 
       map.renderedFeatures = [{ layer: { id: 'search-points' }, properties: {} }];
@@ -887,6 +912,7 @@ describe('SlippyMap', () => {
       });
 
       expect(map.queryRenderedFeatures).not.toHaveBeenCalled();
+      expect(onEmptyMapClick).toHaveBeenCalledTimes(1);
     });
 
     it('gives the topmost rendered feature to its own layer where layers overlap', () => {
@@ -917,8 +943,21 @@ describe('SlippyMap', () => {
         map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: -123, lat: 48 } });
       });
 
-      expect(onClickUpper).toHaveBeenCalledWith(topmost);
+      expect(onClickUpper).toHaveBeenCalledWith(topmost, expect.anything());
       expect(onClickLower).not.toHaveBeenCalled();
+    });
+
+    it('exposes a narrow camera handle that delegates to the map', () => {
+      const handleRef = createRef<SlippyMapHandle>();
+      render(<SlippyMap ref={handleRef} tileSources={tileSources} layers={layers} />);
+      const map = mocks.MockMaplibreMap.instances[0];
+      loadMap(map);
+
+      expect(handleRef.current?.getZoom()).toBe(7);
+
+      handleRef.current?.easeTo({ center: [-124, 54], zoom: 9 });
+
+      expect(map.easeTo).toHaveBeenCalledWith({ center: [-124, 54], zoom: 9 });
     });
 
     it('shows a pointer cursor only while over an interactive feature', () => {
@@ -958,6 +997,172 @@ describe('SlippyMap', () => {
 
       // The hover handler must not clobber it with 'pointer' or reset it to ''.
       expect(map.canvas.style.cursor).toBe('crosshair');
+    });
+  });
+
+  describe('layer popups', () => {
+    const tileSources = {
+      'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+    };
+
+    const clusterFeature = { layer: { id: 'search-clusters' }, properties: { location_count: 12 } };
+
+    /**
+     * Builds a cluster layer whose popup renders its feature count, plus a display-only layer beneath it.
+     */
+    const popupLayers = (popupRender?: ISlippyMapLayer['popupRender']) => [
+      {
+        specification: {
+          id: 'search-points',
+          type: 'circle' as const,
+          source: 'search-results',
+          'source-layer': 'features'
+        }
+      },
+      {
+        specification: {
+          id: 'search-clusters',
+          type: 'circle' as const,
+          source: 'search-results',
+          'source-layer': 'clusters'
+        },
+        popupRender:
+          popupRender ??
+          ((context) => (
+            <button onClick={context.close}>cluster of {context.feature.properties?.location_count}</button>
+          ))
+      }
+    ];
+
+    /** Click the cluster layer, as the map does when its hit test lands there. */
+    const clickCluster = (map: any, feature: unknown = clusterFeature) => {
+      map.renderedFeatures = [feature];
+      act(() => {
+        map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: 40, lat: 60 } });
+      });
+    };
+
+    it("opens the clicked layer's popup, anchored to where the click landed", () => {
+      const { map, getByTestId, getByText } = renderSlippyMap({ tileSources, layers: popupLayers() });
+      loadMap(map);
+
+      clickCluster(map);
+
+      expect(getByText('cluster of 12')).toBeInTheDocument();
+      // Positioned from the click's geography, not its pixel: that is what lets it survive a camera move.
+      expect(map.project).toHaveBeenCalledWith([40, 60]);
+      expect(getByTestId('slippy-map-popup')).toHaveStyle({ transform: 'translate(40px, 60px)' });
+    });
+
+    it('keeps the popup over its geography as the camera moves', () => {
+      const { map, getByTestId } = renderSlippyMap({ tileSources, layers: popupLayers() });
+      loadMap(map);
+
+      clickCluster(map);
+
+      map.panOffset = 100;
+      act(() => {
+        map.fire('move', {});
+      });
+
+      // Re-projected rather than dismissed: the popup tracks the geometry it describes.
+      expect(getByTestId('slippy-map-popup')).toHaveStyle({ transform: 'translate(140px, 160px)' });
+    });
+
+    it('shows no popup when the layer declines to render one', () => {
+      const { map, queryByTestId } = renderSlippyMap({ tileSources, layers: popupLayers(() => null) });
+      loadMap(map);
+
+      clickCluster(map);
+
+      expect(queryByTestId('slippy-map-popup')).not.toBeInTheDocument();
+    });
+
+    it('replaces the open popup rather than stacking a second one', () => {
+      const { map, getAllByTestId, getByText } = renderSlippyMap({ tileSources, layers: popupLayers() });
+      loadMap(map);
+
+      clickCluster(map);
+      clickCluster(map, { layer: { id: 'search-clusters' }, properties: { location_count: 34 } });
+
+      expect(getAllByTestId('slippy-map-popup')).toHaveLength(1);
+      expect(getByText('cluster of 34')).toBeInTheDocument();
+    });
+
+    it.each([
+      [
+        'an empty-map click',
+        (map: any) => {
+          map.renderedFeatures = [];
+          act(() => {
+            map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: 0, lat: 0 } });
+          });
+        }
+      ],
+      [
+        'a click on a layer with no popup',
+        (map: any) => {
+          map.renderedFeatures = [{ layer: { id: 'search-points' }, properties: {} }];
+          act(() => {
+            map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: 0, lat: 0 } });
+          });
+        }
+      ],
+      [
+        'Escape',
+        () =>
+          act(() => {
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+          })
+      ],
+      ['the popup closing itself', (_map: any, view: any) => act(() => view.getByRole('button').click())]
+    ])('dismisses the popup on %s', (_label, dismiss) => {
+      const view = renderSlippyMap({ tileSources, layers: popupLayers() });
+      loadMap(view.map);
+
+      clickCluster(view.map);
+      expect(view.getByTestId('slippy-map-popup')).toBeInTheDocument();
+
+      dismiss(view.map, view);
+
+      expect(view.queryByTestId('slippy-map-popup')).not.toBeInTheDocument();
+    });
+
+    it('dismisses the popup when the map content is replaced', () => {
+      // A new tile source means the features it describes are about to be re-requested; what it points at may not
+      // come back.
+      const { map, rerender, queryByTestId, getByTestId } = renderSlippyMap({ tileSources, layers: popupLayers() });
+      loadMap(map);
+
+      clickCluster(map);
+      expect(getByTestId('slippy-map-popup')).toBeInTheDocument();
+
+      act(() => {
+        rerender(
+          <SlippyMap
+            tileSources={{
+              'search-results': { type: 'vector', tiles: ['https://example.test/tiles/{z}/{x}/{y}?ctx=next'] }
+            }}
+            layers={popupLayers()}
+          />
+        );
+      });
+
+      expect(queryByTestId('slippy-map-popup')).not.toBeInTheDocument();
+    });
+
+    it('takes part in hit testing on the strength of its popup alone', () => {
+      // A layer declaring only `popupRender` is interactive: it is hit tested, and shows a pointer cursor.
+      const { map } = renderSlippyMap({ tileSources, layers: popupLayers() });
+      loadMap(map);
+
+      map.renderedFeatures = [clusterFeature];
+      act(() => {
+        map.fire('mousemove', { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } });
+      });
+
+      expect(map.queryRenderedFeatures).toHaveBeenCalledWith({ x: 1, y: 1 }, { layers: ['search-clusters'] });
+      expect(map.canvas.style.cursor).toBe('pointer');
     });
   });
 

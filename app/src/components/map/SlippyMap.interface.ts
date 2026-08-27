@@ -1,5 +1,6 @@
 import type { SxProps, Theme } from '@mui/material/styles';
 import type { Feature } from 'geojson';
+import type { ReactNode, Ref } from 'react';
 import type {
   LayerSpecification,
   MapGeoJSONFeature,
@@ -15,10 +16,54 @@ import type {
 export type SlippyMapDrawMode = 'point' | 'linestring' | 'polygon';
 
 /**
+ * Where a map click landed: `point` in container-relative screen pixels (suitable for anchoring an overlay inside
+ * the map container), `lngLat` in geographic coordinates.
+ */
+export interface MapClickPosition {
+  point: { x: number; y: number };
+  lngLat: { lng: number; lat: number };
+}
+
+/**
+ * Imperative camera handle exposed through the component ref. Deliberately narrow: the map instance itself stays
+ * inside the component.
+ */
+export interface SlippyMapHandle {
+  /**
+   * Smoothly move the camera. `zoom` is absolute and left unchanged when omitted.
+   */
+  easeTo: (options: { center: [number, number]; zoom?: number }) => void;
+  /**
+   * Current zoom level, or undefined before the map exists.
+   */
+  getZoom: () => number | undefined;
+}
+
+/**
+ * What a layer's `popupRender` is given: the clicked feature, where its popup is anchored, and the means to close it
+ * or move the camera. Everything a popup needs, so a consumer never needs the map itself to render one.
+ */
+export interface ISlippyMapPopupContext extends SlippyMapHandle {
+  /**
+   * The clicked feature, carrying its id, properties, source and layer information.
+   */
+  feature: MapGeoJSONFeature;
+  /**
+   * Where the popup is anchored, geographically. The map keeps the popup over this position as the camera moves.
+   */
+  lngLat: MapClickPosition['lngLat'];
+  /**
+   * Dismiss the popup.
+   */
+  close: () => void;
+}
+
+/**
  * A layer to render, together with how it responds to a click.
  *
  * Styling and behaviour travel together so a layer cannot be made interactive in one prop and styled in another. A
- * layer with no `onClick` is display-only: it takes no part in hit testing and shows no pointer cursor.
+ * layer declaring neither `onClick` nor `popupRender` is display-only: it takes no part in hit testing and shows no
+ * pointer cursor.
  */
 export interface ISlippyMapLayer {
   /**
@@ -27,8 +72,18 @@ export interface ISlippyMapLayer {
   specification: LayerSpecification;
   /**
    * Fired when a rendered feature in this layer is clicked. Where layers overlap, the topmost rendered feature wins.
+   *
+   * Receives the clicked position as well, so an overlay can be anchored to it.
    */
-  onClick?: (feature: MapGeoJSONFeature) => void;
+  onClick?: (feature: MapGeoJSONFeature, position: MapClickPosition) => void;
+  /**
+   * Renders the popup for a clicked feature in this layer.
+   *
+   * The map owns everything about the popup except its content: it is anchored to the clicked geography and tracks it
+   * as the camera moves, and it is dismissed by an empty-map click, `Escape`, a click on another feature, or `close`.
+   * Return null to show no popup for this feature, which is how a consumer rejects one it cannot describe.
+   */
+  popupRender?: (context: ISlippyMapPopupContext) => ReactNode;
 }
 
 /**
@@ -54,6 +109,10 @@ export interface ISlippyMapDrawControls {
 }
 
 export interface ISlippyMapProps {
+  /**
+   * Optional ref receiving the imperative camera handle.
+   */
+  ref?: Ref<SlippyMapHandle>;
   /**
    * Optional id applied to the map container element.
    */
@@ -122,6 +181,11 @@ export interface ISlippyMapProps {
    * short-lived credential without rebuilding the map.
    */
   transformRequest?: RequestTransformFunction;
+  /**
+   * Fired when the map is clicked and no interactive feature is under the cursor, so a consumer can dismiss
+   * anything anchored to a previous selection.
+   */
+  onEmptyMapClick?: (position: MapClickPosition) => void;
   /**
    * Fired once the map style has loaded and any sources/layers have been applied.
    */

@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   slippyMapProps: [] as Record<string, any>[],
   // Counts MOUNTS, not renders: a keyed remount is how the container forces tiles to be re-requested,
   // so the recovery tests assert on when a remount happens, which render counts cannot show.
-  slippyMapMounts: { count: 0 }
+  slippyMapMounts: { count: 0 },
+  easeTo: vi.fn(),
+  getZoom: vi.fn(() => 7)
 }));
 
 vi.mock('hooks/useApi', () => ({
@@ -25,17 +27,34 @@ vi.mock('hooks/useContext', () => ({
   })
 }));
 
-// SlippyMap is exercised by its own suite; here we only care what the search page hands it.
+// SlippyMap is exercised by its own suite; here we only care what the search page hands it. The stub stands in for
+// the real component's popup ownership: it renders whatever the clicked layer's `popupRender` returns and supplies
+// the same camera helpers, so the container's popper content and its zoom-in action can be asserted.
 vi.mock('components/map/SlippyMap', async () => {
-  const { useEffect } = await import('react');
+  const { useEffect, useState } = await import('react');
 
   return {
     SlippyMap: (props: Record<string, any>) => {
-      mocks.slippyMapProps.push(props);
+      const [popup, setPopup] = useState<{ layerId: string; feature: any } | null>(null);
+
+      mocks.slippyMapProps.push({ ...props, openPopup: setPopup, closePopup: () => setPopup(null) });
       useEffect(() => {
         mocks.slippyMapMounts.count += 1;
       }, []);
-      return <div data-testid="slippy-map-stub" />;
+
+      const layer = popup ? props.layers?.find((entry: any) => entry.specification.id === popup.layerId) : undefined;
+
+      return (
+        <div data-testid="slippy-map-stub">
+          {layer?.popupRender?.({
+            feature: popup?.feature,
+            lngLat: { lng: -124, lat: 54 },
+            close: () => setPopup(null),
+            easeTo: mocks.easeTo,
+            getZoom: mocks.getZoom
+          })}
+        </div>
+      );
     }
   };
 });
@@ -272,6 +291,113 @@ describe('SearchResultMapContainer', () => {
 
       // The token it was holding may have expired while hidden, so coming back rotates it.
       expect(mocks.createMartinSession.mock.calls.length).toBe(mintsWhileHidden + 1);
+    });
+  });
+
+  describe('cluster interaction', () => {
+    /** A decoded tile cluster, as the map's hit test returns it. */
+    const tileCluster = (properties: Record<string, unknown> = {}) => ({
+      source: 'search-results',
+      sourceLayer: 'clusters',
+      layer: { id: 'search-clusters' },
+      properties: { location_count: 482391, ...properties }
+    });
+
+    const renderReadyMap = async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+      renderContainer();
+      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+    };
+
+    /** The popup renderer the container declared on a layer, or undefined where the layer is display-only. */
+    const layerPopupRender = (layerId: string) =>
+      latestMapProps().layers.find((layer: { specification: { id: string } }) => layer.specification.id === layerId)
+        ?.popupRender;
+
+    /** Click a cluster, as the map does when its hit test lands on the cluster layer. */
+    const clickCluster = (cluster: Record<string, unknown>) =>
+      act(() => latestMapProps().openPopup({ layerId: 'search-clusters', feature: cluster }));
+
+    it('opens the cluster popper with the represented location count and a Zoom in action', async () => {
+      await renderReadyMap();
+      const mintCallsBefore = mocks.createMartinSession.mock.calls.length;
+
+      clickCluster(tileCluster());
+
+      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('482,391 locations');
+      expect(screen.getByRole('button', { name: 'Zoom in' })).toHaveClass('MuiButton-contained');
+      // Selecting a cluster requests nothing: everything shown comes from the decoded tile.
+      expect(mocks.createMartinSession.mock.calls.length).toBe(mintCallsBefore);
+    });
+
+    it('zooms into the selected cluster by the configured increment and closes the popper', async () => {
+      await renderReadyMap();
+      mocks.getZoom.mockReturnValue(7);
+
+      clickCluster(tileCluster());
+      act(() => screen.getByRole('button', { name: 'Zoom in' }).click());
+
+      expect(mocks.easeTo).toHaveBeenCalledWith({ center: [-124, 54], zoom: 9 });
+      expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
+    });
+
+    it('never zooms past the configured maximum', async () => {
+      await renderReadyMap();
+      mocks.getZoom.mockReturnValue(14);
+
+      clickCluster(tileCluster());
+      act(() => screen.getByRole('button', { name: 'Zoom in' }).click());
+
+      expect(mocks.easeTo).toHaveBeenCalledWith({ center: [-124, 54], zoom: 15 });
+    });
+
+    it('leaves the raw geometry layers display-only, since they carry nothing to resolve', async () => {
+      await renderReadyMap();
+
+      // Feature tiles are geometry only, so those layers declare nothing interactive at all: they take no part in
+      // the map's hit test, and there is deliberately no feature popper.
+      for (const layerId of ['search-points', 'search-lines', 'search-fills', 'search-outlines']) {
+        expect(layerPopupRender(layerId)).toBeUndefined();
+        expect(
+          latestMapProps().layers.find((layer: { specification: { id: string } }) => layer.specification.id === layerId)
+            ?.onClick
+        ).toBeUndefined();
+      }
+    });
+
+    it('replaces the active selection instead of stacking poppers', async () => {
+      await renderReadyMap();
+
+      clickCluster(tileCluster({ location_count: 10 }));
+      clickCluster(tileCluster({ location_count: 20 }));
+
+      expect(screen.getAllByTestId('search-result-map-popper')).toHaveLength(1);
+      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('20 locations');
+    });
+
+    it('closes the popper from its explicit dismiss control', async () => {
+      await renderReadyMap();
+
+      clickCluster(tileCluster());
+      act(() => screen.getByTestId('search-result-map-popper-close').click());
+
+      expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
+    });
+
+    it('names a single location in the singular', async () => {
+      await renderReadyMap();
+
+      clickCluster(tileCluster({ location_count: 1 }));
+
+      expect(screen.getByTestId('search-result-map-popper-count')).toHaveTextContent('1 location');
+    });
+
+    it('ignores a cluster missing its count', async () => {
+      await renderReadyMap();
+
+      clickCluster(tileCluster({ location_count: undefined }));
+
+      expect(screen.queryByTestId('search-result-map-popper')).not.toBeInTheDocument();
     });
   });
 

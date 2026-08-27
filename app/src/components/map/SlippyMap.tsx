@@ -1,9 +1,9 @@
 import Box from '@mui/material/Box';
 import type { Feature } from 'geojson';
 import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
-import { Map as MapLibreMap, type MapMouseEvent } from 'maplibre-gl';
+import { Map as MapLibreMap, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import {
   TerraDraw,
   TerraDrawLineStringMode,
@@ -13,7 +13,7 @@ import {
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { SlippyMapDrawToolbar } from './components/SlippyMapDrawToolbar';
-import type { ISlippyMapLayer, ISlippyMapProps, SlippyMapDrawMode } from './SlippyMap.interface';
+import type { ISlippyMapLayer, ISlippyMapProps, MapClickPosition, SlippyMapDrawMode } from './SlippyMap.interface';
 import {
   areFeatureSetsEqual,
   extractSnapshotFeatures,
@@ -61,11 +61,15 @@ const TERRA_DRAW_LAYER_PREFIX = 'td';
  *   onDrawDelete={(remainingFeatures) => setFeatures(remainingFeatures)}
  * />
  *
+ * An optional ref exposes a deliberately narrow imperative camera handle (`SlippyMapHandle`); the map instance
+ * itself is never handed out.
+ *
  * @param {ISlippyMapProps} props
  * @return {JSX.Element}
  */
 export const SlippyMap = (props: ISlippyMapProps) => {
   const {
+    ref,
     id,
     features,
     drawControls,
@@ -76,6 +80,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     tileSources,
     layers,
     transformRequest,
+    onEmptyMapClick,
     onMapLoad,
     onSourceError,
     sx
@@ -93,14 +98,14 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const realFeatureIdsRef = useRef<Set<string | number>>(new Set());
   const selectedFeatureIdRef = useRef<string | number | null>(null);
   // Latest props, so drawing event handlers (bound once on map load) never read stale values
-  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onMapLoad, onSourceError });
+  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onEmptyMapClick, onMapLoad, onSourceError });
   const featuresRef = useRef<Feature[]>(features ?? []);
   const isEditableRef = useRef(isEditable);
   // Source/layer ids this component applied, so replacing them never touches the drawing library's own
   const appliedSourceIdsRef = useRef<string[]>([]);
   const appliedLayerIdsRef = useRef<string[]>([]);
   const mapContentRef = useRef({ tileSources, layers });
-  // Layers that take part in hit testing: those declaring a click handler.
+  // Layers that take part in hit testing: those declaring a click handler or a popup.
   const interactiveLayersRef = useRef<ISlippyMapLayer[]>([]);
   // Read per request rather than captured at mount, so a rotated credential applies without rebuilding the map
   const transformRequestRef = useRef(transformRequest);
@@ -115,13 +120,33 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
   const [activeDrawMode, setActiveDrawMode] = useState<SlippyMapDrawMode | null>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | number | null>(null);
+  // The open popup, if any. The layer is held by id rather than by reference so the content is always rendered by the
+  // consumer's current `popupRender`, and a popup whose layer goes away disappears with it.
+  const [popup, setPopup] = useState<{
+    layerId: string;
+    feature: MapGeoJSONFeature;
+    lngLat: MapClickPosition['lngLat'];
+  } | null>(null);
+  const popupAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  const easeTo = useCallback((options: { center: [number, number]; zoom?: number }) => {
+    mapRef.current?.easeTo(options);
+  }, []);
+
+  const getZoom = useCallback(() => mapRef.current?.getZoom(), []);
+
+  const closePopup = useCallback(() => {
+    setPopup(null);
+  }, []);
+
+  useImperativeHandle(ref, () => ({ easeTo, getZoom }), [easeTo, getZoom]);
 
   useEffect(() => {
-    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onMapLoad, onSourceError };
+    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onEmptyMapClick, onMapLoad, onSourceError };
     featuresRef.current = features ?? [];
     isEditableRef.current = isEditable;
     mapContentRef.current = { tileSources, layers };
-    interactiveLayersRef.current = (layers ?? []).filter((layer) => layer.onClick);
+    interactiveLayersRef.current = (layers ?? []).filter((layer) => layer.onClick || layer.popupRender);
     transformRequestRef.current = transformRequest;
   });
 
@@ -136,6 +161,10 @@ export const SlippyMap = (props: ISlippyMapProps) => {
    */
   const applyMapContent = useCallback((map: MapLibreMap) => {
     const { tileSources: currentSources, layers: currentLayers } = mapContentRef.current;
+
+    // The features an open popup describes are about to be re-requested, so whatever it is anchored to may not come
+    // back.
+    setPopup(null);
 
     for (const layerId of appliedLayerIdsRef.current) {
       if (map.getLayer(layerId)) {
@@ -325,25 +354,40 @@ export const SlippyMap = (props: ISlippyMapProps) => {
      * map and requires a loaded style).
      */
     /**
-     * Routes a click to the handler of the layer that rendered the topmost feature under the cursor.
+     * Routes a click to the handler of the layer that rendered the topmost feature under the cursor, or reports an
+     * empty click when nothing interactive is there.
      */
     const handleMapClick = (event: MapMouseEvent) => {
+      const position = {
+        point: { x: event.point.x, y: event.point.y },
+        lngLat: { lng: event.lngLat.lng, lat: event.lngLat.lat }
+      };
+
       const interactiveLayers = interactiveLayersRef.current.filter((layer) => map.getLayer(layer.specification.id));
 
-      if (!interactiveLayers.length) {
-        return;
-      }
-
       // Topmost first, so where interactive layers overlap the one drawn on top wins.
-      const [topmost] = map.queryRenderedFeatures(event.point, {
-        layers: interactiveLayers.map((layer) => layer.specification.id)
-      });
+      const [topmost] = interactiveLayers.length
+        ? map.queryRenderedFeatures(event.point, {
+            layers: interactiveLayers.map((layer) => layer.specification.id)
+          })
+        : [];
 
       if (!topmost) {
+        setPopup(null);
+        callbacksRef.current.onEmptyMapClick?.(position);
         return;
       }
 
-      interactiveLayers.find((layer) => layer.specification.id === topmost.layer.id)?.onClick?.(topmost);
+      const clickedLayer = interactiveLayers.find((layer) => layer.specification.id === topmost.layer.id);
+
+      clickedLayer?.onClick?.(topmost, position);
+      // A click on a layer without a popup still dismisses the open one, so a stale popup can never outlive the
+      // selection it describes.
+      setPopup(
+        clickedLayer?.popupRender
+          ? { layerId: clickedLayer.specification.id, feature: topmost, lngLat: position.lngLat }
+          : null
+      );
     };
 
     /**
@@ -527,6 +571,58 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     selectedFeatureIdRef.current = null;
   }, [isEditable, drawControls ?? {}]);
 
+  // Keep an open popup over its geography. Anchoring to a projected position rather than to the pixel that was
+  // clicked is what lets the popup survive a pan or a zoom instead of having to be dismissed by one. The position is
+  // written straight to the element: `move` fires every frame of a pan, and re-rendering the popup's content that
+  // often would be wasteful.
+  //
+  // Laid out before the browser paints, because the popup renders at the container's origin until this runs — as a
+  // passive effect it would show there for a frame on every open, then jump to the feature.
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !popup) {
+      return;
+    }
+
+    const positionPopup = () => {
+      const { x, y } = map.project([popup.lngLat.lng, popup.lngLat.lat]);
+
+      if (popupAnchorRef.current) {
+        popupAnchorRef.current.style.transform = `translate(${x}px, ${y}px)`;
+      }
+    };
+
+    positionPopup();
+    map.on('move', positionPopup);
+    map.on('resize', positionPopup);
+
+    return () => {
+      map.off('move', positionPopup);
+      map.off('resize', positionPopup);
+    };
+  }, [popup]);
+
+  // Escape dismisses the popup, matching how transient surfaces behave elsewhere. Bound only while one is open, so
+  // the map never swallows Escape from the page around it.
+  useEffect(() => {
+    if (!popup) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPopup(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [popup]);
+
   /**
    * Activates the provided draw mode, or returns to the select mode when `null`.
    */
@@ -566,12 +662,32 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     callbacksRef.current.onDrawDelete?.(extractSnapshotFeatures(draw.getSnapshot()));
   };
 
+  const popupLayer = popup ? layers?.find((layer) => layer.specification.id === popup.layerId) : undefined;
+  const popupContent = popupLayer?.popupRender?.({
+    feature: popup!.feature,
+    lngLat: popup!.lngLat,
+    close: closePopup,
+    easeTo,
+    getZoom
+  });
+
   return (
     <Box
       id={id}
       data-testid="slippy-map"
       sx={[{ position: 'relative', overflow: 'hidden' }, ...(Array.isArray(sx) ? sx : [sx ?? false])]}>
       <Box ref={containerRef} data-testid="slippy-map-container" sx={{ position: 'absolute', inset: 0 }} />
+      {popupContent && (
+        // Rendered inside the map's own container: the coordinates it is positioned by are the map canvas's, so
+        // anchoring it anywhere else would only work while the two happened to line up.
+        <Box
+          ref={popupAnchorRef}
+          data-testid="slippy-map-popup"
+          sx={{ position: 'absolute', top: 0, left: 0, zIndex: (theme) => theme.zIndex.tooltip }}>
+          {/* Sits just above-right of the anchored point, so the geometry it describes stays visible. */}
+          <Box sx={{ transform: 'translate(12px, -50%)' }}>{popupContent}</Box>
+        </Box>
+      )}
       {isEditable && (
         <SlippyMapDrawToolbar
           drawControls={drawControls ?? {}}

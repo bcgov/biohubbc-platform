@@ -3,9 +3,10 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { SlippyMap } from 'components/map/SlippyMap';
-import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
+import type { ISlippyMapLayer, ISlippyMapPopupContext } from 'components/map/SlippyMap.interface';
 import {
   ALL_OF_BC_BBOX,
+  MAP_CLUSTER_ZOOM_INCREMENT,
   MAP_FIT_MAX_ZOOM,
   MAP_FIT_PADDING,
   MAP_MAX_ZOOM,
@@ -24,6 +25,8 @@ import {
   buildSearchResultsSource,
   SEARCH_RESULTS_SOURCE_ID
 } from './map-layers';
+import { resolveMapSelection } from './map-selection';
+import { SearchResultMapPopper } from './SearchResultMapPopper';
 import { useMartinSession } from './useMartinSession';
 
 export interface ISearchResultMapContainerProps {
@@ -62,8 +65,8 @@ const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
 /**
  * Map view of the search results.
  *
- * Owns everything search-specific: creating the Martin session, attaching the tile token, and replacing the tile
- * source when the search changes. `SlippyMap` receives only generic map configuration.
+ * Owns everything search-specific: creating the Martin session, attaching the tile token, replacing the tile source
+ * when the search changes, and interpreting cluster selections. `SlippyMap` receives only generic map configuration.
  *
  * @param {ISearchResultMapContainerProps} props
  * @return {*}
@@ -96,6 +99,35 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     return sources;
   }, [config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION, session]);
 
+  /**
+   * Describe a clicked cluster. A cluster whose properties do not resolve to a selection gets no popper at all, so a
+   * malformed tile cannot break the page.
+   *
+   * Zooming in centres on the cluster and zooms by the configured increment, never past the maximum: clusters carry
+   * no expansion zoom of their own. Dismissing first keeps the popper from riding along with the camera.
+   */
+  const renderClusterPopup = useCallback((context: ISlippyMapPopupContext) => {
+    const selection = resolveMapSelection(context.feature);
+
+    if (!selection) {
+      return null;
+    }
+
+    const handleZoomIn = () => {
+      const currentZoom = context.getZoom() ?? MAP_MIN_ZOOM;
+
+      context.close();
+      context.easeTo({
+        center: [context.lngLat.lng, context.lngLat.lat],
+        zoom: Math.min(currentZoom + MAP_CLUSTER_ZOOM_INCREMENT, MAP_MAX_ZOOM)
+      });
+    };
+
+    return (
+      <SearchResultMapPopper locationCount={selection.locationCount} onZoomIn={handleZoomIn} onClose={context.close} />
+    );
+  }, []);
+
   const layers = useMemo((): ISlippyMapLayer[] => {
     const mapLayers: ISlippyMapLayer[] = [];
 
@@ -104,11 +136,11 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     }
 
     if (session) {
-      mapLayers.push(...buildSearchResultLayers());
+      mapLayers.push(...buildSearchResultLayers(renderClusterPopup));
     }
 
     return mapLayers;
-  }, [config?.BASEMAP_URL, session]);
+  }, [config?.BASEMAP_URL, session, renderClusterPopup]);
 
   /**
    * Attach the tile token to tile requests only.
