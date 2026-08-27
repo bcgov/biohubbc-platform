@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 import { isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
-import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
+import { SubmissionFeature, SubmissionFeatureRecord } from './submission-repository';
 
 /**
  * Repository class for submission-feature specific queries.
@@ -203,35 +203,5 @@ export class SubmissionFeatureRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Get all related submission features with their type names.
-   *
-   * @param {number} submissionFeatureId
-   * @returns {Promise<RelatedSubmissionFeature[]>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
-    const sqlStatement = SQL`
-      SELECT DISTINCT
-        sf.submission_feature_id,
-        ft.name as feature_type_name,
-        ft.display_name as feature_type_display_name,
-        sf.data
-      FROM submission_feature sf
-      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-      WHERE sf.submission_feature_id IN (
-        SELECT source_feature_id FROM submission_feature_feature
-        WHERE target_feature_id = ${submissionFeatureId}
-        UNION
-        SELECT target_feature_id FROM submission_feature_feature
-        WHERE source_feature_id = ${submissionFeatureId}
-      )
-    `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('sf')};`);
-
-    const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
-    return response.rows;
   }
 }

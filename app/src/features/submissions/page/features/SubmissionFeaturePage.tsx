@@ -34,10 +34,7 @@ export const SubmissionFeaturePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
 
-  const { feature, relatedFeatures } = useMemo(
-    () => featureDataLoader.data ?? { feature: undefined, relatedFeatures: undefined },
-    [featureDataLoader.data]
-  );
+  const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
   const isLoading = featureDataLoader.isLoading;
 
   if (submissionId === null || submissionFeatureId === null) {
@@ -48,7 +45,6 @@ export const SubmissionFeaturePage = () => {
     <SubmissionFeatureDetailContent
       isLoading={isLoading}
       feature={feature}
-      relatedFeatures={relatedFeatures ?? []}
       submissionId={submissionId}
       submissionFeatureId={submissionFeatureId}
       rootBreadcrumbLabel="Search"

@@ -1,5 +1,5 @@
 import { useApi } from 'hooks/useApi';
-import { fireEvent, waitFor } from '@testing-library/react';
+import { waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -8,15 +8,6 @@ import { PortalSubmissionFeaturePage } from './PortalSubmissionFeaturePage';
 vi.mock('../../../../hooks/useApi');
 
 const mockUseApi = useApi as Mock;
-const mockNavigate = vi.fn();
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate
-  };
-});
 
 // The map owns its own data loading and is covered by its own suite; this one is about the page layout.
 vi.mock('features/submissions/page/features/components/map/SubmissionFeatureMap', () => ({
@@ -41,15 +32,6 @@ const mockFeature = {
   data: { species_name: 'Wolf' },
   secured: false
 };
-
-const mockRelatedFeatures = [
-  {
-    submission_feature_id: 20,
-    feature_type_name: 'survey',
-    feature_type_display_name: 'Survey',
-    data: { name: 'Related Survey' }
-  }
-];
 
 const renderPage = (initialPath = '/portal/submission/1/feature/10') =>
   render(
@@ -76,8 +58,7 @@ describe('PortalSubmissionFeaturePage', () => {
     });
 
     mockGetSubmissionFeatureById.mockResolvedValue({
-      feature: mockFeature,
-      relatedFeatures: mockRelatedFeatures
+      feature: mockFeature
     });
 
     mockGetSubmissionFeatureProperties.mockResolvedValue({
@@ -124,30 +105,19 @@ describe('PortalSubmissionFeaturePage', () => {
     expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();
   });
 
-  it('uses portal route for related feature links', async () => {
-    const { findByText } = renderPage();
-
-    const relatedRowText = await findByText('Related Survey');
-    fireEvent.click(relatedRowText.closest('.MuiDataGrid-row')!);
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/portal/submission/1/feature/20');
-    });
-  });
-
   it('renders portal as the breadcrumb root', async () => {
     const { findByRole } = renderPage();
 
     expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal/submission');
   });
 
-  it('places the map between Properties and Related', async () => {
+  it('places the map after Properties', async () => {
     const { findByText, getAllByRole } = renderPage();
     await findByText('Properties');
 
     const sectionLabels = getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
 
-    expect(sectionLabels).toEqual(['Properties', 'Map', 'Related']);
+    expect(sectionLabels).toEqual(['Properties', 'Map']);
   });
 
   it('maps the feature being viewed', async () => {

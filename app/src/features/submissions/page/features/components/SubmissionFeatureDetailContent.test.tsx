@@ -36,7 +36,6 @@ const mockFeature: ISubmissionFeature = {
 const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   isLoading: false,
   feature: mockFeature,
-  relatedFeatures: [],
   submissionId: 1,
   submissionFeatureId: 10,
   rootBreadcrumbLabel: 'Submissions',
@@ -94,12 +93,12 @@ describe('SubmissionFeatureDetailContent', () => {
   });
 
   describe('map section', () => {
-    it('places the map between Properties and Related', () => {
+    it('places the map after Properties', () => {
       const { getAllByRole } = renderComponent();
 
       const sectionLabels = getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
 
-      expect(sectionLabels).toEqual(['Properties', 'Map', 'Related']);
+      expect(sectionLabels).toEqual(['Properties', 'Map']);
     });
 
     it('maps the feature being viewed', () => {

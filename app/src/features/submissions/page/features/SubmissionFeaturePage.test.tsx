@@ -26,15 +26,6 @@ const mockFeature = {
   security_reasons: []
 };
 
-const mockRelatedFeatures = [
-  {
-    submission_feature_id: 20,
-    feature_type_name: 'survey',
-    feature_type_display_name: 'Survey',
-    data: { name: 'Related Survey' }
-  }
-];
-
 const renderPage = (initialPath = '/submission/1/feature/10') =>
   render(
     <MemoryRouter initialEntries={[initialPath]}>
@@ -57,8 +48,7 @@ describe('SubmissionFeaturePage', () => {
     });
 
     mockGetSubmissionFeatureById.mockResolvedValue({
-      feature: mockFeature,
-      relatedFeatures: []
+      feature: mockFeature
     });
 
     mockGetSubmissionFeatureProperties.mockResolvedValue({
@@ -102,37 +92,11 @@ describe('SubmissionFeaturePage', () => {
 
   it('renders Secured chip when feature is secured', async () => {
     mockGetSubmissionFeatureById.mockResolvedValue({
-      feature: { ...mockFeature, secured: true },
-      relatedFeatures: []
+      feature: { ...mockFeature, secured: true }
     });
 
     const { findByText } = renderPage();
 
     expect(await findByText('Secured')).toBeVisible();
-  });
-
-  it('renders related features', async () => {
-    mockGetSubmissionFeatureById.mockResolvedValue({
-      feature: mockFeature,
-      relatedFeatures: mockRelatedFeatures
-    });
-
-    const { findByText } = renderPage();
-
-    expect(await findByText('Related Survey')).toBeVisible();
-  });
-
-  it('navigates to related feature URL on click', async () => {
-    mockGetSubmissionFeatureById.mockResolvedValue({
-      feature: mockFeature,
-      relatedFeatures: mockRelatedFeatures
-    });
-
-    const { findByText } = renderPage();
-
-    const relatedLink = await findByText('Related Survey');
-    const anchor = relatedLink.closest('a');
-
-    expect(anchor).toHaveAttribute('href', '/submission/1/feature/20');
   });
 });
