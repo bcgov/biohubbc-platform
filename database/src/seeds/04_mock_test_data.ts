@@ -76,26 +76,6 @@ const insertRecord = async (knex: Knex) => {
   // Survey
   const parent_submission_feature_id1 = await insertSurveyRecord(knex, { submission_id, submission_upload_id });
 
-  // Telemetry Deployments
-  const deployments: { id: number; devices: { submission_feature_id: number; device_id: string }[] }[] = [];
-  for (let i = 0; i < 5; i++) {
-    const deploymentId = await insertTelemetryDeployment(knex, {
-      submission_id,
-      submission_upload_id,
-      parent_submission_feature_id: parent_submission_feature_id1
-    });
-    const devices: { submission_feature_id: number; device_id: string }[] = [];
-    for (let j = 0; j < 2; j++) {
-      const deviceInfo = await insertTelemetryDevice(knex, {
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id: deploymentId
-      });
-      devices.push(deviceInfo);
-    }
-    deployments.push({ id: deploymentId, devices });
-  }
-
   // Sample Sites and their children
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
@@ -127,29 +107,16 @@ const insertRecord = async (knex: Knex) => {
   });
 
   // Telemetry
-  const telemetryPromises = Array.from({ length: 100 }).map(() => {
-    const randomDeployment = deployments[Math.floor(Math.random() * deployments.length)];
-    const randomDevice = randomDeployment.devices[Math.floor(Math.random() * randomDeployment.devices.length)];
-    return insertTelemetryRecord(knex, {
+  const telemetryPromises = Array.from({ length: 100 }).map(() =>
+    insertTelemetryRecord(knex, {
       submission_id,
       submission_upload_id,
-      parent_submission_feature_id: randomDeployment.id,
-      device_id: randomDevice.device_id
-    });
-  });
+      parent_submission_feature_id: parent_submission_feature_id1
+    })
+  );
 
   // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
-
-  // Seed submission_feature_feature table
-  for (const deployment of deployments) {
-    for (const device of deployment.devices) {
-      await knex.raw(`
-        INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-        VALUES (${deployment.id}, ${device.submission_feature_id})
-      `);
-    }
-  }
 
   // Build the derived reachability closure for this upload. Read-path security resolves against it and
   // fails closed when absent, so without this every seeded feature reads as secured-and-inaccessible.
@@ -161,7 +128,31 @@ export const insertSubmissionRecord = async (
   includeSecurityReview = false,
   includePublishTimestamp = false
 ): Promise<number> => {
-  const response = await knex.raw(`${insertSubmission(includeSecurityReview, includePublishTimestamp)}`);
+  const owner = await knex('contributor_system_user as csu')
+    .join('contributor as c', 'c.contributor_id', 'csu.contributor_id')
+    .whereRaw('LOWER(c.client_id) = LOWER(?)', [CONTRIBUTOR_CLIENT_ID])
+    .whereNull('c.record_end_date')
+    .whereNull('csu.record_end_date')
+    .select('csu.system_user_id')
+    .first();
+
+  const [submissionTeam] = await knex('team')
+    .insert({
+      name: `Seed Submission Team ${faker.string.uuid()}`,
+      description: 'Dedicated access team for a seeded submission.',
+      create_user: owner.system_user_id
+    })
+    .returning('team_id');
+
+  await knex('team_member').insert({
+    system_user_id: owner.system_user_id,
+    team_id: submissionTeam.team_id,
+    create_user: owner.system_user_id
+  });
+
+  const response = await knex.raw(
+    `${insertSubmission(includeSecurityReview, includePublishTimestamp, submissionTeam.team_id)}`
+  );
   const submission_id = response.rows[0].submission_id;
 
   return submission_id;
@@ -230,6 +221,14 @@ export const insertSubmissionUploadRecord = async (
   upload_id: string
 ): Promise<string> => {
   const ticket_id = await ensureTicketForSubmissionUpload(knex, { submission_id, upload_id });
+  const [{ team_id }] = await knex('team')
+    .insert({
+      name: `Seed Submission Upload Team ${upload_id}`,
+      description: 'Dedicated access team for a seeded submission upload.',
+      create_user: 1
+    })
+    .returning('team_id');
+  await knex('team_member').insert({ system_user_id: 1, team_id, create_user: 1 });
 
   // Pin the upload to the active default Blueprint (seeded by the initial-blueprint migration).
   const blueprintRow = await knex('blueprint')
@@ -242,6 +241,7 @@ export const insertSubmissionUploadRecord = async (
     .insert({
       submission_id,
       upload_id,
+      team_id,
       create_user: 1,
       ticket_id,
       blueprint_id: blueprintRow.blueprint_id
@@ -261,18 +261,29 @@ const ensureTicketForSubmissionUpload = async (
 
   // Keep a stable team across seed runs so we only need one FK target.
   const teamName = 'Seed Submission Upload Team';
-  const team = await knex('team').where({ name: teamName }).whereNull('record_end_date').first();
-  const team_id =
-    team?.team_id ??
-    (
-      await knex('team')
-        .insert({
-          name: teamName,
-          description: 'Auto-generated team for submission_upload seed tickets.',
-          create_user
-        })
-        .returning(['team_id'])
-    )[0].team_id;
+  let team = await knex('team').where({ name: teamName }).whereNull('record_end_date').select('team_id').first();
+
+  if (!team) {
+    const [insertedTeam] = await knex('team')
+      .insert({
+        name: teamName,
+        description: 'Auto-generated team for submission_upload seed tickets.',
+        create_user
+      })
+      .onConflict()
+      .ignore()
+      .returning(['team_id']);
+
+    team =
+      insertedTeam ??
+      (await knex('team').where({ name: teamName }).whereNull('record_end_date').select('team_id').first());
+  }
+
+  if (!team) {
+    throw new Error(`Failed to resolve seed team '${teamName}'`);
+  }
+
+  const team_id = team.team_id;
 
   // Make subject unique per upload UUID so rerunning seeds can reuse the same ticket.
   const subject = `Submission Upload - ${input.upload_id}`;
@@ -377,8 +388,6 @@ export const insertObservationRecord = async (
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const taxonTsn = await getRandomActiveTaxonTsn(knex);
-  const sex = faker.helpers.arrayElement(['female', 'male', 'unknown']);
-  const lifeStage = faker.helpers.arrayElement(['adult', 'juvenile', 'subadult', 'unknown']);
 
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -392,12 +401,7 @@ export const insertObservationRecord = async (
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
         ),
-        timestamp: faker.date.past({ years: 5 }).toISOString(),
-        sign: faker.helpers.arrayElement(['code::observation_sign::1', 'code::observation_sign::2']),
-        count: faker.number.int({ min: 1, max: 100 }),
-        taxon_id: taxonTsn ?? 180703,
-        sex,
-        life_stage: lifeStage
+        count: faker.number.int({ min: 0, max: 100 })
       }
     })}`
   );
@@ -462,7 +466,11 @@ const insertAnimalRecord = async (
   return submission_feature_id;
 };
 
-export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includePublishTimestamp: boolean) => {
+export const insertSubmission = (
+  includeSecurityReviewTimestamp: boolean,
+  includePublishTimestamp: boolean,
+  teamId: string
+) => {
   const securityReviewTimestamp = includeSecurityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
   // Only generate a non-null publish timestamp if the security timestamp is non-null (to confirm to database constraints)
   const publishTimestamp =
@@ -478,6 +486,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
       security_review_timestamp,
       publish_timestamp,
       system_user_id,
+      team_id,
       contributor_id
   )
   values
@@ -497,6 +506,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
           AND csu.record_end_date IS NULL
         LIMIT 1
       ),
+      '${teamId}',
       (
         SELECT contributor_id
         FROM contributor
@@ -513,25 +523,9 @@ export const insertSubmissionFeature = (options: {
   submission_id: number;
   submission_upload_id: string;
   parent_submission_feature_id: number | null;
-  feature_type:
-    | 'survey'
-    | 'sample_site'
-    | 'species_observation'
-    | 'animal'
-    | 'artifact'
-    | 'telemetry'
-    | 'telemetry_deployment'
-    | 'telemetry_device';
+  feature_type: 'survey' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
   data: { [key: string]: any };
-}) => {
-  const sourceId = faker.string.uuid();
-  const featureData = {
-    id: sourceId,
-    type: options.feature_type,
-    properties: options.data
-  };
-
-  return `
+}) => `
     INSERT INTO submission_feature
     (
         submission_id,
@@ -548,13 +542,12 @@ export const insertSubmissionFeature = (options: {
         '${options.submission_upload_id}',
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
-        '${sourceId}',
-        ${options.data ? `$$${JSON.stringify(featureData)}$$` : null},
+        public.gen_random_uuid(),
+        ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
         now()
     )
     RETURNING submission_feature_id;
 `;
-};
 
 const insertSearchString = (options: { submission_feature_id: number; property_name: string; value: string }) => `
     INSERT INTO submission_feature_property_string
@@ -838,76 +831,15 @@ const getRandomActiveTaxonTsn = async (knex: Knex): Promise<number | undefined> 
   return activeTaxonTsns[randomIntFromInterval(0, activeTaxonTsns.length - 1)];
 };
 
-export const insertTelemetryDeployment = async (
-  knex: Knex,
-  options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
-): Promise<number> => {
-  const deploymentData = {
-    animal_identifier: faker.string.alphanumeric({ length: 10 }),
-    device_key: faker.string.alphanumeric({ length: 8 }),
-    start_date: faker.date.past().toISOString(),
-    end_date: faker.date.future().toISOString()
-  };
-
-  const response = await knex.raw(
-    `${insertSubmissionFeature({
-      submission_id: options.submission_id,
-      submission_upload_id: options.submission_upload_id,
-      parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'telemetry_deployment',
-      data: deploymentData
-    })}`
-  );
-
-  return response.rows[0].submission_feature_id;
-};
-
-export const insertTelemetryDevice = async (
-  knex: Knex,
-  options: {
-    submission_id: number;
-    submission_upload_id: string;
-    parent_submission_feature_id: number;
-    device_id?: string;
-  }
-): Promise<{ submission_feature_id: number; device_id: string }> => {
-  const device_id = options.device_id || faker.string.alphanumeric({ length: 8 });
-  const deviceData = {
-    device_id,
-    device_manufacturer: faker.company.name(),
-    device_model: faker.commerce.productName(),
-    description: faker.lorem.sentence(),
-    serial_number: faker.string.alphanumeric({ length: 12 })
-  };
-
-  const response = await knex.raw(
-    `${insertSubmissionFeature({
-      submission_id: options.submission_id,
-      submission_upload_id: options.submission_upload_id,
-      parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'telemetry_device',
-      data: deviceData
-    })}`
-  );
-
-  return { submission_feature_id: response.rows[0].submission_feature_id, device_id };
-};
-
 export const insertTelemetryRecord = async (
   knex: Knex,
-  options: {
-    submission_id: number;
-    submission_upload_id: string;
-    parent_submission_feature_id: number;
-    device_id?: string;
-  }
+  options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   // Match the `feature_type_property` schema for telemetry (dop, elevation,
   // timestamp, geometry). Property names MUST align with the declarations in
   // `20251001000000_insert_feature_types.ts`. Full FeatureCollection matches
   // the ingest contract.
   const telemetryData = {
-    device_id: options.device_id,
     dop: faker.number.float({ min: 0.5, max: 10, multipleOf: 0.1 }),
     elevation: faker.number.float({ min: 0, max: 3000, multipleOf: 0.1 }),
     timestamp: faker.date.recent().toISOString(),
