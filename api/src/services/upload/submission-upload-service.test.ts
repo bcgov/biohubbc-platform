@@ -4,10 +4,12 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
-import { HTTP400 } from '../../errors/http-error';
+import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
+import { TeamService } from '../access-policy/team-service';
+import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 
 chai.use(sinonChai);
@@ -31,6 +33,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
@@ -63,6 +66,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 123,
         upload_id: 'upload-1',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
@@ -74,6 +78,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 123,
         upload_id: 'upload-1',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
@@ -99,6 +104,7 @@ describe('SubmissionUploadService', () => {
           submission_upload_id: 'artifact-1',
           submission_id: mockSubmissionId,
           upload_id: 'upload-1',
+          team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           status: 'uploaded',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
@@ -106,6 +112,7 @@ describe('SubmissionUploadService', () => {
           submission_upload_id: 'artifact-2',
           submission_id: mockSubmissionId,
           upload_id: 'upload-2',
+          team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           status: 'uploaded',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
@@ -141,16 +148,31 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         ticket_id: '11111111-1111-1111-1111-111111111111',
-        status: 'uploaded'
+        status: 'uploaded',
+        blueprint_id: 7
       };
 
+      const createTeam = sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        name: 'Submission Upload Team upload-1',
+        description: null,
+        member_count: 1
+      });
       const stub = sinon
         .stub(SubmissionUploadRepository.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'artifact-new' });
 
-      const result = await service.insertSubmissionUpload(fakeInput);
+      const result = await service.insertSubmissionUpload(fakeInput, 2, [2]);
 
-      expect(stub).to.have.been.calledWith(fakeInput);
+      expect(createTeam).to.have.been.calledOnceWith(
+        sinon.match({
+          system_user_ids: [2]
+        })
+      );
+      expect(stub).to.have.been.calledWith({
+        ...fakeInput,
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+      });
       expect(result).to.eql({ submission_upload_id: 'artifact-new' });
     });
 
@@ -159,13 +181,20 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         ticket_id: '11111111-1111-1111-1111-111111111111',
-        status: 'uploaded'
+        status: 'uploaded',
+        blueprint_id: 7
       };
 
+      sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        name: 'Submission Upload Team upload-1',
+        description: null,
+        member_count: 0
+      });
       sinon.stub(SubmissionUploadRepository.prototype, 'insertSubmissionUpload').throws(new Error('Insert failed'));
 
       try {
-        await service.insertSubmissionUpload(fakeInput);
+        await service.insertSubmissionUpload(fakeInput, 2);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('Insert failed');
@@ -275,22 +304,68 @@ describe('SubmissionUploadService', () => {
   });
 
   describe('deleteSubmissionUpload', () => {
-    it('should soft-delete a submission_upload record', async () => {
-      const stub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload').resolves();
+    const submissionId = '11111111-1111-1111-1111-111111111111';
+    const submissionUploadId = '22222222-2222-2222-2222-222222222222';
+    const teamId = '33333333-3333-3333-3333-333333333333';
 
-      await service.deleteSubmissionUpload('artifact-1');
-
-      expect(stub).to.have.been.calledWith('artifact-1');
+    beforeEach(() => {
+      sinon.stub(service, 'getSubmissionUploadBySubmissionUuid').resolves({
+        submission_upload_id: submissionUploadId,
+        submission_id: 1,
+        upload_id: '44444444-4444-4444-4444-444444444444',
+        team_id: teamId,
+        status: 'uploaded',
+        ticket_id: '55555555-5555-5555-5555-555555555555',
+        blueprint_id: 1,
+        comment: null
+      });
     });
 
-    it('should throw an error if repository fails', async () => {
-      sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload').throws(new Error('Delete failed'));
+    it('soft-deletes the upload, records deleted status, and retires its team', async () => {
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: submissionUploadId,
+        status: 'submitted'
+      });
+      const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload').resolves();
+      const updateStatusStub = sinon
+        .stub(SubmissionUploadReviewStatusService.prototype, 'updateSubmissionUploadReviewStatus')
+        .resolves({
+          submission_upload_status_id: 2,
+          submission_upload_id: submissionUploadId,
+          status: 'deleted'
+        });
+      const deleteTeamStub = sinon.stub(TeamService.prototype, 'deleteTeam').resolves();
+
+      await service.deleteSubmissionUpload(submissionId, submissionUploadId);
+
+      expect(service.getSubmissionUploadBySubmissionUuid).to.have.been.calledOnceWith(submissionId, submissionUploadId);
+      expect(deleteUploadStub).to.have.been.calledOnceWith(submissionUploadId);
+      expect(updateStatusStub).to.have.been.calledOnceWith(submissionUploadId, { status: 'deleted' });
+      expect(deleteTeamStub).to.have.been.calledOnceWith(teamId);
+    });
+
+    it('rejects a reviewed upload without deleting the upload or its team', async () => {
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: submissionUploadId,
+        status: 'approved'
+      });
+      const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
+      const updateStatusStub = sinon.stub(
+        SubmissionUploadReviewStatusService.prototype,
+        'updateSubmissionUploadReviewStatus'
+      );
+      const deleteTeamStub = sinon.stub(TeamService.prototype, 'deleteTeam');
 
       try {
-        await service.deleteSubmissionUpload('artifact-1');
-        expect.fail('Expected error not thrown');
-      } catch (err) {
-        expect((err as Error).message).to.equal('Delete failed');
+        await service.deleteSubmissionUpload(submissionId, submissionUploadId);
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+        expect(deleteUploadStub).not.to.have.been.called;
+        expect(updateStatusStub).not.to.have.been.called;
+        expect(deleteTeamStub).not.to.have.been.called;
       }
     });
   });

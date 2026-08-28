@@ -109,7 +109,8 @@ describe('SubmissionRepository', () => {
           description: 'description',
           name: 'name',
           contributor_id: 1,
-          system_user_id: 1
+          system_user_id: 1,
+          team_id: '11111111-1111-1111-1111-111111111111'
         });
         expect.fail();
       } catch (actualError) {
@@ -132,7 +133,8 @@ describe('SubmissionRepository', () => {
         description: 'description',
         name: 'name',
         contributor_id: 1,
-        system_user_id: 1
+        system_user_id: 1,
+        team_id: '11111111-1111-1111-1111-111111111111'
       });
 
       expect(response.submission_id).to.equal(1);
@@ -164,7 +166,8 @@ describe('SubmissionRepository', () => {
     it('should succeed with valid data', async () => {
       const mockResponse: ISubmissionModel = {
         uuid: '123-456-789',
-        system_user_id: 1
+        system_user_id: 1,
+        team_id: '11111111-1111-1111-1111-111111111111'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -424,7 +427,8 @@ describe('SubmissionRepository', () => {
         'submission desc',
         'submission comment',
         3,
-        1
+        1,
+        '11111111-1111-1111-1111-111111111111'
       );
 
       expect(response).to.eql({ submission_id: 20 });
@@ -444,7 +448,8 @@ describe('SubmissionRepository', () => {
           'submission desc',
           'submission comment',
           3,
-          1
+          1,
+          '11111111-1111-1111-1111-111111111111'
         );
         expect.fail();
       } catch (actualError) {
@@ -1370,88 +1375,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('downloadSubmission', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.downloadSubmission(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission with associated features');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        submission_feature_id: 1,
-        parent_submission_feature_id: null,
-        feature_type_name: 'string',
-        data: {},
-        level: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.downloadSubmission(1);
-
-      expect(response).to.eql([mockResponse]);
-    });
-  });
-
-  describe('downloadPublishedSubmission', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.downloadPublishedSubmission(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission with associated features');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        submission_feature_id: 1,
-        parent_submission_feature_id: null,
-        feature_type_name: 'string',
-        data: {},
-        level: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.downloadPublishedSubmission(1);
-
-      expect(response).to.eql([mockResponse]);
-    });
-  });
-
   describe('getSubmissionFeaturesBySubmissionId', () => {
     it('should return a list of submission features', async () => {
       const mockResponse = {
@@ -1606,10 +1529,20 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('getSubmissionsByUserId should require active team records', async () => {
+    it('getSubmissionsByUserId should use active submission-team membership', async () => {
       const knexStub = sinon.stub().callsFake(async (query: any) => {
         const sql = query.toSQL().sql.toLowerCase();
         expect(sql).to.include('inner join "team" as "t"');
+        expect(sql).to.include('inner join "submission" as "s"');
+        expect(sql).to.include('"s"."team_id" = "tm"."team_id"');
+        expect(sql).to.not.include('submission_upload');
+        expect(sql).to.not.include('submission_team');
+        expect(sql).to.include('left join "submission_feature" as "sf"');
+        expect(sql).to.include('"sf"."submission_id" = "s"."submission_id"');
+        expect(sql).to.include('record_effective_date <= now()');
+        expect(sql).to.include('record_end_date is null');
+        expect(sql).to.not.include('parent_submission_feature_id');
+        expect(sql).to.not.include('feature_type');
         expect(sql).to.include('"t"."record_end_date" is null');
         return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       });
@@ -1621,7 +1554,7 @@ describe('SubmissionRepository', () => {
       expect(knexStub).to.have.been.calledOnce;
     });
 
-    it('getSubmissionsByUserIdCount should require active team records', async () => {
+    it('getSubmissionsByUserIdCount should use active submission-team membership', async () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 0 }] } as QueryResult<any>);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -1631,40 +1564,10 @@ describe('SubmissionRepository', () => {
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
       expect(sqlText).to.include('inner join team t');
-      expect(sqlText).to.include('and t.record_end_date is null');
-    });
-  });
-
-  describe('team membership authorization guards', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('getSubmissionsByUserId should require active team records', async () => {
-      const knexStub = sinon.stub().callsFake(async (query: any) => {
-        const sql = query.toSQL().sql.toLowerCase();
-        expect(sql).to.include('inner join "team" as "t"');
-        expect(sql).to.include('"t"."record_end_date" is null');
-        return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      });
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.getSubmissionsByUserId(1, { page: 1, limit: 10 });
-
-      expect(knexStub).to.have.been.calledOnce;
-    });
-
-    it('getSubmissionsByUserIdCount should require active team records', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 0 }] } as QueryResult<any>);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.getSubmissionsByUserIdCount(1);
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
-      expect(sqlText).to.include('inner join team t');
+      expect(sqlText).to.include('inner join submission s');
+      expect(sqlText).to.include('s.team_id = tm.team_id');
+      expect(sqlText).to.not.include('submission_upload');
+      expect(sqlText).to.not.include('submission_team');
       expect(sqlText).to.include('and t.record_end_date is null');
     });
   });

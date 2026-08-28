@@ -1,6 +1,13 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
-import { isAccessibleToUser, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
+import {
+  codePropertyValueJson,
+  featureReferencePropertyValueJson,
+  isAccessibleToUser,
+  isEffectivelySecured,
+  isSubmissionFeatureActive,
+  taxonPropertyValueJson
+} from './sql-fragments';
 
 describe('sql-fragments', () => {
   describe('isSubmissionFeatureActive', () => {
@@ -43,7 +50,7 @@ describe('sql-fragments', () => {
       const sql = isEffectivelySecured('wf.submission_feature_id');
 
       // Step 2: Count `?` placeholders — must be none
-      expect((sql.match(/\?/g) || []).length).to.equal(0);
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
     });
   });
 
@@ -53,6 +60,17 @@ describe('sql-fragments', () => {
 
       expect(sql).to.include('join team t on t.team_id = tss.team_id');
       expect(sql).to.include('and t.record_end_date is null');
+    });
+
+    it('revalidates cached anchors before treating them as grants', () => {
+      const sql = isAccessibleToUser('wf.submission_feature_id').toLowerCase();
+
+      expect(sql).to.include('closure_ready');
+      expect(sql).to.include('submission_feature_security');
+      expect(sql).to.include('urn_submission_id');
+      expect(sql).to.include('urn_feature_type');
+      expect(sql).to.include('urn_feature_id');
+      expect(sql).to.include('anchor_sf.record_effective_date <= now()');
     });
 
     it('probes the closure ancestry for a scope anchor instead of a recursive parent walk', () => {
@@ -84,7 +102,71 @@ describe('sql-fragments', () => {
       const sql = isAccessibleToUser('wf.submission_feature_id');
 
       // Step 2: Count `?` placeholders — must be exactly one (the system user id)
-      expect((sql.match(/\?/g) || []).length).to.equal(1);
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(1);
+    });
+  });
+
+  describe('taxonPropertyValueJson', () => {
+    it('builds the taxon value object from the aliased taxon row', () => {
+      const sql = taxonPropertyValueJson('t');
+
+      expect(sql).to.include('jsonb_build_object(');
+      expect(sql).to.include("'taxon_id', t.taxon_id");
+      expect(sql).to.include("'tsn', t.itis_tsn");
+      expect(sql).to.include("'rank', t.rank");
+    });
+
+    it('labels with the scientific name', () => {
+      const sql = taxonPropertyValueJson('tx');
+
+      expect(sql).to.include("'label', tx.itis_scientific_name");
+      expect(sql).to.not.include('COALESCE(');
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = taxonPropertyValueJson('t');
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
+    });
+  });
+
+  describe('codePropertyValueJson', () => {
+    it('builds the code value object from the aliased code and codeset rows', () => {
+      const sql = codePropertyValueJson('ccc', 'cs');
+
+      expect(sql).to.include('jsonb_build_object(');
+      expect(sql).to.include("'codeset_key', cs.key");
+      expect(sql).to.include("'codeset_label', cs.label");
+      expect(sql).to.include("'code_key', ccc.key");
+      expect(sql).to.include("'code_label', ccc.label");
+    });
+
+    it('labels with the code label', () => {
+      const sql = codePropertyValueJson('code', 'codeset');
+
+      expect(sql).to.include("'label', code.label");
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = codePropertyValueJson('ccc', 'cs');
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
+    });
+  });
+
+  describe('featureReferencePropertyValueJson', () => {
+    it('builds the feature reference value object from the aliased referenced feature row', () => {
+      const sql = featureReferencePropertyValueJson('referenced_sf');
+
+      expect(sql).to.include('jsonb_build_object(');
+      expect(sql).to.include("'urn', referenced_sf.urn");
+      expect(sql).to.include("'label', referenced_sf.urn");
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = featureReferencePropertyValueJson('referenced_sf');
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(0);
     });
   });
 });

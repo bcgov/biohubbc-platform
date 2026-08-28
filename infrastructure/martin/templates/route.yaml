@@ -1,0 +1,26 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+spec:
+  # Path based Route on the APP's hostname, so tiles are same origin with the frontend and no CORS
+  # preflight occurs. The OpenShift router does not strip the path prefix, which is why the gateway
+  # serves its routes under /martin natively.
+  host: {{ include "tilesRouteHost" . }}
+  path: {{ .Values.route.path }}
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  port:
+    targetPort: {{ .Values.app.name }}-{{ .Values.service.name }}
+  to:
+    kind: Service
+    # Targets the gateway Service. Martin has no Service of its own and no Route.
+    name: {{ include "app.fullname" . }}
+    weight: 100
+  wildcardPolicy: None

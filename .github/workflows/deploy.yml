@@ -4,7 +4,7 @@ name: PR-Based Deploy on OpenShift
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, unlabeled]
     branches-ignore:
       - test
       - prod
@@ -12,6 +12,9 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   IMAGE_TAG: build-1.0.0-${{ github.event.number }}
@@ -21,14 +24,30 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # Print variables for logging and debugging purposes
+  # Print variables for logging, and decide whether this PR gets a preview environment. Every
+  # job below gates on the `deployPreview` output, so the rule lives in exactly one place.
   checkEnv:
     name: Print Env variables
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false }}
+    # An `unlabeled` event for any other label says nothing about the preview; without this,
+    # moving a triage label would rebuild four images.
+    if: ${{ github.event.pull_request.merged == false &&
+      (github.event.action != 'unlabeled' || github.event.label.name == 'No Preview') }}
+    outputs:
+      # A preview environment exists only for a PR that is open, not draft, and without the
+      # "No Preview" label — which is how a stacked PR stays ready for review while taking no
+      # share of the namespace quota. Job outputs are strings, hence the literal 'true'.
+      deployPreview: ${{ github.event.pull_request.draft == false &&
+        !contains(github.event.pull_request.labels.*.name, 'No Preview') }}
     steps:
       - name: Print Env Vars
+        # Branch and label names are author-controlled: pass them through env, never interpolate.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
+          DEPLOY_PREVIEW: ${{ github.event.pull_request.draft == false &&
+            !contains(github.event.pull_request.labels.*.name, 'No Preview') }}
         run: |
           echo OC CLI Version: $(oc version)
           echo Git Base Ref: ${{ github.base_ref }}
@@ -36,15 +55,17 @@ jobs:
           echo Git Pull Request Ref: ${{ github.event.pull_request.head.sha }}
           echo Git Event Name: ${{ github.event_name }}
           echo Git Event Action: ${{ github.event.action }}
-          echo Git Branch Ref: ${{ github.head_ref }}
+          echo "Git Branch Ref: ${HEAD_REF}"
           echo PR in Draft: ${{ github.event.pull_request.draft }}
+          echo "PR Labels: ${PR_LABELS}"
+          echo "Deploy Preview: ${DEPLOY_PREVIEW}"
 
   # Checkout the repo once and cache it for use in subsequent jobs
   checkoutRepo:
     name: Checkout and cache target branch
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false }}
+    if: ${{ needs.checkEnv.outputs.deployPreview == 'true' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
@@ -78,11 +99,12 @@ jobs:
     name: Build App Image
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ needs.checkEnv.outputs.deployPreview == 'true' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       APP_NAME: "biohub-platform-app"
     needs:
+      - checkEnv
       - checkoutRepo
     steps:
       # Load repo from cache
@@ -99,16 +121,22 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the app image
       - name: Build and Push App Image
@@ -139,11 +167,12 @@ jobs:
     name: Build Database Image
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ needs.checkEnv.outputs.deployPreview == 'true' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       APP_NAME: "biohub-platform-db"
     needs:
+      - checkEnv
       - checkoutRepo
     steps:
       # Load repo from cache
@@ -160,16 +189,22 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the database image using Docker
       - name: Build and Push Database Image
@@ -200,11 +235,12 @@ jobs:
     name: Build Database Setup Image
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ needs.checkEnv.outputs.deployPreview == 'true' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       APP_NAME: "biohub-platform-db-setup"
     needs:
+      - checkEnv
       - checkoutRepo
     steps:
       # Load repo from cache
@@ -221,16 +257,22 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the database setup image using Docker
       - name: Build and Push Database Setup Image
@@ -261,10 +303,77 @@ jobs:
     name: Build API Image
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ needs.checkEnv.outputs.deployPreview == 'true' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       APP_NAME: "biohub-platform-api"
+    needs:
+      - checkEnv
+      - checkoutRepo
+    steps:
+      # Load repo from cache
+      - name: Cache repo
+        uses: actions/cache@v5
+        id: cache-repo
+        env:
+          cache-name: cache-repo
+        with:
+          path: ${{ github.workspace }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
+
+      # Checkout the branch if not restored via cache
+      - name: Checkout Target Branch
+        if: steps.cache-repo.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Authenticate Docker with OpenShift registry.
+      # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
+      # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
+      - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
+        run: |
+          echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
+
+      # Build and push the API image
+      - name: Build and Push API Image
+        working-directory: api
+        run: |
+          docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
+          docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'trivy-${{ env.APP_NAME }}-results.sarif'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          limit-severities-for-sarif: true
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-${{ env.APP_NAME }}-results
+          path: trivy-${{ env.APP_NAME }}-results.sarif
+
+  buildAndPushMartinGateway:
+    name: Build Martin Gateway Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    env:
+      PR_NUMBER: ${{ github.event.number }}
+      APP_NAME: "biohub-platform-martin-gateway"
     needs:
       - checkoutRepo
     steps:
@@ -294,8 +403,8 @@ jobs:
           echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
 
       # Build and push the API image
-      - name: Build and Push API Image
-        working-directory: api
+      - name: Build and Push Martin Gateway Image
+        working-directory: martin-gateway
         run: |
           docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
           docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
@@ -323,20 +432,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: ${{ always() &&
-      github.event.pull_request.merged == false &&
-      github.event.pull_request.draft == false &&
+      needs.checkEnv.outputs.deployPreview == 'true' &&
       needs.buildAndPushApp.result == 'success' &&
       needs.buildAndPushDatabase.result == 'success' &&
       needs.buildAndPushDatabaseSetup.result == 'success' &&
-      needs.buildAndPushAPI.result == 'success' }}
+      needs.buildAndPushAPI.result == 'success' &&
+      needs.buildAndPushMartinGateway.result == 'success' }}
     environment: dev
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
+      - checkEnv
       - buildAndPushApp
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
     steps:
       # Load repo from cache
       - name: Cache repo
@@ -352,6 +463,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
       - uses: ./.github/actions/setup-openshift-cli
@@ -402,6 +515,8 @@ jobs:
             --set-string biohub-platform-db.app.postgresUserPassword=${{ secrets.DATABASE_USER_PASSWORD }} \
             --set-string biohub-platform-db.app.postgresUserApi=${{ secrets.DATABASE_USER_API }} \
             --set-string biohub-platform-db.app.postgresUserApiPassword=${{ secrets.DATABASE_USER_API_PASSWORD }} \
+            --set-string biohub-platform-db.app.postgresUserMartin=${{ secrets.DATABASE_USER_MARTIN }} \
+            --set-string biohub-platform-db.app.postgresUserMartinPassword=${{ secrets.DATABASE_USER_MARTIN_PASSWORD }} \
             --set-string biohub-platform-db.app.postgresDb=${{ secrets.DATABASE_NAME }} \
             --set-string biohub-platform-db-setup.environment.ts=$TS \
             --set-string biohub-platform-db-setup.environment.id=$PR_NUMBER \
@@ -412,6 +527,9 @@ jobs:
             --set-string biohub-platform-queue.environment.ts=$TS \
             --set-string biohub-platform-queue.environment.id=$PR_NUMBER \
             --set-string biohub-platform-queue.environment.changeId=$PR_NUMBER \
+            --set-string biohub-platform-martin.environment.ts=$TS \
+            --set-string biohub-platform-martin.environment.id=$PR_NUMBER \
+            --set-string biohub-platform-martin.environment.changeId=$PR_NUMBER \
             --wait --timeout=600s
           
           echo "Helm chart deployment completed for PR $PR_NUMBER"
@@ -421,13 +539,17 @@ jobs:
     name: Comment Trivy Results
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false &&
-      github.event.pull_request.draft == false }}
+    # Only this job uses GITHUB_TOKEN: github-script posts the vulnerability summary as a PR comment.
+    permissions:
+      pull-requests: write
+    if: ${{ needs.checkEnv.outputs.deployPreview == 'true' }}
     needs:
+      - checkEnv
       - buildAndPushApp
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
     steps:
       - name: Download all Trivy scan results
         uses: actions/download-artifact@v6
@@ -475,10 +597,11 @@ jobs:
             const databaseResults = parseSarifFile('trivy-results/trivy-biohub-platform-db-results/trivy-biohub-platform-db-results.sarif');
             const databaseSetupResults = parseSarifFile('trivy-results/trivy-biohub-platform-db-setup-results/trivy-biohub-platform-db-setup-results.sarif');
             const apiResults = parseSarifFile('trivy-results/trivy-biohub-platform-api-results/trivy-biohub-platform-api-results.sarif');
+            const martinGatewayResults = parseSarifFile('trivy-results/trivy-biohub-platform-martin-gateway-results/trivy-biohub-platform-martin-gateway-results.sarif');
             
             // Calculate totals
-            const totalCritical = appResults.critical + databaseResults.critical + databaseSetupResults.critical + apiResults.critical;
-            const totalHigh = appResults.high + databaseResults.high + databaseSetupResults.high + apiResults.high;
+            const totalCritical = appResults.critical + databaseResults.critical + databaseSetupResults.critical + apiResults.critical + martinGatewayResults.critical;
+            const totalHigh = appResults.high + databaseResults.high + databaseSetupResults.high + apiResults.high + martinGatewayResults.high;
             const totalVulnerabilities = totalCritical + totalHigh;
             
             // Only comment if there are vulnerabilities
@@ -506,6 +629,9 @@ jobs:
               **API Image:**
               - Critical: ${apiResults.critical}, High: ${apiResults.high}
               
+              **Martin Gateway Image:**
+              - Critical: ${martinGatewayResults.critical}, High: ${martinGatewayResults.high}
+              
               ---
               
               **Note:** This scan was performed using Trivy on the container images built for this PR, focusing only on Critical and High severity vulnerabilities with available fixes. Please review the vulnerabilities and consider updating dependencies or base images as needed.
@@ -526,16 +652,15 @@ jobs:
             }
 
   # Report the overall status of all jobs.
-  # Why? Skipped jobs are not considered successes when specifying requird jobs in the GitHub PR settings. Rather than
-  # specify each job, we can specify this final job only, and use its status as an indicator of all previous jobs
-  # having successfully run. We can then manually include the 'skipped' status as part our definition of success.
+  # Why? Skipped jobs are not considered successes when specifying required jobs in the GitHub PR settings. Rather
+  # than specify each job, we can specify this final job only, and use its status as an indicator of all previous
+  # jobs having successfully run. We can then manually include the 'skipped' status as part of our definition of
+  # success.
   workflowStatus:
     name: Workflow Status
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ always() &&
-      github.event.pull_request.merged == false &&
-      github.event.pull_request.draft == false }}
+    if: ${{ always() && needs.checkEnv.outputs.deployPreview == 'true' }}
     needs:
       - checkEnv
       - checkoutRepo
@@ -543,6 +668,7 @@ jobs:
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
       - deployHelmChart
       - commentTrivyResults
     steps:
@@ -554,6 +680,7 @@ jobs:
           echo needs.buildAndPushDatabase.result: ${{ needs.buildAndPushDatabase.result }}
           echo needs.buildAndPushDatabaseSetup.result: ${{ needs.buildAndPushDatabaseSetup.result }}
           echo needs.buildAndPushAPI.result: ${{ needs.buildAndPushAPI.result }}
+          echo needs.buildAndPushMartinGateway.result: ${{ needs.buildAndPushMartinGateway.result }}
           echo needs.deployHelmChart.result: ${{ needs.deployHelmChart.result }}
           echo needs.commentTrivyResults.result: ${{ needs.commentTrivyResults.result }}
 

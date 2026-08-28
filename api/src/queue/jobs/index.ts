@@ -79,6 +79,16 @@ export const JobQueues = {
    */
   POLL_DOWNLOAD_SCHEDULES_FAILED: 'poll-download-schedules-failed',
   /**
+   * Recurring sweep that deletes expired map tile contexts. Housekeeping only: expiry is enforced in
+   * the tile SQL on every request, so a missed tick leaves no context authorizing tiles.
+   */
+  DELETE_EXPIRED_MARTIN_CONTEXTS: 'delete-expired-martin-contexts',
+  /**
+   * Dead letter queue for failed delete-expired-martin-contexts ticks.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  DELETE_EXPIRED_MARTIN_CONTEXTS_FAILED: 'delete-expired-martin-contexts-failed',
+  /**
    * Submission upload security queue — automatic security screening. Evaluates active security
    * rules against a submission upload's features after closure has been populated and inserts
    * draft submission_feature_security records. Records its lifecycle in submission_upload_security.

@@ -80,7 +80,7 @@ export const SubmissionContextProvider = ({ children }: PropsWithChildren) => {
   const submissionDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
 
   const featureDataLoader = useDataLoader((submissionId: number, pagination: ApiPaginationRequestOptions) =>
-    api.submissions.getSubmissionFeatures(submissionId, pagination)
+    api.admin.getSubmissionFeatures(submissionId, pagination)
   );
 
   /**

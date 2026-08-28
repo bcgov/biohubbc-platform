@@ -1,9 +1,9 @@
 import { IDBConnection } from '../database/db';
-import { SearchSummaryResponse } from '../models/search';
+import { SearchSummaryResponse, SearchTaxonResult } from '../models/search';
 import { SearchRepository } from '../repositories/search-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
-import { SearchParams, SearchResponseWithCounts } from './search-service.interface';
+import { SearchParams, SearchResponseWithCounts, SearchTaxonFilters, WithCount } from './search-service.interface';
 
 export class SearchService extends DBService {
   searchRepository: SearchRepository;
@@ -25,10 +25,24 @@ export class SearchService extends DBService {
     const [features, submissions, taxonomy] = await Promise.all([
       this.searchRepository.findFeatures(params, pagination),
       this.searchRepository.findSubmissions(params, pagination),
-      this.searchRepository.findTaxon(params, pagination)
+      this.searchRepository.findTaxon({ keyword: params.keyword }, pagination)
     ]);
 
     return { features, submissions, taxonomy };
+  }
+
+  /**
+   * Search local taxonomy rows with pagination.
+   *
+   * @param {SearchTaxonFilters} filters
+   * @param {ApiPaginationOptions} pagination
+   * @returns {Promise<WithCount<SearchTaxonResult>>}
+   */
+  async findTaxon(
+    filters: SearchTaxonFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<WithCount<SearchTaxonResult>> {
+    return this.searchRepository.findTaxon(filters, pagination);
   }
 
   /**

@@ -1069,17 +1069,17 @@ const validateDatetimePredicate = (draft: BuilderPredicateDraft, path: string): 
 };
 
 /**
- * Checks whether a predicate type serializes through a numeric API value.
+ * Checks whether a predicate type must serialize through a finite numeric API value.
  *
- * Number, taxon, and code drafts are edited as text for UI consistency, then
- * converted to numbers during serialization. This helper centralizes that type
- * grouping so validation and serialization rules remain easy to compare.
+ * Number and code drafts are edited as text for UI consistency, then converted to
+ * numbers during serialization, so their value must be finite numeric text. Taxon
+ * drafts are selected through autocomplete and already carry a numeric ITIS TSN.
  *
  * @param {ExpressionPropertyType} predicateType - Editable predicate value type.
  * @returns {boolean} True when the predicate value must be finite numeric text.
  */
 const isNumericPredicateType = (predicateType: ExpressionPropertyType): boolean =>
-  predicateType === 'number' || predicateType === 'taxon' || predicateType === 'code';
+  predicateType === 'number' || predicateType === 'code';
 
 /**
  * Validates GeoJSON-like spatial predicate drafts.
@@ -1216,8 +1216,12 @@ const serializePredicateValue = (draft: BuilderPredicateDraft): unknown => {
     return datetimeObjectToString(draft.value);
   }
 
-  if (draft.type === 'number' || draft.type === 'taxon' || draft.type === 'code') {
+  if (draft.type === 'number' || draft.type === 'code') {
     return Number(draft.value);
+  }
+
+  if (draft.type === 'taxon') {
+    return draft.value;
   }
 
   if (draft.type === 'spatial') {
@@ -1231,8 +1235,8 @@ const serializePredicateValue = (draft: BuilderPredicateDraft): unknown => {
  * Serializes a valid builder tree into the backend expression-tree shape.
  *
  * Use this only after validation passes. It strips all local UI ids, converts
- * datetime edit objects to API strings, coerces numeric/taxon/code values to
- * numbers, and omits value fields for `Exists` predicates.
+ * datetime edit objects to API strings, coerces numeric/code values to numbers,
+ * passes selected taxon TSNs through, and omits value fields for `Exists` predicates.
  *
  * @param {BuilderExpressionNode} node - Valid builder expression tree to serialize.
  * @returns {ExpressionTreeExpression} Backend expression-tree payload.

@@ -78,6 +78,7 @@ describe('Download Worker', function () {
   const createdSubmissionIds: number[] = [];
   const createdUploadIds: string[] = [];
   const createdTicketIds: string[] = [];
+  const createdTeamIds: string[] = [];
   const createdS3Keys: string[] = [];
   const createdArtifactIds: string[] = [];
 
@@ -137,6 +138,10 @@ describe('Download Worker', function () {
       if (createdTicketIds.length > 0) {
         await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
+      }
+      if (createdTeamIds.length > 0) {
+        await db('biohub.team_member').whereIn('team_id', createdTeamIds).del();
+        await db('biohub.team').whereIn('team_id', createdTeamIds).del();
       }
 
       // 4. S3 objects.
@@ -245,6 +250,19 @@ describe('Download Worker', function () {
     createdUploadIds.push(upload.upload_id);
 
     const ticketId = await getOrCreateTestTicketId(db, submissionId, upload.upload_id, SYSTEM_USER_ID);
+    const [uploadTeam] = await db('biohub.team')
+      .insert({
+        name: `${TEST_PREFIX} upload team ${upload.upload_id}`,
+        description: 'Dedicated upload access team for download integration testing.',
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('team_id');
+    createdTeamIds.push(uploadTeam.team_id);
+    await db('biohub.team_member').insert({
+      system_user_id: SYSTEM_USER_ID,
+      team_id: uploadTeam.team_id,
+      create_user: SYSTEM_USER_ID
+    });
 
     // submission_upload.blueprint_id is NOT NULL; bind the seeded default blueprint.
     const blueprint = await db('biohub.blueprint')
@@ -256,6 +274,7 @@ describe('Download Worker', function () {
       .insert({
         submission_id: submissionId,
         upload_id: upload.upload_id,
+        team_id: uploadTeam.team_id,
         ticket_id: ticketId,
         blueprint_id: blueprint.blueprint_id,
         create_user: SYSTEM_USER_ID

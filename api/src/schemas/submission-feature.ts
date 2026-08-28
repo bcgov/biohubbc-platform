@@ -3,7 +3,7 @@ import { OpenAPIV3 } from 'openapi-types';
 export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['feature', 'relatedFeatures'],
+  required: ['feature'],
   properties: {
     feature: {
       type: 'object',
@@ -74,32 +74,6 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
           items: { type: 'string' },
           description:
             "Distinct active security rule names applied across this feature's closure ancestry; empty when the feature is not effectively secured."
-        }
-      }
-    },
-    relatedFeatures: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['submission_feature_id', 'feature_type_name', 'feature_type_display_name', 'data'],
-        properties: {
-          submission_feature_id: {
-            type: 'integer',
-            description: 'Unique identifier for the related submission feature.'
-          },
-          feature_type_name: {
-            type: 'string',
-            description: 'Name of the related feature type.'
-          },
-          feature_type_display_name: {
-            type: 'string',
-            description: 'Display name of the related feature type.'
-          },
-          data: {
-            type: 'object',
-            description: 'Feature-specific payload for the related feature.'
-          }
         }
       }
     }

@@ -1,16 +1,9 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureType, FeatureTypeWithProperties } from '../../models/feature-type';
 import { InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
-
-const ActiveFeatureTypeRow = z.object({
-  feature_type_id: z.number(),
-  name: z.string()
-});
-
-export type ActiveFeatureTypeRow = z.infer<typeof ActiveFeatureTypeRow>;
 
 /**
  * A repository class for ingestion-related data access.
@@ -26,21 +19,54 @@ export class FeatureIngestionRepository extends BaseRepository {
    * Repository methods should return row-shaped data; callers can project this
    * into domain-specific structures (for example, a `Map`) in the service layer.
    *
-   * @returns {Promise<ActiveFeatureTypeRow[]>}
+   * @returns {Promise<FeatureType[]>}
    * @memberof FeatureIngestionRepository
    */
-  async getActiveFeatureTypeMap(): Promise<ActiveFeatureTypeRow[]> {
+  async getActiveFeatureTypeMap(): Promise<FeatureType[]> {
     const sqlStatement = SQL`
       SELECT
         feature_type_id,
-        name
+        name,
+        display_name,
+        description
       FROM
         feature_type
       WHERE
         record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sqlStatement, ActiveFeatureTypeRow);
+    const response = await this.connection.sql(sqlStatement, FeatureType);
+
+    return response.rows;
+  }
+
+  /**
+   * Get feature type name/id mappings used to ingest tarball features.
+   *
+   * Retired feature types remain ingestible so the Blueprint selected for the
+   * upload can determine whether their features and properties are valid. When
+   * multiple historical rows share a name, prefer the active row, otherwise the
+   * most recently retired row; the tarball format contains only the type name.
+   *
+   * @returns {Promise<FeatureType[]>}
+   * @memberof FeatureIngestionRepository
+   */
+  async getKnownFeatureTypeMap(): Promise<FeatureType[]> {
+    const sqlStatement = SQL`
+      SELECT DISTINCT ON (name)
+        feature_type_id,
+        name,
+        display_name,
+        description
+      FROM
+        feature_type
+      ORDER BY
+        name,
+        record_end_date DESC NULLS FIRST,
+        feature_type_id DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, FeatureType);
 
     return response.rows;
   }

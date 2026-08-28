@@ -56,11 +56,11 @@ const systemUsers: SystemUserSeed[] = [
     display_name: 'Meijer, Annika WLRS:EX'
   },
   {
-    identifier: 'dylrogow',
+    identifier: 'drogowsk',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '473C7CDAC46D402AA79AE980DDDB85C3',
-    display_name: 'Rogowsky, Dylan WLRS:EX'
+    user_guid: '2B9B0C48587E41D68A184E8D772EEA11',
+    display_name: 'Rogowsky, Dylan WLRS:IN'
   },
   {
     // No display_name: exercises the user_identifier fallback in user selectors.

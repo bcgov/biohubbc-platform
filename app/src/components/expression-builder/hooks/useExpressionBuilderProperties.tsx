@@ -65,6 +65,7 @@ export const useExpressionBuilderProperties = (
   );
   const lastRecommendedSearchTermRef = useRef<string | null>(null);
   const activePropertyOptionsLookupIdRef = useRef(0);
+  const activePropertyOptionsKeywordRef = useRef('');
   const usedPropertyKeysRef = useRef(usedPropertyKeys);
   const { recommended, handleRefresh: refreshRecommendedFilters } = useRecommendedFilters();
 
@@ -274,10 +275,24 @@ export const useExpressionBuilderProperties = (
         return;
       }
 
+      const normalizedKeyword = keyword.trim();
+
+      if (normalizedKeyword === activePropertyOptionsKeywordRef.current) {
+        return;
+      }
+
+      activePropertyOptionsKeywordRef.current = normalizedKeyword;
       const lookupId = ++activePropertyOptionsLookupIdRef.current;
-      debouncedLoadPropertyOptions(keyword.trim(), lookupId);
+
+      if (!normalizedKeyword) {
+        debouncedLoadPropertyOptions.cancel();
+        void loadPropertyOptions('', lookupId);
+        return;
+      }
+
+      debouncedLoadPropertyOptions(normalizedKeyword, lookupId);
     },
-    [debouncedLoadPropertyOptions, enabled]
+    [debouncedLoadPropertyOptions, enabled, loadPropertyOptions]
   );
 
   useEffect(() => {

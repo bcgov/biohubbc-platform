@@ -88,6 +88,7 @@ describe('Process Submission Features Worker', function () {
   const createdUploadIds: string[] = [];
   const createdArtifactIds: string[] = [];
   const createdTicketIds: string[] = [];
+  const createdTeamIds: string[] = [];
   const createdObjectKeys: string[] = [];
 
   before(async () => {
@@ -139,6 +140,10 @@ describe('Process Submission Features Worker', function () {
         await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
+      if (createdTeamIds.length) {
+        await db('biohub.team_member').whereIn('team_id', createdTeamIds).del();
+        await db('biohub.team').whereIn('team_id', createdTeamIds).del();
+      }
 
       // Clean up S3 objects
       for (const key of createdObjectKeys) {
@@ -164,6 +169,7 @@ describe('Process Submission Features Worker', function () {
     uploadId: string;
     submissionUploadId: string;
     ticketId: string;
+    teamId: string;
     blueprintId: number;
     artifactId: string;
     objectKey: string;
@@ -218,6 +224,14 @@ describe('Process Submission Features Worker', function () {
 
     // 5. ticket (required FK for submission_upload)
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
+    const [uploadTeam] = await db('biohub.team')
+      .insert({
+        name: `${TEST_PREFIX} upload team ${upload.upload_id}`,
+        description: 'Upload access team for integration testing.'
+      })
+      .returning('team_id');
+    createdTeamIds.push(uploadTeam.team_id);
+    await db('biohub.team_member').insert({ system_user_id: SYSTEM_USER_ID, team_id: uploadTeam.team_id });
 
     // 6. submission_upload (links submission to upload; pinned to the active default Blueprint)
     const [{ blueprint_id: blueprintId }] = await db('biohub.blueprint')
@@ -228,6 +242,7 @@ describe('Process Submission Features Worker', function () {
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
+        team_id: uploadTeam.team_id,
         ticket_id: ticketId,
         blueprint_id: blueprintId
       })
@@ -245,6 +260,7 @@ describe('Process Submission Features Worker', function () {
       uploadId: upload.upload_id,
       submissionUploadId: submissionUpload.submission_upload_id,
       ticketId,
+      teamId: uploadTeam.team_id,
       blueprintId,
       artifactId: artifact.artifact_id,
       objectKey
@@ -260,6 +276,7 @@ describe('Process Submission Features Worker', function () {
     submissionId: number;
     uploadId: string;
     ticketId: string;
+    teamId: string;
     blueprintId: number;
   }): Promise<void> {
     const connection = getAPIUserDBConnection();
@@ -269,6 +286,7 @@ describe('Process Submission Features Worker', function () {
         submission_upload_id: params.submissionUploadId,
         submission_id: params.submissionId,
         upload_id: params.uploadId,
+        team_id: params.teamId,
         status: 'uploaded',
         ticket_id: params.ticketId,
         blueprint_id: params.blueprintId
@@ -304,10 +322,10 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId, blueprintId } = await setupSubmissionWithTar(
+    const { submissionId, uploadId, submissionUploadId, ticketId, teamId, blueprintId } = await setupSubmissionWithTar(
       tarBuffer
     );
-    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, blueprintId });
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, teamId, blueprintId });
 
     // Wait for the worker to finish
     const validation = await waitForValidationStatus(db, submissionId);
@@ -373,10 +391,10 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId, blueprintId } = await setupSubmissionWithTar(
+    const { submissionId, uploadId, submissionUploadId, ticketId, teamId, blueprintId } = await setupSubmissionWithTar(
       tarBuffer
     );
-    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, blueprintId });
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId, teamId, blueprintId });
 
     const validation = await waitForValidationStatus(db, submissionId);
     expect(validation.status).to.equal('completed');
@@ -413,6 +431,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   const createdUploadIds: string[] = [];
   const createdArtifactIds: string[] = [];
   const createdTicketIds: string[] = [];
+  const createdTeamIds: string[] = [];
   const createdObjectKeys: string[] = [];
 
   before(() => {
@@ -451,6 +470,10 @@ describe('SubmissionIngestionService pipeline (system)', function () {
         await db('biohub.ticket_status').whereIn('ticket_id', createdTicketIds).del();
         await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
+      if (createdTeamIds.length) {
+        await db('biohub.team_member').whereIn('team_id', createdTeamIds).del();
+        await db('biohub.team').whereIn('team_id', createdTeamIds).del();
+      }
 
       // Clean up S3 objects (not rolled back by DB transaction)
       for (const key of createdObjectKeys) {
@@ -477,6 +500,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     uploadId: string;
     submissionUploadId: string;
     ticketId: string;
+    teamId: string;
     blueprintId: number;
   }> {
     const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
@@ -529,6 +553,14 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     // 5. ticket (required FK for submission_upload)
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
     createdTicketIds.push(ticketId);
+    const [uploadTeam] = await db('biohub.team')
+      .insert({
+        name: `${TEST_PREFIX} upload team ${upload.upload_id}`,
+        description: 'Upload access team for integration testing.'
+      })
+      .returning('team_id');
+    createdTeamIds.push(uploadTeam.team_id);
+    await db('biohub.team_member').insert({ system_user_id: SYSTEM_USER_ID, team_id: uploadTeam.team_id });
 
     // 6. submission_upload (pinned to the active default Blueprint)
     const [{ blueprint_id: blueprintId }] = await db('biohub.blueprint')
@@ -539,6 +571,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
+        team_id: uploadTeam.team_id,
         ticket_id: ticketId,
         blueprint_id: blueprintId
       })
@@ -556,6 +589,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       uploadId: upload.upload_id,
       submissionUploadId: submissionUpload.submission_upload_id,
       ticketId,
+      teamId: uploadTeam.team_id,
       blueprintId
     };
   }
@@ -574,6 +608,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submission_upload_id: setup.submissionUploadId,
       submission_id: setup.submissionId,
       upload_id: setup.uploadId,
+      team_id: setup.teamId,
       status: 'uploaded',
       ticket_id: setup.ticketId,
       blueprint_id: setup.blueprintId

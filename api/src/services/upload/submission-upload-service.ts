@@ -1,6 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
-import { HTTP400 } from '../../errors/http-error';
+import { HTTP400, HTTP409 } from '../../errors/http-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -11,11 +11,15 @@ import {
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
+import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
+import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 
 export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
   blueprintRepository: BlueprintRepository;
+  submissionUploadReviewStatusService: SubmissionUploadReviewStatusService;
+  teamService: TeamService;
 
   /**
    * Creates an instance of SubmissionUploadService.
@@ -27,6 +31,8 @@ export class SubmissionUploadService extends DBService {
     super(connection);
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
     this.blueprintRepository = new BlueprintRepository(connection);
+    this.submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(connection);
+    this.teamService = new TeamService(connection);
   }
 
   /**
@@ -162,14 +168,29 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Inserts a new submission_upload record.
+   * Create a dedicated access team and insert a new submission_upload record.
    *
    * @param {CreateSubmissionUpload} submissionUpload The artifact data to insert
+   * @param {number} requestorSystemUserId Authenticated user who initiated the upload
+   * @param {number[]} [submitterSystemUserIds] Additional users who may access the upload
    * @returns {Promise<{ submission_upload_artipfact_id: string }>} Newly created artifact ID
    * @memberof SubmissionUploadService
    */
-  async insertSubmissionUpload(submissionUpload: CreateSubmissionUpload): Promise<{ submission_upload_id: string }> {
-    return this.submissionUploadRepository.insertSubmissionUpload(submissionUpload);
+  async insertSubmissionUpload(
+    submissionUpload: CreateSubmissionUpload,
+    requestorSystemUserId: number,
+    submitterSystemUserIds: number[] = []
+  ): Promise<{ submission_upload_id: string }> {
+    const team = await this.teamService.createTeam({
+      name: `Submission Upload Team ${submissionUpload.upload_id}`,
+      description: `Auto-generated access team for submission upload ${submissionUpload.upload_id}.`,
+      system_user_ids: [...new Set([requestorSystemUserId, ...submitterSystemUserIds])]
+    });
+
+    return this.submissionUploadRepository.insertSubmissionUpload({
+      ...submissionUpload,
+      team_id: team.team_id
+    });
   }
 
   /**
@@ -340,13 +361,34 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Soft-deletes a submission_upload record by ID.
+   * Delete an unreviewed submission upload and retire its dedicated access team.
    *
-   * @param {string} submissionUploadId The ID of the record to soft-delete
+   * Verifies that the upload belongs to the submission, requires its current review status to be
+   * `submitted`, soft-deletes the upload, records the `deleted` status, and soft-deletes its team.
+   * The caller is responsible for running this method in a transaction.
+   *
+   * @param {string} submissionUuid Submission UUID from the request path.
+   * @param {string} submissionUploadId Submission upload UUID from the request path.
    * @returns {Promise<void>}
+   * @throws {HTTP409} If the upload has already been reviewed.
    * @memberof SubmissionUploadService
    */
-  async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
-    return this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
+  async deleteSubmissionUpload(submissionUuid: string, submissionUploadId: string): Promise<void> {
+    const submissionUpload = await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+    const reviewStatus = await this.submissionUploadReviewStatusService.getSubmissionUploadReviewStatus(
+      submissionUploadId
+    );
+
+    if (reviewStatus.status !== 'submitted') {
+      throw new HTTP409(
+        `Cannot delete a submission upload with status "${reviewStatus.status}". Only uploads with status "submitted" may be deleted.`
+      );
+    }
+
+    await this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
+    await this.submissionUploadReviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, {
+      status: 'deleted'
+    });
+    await this.teamService.deleteTeam(submissionUpload.team_id);
   }
 }

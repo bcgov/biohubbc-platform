@@ -7,7 +7,16 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 export default defineConfig(({ mode }) => ({
   server: {
     host: '0.0.0.0',
-    port: Number(process.env.VITE_PORT) || 5173
+    port: Number(process.env.VITE_PORT) || 5173,
+    proxy: {
+      // Tiles are same origin in deployed environments, where an OpenShift route serves /martin on the app's own
+      // hostname. Proxying here gives local development the same relative URL, so the tile URL template the API
+      // returns works unchanged in both.
+      '/martin': {
+        target: process.env.VITE_MARTIN_PROXY_TARGET || 'http://localhost:6300',
+        changeOrigin: true
+      }
+    }
   },
   plugins: [
     tsconfigPaths(),

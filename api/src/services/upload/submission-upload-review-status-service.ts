@@ -104,7 +104,7 @@ export class SubmissionUploadReviewStatusService extends DBService {
 
   /**
    * Get submission history by UUID, returning the API response shape (submissionId + history array).
-   * When there are no status rows, resolves submissionId via getSubmissionIdByUUID (throws if submission not found).
+   * When there are no status rows, resolves and verifies the submission ID.
    *
    * @param {string} submissionUuid
    * @returns {Promise<SubmissionHistoryResponse>}
@@ -118,8 +118,8 @@ export class SubmissionUploadReviewStatusService extends DBService {
       submissionId = rows[0].submission_id;
     } else {
       const submissionService = new SubmissionService(this.connection);
-      const byUuid = await submissionService.getSubmissionIdByUUID(submissionUuid);
-      submissionId = byUuid.submission_id;
+      const submission = await submissionService.getSubmissionIdByUUID(submissionUuid);
+      submissionId = submission.submission_id;
     }
 
     const history = rows.map((row) => ({

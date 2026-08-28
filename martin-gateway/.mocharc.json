@@ -1,0 +1,5 @@
+{
+  "extension": ["ts"],
+  "file": ["src/__mocks__/test-setup.ts"],
+  "spec": "src/{*.@(test|spec).ts,!(__integration__)/**/*.@(test|spec).ts}"
+}

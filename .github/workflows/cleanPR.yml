@@ -1,11 +1,20 @@
 # Clean PR artifacts and image tags.
-# Runs when a PR is closed (merged or not), or when a PR is converted back to draft.
+# Runs when a PR is closed (merged or not), converted back to draft, or labelled "No Preview".
 # Deletes PR Helm release in dev and the four PR image tags (build-1.0.0-{PR}) in -tools.
+#
+# "No Preview" is the ready-PR equivalent of draft: a stacked PR has to be ready for the top of
+# the stack to merge, so the label is how it stays ready without holding an environment.
 name: Clean PR Artifacts
 
 on:
   pull_request:
-    types: [closed, converted_to_draft]
+    types: [closed, converted_to_draft, labeled]
+
+# Serialize teardowns: labelling then closing fires twice, and two uninstalls of one release
+# race. cancel-in-progress is off — a cancelled `helm uninstall` leaves the PVCs behind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -20,11 +29,15 @@ jobs:
     name: Clean PR Artifacts for API, App, DB, and DB Setup in Dev and Tools environment
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # `labeled` fires for every label; only "No Preview" means "tear the preview down".
+    if: ${{ github.event.action != 'labeled' || github.event.label.name == 'No Preview' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
       - name: Checkout Target Branch
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
       - uses: ./.github/actions/setup-openshift-cli
@@ -37,11 +50,33 @@ jobs:
 
       # Clean all PR artifacts for the PR using Helm
       - name: Clean PR Artifacts
+        env:
+          DEV_NAMESPACE: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev
         run: |
           echo "Cleaning PR artifacts for PR $PR_NUMBER"
-          
-          echo "Uninstalling Helm release from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev namespace..."
-          helm uninstall "pr-$PR_NUMBER" --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev || echo "No Helm release found in dev namespace for PR $PR_NUMBER"
+
+          # An absent release is a no-op, but a failed uninstall must fail the job: it leaves
+          # the PR's PVCs (and their storage quota) behind. Swallowing the error here would
+          # report success and also hide the run from retryFailedJobs, which only sees failures.
+          if helm status "pr-$PR_NUMBER" --namespace "$DEV_NAMESPACE" >/dev/null 2>&1; then
+            echo "Uninstalling Helm release pr-$PR_NUMBER from $DEV_NAMESPACE..."
+            helm uninstall "pr-$PR_NUMBER" --namespace "$DEV_NAMESPACE" --wait --timeout 10m
+          else
+            echo "No Helm release found in $DEV_NAMESPACE for PR $PR_NUMBER; nothing to uninstall."
+          fi
+
+          # PR PVCs carry no "helm.sh/resource-policy: keep" (that is set only for environment.id
+          # "deploy"), so a clean uninstall removes them. Verify, and sweep any that outlived the
+          # release — e.g. left by an interrupted uninstall or created outside the release.
+          LEFTOVER=$(oc -n "$DEV_NAMESPACE" get pvc -o name 2>/dev/null | grep -E -- "-dev-${PR_NUMBER}\$" || true)
+          if [ -n "$LEFTOVER" ]; then
+            echo "PVCs still present for PR $PR_NUMBER after uninstall; deleting:"
+            echo "$LEFTOVER"
+            # shellcheck disable=SC2086
+            oc -n "$DEV_NAMESPACE" delete $LEFTOVER
+          else
+            echo "No PVCs remain for PR $PR_NUMBER in $DEV_NAMESPACE."
+          fi
 
           echo "Removing App image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
           oc tag -d biohub-platform-app:${{ env.IMAGE_TAG }} --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
@@ -54,5 +89,8 @@ jobs:
 
           echo "Removing DB Setup image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
           oc tag -d biohub-platform-db-setup:${{ env.IMAGE_TAG }}  --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
+
+          echo "Removing Martin Gateway image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
+          oc tag -d biohub-platform-martin-gateway:${{ env.IMAGE_TAG }} --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
           
           echo "Cleanup completed for PR $PR_NUMBER"

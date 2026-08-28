@@ -12,6 +12,7 @@ import { useGalleryApi } from './api/useGalleryApi';
 import { useObjectStorageApi } from './api/useObjectStorageApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
+import { useMartinApi } from './api/useMartinApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
@@ -53,6 +54,8 @@ export const useApi = () => {
 
   const search = useSearchApi(apiAxios);
 
+  const martin = useMartinApi(apiAxios);
+
   const teams = useTeamsApi(apiAxios);
 
   const download = useDownloadApi(apiAxios);
@@ -83,6 +86,7 @@ export const useApi = () => {
     codes,
     policies,
     search,
+    martin,
     teams,
     download,
     downloadExport,

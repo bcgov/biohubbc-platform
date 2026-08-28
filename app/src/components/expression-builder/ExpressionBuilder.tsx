@@ -1,7 +1,11 @@
 import AddIcon from '@mui/icons-material/Add';
 import { Box, Button, Stack } from '@mui/material';
 import { useDialogContext } from 'hooks/useContext';
-import { ExpressionLogicalOperator, ExpressionPredicateOperator } from 'interfaces/expression.interface';
+import {
+  ExpressionLogicalOperator,
+  ExpressionPredicateOperator,
+  ExpressionPropertyType
+} from 'interfaces/expression.interface';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   appendClauseToGroup,
@@ -12,6 +16,7 @@ import {
   getExpressionBuilderPropertyKeyFromProperty,
   getUsedExpressionBuilderPropertyKeys,
   groupPredicateWithPredicate,
+  hasPredicateValue,
   hydrateBuilderExpressionNode,
   moveExpressionToExpressionGroup,
   movePredicateToExpressionGroup,
@@ -138,9 +143,61 @@ export const ExpressionBuilder = ({
     [knownProperties]
   );
 
+  // Use when only the operator changes so compatible value-taking operators keep the current draft value.
   const getValueForOperator = useCallback(
-    (operator: ExpressionPredicateOperator | null, predicateType: ExpressionBuilderProperty['predicate_type']) =>
-      operator === 'Exists' || operator === null ? undefined : getDefaultValueForPredicateType(predicateType),
+    (
+      operator: ExpressionPredicateOperator | null,
+      predicateType: ExpressionBuilderProperty['predicate_type'],
+      currentValue?: unknown
+    ) => {
+      if (operator === 'Exists' || operator === null) {
+        return undefined;
+      }
+
+      if (hasPredicateValue(currentValue)) {
+        return currentValue;
+      }
+
+      return getDefaultValueForPredicateType(predicateType);
+    },
+    []
+  );
+
+  // Use when a property changes to preserve only values that can be safely edited by the new predicate type.
+  const getValueForPropertyType = useCallback(
+    (value: unknown, currentType: ExpressionPropertyType, nextType: ExpressionPropertyType): unknown => {
+      if (!hasPredicateValue(value)) {
+        return undefined;
+      }
+
+      if (currentType === nextType) {
+        return value;
+      }
+
+      if (nextType === 'string' && (typeof value === 'string' || typeof value === 'number')) {
+        return String(value);
+      }
+
+      if ((nextType === 'number' || nextType === 'code') && (typeof value === 'string' || typeof value === 'number')) {
+        return String(value);
+      }
+
+      if (nextType === 'taxon') {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return value;
+        }
+
+        if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+          return Number(value);
+        }
+      }
+
+      if (nextType === 'boolean' && typeof value === 'boolean') {
+        return value;
+      }
+
+      return undefined;
+    },
     []
   );
 
@@ -165,7 +222,7 @@ export const ExpressionBuilder = ({
         predicate: {
           ...predicate.predicate,
           operator,
-          value: getValueForOperator(operator, predicate.predicate.type)
+          value: getValueForOperator(operator, predicate.predicate.type, predicate.predicate.value)
         }
       };
     },
@@ -235,8 +292,8 @@ export const ExpressionBuilder = ({
     setRootNode((current) => appendClauseToGroup(current, current.ui_id, createBuilderPredicateNode()));
   }, []);
 
-  // Species recommendation chips become taxon_id equals TSN predicates. The
-  // taxon property is reused from recommendations or loaded once on demand.
+  // Species recommendation chips become Equals predicates on the taxon_id property whose value is the species TSN.
+  // The taxon property is reused from recommendations or loaded once on demand.
   const handleSuggestedSpeciesClick = useCallback(
     async (species: { label: string; value: string | number }) => {
       const property = speciesPredicateProperty ?? (await loadSpeciesPredicateProperty());
@@ -423,8 +480,9 @@ export const ExpressionBuilder = ({
           let value = defaultDraft?.value;
           if (operator === 'Exists') {
             value = undefined;
-          } else if (hasCurrentValue) {
-            value = currentDraft.value;
+          } else if (property && hasCurrentValue) {
+            const typedValue = getValueForPropertyType(currentDraft.value, currentDraft.type, property.predicate_type);
+            value = typedValue ?? defaultDraft?.value;
           }
 
           return {
@@ -440,11 +498,11 @@ export const ExpressionBuilder = ({
         })
       );
     },
-    [handlePropertySelected, knownProperties]
+    [getValueForPropertyType, handlePropertySelected, knownProperties]
   );
 
-  // Operator changes reset the draft value. Exists intentionally clears value
-  // because the API requires Exists predicates to omit that field.
+  // Operator changes keep compatible draft values. Exists intentionally clears
+  // value because the API requires Exists predicates to omit that field.
   const handleOperatorChange = useCallback(
     (predicateId: string, operator: ExpressionPredicateOperator | null) => {
       setRootNode((current) =>

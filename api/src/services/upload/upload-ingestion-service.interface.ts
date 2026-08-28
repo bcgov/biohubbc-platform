@@ -10,7 +10,7 @@ interface PresignedUrl {
 }
 
 export interface PresignedUploadUrlResponse {
-  submissionId: string;
+  submissionUuid: string;
   submissionUploadId: string;
   uploadId: string;
   s3UploadId: string;

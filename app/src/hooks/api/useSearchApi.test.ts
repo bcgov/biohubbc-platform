@@ -7,7 +7,8 @@ import {
   SearchFeatureResultWithRelevancy,
   SearchPropertyResponse,
   SearchResponse,
-  SearchSummaryResponse
+  SearchSummaryResponse,
+  SearchTaxonResponse
 } from 'interfaces/useSearchApi.interface';
 import { useSearchApi } from './useSearchApi';
 
@@ -265,6 +266,43 @@ describe('useSearchApi', () => {
       expect(result.properties.string).toEqual([]);
       expect(result.properties.number).toEqual([]);
       expect(result.pagination.total).toEqual(0);
+    });
+  });
+
+  describe('searchTaxon', () => {
+    it('should make POST request to /api/search/taxon with filters and pagination', async () => {
+      const mockResponse: SearchTaxonResponse = {
+        taxonomy: [
+          {
+            taxon_id: 12,
+            itis_tsn: 180702,
+            itis_scientific_name: 'Ovis dalli',
+            common_name: "Dall's sheep",
+            rank: 'Species',
+            relevancy_score: 2
+          }
+        ],
+        pagination: {
+          total: 1,
+          per_page: 10,
+          current_page: 1,
+          last_page: 1,
+          sort: undefined,
+          order: undefined
+        }
+      };
+
+      mock.onPost('/api/search/taxon').reply(200, mockResponse);
+
+      const result = await useSearchApi(axios).searchTaxon({ keyword: 'Ovis dalli' }, { page: 1, limit: 10 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.post[0].data).toEqual(
+        JSON.stringify({
+          filters: { keyword: 'Ovis dalli' },
+          pagination: { page: 1, limit: 10 }
+        })
+      );
     });
   });
 

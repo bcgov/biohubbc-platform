@@ -30,11 +30,7 @@ export const SubmissionDetailPage = () => {
   );
 
   const featureGrid = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) =>
-      api.submissions.getSubmissionFeatures(Number(submissionId), {
-        search,
-        ...pagination
-      }),
+    fetcher: (_search, pagination) => api.submissions.getSubmissionFeatures(Number(submissionId), pagination),
     extractData: (response) =>
       response.features.map((f) => ({
         submission_feature_id: f.submission_feature_id,
@@ -89,8 +85,6 @@ export const SubmissionDetailPage = () => {
       rows={featureGrid.rows}
       rowCount={featureGrid.rowCount}
       isLoading={featureGrid.isLoading}
-      searchTerm={featureGrid.searchTerm}
-      onSearch={featureGrid.handleSearch}
       onRowClick={handleRowClick}
       paginationModel={featureGrid.paginationModel}
       onPaginationModelChange={featureGrid.handlePaginationChange}

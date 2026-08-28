@@ -1,18 +1,14 @@
 import { IDBConnection } from '../database/db';
-import { HTTP403 } from '../errors/http-error';
 import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
 import {
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
 } from '../models/submission-feature-security';
 import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
-import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { getActiveSystemUserId } from '../utils/system-user-context';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
-import { UserService } from './user-service';
 
 const defaultLog = getLogger('services/security-service');
 
@@ -25,22 +21,13 @@ const defaultLog = getLogger('services/security-service');
 export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
   artifactService: ArtifactService;
-  userService: UserService;
   securityScopeService: SecurityScopeService;
-
-  /**
-   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
-   */
-  static readonly dependencies = {
-    getS3SignedURL
-  };
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.securityRepository = new SecurityRepository(connection);
     this.artifactService = new ArtifactService(connection);
-    this.userService = new UserService(connection);
     this.securityScopeService = new SecurityScopeService(connection);
   }
 
@@ -218,60 +205,6 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Returns the signed URL of a document for which a user has permissions.
-   *
-   * Rules:
-   * non-admin user cannot access the document when:
-   * - it is pending review, OR
-   * - user hasn't been granted an exception to every security rule
-   *
-   * non-admin user can access the document when:
-   * - document is not secured
-   * - user has the correct exceptions
-   *
-   *
-   * @param {number} artifactId
-   * @return {*}  {Promise<any>}
-   * @memberof SecurityService
-   */
-  async getSecuredArtifactBasedOnRulesAndPermissions(artifactId: number): Promise<any> {
-    const userId = await getActiveSystemUserId(this.connection);
-    const isSystemUserAdmin = userId ? await this.userService.isSystemUserAdmin() : false;
-
-    const isArtifactPendingReview = await this.isArtifactPendingReview(artifactId);
-
-    //non-admin user cannot access a document pending review
-    if (!isSystemUserAdmin && isArtifactPendingReview) {
-      throw new HTTP403('You do not have access to this document.');
-    }
-
-    const artifactSecurityRuleIds = await this.getArtifactPersecutionAndHarmRulesIds(artifactId);
-
-    const pers_harm_exceptionIds = userId ? await this.getPersecutionAndHarmExceptionsIdsByUser(userId) : [];
-
-    const userHasExceptionsToAllRules = artifactSecurityRuleIds.every((rule) => pers_harm_exceptionIds.includes(rule));
-
-    //non-admin user cannot access a document if they don't have exceptions to all the rules applied to that document
-    if (
-      !isSystemUserAdmin &&
-      !isArtifactPendingReview &&
-      artifactSecurityRuleIds.length > 0 &&
-      !userHasExceptionsToAllRules
-    ) {
-      throw new HTTP403('You do not have access to this document.');
-    }
-
-    // access is granted because
-    // 1) admin (isSystemAdmin is true)
-    // 2) document is unsecured (not pending review, and has no security rules applied)
-    // 3) non-admin user has exceptions all security rules
-
-    const artifact = await this.artifactService.getArtifactById(artifactId);
-
-    return SecurityService.dependencies.getS3SignedURL(artifact.key);
-  }
-
-  /**
    * Get the persecution or harm rules for which a user is granted exception
    *
    * @param {number} userId
@@ -346,9 +279,9 @@ export class SecurityService extends DBService {
    *
    * @param {number} submissionId ID of the submission the features belong to.
    * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
-   * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
-   * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
-   * @return {*}  {Promise<void>}
+   * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation.
+   * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation.
+   * @returns {Promise<void>} Resolves after the mutations and anchor-recomputation jobs are queued.
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmissionFeatures(
@@ -364,11 +297,19 @@ export class SecurityService extends DBService {
     }
 
     if (removeRuleIds.length > 0) {
-      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(
+        submissionId,
+        submissionFeatureIds,
+        removeRuleIds
+      );
     }
 
     if (applyRuleIds.length > 0) {
-      await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
+      await this.securityRepository.applySecurityRulesToSubmissionFeatures(
+        submissionId,
+        submissionFeatureIds,
+        applyRuleIds
+      );
     }
 
     // Trigger scope recomputation — the recompute job handles both added and removed rules
@@ -383,10 +324,10 @@ export class SecurityService extends DBService {
    * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
    * added and removed rules idempotently.
    *
-   * @param {number} submissionId
-   * @param {number[]} applyRuleIds IDs of rules to apply
-   * @param {number[]} removeRuleIds IDs of rules to remove
-   * @return {Promise<void>}
+   * @param {number} submissionId ID of the submission whose feature security should be updated.
+   * @param {number[]} applyRuleIds IDs of rules to apply.
+   * @param {number[]} removeRuleIds IDs of rules to remove.
+   * @returns {Promise<void>} Resolves after the mutations and anchor-recomputation jobs are queued.
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmission(

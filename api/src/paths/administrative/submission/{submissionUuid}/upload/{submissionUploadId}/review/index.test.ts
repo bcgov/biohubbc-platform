@@ -1,0 +1,96 @@
+import chai, { expect } from 'chai';
+import sinon from 'sinon';
+import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../__mocks__/db';
+import * as db from '../../../../../../../database/db';
+import {
+  SubmissionUploadReview,
+  SubmissionUploadReviewScope,
+  SubmissionUploadReviewStatus
+} from '../../../../../../../models/submission-upload-review';
+import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
+import { getSubmissionUploadReviews, insertSubmissionUploadReview } from './index';
+
+chai.use(sinonChai);
+
+describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('GET returns active scoped upload reviews', async () => {
+    registerConnection();
+    const review = buildReview({
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+      scope: SubmissionUploadReviewScope.SECURITY
+    });
+    const findStub = sinon
+      .stub(SubmissionUploadReviewService.prototype, 'findReviewsBySubmissionUploadId')
+      .resolves([review]);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = {
+      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+    };
+
+    await getSubmissionUploadReviews()(mockReq, mockRes, mockNext);
+
+    expect(findStub).to.have.been.calledOnceWith(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql([review]);
+  });
+
+  it('POST inserts a scoped upload review', async () => {
+    registerConnection();
+    const review = buildReview({
+      submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
+      scope: SubmissionUploadReviewScope.SECURITY
+    });
+    const insertStub = sinon
+      .stub(SubmissionUploadReviewService.prototype, 'insertSubmissionUploadReview')
+      .resolves(review);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = {
+      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+    };
+    mockReq.body = { scope: 'security', status: 'requested' };
+
+    await insertSubmissionUploadReview()(mockReq, mockRes, mockNext);
+
+    expect(insertStub).to.have.been.calledOnceWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+      submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+      scope: SubmissionUploadReviewScope.SECURITY,
+      status: SubmissionUploadReviewStatus.REQUESTED,
+      requested_by: 7
+    });
+    expect(mockRes.statusValue).to.equal(201);
+    expect(mockRes.jsonValue).to.eql(review);
+  });
+});
+
+const registerConnection = () => {
+  const mockDBConnection = getMockDBConnection({
+    systemUserId: () => 7,
+    commit: sinon.stub(),
+    rollback: sinon.stub(),
+    release: sinon.stub()
+  });
+  sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+};
+
+const buildReview = (params: {
+  submission_upload_review_id: string;
+  scope: SubmissionUploadReviewScope;
+}): SubmissionUploadReview => ({
+  submission_upload_review_id: params.submission_upload_review_id,
+  submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+  scope: params.scope,
+  status: SubmissionUploadReviewStatus.REQUESTED,
+  requested_by: 7
+});

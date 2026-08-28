@@ -13,10 +13,16 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
-import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchRepository } from '../../repositories/search-repository';
+import {
+  addCodeProperty,
+  addStringProperty,
+  addTaxonProperty,
+  createCodesetCode,
+  createTaxon
+} from '../helpers/test-feature-property-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 // Deterministic token: no seeded value contains it, so the keyword can't match pre-existing data.
@@ -44,151 +50,6 @@ describe('SearchRepository (integration)', function () {
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────
-
-  async function getFeatureTypePropertyId(featureTypeName: string, propertyName: string): Promise<number> {
-    const result = await connection.sql(SQL`
-      SELECT ftp.feature_type_property_id
-      FROM feature_type_property ftp
-      JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-      JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
-      WHERE ft.name = ${featureTypeName}
-        AND fp.name = ${propertyName}
-        AND ftp.record_end_date IS NULL
-      LIMIT 1;
-    `);
-
-    if (!result.rows[0]) {
-      throw new Error(`No feature_type_property row for (${featureTypeName}, ${propertyName})`);
-    }
-
-    return result.rows[0].feature_type_property_id;
-  }
-
-  /** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
-  async function getBlueprintFeatureTypePropertyId(submissionFeatureId: number, ftpId: number): Promise<number> {
-    const result = await connection.sql(SQL`
-      SELECT bftp.blueprint_feature_type_property_id
-      FROM submission_feature sf
-      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
-      JOIN blueprint_feature_type bft
-        ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-      JOIN blueprint_feature_type_property bftp
-        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-       AND bftp.feature_type_property_id = ${ftpId}
-       AND bftp.record_end_date IS NULL
-      WHERE sf.submission_feature_id = ${submissionFeatureId}
-      LIMIT 1;
-    `);
-
-    if (!result.rows[0]) {
-      throw new Error(`No blueprint_feature_type_property for feature ${submissionFeatureId}, ftp ${ftpId}`);
-    }
-
-    return result.rows[0].blueprint_feature_type_property_id;
-  }
-
-  async function addStringProperty(
-    submissionFeatureId: number,
-    featureTypeName: string,
-    propertyName: string,
-    value: string
-  ): Promise<void> {
-    const systemUserId = connection.systemUserId();
-    const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
-    const bftpId = await getBlueprintFeatureTypePropertyId(submissionFeatureId, ftpId);
-
-    await connection.sql(SQL`
-      INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${value}, ${systemUserId});
-    `);
-  }
-
-  async function addCodeProperty(
-    submissionFeatureId: number,
-    featureTypeName: string,
-    propertyName: string,
-    contributorCodesetCodeId: number
-  ): Promise<void> {
-    const systemUserId = connection.systemUserId();
-    const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
-    const bftpId = await getBlueprintFeatureTypePropertyId(submissionFeatureId, ftpId);
-
-    await connection.sql(SQL`
-      INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
-      VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
-    `);
-  }
-
-  async function addTaxonProperty(
-    submissionFeatureId: number,
-    featureTypeName: string,
-    propertyName: string,
-    taxonId: number
-  ): Promise<void> {
-    const systemUserId = connection.systemUserId();
-    const ftpId = await getFeatureTypePropertyId(featureTypeName, propertyName);
-    const bftpId = await getBlueprintFeatureTypePropertyId(submissionFeatureId, ftpId);
-
-    await connection.sql(SQL`
-      INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, taxon_id, create_user)
-      VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${taxonId}, ${systemUserId});
-    `);
-  }
-
-  async function createCodesetCode(key: string, label: string, description: string | null = null): Promise<number> {
-    const systemUserId = connection.systemUserId();
-    const codesetKey = `int_test_${TOKEN}_${Date.now()}_${randomUUID().slice(0, 8)}`;
-
-    // Mirror createTestSubmission: ensure the SIMS contributor exists before referencing it.
-    await connection.sql(SQL`
-      INSERT INTO contributor (client_id, description)
-      SELECT 'SIMS', 'Integration test contributor'
-      WHERE NOT EXISTS (
-        SELECT 1 FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL
-      );
-    `);
-
-    const codesetResult = await connection.sql(SQL`
-      INSERT INTO contributor_codeset (contributor_id, key, label, create_user)
-      VALUES (
-        (SELECT contributor_id FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL LIMIT 1),
-        ${codesetKey},
-        ${'Codeset for ' + key},
-        ${systemUserId}
-      )
-      RETURNING contributor_codeset_id;
-    `);
-    const codesetId = codesetResult.rows[0].contributor_codeset_id;
-
-    const codeResult = await connection.sql(SQL`
-      INSERT INTO contributor_codeset_code (contributor_codeset_id, key, label, description, create_user)
-      VALUES (${codesetId}, ${key}, ${label}, ${description}, ${systemUserId})
-      RETURNING contributor_codeset_code_id;
-    `);
-
-    return codeResult.rows[0].contributor_codeset_code_id;
-  }
-
-  // Auto-assigned `itis_tsn` for taxa where the test doesn't care about the TSN value.
-  // taxon.itis_tsn is NOT NULL UNIQUE, so we need a fresh integer per row.
-  let nextSyntheticTsn = 100_000_000;
-
-  async function createTaxon(
-    scientificName: string,
-    commonName: string | null = null,
-    tsn: number | null = null,
-    bcCode: string | null = null
-  ): Promise<number> {
-    const systemUserId = connection.systemUserId();
-    const effectiveTsn = tsn ?? nextSyntheticTsn++;
-
-    const result = await connection.sql(SQL`
-      INSERT INTO taxon (itis_scientific_name, common_name, itis_tsn, bc_taxon_code, itis_data, itis_update_date, create_user)
-      VALUES (${scientificName}, ${commonName}, ${effectiveTsn}, ${bcCode}, '{}'::jsonb, now(), ${systemUserId})
-      RETURNING taxon_id;
-    `);
-    return result.rows[0].taxon_id;
-  }
 
   async function tombstoneCodesetCode(codesetCodeId: number): Promise<void> {
     await connection.sql(SQL`
@@ -268,7 +129,7 @@ describe('SearchRepository (integration)', function () {
       const keyword = `${TOKEN}_stringbase`;
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Survey alpha' });
-      await addStringProperty(featureId, 'survey', 'description', `moose habitat near ${keyword}`);
+      await addStringProperty(connection, featureId, 'survey', 'description', `moose habitat near ${keyword}`);
 
       const result = await findFeatures(keyword);
 
@@ -278,10 +139,15 @@ describe('SearchRepository (integration)', function () {
 
     it('matches code-label values via the code arm', async () => {
       const keyword = `${TOKEN}_codelabel`;
-      const codeId = await createCodesetCode('camera_trap', `${keyword} Camera trap`, 'Camera-based observations');
+      const codeId = await createCodesetCode(
+        connection,
+        'camera_trap',
+        `${keyword} Camera trap`,
+        'Camera-based observations'
+      );
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST alpha' });
-      await addCodeProperty(featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -291,10 +157,15 @@ describe('SearchRepository (integration)', function () {
 
     it('matches code-description values via the code arm', async () => {
       const keyword = `${TOKEN}_codedesc`;
-      const codeId = await createCodesetCode('motion_cam', 'Motion Camera', `${keyword} motion-activated lens`);
+      const codeId = await createCodesetCode(
+        connection,
+        'motion_cam',
+        'Motion Camera',
+        `${keyword} motion-activated lens`
+      );
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST beta' });
-      await addCodeProperty(featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -304,10 +175,10 @@ describe('SearchRepository (integration)', function () {
 
     it('matches code rows by their `key` column', async () => {
       const keyword = `${TOKEN}_keyonly`;
-      const codeId = await createCodesetCode(keyword, 'Friendly label', 'Friendly description');
+      const codeId = await createCodesetCode(connection, keyword, 'Friendly label', 'Friendly description');
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST keyonly' });
-      await addCodeProperty(featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -318,10 +189,10 @@ describe('SearchRepository (integration)', function () {
 
     it('matches taxon scientific name via the taxon arm', async () => {
       const keyword = `${TOKEN}_taxon`;
-      const taxonId = await createTaxon(`Alces ${keyword}`, 'Moose');
+      const taxonId = await createTaxon(connection, `Alces ${keyword}`, 'Moose');
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Bear-1' });
-      await addTaxonProperty(featureId, 'animal', 'animal_identifier', taxonId);
+      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
 
       const result = await findFeatures(keyword);
 
@@ -331,10 +202,10 @@ describe('SearchRepository (integration)', function () {
 
     it('matches taxon by ITIS TSN', async () => {
       const tsn = 9_876_543;
-      const taxonId = await createTaxon(`Ursus ${TOKEN}`, 'Bear', tsn);
+      const taxonId = await createTaxon(connection, `Ursus ${TOKEN}`, 'Bear', tsn);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Bear-2' });
-      await addTaxonProperty(featureId, 'animal', 'animal_identifier', taxonId);
+      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
 
       const result = await findFeatures(String(tsn));
 
@@ -344,11 +215,11 @@ describe('SearchRepository (integration)', function () {
 
     it('hides tombstoned codeset code rows', async () => {
       const keyword = `${TOKEN}_dead_code`;
-      const codeId = await createCodesetCode('dead', `${keyword} Camera`, null);
+      const codeId = await createCodesetCode(connection, 'dead', `${keyword} Camera`, null);
       await tombstoneCodesetCode(codeId);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dead' });
-      await addCodeProperty(featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -357,11 +228,11 @@ describe('SearchRepository (integration)', function () {
 
     it('hides tombstoned taxon rows', async () => {
       const keyword = `${TOKEN}_dead_taxon`;
-      const taxonId = await createTaxon(`Vulpes ${keyword}`);
+      const taxonId = await createTaxon(connection, `Vulpes ${keyword}`);
       await tombstoneTaxon(taxonId);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Fox-1' });
-      await addTaxonProperty(featureId, 'animal', 'animal_identifier', taxonId);
+      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
 
       const result = await findFeatures(keyword);
 
@@ -375,7 +246,7 @@ describe('SearchRepository (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       // `animal` features carry no `sf.data->>'name'` — label must fall back to the matched fragment.
       const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: identifier });
-      await addStringProperty(featureId, 'animal', 'animal_identifier', identifier);
+      await addStringProperty(connection, featureId, 'animal', 'animal_identifier', identifier);
 
       const result = await findFeatures(identifier);
 
@@ -391,8 +262,8 @@ describe('SearchRepository (integration)', function () {
       // dropdown should show.
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'study_area', { name: 'Salmon River' });
-      await addStringProperty(featureId, 'study_area', 'name', `Salmon ${TOKEN} River`);
-      await addStringProperty(featureId, 'study_area', 'description', 'unrelated description text');
+      await addStringProperty(connection, featureId, 'study_area', 'name', `Salmon ${TOKEN} River`);
+      await addStringProperty(connection, featureId, 'study_area', 'description', 'unrelated description text');
 
       const result = await findFeatures(`Salmon ${TOKEN}`);
 
@@ -406,7 +277,7 @@ describe('SearchRepository (integration)', function () {
       const keyword = `${TOKEN}_excluded`;
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'measurement', { measurement_type: 'mass' });
-      await addStringProperty(featureId, 'measurement', 'description', `payload ${keyword}`);
+      await addStringProperty(connection, featureId, 'measurement', 'description', `payload ${keyword}`);
 
       const result = await findFeatures(keyword);
 
@@ -418,12 +289,12 @@ describe('SearchRepository (integration)', function () {
 
     it('emits one row when a feature matches in multiple arms', async () => {
       const keyword = `${TOKEN}_dedup`;
-      const codeId = await createCodesetCode('dedupkey', `${keyword} method`, null);
+      const codeId = await createCodesetCode(connection, 'dedupkey', `${keyword} method`, null);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dedup' });
       // Feature matches the keyword via _string AND via _code.
-      await addStringProperty(featureId, 'sample_technique', 'description', `also ${keyword} text`);
-      await addCodeProperty(featureId, 'sample_technique', 'description', codeId);
+      await addStringProperty(connection, featureId, 'sample_technique', 'description', `also ${keyword} text`);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -448,10 +319,10 @@ describe('SearchRepository (integration)', function () {
       // Verify the code corpus widening reaches the summary by seeding a `survey` feature that
       // matches only via the code arm.
       const keyword = `${TOKEN}_summary_code`;
-      const codeId = await createCodesetCode('summarycode', `${keyword} Agency`, null);
+      const codeId = await createCodesetCode(connection, 'summarycode', `${keyword} Agency`, null);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
-      await addCodeProperty(featureId, 'survey', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'survey', 'description', codeId);
 
       const summary = await repo.findFeatureSummary({ keyword });
       const records = await findFeatures(keyword);
@@ -468,7 +339,7 @@ describe('SearchRepository (integration)', function () {
       const featureId = await createTestFeature(connection, submissionId, 'measurement', {
         measurement_type: 'mass'
       });
-      await addStringProperty(featureId, 'measurement', 'description', `${keyword} payload`);
+      await addStringProperty(connection, featureId, 'measurement', 'description', `${keyword} payload`);
 
       const summary = await repo.findFeatureSummary({ keyword });
 

@@ -5,8 +5,10 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { ApiValidationError } from '../errors/api-error';
 import { PredicateOperator } from '../models/expression-predicate';
 import { ExpressionPredicatePropertyMetadata } from '../models/feature-type-property';
+import { TaxonRecord } from '../models/taxon';
 import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { TaxonomyService } from './taxonomy-service';
 
 const metadata = (
   feature_property_type_name: ExpressionPredicatePropertyMetadata['feature_property_type_name'],
@@ -18,6 +20,19 @@ const metadata = (
   feature_property_type_name,
   display_name: 'Species',
   ...overrides
+});
+
+const taxonRecord = (taxon_id: number): TaxonRecord => ({
+  taxon_id,
+  itis_tsn: 180693,
+  parent_itis_tsn: null,
+  parent_taxon_id: null,
+  bc_taxon_code: null,
+  itis_scientific_name: 'Cervidae',
+  rank: 'Family',
+  common_name: null,
+  itis_data: {},
+  itis_update_date: '2020-01-01'
 });
 
 describe('ExpressionPredicateSemanticValidator', () => {
@@ -42,7 +57,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
     currentMetadata = metadata(propertyType);
 
     const validator = new ExpressionPredicateSemanticValidator(getMockDBConnection());
-    return validator.validateExpressionTree({
+    const tree = {
       type: 'expression',
       operator: 'AND',
       clauses: [
@@ -54,11 +69,15 @@ describe('ExpressionPredicateSemanticValidator', () => {
           ...(value !== undefined ? { value } : {})
         }
       ]
-    });
+    } as const;
+
+    return validator.validateExpressionTree(tree);
   };
 
   it('normalizes a taxon DescendsFrom predicate', async () => {
-    const result = await validateOne('taxon', 'DescendsFrom', 123);
+    sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
+
+    const result = await validateOne('taxon', 'DescendsFrom', 180703);
     const predicate = result.clauses[0];
 
     expect(predicate).to.include({
@@ -69,8 +88,120 @@ describe('ExpressionPredicateSemanticValidator', () => {
     expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
       type: 'taxon',
       operator: 'DescendsFrom',
-      value: 123
+      value: 456
     });
+  });
+
+  it('resolves a numeric taxon TSN to an internal taxon_id', async () => {
+    const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
+
+    const result = await validateOne('taxon', 'Equals', 180703);
+    const predicate = result.clauses[0];
+
+    // The client value is an ITIS TSN; findTaxon resolves it to the internal taxon_id.
+    expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 180703 });
+    expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
+      type: 'taxon',
+      operator: 'Equals',
+      value: 456
+    });
+  });
+
+  it('resolves a taxon scientific-name string to a taxon_id', async () => {
+    const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7)]);
+
+    const result = await validateOne('taxon', 'DescendsFrom', 'Cervidae');
+    const predicate = result.clauses[0];
+
+    expect(taxonStub).to.have.been.calledOnceWith({ itis_scientific_name: 'Cervidae' });
+    expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
+      type: 'taxon',
+      operator: 'DescendsFrom',
+      value: 7
+    });
+  });
+
+  it('resolves a numeric-string taxon TSN to an internal taxon_id', async () => {
+    const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
+
+    const result = await validateOne('taxon', 'Equals', '180703');
+    const predicate = result.clauses[0];
+
+    expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 180703 });
+    expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
+      type: 'taxon',
+      operator: 'Equals',
+      value: 456
+    });
+  });
+
+  it('rejects an out-of-range numeric-string taxon TSN', async () => {
+    sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([]);
+
+    try {
+      await validateOne('taxon', 'Equals', '2147483648');
+      expect.fail();
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiValidationError);
+      expect((error as ApiValidationError).message).to.equal('Predicate value must be a valid ITIS TSN');
+    }
+  });
+
+  it('rejects an ambiguous taxon value', async () => {
+    sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7), taxonRecord(8)]);
+
+    try {
+      await validateOne('taxon', 'DescendsFrom', 'Cervidae');
+      expect.fail();
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiValidationError);
+      expect((error as ApiValidationError).message).to.equal('Taxon value matched multiple taxa');
+    }
+  });
+
+  it('resolves a taxon value for every taxon operator', async () => {
+    sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7)]);
+
+    for (const operator of ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom'] as const) {
+      const result = await validateOne('taxon', operator, 180703);
+      const predicate = result.clauses[0];
+
+      expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
+        type: 'taxon',
+        operator,
+        value: 7
+      });
+    }
+  });
+
+  it('rejects a TSN that does not exist locally without fetching it from ITIS', async () => {
+    const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([]);
+    const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
+
+    try {
+      await validateOne('taxon', 'Equals', 999999);
+      expect.fail();
+    } catch (error) {
+      expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 999999 });
+      expect(ensureStub).to.not.have.been.called;
+      expect(error).to.be.instanceOf(ApiValidationError);
+      expect((error as ApiValidationError).message).to.equal('Taxon not found');
+    }
+  });
+
+  it('rejects a scientific-name taxon value that resolves to no local taxon', async () => {
+    const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([]);
+    const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
+
+    try {
+      await validateOne('taxon', 'Equals', 'Notarealtaxon');
+      expect.fail();
+    } catch (error) {
+      expect(taxonStub).to.have.been.calledOnceWith({ itis_scientific_name: 'Notarealtaxon' });
+      expect(ensureStub).to.not.have.been.called;
+      expect(error).to.be.instanceOf(ApiValidationError);
+      expect((error as ApiValidationError).message).to.equal('Taxon not found');
+    }
   });
 
   it('rejects an operator that is invalid for the property type', async () => {

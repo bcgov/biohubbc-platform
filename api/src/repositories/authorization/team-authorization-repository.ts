@@ -1,5 +1,10 @@
 import { getKnex } from '../../database/db';
-import { DataRequestRecord, TicketRecord } from '../../models/team-authorization';
+import {
+  DataRequestRecord,
+  SubmissionRecord,
+  SubmissionUploadRecord,
+  TicketRecord
+} from '../../models/team-authorization';
 import { BaseRepository } from '../base-repository';
 import { buildSecurityFilter, isSubmissionFeatureActive } from '../sql-fragments';
 
@@ -65,6 +70,93 @@ export class TeamAuthorizationRepository extends BaseRepository {
       .limit(1);
 
     const response = await this.connection.knex(query, DataRequestRecord);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Find a team membership for a user through a submission upload.
+   *
+   * @param {number} systemUserId
+   * @param {string} submissionUploadId
+   * @return {Promise<SubmissionUploadRecord | null>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async findTeamMembershipBySubmissionUpload(
+    systemUserId: number,
+    submissionUploadId: string
+  ): Promise<SubmissionUploadRecord | null> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select('su.submission_upload_id', 'tm.record_end_date')
+      .from('submission_upload as su')
+      .join('team as team', 'team.team_id', 'su.team_id')
+      .join('team_member as tm', 'tm.team_id', 'su.team_id')
+      .where('su.submission_upload_id', submissionUploadId)
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('su.record_end_date')
+      .whereNull('team.record_end_date')
+      .whereNull('tm.record_end_date')
+      .limit(1);
+
+    const response = await this.connection.knex(query, SubmissionUploadRecord);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Find a team membership for a user through a submission.
+   *
+   * @param {number} systemUserId
+   * @param {number} submissionId Submission database ID.
+   * @return {Promise<SubmissionRecord | null>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async findTeamMembershipBySubmissionId(systemUserId: number, submissionId: number): Promise<SubmissionRecord | null> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select('s.submission_id', 'tm.record_end_date')
+      .from('submission as s')
+      .join('team as team', 'team.team_id', 's.team_id')
+      .join('team_member as tm', 'tm.team_id', 's.team_id')
+      .where('s.submission_id', submissionId)
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('s.record_end_date')
+      .whereNull('team.record_end_date')
+      .whereNull('tm.record_end_date')
+      .limit(1);
+
+    const response = await this.connection.knex(query, SubmissionRecord);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Find a team membership for a user through a submission UUID.
+   *
+   * @param {number} systemUserId
+   * @param {string} submissionUuid Submission UUID.
+   * @return {Promise<SubmissionRecord | null>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async findTeamMembershipBySubmissionUuid(
+    systemUserId: number,
+    submissionUuid: string
+  ): Promise<SubmissionRecord | null> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select('s.submission_id', 'tm.record_end_date')
+      .from('submission as s')
+      .join('team as team', 'team.team_id', 's.team_id')
+      .join('team_member as tm', 'tm.team_id', 's.team_id')
+      .where('s.uuid', submissionUuid)
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('s.record_end_date')
+      .whereNull('team.record_end_date')
+      .whereNull('tm.record_end_date')
+      .limit(1);
+
+    const response = await this.connection.knex(query, SubmissionRecord);
     return response.rows[0] ?? null;
   }
 

@@ -99,7 +99,7 @@ export const PolicyAutocompleteContextProvider = (props: PropsWithChildren) => {
       }
 
       try {
-        const featureGroups = await biohubApi.submissions.getSubmissionFeatures(submissionId);
+        const featureGroups = await biohubApi.admin.getSubmissionFeatures(submissionId);
         setSubmissionFeaturesCache((prev) => new Map(prev).set(submissionId, featureGroups.features));
       } catch {
         dialogContext.setSnackbar({
@@ -108,7 +108,7 @@ export const PolicyAutocompleteContextProvider = (props: PropsWithChildren) => {
         });
       }
     },
-    [biohubApi.submissions, dialogContext, submissionFeaturesCache]
+    [biohubApi.admin, dialogContext, submissionFeaturesCache]
   );
 
   const policyAutocompleteContext: IPolicyAutocompleteContext = useMemo(

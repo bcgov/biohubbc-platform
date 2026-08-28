@@ -66,7 +66,7 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(SubmissionFeatureIngestionService.prototype, 'getActiveFeatureTypeMap').resolves(new Map());
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'getKnownFeatureTypeMap').resolves(new Map());
     };
 
     it('streams archive in one pass and persists media/codes/features', async () => {

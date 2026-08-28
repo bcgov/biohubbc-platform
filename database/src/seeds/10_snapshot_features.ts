@@ -391,10 +391,24 @@ async function resolveSeedContext(knex: Knex, fixture: SnapshotFixture): Promise
  * locally, so it 404s by design).
  */
 async function createFkChain(knex: Knex, fixture: SnapshotFixture, context: SeedContext): Promise<FkChain> {
+  const [submissionTeam] = await knex('team')
+    .insert({
+      name: `Seed Snapshot Submission Team ${fixture.submission.name}`,
+      description: 'Dedicated access team for a golden-snapshot submission.',
+      create_user: context.systemUserId
+    })
+    .returning('team_id');
+  await knex('team_member').insert({
+    system_user_id: context.systemUserId,
+    team_id: submissionTeam.team_id,
+    create_user: context.systemUserId
+  });
+
   const [submission] = await knex('submission')
     .insert({
       uuid: knex.raw('gen_random_uuid()'),
       system_user_id: context.systemUserId,
+      team_id: submissionTeam.team_id,
       contributor_id: context.contributorId,
       name: fixture.submission.name,
       description: fixture.submission.description ?? '',
@@ -412,11 +426,24 @@ async function createFkChain(knex: Knex, fixture: SnapshotFixture, context: Seed
     .returning('upload_id');
 
   const ticketId = await createSnapshotTicket(knex, context.systemUserId);
+  const [uploadTeam] = await knex('team')
+    .insert({
+      name: `Seed Snapshot Upload Team ${upload.upload_id}`,
+      description: 'Dedicated access team for a golden-snapshot upload.',
+      create_user: context.systemUserId
+    })
+    .returning('team_id');
+  await knex('team_member').insert({
+    system_user_id: context.systemUserId,
+    team_id: uploadTeam.team_id,
+    create_user: context.systemUserId
+  });
 
   const [submissionUpload] = await knex('submission_upload')
     .insert({
       submission_id: submission.submission_id,
       upload_id: upload.upload_id,
+      team_id: uploadTeam.team_id,
       ticket_id: ticketId,
       blueprint_id: context.blueprintId,
       create_user: context.systemUserId

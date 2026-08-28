@@ -1,11 +1,5 @@
+import { SubmissionPropertyValue } from 'interfaces/property-value.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
-
-export interface IRelatedSubmissionFeature {
-  submission_feature_id: number;
-  feature_type_name: string;
-  feature_type_display_name: string;
-  data: Record<string, any>;
-}
 
 export interface ISubmissionFeature {
   submission_feature_id: number;
@@ -24,13 +18,12 @@ export interface ISubmissionFeature {
 
 export interface ISubmissionFeatureResponse {
   feature: ISubmissionFeature;
-  relatedFeatures: IRelatedSubmissionFeature[];
 }
 
 export interface IFeaturePropertyRow {
   id: string;
   property: string;
-  value: string;
+  value: SubmissionPropertyValue;
 }
 
 export interface SubmissionFeaturePropertyFilters {
