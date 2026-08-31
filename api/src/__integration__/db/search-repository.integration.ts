@@ -147,7 +147,7 @@ describe('SearchRepository (integration)', function () {
       );
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST alpha' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -165,7 +165,7 @@ describe('SearchRepository (integration)', function () {
       );
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST beta' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -178,7 +178,7 @@ describe('SearchRepository (integration)', function () {
       const codeId = await createCodesetCode(connection, keyword, 'Friendly label', 'Friendly description');
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST keyonly' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -191,8 +191,8 @@ describe('SearchRepository (integration)', function () {
       const keyword = `${TOKEN}_taxon`;
       const taxonId = await createTaxon(connection, `Alces ${keyword}`, 'Moose');
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Bear-1' });
-      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
+      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Bear-1' });
+      await addTaxonProperty(connection, featureId, 'habitat_feature', 'associated_species', taxonId);
 
       const result = await findFeatures(keyword);
 
@@ -204,8 +204,8 @@ describe('SearchRepository (integration)', function () {
       const tsn = 9_876_543;
       const taxonId = await createTaxon(connection, `Ursus ${TOKEN}`, 'Bear', tsn);
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Bear-2' });
-      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
+      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Bear-2' });
+      await addTaxonProperty(connection, featureId, 'habitat_feature', 'associated_species', taxonId);
 
       const result = await findFeatures(String(tsn));
 
@@ -219,7 +219,7 @@ describe('SearchRepository (integration)', function () {
       await tombstoneCodesetCode(codeId);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dead' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -231,8 +231,8 @@ describe('SearchRepository (integration)', function () {
       const taxonId = await createTaxon(connection, `Vulpes ${keyword}`);
       await tombstoneTaxon(taxonId);
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Fox-1' });
-      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
+      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Fox-1' });
+      await addTaxonProperty(connection, featureId, 'habitat_feature', 'associated_species', taxonId);
 
       const result = await findFeatures(keyword);
 
@@ -294,7 +294,7 @@ describe('SearchRepository (integration)', function () {
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dedup' });
       // Feature matches the keyword via _string AND via _code.
       await addStringProperty(connection, featureId, 'sample_technique', 'description', `also ${keyword} text`);
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'sample_technique', 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -322,7 +322,7 @@ describe('SearchRepository (integration)', function () {
       const codeId = await createCodesetCode(connection, 'summarycode', `${keyword} Agency`, null);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
-      await addCodeProperty(connection, featureId, 'survey', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'survey', 'collected_data', codeId);
 
       const summary = await repo.findFeatureSummary({ keyword });
       const records = await findFeatures(keyword);

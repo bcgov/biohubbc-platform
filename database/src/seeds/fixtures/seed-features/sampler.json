@@ -335,209 +335,250 @@
   "property_string": [
     {
       "feature_uuid": "34bb8126-5bac-4213-b76b-2110928aba8b",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "SAMPLER-001"
     },
     {
       "feature_uuid": "34bb8126-5bac-4213-b76b-2110928aba8b",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Sampler animal carrying marking, measurement, and mortality children."
     },
     {
       "feature_uuid": "34bb8126-5bac-4213-b76b-2110928aba8b",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "female"
     },
     {
       "feature_uuid": "57e57561-3555-4087-a3c8-65d3698de0a1",
-      "feature_type_property_id": 122,
+      "feature_type_name": "survey",
+      "property_name": "name",
       "value": "Feature Type Sampler"
     },
     {
       "feature_uuid": "57e57561-3555-4087-a3c8-65d3698de0a1",
-      "feature_type_property_id": 126,
+      "feature_type_name": "survey",
+      "property_name": "objectives",
       "value": "One valid feature per feature type for pipeline coverage."
     },
     {
       "feature_uuid": "d8808af6-80c4-4a4e-851e-bf3cc95ad9e4",
-      "feature_type_property_id": 79,
+      "feature_type_name": "habitat_feature",
+      "property_name": "name",
       "value": "Sampler Habitat Feature 1"
     },
     {
       "feature_uuid": "8cb74c26-faff-46f4-9919-b63820df324e",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Tag"
     },
     {
       "feature_uuid": "8cb74c26-faff-46f4-9919-b63820df324e",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Sampler marking."
     },
     {
       "feature_uuid": "8cb74c26-faff-46f4-9919-b63820df324e",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Left Ear"
     },
     {
       "feature_uuid": "8cb74c26-faff-46f4-9919-b63820df324e",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Yellow"
     },
     {
       "feature_uuid": "8cb74c26-faff-46f4-9919-b63820df324e",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "TAG-001"
     },
     {
       "feature_uuid": "b4afabc3-95c9-4bfa-a41b-119376d4eb47",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "b4afabc3-95c9-4bfa-a41b-119376d4eb47",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Sampler measurement."
     },
     {
       "feature_uuid": "a809efe1-ad7c-4f51-ba3a-7e23cce160d0",
-      "feature_type_property_id": 30,
+      "feature_type_name": "block",
+      "property_name": "name",
       "value": "Sampler Block 1"
     },
     {
       "feature_uuid": "a809efe1-ad7c-4f51-ba3a-7e23cce160d0",
-      "feature_type_property_id": 18,
+      "feature_type_name": "block",
+      "property_name": "description",
       "value": "Sampler survey block."
     },
     {
       "feature_uuid": "e0657568-615a-44ad-ae04-5d35d53f81e4",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "Boreal White and Black Spruce"
     },
     {
       "feature_uuid": "e0657568-615a-44ad-ae04-5d35d53f81e4",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Biogeoclimatic Zone"
     },
     {
       "feature_uuid": "544d523e-7053-47a0-994c-00f801951bf6",
-      "feature_type_property_id": 57,
+      "feature_type_name": "mortality",
+      "property_name": "cause_of_death",
       "value": "Predation"
     },
     {
       "feature_uuid": "544d523e-7053-47a0-994c-00f801951bf6",
-      "feature_type_property_id": 2,
+      "feature_type_name": "mortality",
+      "property_name": "comment",
       "value": "Sampler mortality."
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 65,
+      "feature_type_name": "report",
+      "property_name": "author",
       "value": "Sampler"
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 72,
+      "feature_type_name": "report",
+      "property_name": "name",
       "value": "Sampler Report"
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 83,
+      "feature_type_name": "report",
+      "property_name": "description",
       "value": "Sampler report artifact."
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 105,
+      "feature_type_name": "report",
+      "property_name": "file_type",
       "value": "Report"
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 103,
+      "feature_type_name": "report",
+      "property_name": "filename",
       "value": "report.pdf"
     },
     {
       "feature_uuid": "6d343bad-0d69-4077-9a98-a308d0685738",
-      "feature_type_property_id": 33,
+      "feature_type_name": "sample_period",
+      "property_name": "site_identifier",
       "value": "Sampler Site 1"
     },
     {
       "feature_uuid": "92875f61-eb1b-487b-8ee8-b752d12abc5e",
-      "feature_type_property_id": 45,
+      "feature_type_name": "sample_site",
+      "property_name": "name",
       "value": "Sampler Site 1"
     },
     {
       "feature_uuid": "92875f61-eb1b-487b-8ee8-b752d12abc5e",
-      "feature_type_property_id": 9,
+      "feature_type_name": "sample_site",
+      "property_name": "description",
       "value": "Sampler sampling site carrying a period and a technique."
     },
     {
       "feature_uuid": "c24a1d13-0c81-487e-b8c3-5be85905d3f0",
-      "feature_type_property_id": 17,
+      "feature_type_name": "sample_technique",
+      "property_name": "response_metric",
       "value": "Count"
     },
     {
       "feature_uuid": "c24a1d13-0c81-487e-b8c3-5be85905d3f0",
-      "feature_type_property_id": 24,
+      "feature_type_name": "sample_technique",
+      "property_name": "name",
       "value": "Sampler Technique 1"
     },
     {
       "feature_uuid": "c24a1d13-0c81-487e-b8c3-5be85905d3f0",
-      "feature_type_property_id": 13,
+      "feature_type_name": "sample_technique",
+      "property_name": "description",
       "value": "Sampler sampling technique."
     },
     {
       "feature_uuid": "c24a1d13-0c81-487e-b8c3-5be85905d3f0",
-      "feature_type_property_id": 49,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_name",
       "value": "Camera Trap"
     },
     {
       "feature_uuid": "cb4a0a73-8822-4d71-836d-b52938fb86a7",
-      "feature_type_property_id": 48,
+      "feature_type_name": "stratum",
+      "property_name": "name",
       "value": "Sampler Stratum 1"
     },
     {
       "feature_uuid": "cb4a0a73-8822-4d71-836d-b52938fb86a7",
-      "feature_type_property_id": 87,
+      "feature_type_name": "stratum",
+      "property_name": "description",
       "value": "Sampler survey stratum."
     },
     {
       "feature_uuid": "8f644cbb-8b3d-4930-b908-40aa9bbc3c61",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     }
   ],
   "property_number": [
     {
       "feature_uuid": "34bb8126-5bac-4213-b76b-2110928aba8b",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "d8808af6-80c4-4a4e-851e-bf3cc95ad9e4",
-      "feature_type_property_id": 8,
+      "feature_type_name": "habitat_feature",
+      "property_name": "count",
       "value": 3
     },
     {
       "feature_uuid": "b4afabc3-95c9-4bfa-a41b-119376d4eb47",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 412.5
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 21,
+      "feature_type_name": "report",
+      "property_name": "year",
       "value": 2020
     },
     {
       "feature_uuid": "710c00d7-04c1-4231-8bfc-3ea10554dd2b",
-      "feature_type_property_id": 104,
+      "feature_type_name": "report",
+      "property_name": "file_size",
       "value": 193
     },
     {
       "feature_uuid": "c24a1d13-0c81-487e-b8c3-5be85905d3f0",
-      "feature_type_property_id": 90,
+      "feature_type_name": "sample_technique",
+      "property_name": "detect_distance",
       "value": 25
     },
     {
       "feature_uuid": "8f644cbb-8b3d-4930-b908-40aa9bbc3c61",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 150.125
     }
   ],
@@ -545,37 +586,43 @@
   "property_timestamp": [
     {
       "feature_uuid": "57e57561-3555-4087-a3c8-65d3698de0a1",
-      "feature_type_property_id": 121,
+      "feature_type_name": "survey",
+      "property_name": "end_date",
       "date_value": "2020-12-31",
       "time_value": null
     },
     {
       "feature_uuid": "57e57561-3555-4087-a3c8-65d3698de0a1",
-      "feature_type_property_id": 128,
+      "feature_type_name": "survey",
+      "property_name": "start_date",
       "date_value": "2020-01-01",
       "time_value": null
     },
     {
       "feature_uuid": "d8808af6-80c4-4a4e-851e-bf3cc95ad9e4",
-      "feature_type_property_id": 69,
+      "feature_type_name": "habitat_feature",
+      "property_name": "timestamp",
       "date_value": "2020-07-15",
       "time_value": "12:00:00"
     },
     {
       "feature_uuid": "544d523e-7053-47a0-994c-00f801951bf6",
-      "feature_type_property_id": 15,
+      "feature_type_name": "mortality",
+      "property_name": "timestamp",
       "date_value": "2020-09-01",
       "time_value": "08:30:00"
     },
     {
       "feature_uuid": "6d343bad-0d69-4077-9a98-a308d0685738",
-      "feature_type_property_id": 93,
+      "feature_type_name": "sample_period",
+      "property_name": "end_date",
       "date_value": "2020-06-30",
       "time_value": null
     },
     {
       "feature_uuid": "6d343bad-0d69-4077-9a98-a308d0685738",
-      "feature_type_property_id": 37,
+      "feature_type_name": "sample_period",
+      "property_name": "start_date",
       "date_value": "2020-06-01",
       "time_value": null
     }
@@ -585,7 +632,8 @@
   "property_geometry": [
     {
       "feature_uuid": "d8808af6-80c4-4a4e-851e-bf3cc95ad9e4",
-      "feature_type_property_id": 60,
+      "feature_type_name": "habitat_feature",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -598,7 +646,8 @@
     },
     {
       "feature_uuid": "544d523e-7053-47a0-994c-00f801951bf6",
-      "feature_type_property_id": 19,
+      "feature_type_name": "mortality",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -611,7 +660,8 @@
     },
     {
       "feature_uuid": "92875f61-eb1b-487b-8ee8-b752d12abc5e",
-      "feature_type_property_id": 4,
+      "feature_type_name": "sample_site",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
