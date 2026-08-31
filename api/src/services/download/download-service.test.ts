@@ -73,6 +73,34 @@ describe('DownloadService', () => {
     });
   });
 
+  describe('getDownloadVersion', () => {
+    it('returns a version belonging to the requested download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+      const version = createMockDownloadVersionStatusRecord({ download_id: downloadId });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(version);
+
+      expect(await service.getDownloadVersion(downloadId, version.download_version_id)).to.eql(version);
+    });
+
+    it('returns 404 when the version belongs to another download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const version = createMockDownloadVersionStatusRecord({
+        download_id: 'aaaa0000-0000-0000-0000-000000000002'
+      });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(version);
+
+      try {
+        await service.getDownloadVersion('aaaa0000-0000-0000-0000-000000000001', version.download_version_id);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP404);
+      }
+    });
+  });
+
   describe('getDownloadsByTeamMembership', () => {
     it('short-circuits on empty page and does not fetch exports', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -694,9 +722,7 @@ describe('DownloadService', () => {
         }
       ];
 
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
-        .resolves(artifacts);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves(artifacts);
       const signedUrlStub = sinon
         .stub(ObjectStorageService.prototype, 'getSignedUrl')
         .callsFake(async (_bucket, key) => `https://s3.example.com/${key}?sig=x`);
@@ -717,7 +743,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([
         {
           artifact_id: 'art-1',
           object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Animal/data.parquet`
@@ -748,9 +774,7 @@ describe('DownloadService', () => {
         }
       ];
 
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
-        .resolves(artifacts);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves(artifacts);
       sinon.stub(ObjectStorageService.prototype, 'getSignedUrl').resolves('https://s3.example.com/signed');
 
       const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
@@ -763,7 +787,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([]);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([]);
 
       const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
 

@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, waitFor, within } from '@testing-library/react';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import dayjs from 'dayjs';
 import { DownloadDetail, DownloadVersion, DownloadVersionListResponse } from 'interfaces/useDownloadApi.interface';
-import { DownloadExport, DownloadExportListResponse } from 'interfaces/useDownloadExportApi.interface';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { describe, expect, it, vi } from 'vitest';
@@ -8,7 +9,8 @@ import { DownloadPage } from './DownloadPage';
 
 const mockGetDownload = vi.fn();
 const mockListDownloadVersions = vi.fn();
-const mockGetExports = vi.fn();
+const mockGetDownloadVersionFeatureTypes = vi.fn();
+const mockCreateExport = vi.fn();
 
 vi.mock('hooks/useApi', () => ({
   useApi: () => ({
@@ -17,14 +19,14 @@ vi.mock('hooks/useApi', () => ({
       listDownloadVersions: mockListDownloadVersions
     },
     downloadExport: {
-      getExports: mockGetExports
+      getDownloadVersionFeatureTypes: mockGetDownloadVersionFeatureTypes,
+      createExport: mockCreateExport
     }
   })
 }));
 
 const DOWNLOAD_ID = '11111111-2222-3333-4444-555555555555';
 const VERSION_ID = '22222222-3333-4444-5555-666666666666';
-const EXPORT_ID = '33333333-4444-5555-6666-777777777777';
 
 const makeDownload = (overrides: Partial<DownloadDetail> = {}): DownloadDetail => ({
   download_id: DOWNLOAD_ID,
@@ -51,28 +53,9 @@ const makeVersion = (overrides: Partial<DownloadVersion> = {}): DownloadVersion 
   ...overrides
 });
 
-const makeExport = (overrides: Partial<DownloadExport> = {}): DownloadExport => ({
-  download_version_export_id: EXPORT_ID,
-  download_id: DOWNLOAD_ID,
-  format: 'csv',
-  mode: 'per_feature_type',
-  status: 'ready',
-  max_part_size_bytes: '524288000',
-  part_count: 2,
-  started_at: '2026-04-22T00:00:00Z',
-  completed_at: '2026-04-22T00:01:00Z',
-  error_message: null,
-  ...overrides
-});
-
 const makeVersionsResponse = (versions: DownloadVersion[] = [makeVersion()]): DownloadVersionListResponse => ({
   versions,
   pagination: { total: versions.length, current_page: 1, last_page: 1 }
-});
-
-const makeExportsResponse = (exports: DownloadExport[] = [makeExport()]): DownloadExportListResponse => ({
-  exports,
-  pagination: { total: exports.length, current_page: 1, last_page: 1 }
 });
 
 const makeApiError = (status: number) => {
@@ -87,6 +70,10 @@ const renderAt = (path: string) =>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/download/:downloadId" element={<DownloadPage />} />
+        <Route
+          path="/download/:downloadId/version/:downloadVersionId"
+          element={<div>Version detail destination</div>}
+        />
       </Routes>
     </MemoryRouter>
   );
@@ -96,76 +83,69 @@ describe('DownloadPage', () => {
     vi.clearAllMocks();
     mockGetDownload.mockResolvedValue(makeDownload());
     mockListDownloadVersions.mockResolvedValue(makeVersionsResponse());
-    mockGetExports.mockResolvedValue(makeExportsResponse());
+    mockGetDownloadVersionFeatureTypes.mockResolvedValue([{ feature_type: 'observation', columns: ['uuid'] }]);
+    mockCreateExport.mockResolvedValue({});
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders the download header with Versions and Exports tabs', async () => {
-    const { findByRole, getAllByText, getByRole, getByText } = renderAt(`/download/${DOWNLOAD_ID}`);
+  it('renders the download header with only the Versions tab', async () => {
+    const { findByRole, getAllByText, getByRole, getByText, queryByRole } = renderAt(`/download/${DOWNLOAD_ID}`);
 
-    expect(await findByRole('heading', { name: 'Download' })).toBeVisible();
+    expect(await findByRole('heading', { name: 'Bears in BC' })).toBeVisible();
     expect(getAllByText('Bears in BC')[0]).toBeVisible();
     expect(getByText('All bear observations within BC')).toBeVisible();
-    expect(getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
     expect(getByRole('link', { name: 'Downloads' })).toHaveAttribute('href', '/portal/downloads');
-    expect(getByRole('link', { name: 'Bears in BC' })).toHaveAttribute('href', `/download/${DOWNLOAD_ID}`);
+    const breadcrumb = getByRole('navigation', { name: 'download breadcrumb' });
+    expect(within(breadcrumb).queryByText('Search')).not.toBeInTheDocument();
+    expect(within(breadcrumb).getByText('Bears in BC')).not.toHaveAttribute('href');
+    expect(within(breadcrumb).queryByRole('link', { name: 'Bears in BC' })).not.toBeInTheDocument();
     expect(await findByRole('tab', { name: 'Versions' })).toBeVisible();
-    expect(await findByRole('tab', { name: 'Exports' })).toBeVisible();
+    expect(queryByRole('tab', { name: 'Exports' })).not.toBeInTheDocument();
   });
 
-  it('renders the Versions tab as the default paginated table', async () => {
-    const { findByText, getByText } = renderAt(`/download/${DOWNLOAD_ID}`);
+  it('renders the paginated versions table', async () => {
+    const { findByText, getByText, queryByText } = renderAt(`/download/${DOWNLOAD_ID}`);
 
     expect(await findByText(VERSION_ID)).toBeVisible();
     expect(
       getByText((_content, element) => element?.tagName === 'H2' && element.textContent === 'Versions (1)')
     ).toBeVisible();
-    expect(getByText('Feature count')).toBeVisible();
-    expect(getByText('42')).toBeVisible();
+    expect(getByText('Status')).toBeVisible();
+    expect(getByText('Created at')).toBeVisible();
+    expect(getByText(dayjs(makeVersion().create_date).format(DATE_FORMAT.MediumDateFormat))).toBeVisible();
+    expect(getByText('Export')).toBeVisible();
+    expect(queryByText('Feature count')).not.toBeInTheDocument();
+    expect(queryByText('Started')).not.toBeInTheDocument();
     expect(mockListDownloadVersions).toHaveBeenCalledWith(
       DOWNLOAD_ID,
       expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' })
     );
-    expect(mockGetExports).not.toHaveBeenCalled();
   });
 
-  it('renders the Exports tab table when selected', async () => {
-    const { findByRole, findByText, getByText } = renderAt(`/download/${DOWNLOAD_ID}`);
+  it('starts an export for the selected version without navigating the row', async () => {
+    const { findByRole, queryByText } = renderAt(`/download/${DOWNLOAD_ID}`);
 
-    fireEvent.click(await findByRole('tab', { name: 'Exports' }));
-
-    expect(await findByText(EXPORT_ID)).toBeVisible();
-    expect(
-      getByText((_content, element) => element?.tagName === 'H2' && element.textContent === 'Exports (1)')
-    ).toBeVisible();
-    expect(getByText('per feature type')).toBeVisible();
-    expect(getByText('2')).toBeVisible();
-    expect(mockGetExports).toHaveBeenCalledWith(
-      DOWNLOAD_ID,
-      expect.objectContaining({ page: 1, limit: 10, sort: 'started_at', order: 'desc' })
-    );
-  });
-
-  it('refreshes tab data when switching back to a remounted tab', async () => {
-    const { findByRole, findByText } = renderAt(`/download/${DOWNLOAD_ID}`);
-
-    expect(await findByText(VERSION_ID)).toBeVisible();
-    expect(mockListDownloadVersions).toHaveBeenCalledTimes(1);
-    expect(mockGetExports).not.toHaveBeenCalled();
-
-    fireEvent.click(await findByRole('tab', { name: 'Exports' }));
-
-    expect(await findByText(EXPORT_ID)).toBeVisible();
-    expect(mockGetExports).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(await findByRole('tab', { name: 'Versions' }));
+    fireEvent.click(await findByRole('button', { name: 'Export' }));
 
     await waitFor(() => {
-      expect(mockListDownloadVersions).toHaveBeenCalledTimes(2);
+      expect(mockCreateExport).toHaveBeenCalledWith(
+        DOWNLOAD_ID,
+        expect.objectContaining({ download_version_id: VERSION_ID, feature_types: ['observation'] })
+      );
     });
+    expect(queryByText('Version detail destination')).not.toBeInTheDocument();
+  });
+
+  it('navigates to the selected download version', async () => {
+    const { findByText } = renderAt(`/download/${DOWNLOAD_ID}`);
+
+    const versionId = await findByText(VERSION_ID);
+    fireEvent.click(versionId.closest('.MuiDataGrid-row')!);
+
+    expect(await findByText('Version detail destination')).toBeVisible();
   });
 
   it('renders the dead-end card when the API returns 404', async () => {

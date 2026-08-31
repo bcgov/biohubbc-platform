@@ -74,7 +74,7 @@ export const createMockDownloadVersion = (overrides?: Partial<DownloadVersionRec
 
 /**
  * Test factory: build a DownloadVersionStatusRecord (the version's materialization-lifecycle row
- * returned by `getDownloadVersionStatusById`). The version owns the lifecycle, so callers override
+ * returned by `getDownloadVersion`). The version owns the lifecycle, so callers override
  * `status` (and timing/error fields) to drive transition tests.
  */
 export const createMockDownloadVersionStatusRecord = (

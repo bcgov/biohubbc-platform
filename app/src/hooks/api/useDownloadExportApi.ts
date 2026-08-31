@@ -11,9 +11,8 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
 /**
  * Returns a set of supported api methods for working with CSV exports of downloads.
  *
- * Exports are authenticated-only and live under a ready download; see SIMSBIOHUB-954.
- * Intentionally no `listExports` method — `download.exports[]` is pre-joined onto each
- * row of `GET /api/download` (Phase 5a), so a standalone list call has no caller.
+ * Export creation and presigned part retrieval require authentication; collection reads follow the
+ * parent download's access rules. See SIMSBIOHUB-954.
  *
  * @param {AxiosInstance} axios
  * @return {*} object whose properties are supported api methods.
@@ -49,19 +48,22 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * List exports for a download.
+   * List exports belonging to a single download version.
    *
-   * @param {string} downloadId
-   * @param {ApiPaginationRequestOptions} [pagination]
-   * @return {Promise<DownloadExportListResponse>}
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} downloadVersionId - The selected download version ID.
+   * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination and sorting parameters.
+   * @return {Promise<DownloadExportListResponse>} The selected version's paginated exports.
    */
-  const getExports = async (
+  const listDownloadVersionExports = async (
     downloadId: string,
+    downloadVersionId: string,
     pagination?: ApiPaginationRequestOptions
   ): Promise<DownloadExportListResponse> => {
-    const { data } = await axios.get<DownloadExportListResponse>(`/api/download/${downloadId}/export`, {
-      params: pagination
-    });
+    const { data } = await axios.get<DownloadExportListResponse>(
+      `/api/download/${downloadId}/version/${downloadVersionId}/export`,
+      { params: pagination }
+    );
     return data;
   };
 
@@ -77,5 +79,28 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { createExport, getExport, getExports, getDownloadFeatureTypes };
+  /**
+   * Lists the feature types and exportable columns materialized by one download version.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} downloadVersionId - The selected download version ID.
+   * @return {Promise<DownloadFeatureType[]>} The version's exportable feature types and columns.
+   */
+  const getDownloadVersionFeatureTypes = async (
+    downloadId: string,
+    downloadVersionId: string
+  ): Promise<DownloadFeatureType[]> => {
+    const { data } = await axios.get<DownloadFeatureType[]>(
+      `/api/download/${downloadId}/version/${downloadVersionId}/feature-types`
+    );
+    return data;
+  };
+
+  return {
+    createExport,
+    getExport,
+    listDownloadVersionExports,
+    getDownloadFeatureTypes,
+    getDownloadVersionFeatureTypes
+  };
 };

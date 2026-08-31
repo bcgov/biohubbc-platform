@@ -5,6 +5,7 @@ import {
   CreateDownloadResponse,
   DownloadDetail,
   DownloadListResponse,
+  DownloadVersion,
   DownloadVersionListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { useDownloadApi } from './useDownloadApi';
@@ -165,6 +166,31 @@ describe('useDownloadApi', () => {
       expect(result).toEqual(mockResponse);
       expect(mock.history.get[0].url).toBe(`/api/download/${downloadId}/version`);
       expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
+    });
+  });
+
+  describe('getDownloadVersion', () => {
+    it('should send GET to the nested version resource and return it', async () => {
+      const downloadId = '550e8400-e29b-41d4-a716-446655440099';
+      const downloadVersionId = '660e8400-e29b-41d4-a716-446655440099';
+      const mockResponse: DownloadVersion = {
+        download_version_id: downloadVersionId,
+        download_id: downloadId,
+        status: 'ready',
+        feature_count: 42,
+        started_at: null,
+        completed_at: null,
+        materialized_at: null,
+        error_message: null,
+        create_date: '2026-03-01T00:00:00Z'
+      };
+
+      mock.onGet(`/api/download/${downloadId}/version/${downloadVersionId}`).reply(200, mockResponse);
+
+      const result = await useDownloadApi(axios).getDownloadVersion(downloadId, downloadVersionId);
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].url).toBe(`/api/download/${downloadId}/version/${downloadVersionId}`);
     });
   });
 });

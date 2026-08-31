@@ -230,32 +230,21 @@ describe('useDownloadExportApi', () => {
     });
   });
 
-  describe('getExports', () => {
-    it('GETs the paginated /api/download/{downloadId}/export list path', async () => {
+  describe('listDownloadVersionExports', () => {
+    it('GETs the paginated exports collection nested under a download version', async () => {
       const mockResponse: DownloadExportListResponse = {
-        exports: [
-          {
-            download_version_export_id: 'ex-9',
-            download_id: 'dl-1',
-            format: 'csv',
-            mode: 'per_feature_type',
-            status: 'ready',
-            max_part_size_bytes: '524288000',
-            part_count: 1,
-            started_at: '2026-04-22T00:00:00Z',
-            completed_at: '2026-04-22T00:01:00Z',
-            error_message: null
-          }
-        ],
-        pagination: { total: 1, current_page: 1, last_page: 1 }
+        exports: [],
+        pagination: { total: 0, current_page: 1, last_page: 1 }
       };
+      mock.onGet('/api/download/dl-1/version/ver-2/export').reply(200, mockResponse);
 
-      mock.onGet('/api/download/dl-1/export').reply(200, mockResponse);
-
-      const result = await useDownloadExportApi(axios).getExports('dl-1', { page: 2, limit: 25 });
+      const result = await useDownloadExportApi(axios).listDownloadVersionExports('dl-1', 'ver-2', {
+        page: 2,
+        limit: 25
+      });
 
       expect(result).toEqual(mockResponse);
-      expect(mock.history.get[0].url).toBe('/api/download/dl-1/export');
+      expect(mock.history.get[0].url).toBe('/api/download/dl-1/version/ver-2/export');
       expect(mock.history.get[0].params).toEqual({ page: 2, limit: 25 });
     });
   });
@@ -278,6 +267,18 @@ describe('useDownloadExportApi', () => {
 
       // Step 3: Assert the request URL and the returned payload.
       expect(mock.history.get[0].url).toBe('/api/download/abc-123/feature-types');
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('getDownloadVersionFeatureTypes', () => {
+    it('GETs the nested feature-types resource for a selected version', async () => {
+      const mockResponse: DownloadFeatureType[] = [{ feature_type: 'animal', columns: ['uuid'] }];
+      mock.onGet('/api/download/dl-1/version/ver-2/feature-types').reply(200, mockResponse);
+
+      const result = await useDownloadExportApi(axios).getDownloadVersionFeatureTypes('dl-1', 'ver-2');
+
+      expect(mock.history.get[0].url).toBe('/api/download/dl-1/version/ver-2/feature-types');
       expect(result).toEqual(mockResponse);
     });
   });
