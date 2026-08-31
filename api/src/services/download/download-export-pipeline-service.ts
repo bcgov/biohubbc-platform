@@ -201,9 +201,7 @@ export class DownloadExportPipelineService extends DBService {
    * artifacts can accrete across retries.
    */
   async listExportFeatureTypes(downloadId: string, downloadVersionId: string): Promise<string[]> {
-    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
-      downloadVersionId
-    );
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifacts(downloadVersionId);
 
     const featureTypes = new Set<string>();
     for (const artifact of artifacts) {
@@ -1126,9 +1124,9 @@ export class DownloadExportPipelineService extends DBService {
 
     // Resolve the version the group is pinned to (NOT the download's current
     // version) so a later re-materialization of the download doesn't change what
-    // this group packages. getDownloadVersionById throws ApiNotFoundError if the
+    // this group packages. getDownloadVersion throws ApiNotFoundError if the
     // version is gone — that absence is the guard.
-    const version = await this.downloadVersionRepository.getDownloadVersionById(group.download_version_id);
+    const version = await this.downloadVersionRepository.getDownloadVersion(group.download_version_id);
     const downloadId = version.download_id;
     const downloadVersionId = group.download_version_id;
 

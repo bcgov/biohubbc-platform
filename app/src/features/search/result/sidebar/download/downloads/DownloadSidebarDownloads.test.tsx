@@ -4,7 +4,6 @@ import { DownloadFeatureType } from 'interfaces/useDownloadExportApi.interface';
 import { makeDownload, makeExport } from 'test-helpers/download-helpers';
 import { render } from 'test-helpers/test-utils';
 import { DownloadSidebarDownloads } from './DownloadSidebarDownloads';
-import { isExportReady, triggerIframeDownload } from './download-export-utils';
 
 const mockGetDownloads = vi.fn();
 const mockCreateExport = vi.fn();
@@ -49,17 +48,6 @@ describe('DownloadSidebarDownloads', () => {
   });
 
   const mockPagination = (overrides = {}) => ({ total: 1, current_page: 1, last_page: 1, ...overrides });
-
-  describe('isExportReady', () => {
-    it.each([
-      { status: 'pending', expected: false },
-      { status: 'processing', expected: false },
-      { status: 'ready', expected: true },
-      { status: 'failed', expected: false }
-    ] as const)('returns $expected for status "$status"', ({ status, expected }) => {
-      expect(isExportReady(status)).toBe(expected);
-    });
-  });
 
   describe('list rendering', () => {
     it('renders download cards when data loads', async () => {
@@ -479,23 +467,6 @@ describe('DownloadSidebarDownloads', () => {
           expect.objectContaining({ dialogTitle: 'Nothing to download' })
         );
       });
-    });
-  });
-
-  describe('triggerIframeDownload', () => {
-    it('removes the injected iframe after 30s', () => {
-      vi.useFakeTimers();
-      try {
-        triggerIframeDownload('https://s3.example.com/test');
-
-        expect(document.querySelectorAll('iframe').length).toBe(1);
-
-        vi.advanceTimersByTime(31000);
-
-        expect(document.querySelectorAll('iframe').length).toBe(0);
-      } finally {
-        vi.useRealTimers();
-      }
     });
   });
 });

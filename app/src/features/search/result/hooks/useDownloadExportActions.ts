@@ -7,7 +7,7 @@ import { type CreateExportPayload } from 'interfaces/useDownloadExportApi.interf
 import { useCallback, useEffect, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { buildExportConfig } from '../sidebar/download/export-config-form';
-import { triggerIframeDownload } from '../sidebar/download/downloads/download-export-utils';
+import { triggerIframeDownload } from 'utils/download';
 import { IExportConfigFormValues } from '../sidebar/download/ConfigureExportForm';
 
 const PAGE_SIZE = 10;

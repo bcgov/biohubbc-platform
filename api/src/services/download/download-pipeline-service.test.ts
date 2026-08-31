@@ -38,7 +38,7 @@ describe('DownloadPipelineService', () => {
 
   describe('transitionDownloadVersionStatus', () => {
     // The transition now reads + writes the version DIRECTLY (status lives on the version), so the
-    // lifecycle read is stubbed on DownloadVersionRepository.getDownloadVersionStatusById and the
+    // lifecycle read is stubbed on DownloadVersionRepository.getDownloadVersion and the
     // write on updateDownloadVersionStatus; the first arg of both is the version id.
     const versionId = 'dddd0000-0000-0000-0000-000000000001';
 
@@ -51,7 +51,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.READY }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
@@ -80,7 +80,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PENDING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
@@ -113,7 +113,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
@@ -145,7 +145,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
@@ -180,7 +180,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
@@ -212,7 +212,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 
@@ -238,7 +238,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionStatus').resolves();
 

@@ -197,31 +197,9 @@ describe('DownloadVersionRepository', () => {
     });
   });
 
-  describe('getDownloadVersionById', () => {
-    it('throws ApiNotFoundError when no version matches', async () => {
-      // Verifies: the get* variant maps an empty result to a 404-mapping ApiNotFoundError
-
-      // Step 1: Setup mock DB to return no rows
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      // Step 2: Create repository with mocked connection
-      const repo = new DownloadVersionRepository(mockDBConnection);
-
-      // Step 3 + 4: Call and assert it rejects with ApiNotFoundError
-      try {
-        await repo.getDownloadVersionById(VERSION_ID);
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err).to.be.instanceOf(ApiNotFoundError);
-        expect(err.message).to.equal('Download version not found');
-      }
-    });
-  });
-
-  describe('getDownloadVersionStatusById', () => {
+  describe('getDownloadVersion', () => {
     it('SELECTs the lifecycle status columns from download_version, binds the version id, and returns the row', async () => {
-      // Verifies: the wider status read targets download_version, surfaces status/timing/error, returns the raw row
+      // Verifies: the canonical version read surfaces the full lifecycle row.
 
       // Step 1: Setup mock DB to return one status row
       const statusRow = {
@@ -242,7 +220,7 @@ describe('DownloadVersionRepository', () => {
       const repo = new DownloadVersionRepository(mockDBConnection);
 
       // Step 3: Call the get method
-      const result = await repo.getDownloadVersionStatusById(VERSION_ID);
+      const result = await repo.getDownloadVersion(VERSION_ID);
 
       // Step 4: Verify the returned row, the SELECTed columns, and the bound version id
       expect(result).to.equal(statusRow);
@@ -275,7 +253,7 @@ describe('DownloadVersionRepository', () => {
 
       // Step 3 + 4: Call and assert it rejects with ApiNotFoundError
       try {
-        await repo.getDownloadVersionStatusById(VERSION_ID);
+        await repo.getDownloadVersion(VERSION_ID);
         expect.fail('Expected error');
       } catch (err: any) {
         expect(err).to.be.instanceOf(ApiNotFoundError);
@@ -284,7 +262,7 @@ describe('DownloadVersionRepository', () => {
     });
   });
 
-  describe('listDownloadVersionArtifactsByDownloadVersionId', () => {
+  describe('listDownloadVersionArtifacts', () => {
     it('JOINs artifact, filters record_end_date IS NULL, and binds versionId', async () => {
       // Verifies: the active-artifact lookup joins artifact for object_key and excludes ended links
 
@@ -296,7 +274,7 @@ describe('DownloadVersionRepository', () => {
       const repo = new DownloadVersionRepository(mockDBConnection);
 
       // Step 3: Call the list method
-      await repo.listDownloadVersionArtifactsByDownloadVersionId(VERSION_ID);
+      await repo.listDownloadVersionArtifacts(VERSION_ID);
 
       // Step 4: Verify the JOIN, the active-row filter, and the bound version id
       const sqlText = sqlStub.firstCall.args[0].text;

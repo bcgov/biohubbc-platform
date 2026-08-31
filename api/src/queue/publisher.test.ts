@@ -566,7 +566,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
 
       const data = { downloadVersionId: DOWNLOAD_VERSION_ID };
@@ -590,7 +590,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
 
       await publishProcessDownloadJob(mockConnection, {
@@ -608,7 +608,7 @@ describe('publisher', () => {
     it('returns duplicate when version is not in pending status', async () => {
       const mockConnection = getMockDBConnection();
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: 'processing' }));
 
       const data = { downloadVersionId: DOWNLOAD_VERSION_ID };
@@ -624,7 +624,7 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       // The repository's get* throws on a miss; the publisher has no null-guard of its own.
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .rejects(new ApiNotFoundError('Download version not found'));
 
       const data = { downloadVersionId: 'dddd0000-0000-0000-0000-000000000999' };
@@ -646,7 +646,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(
           createMockDownloadVersionStatusRecord({ download_version_id: 'dddd0000-0000-0000-0000-000000000456' })
         );
@@ -667,7 +667,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
 
       const result = await publishProcessDownloadJob(mockConnection, {
@@ -684,7 +684,7 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 

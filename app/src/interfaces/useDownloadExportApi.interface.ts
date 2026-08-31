@@ -41,7 +41,8 @@ export interface DownloadExportPart {
 }
 
 /**
- * Detail response for `GET /api/download-export/:exportId` — same shape as `DownloadExport` plus per-part URLs.
+ * Detail response for `GET /api/download/:downloadId/export/:downloadVersionExportId` — the same shape as
+ * `DownloadExport` plus per-part URLs.
  * URLs regenerate per request; never persist them.
  */
 export interface DownloadExportDetail extends DownloadExport {

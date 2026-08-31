@@ -188,9 +188,7 @@ describe('DownloadExportPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      const listStub = sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
-        .resolves([]);
+      const listStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([]);
 
       await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
 
@@ -201,7 +199,7 @@ describe('DownloadExportPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([]);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([]);
 
       const result = await service.listExportFeatureTypes(DOWNLOAD_ID, DOWNLOAD_VERSION_ID);
 
@@ -212,7 +210,7 @@ describe('DownloadExportPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/survey/data.parquet`
@@ -233,7 +231,7 @@ describe('DownloadExportPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadExportPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`
@@ -258,7 +256,7 @@ describe('DownloadExportPipelineService', () => {
       const service = new DownloadExportPipelineService(mockDBConnection);
 
       const otherDownloadId = 'ffff0000-0000-0000-0000-000000000999';
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([
         {
           artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
           object_key: `downloads/${DOWNLOAD_ID}/versions/${DOWNLOAD_VERSION_ID}/observation/data.parquet`
@@ -313,7 +311,7 @@ describe('DownloadExportPipelineService', () => {
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup({ download_version_id: DOWNLOAD_VERSION_ID }));
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
@@ -358,7 +356,7 @@ describe('DownloadExportPipelineService', () => {
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
@@ -394,7 +392,7 @@ describe('DownloadExportPipelineService', () => {
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
@@ -431,7 +429,7 @@ describe('DownloadExportPipelineService', () => {
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
 
@@ -1188,7 +1186,7 @@ describe('DownloadExportPipelineService', () => {
         })
       );
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(service as any, 'buildSchemaLookup').resolves(new Map<string, CsvPropertyDefinition[]>());
 
@@ -1247,7 +1245,7 @@ describe('DownloadExportPipelineService', () => {
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
       sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();

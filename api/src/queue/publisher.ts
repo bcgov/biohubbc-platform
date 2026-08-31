@@ -361,9 +361,7 @@ export const publishProcessDownloadJob = async (
 ): Promise<PublishJobResult> => {
   try {
     // Resolve the version directly; a missing version throws ApiNotFoundError from the repository.
-    const version = await new DownloadVersionRepository(connection).getDownloadVersionStatusById(
-      data.downloadVersionId
-    );
+    const version = await new DownloadVersionRepository(connection).getDownloadVersion(data.downloadVersionId);
 
     // Only a pending version is enqueueable — any other status is already in flight or terminal.
     if (version.status !== DownloadStatusEnum.PENDING) {
