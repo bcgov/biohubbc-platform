@@ -1,8 +1,10 @@
+import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import {
   DataRequestRecord,
   SubmissionRecord,
   SubmissionUploadRecord,
+  TeamAuthorizationResult,
   TicketRecord
 } from '../../models/team-authorization';
 import { BaseRepository } from '../base-repository';
@@ -158,6 +160,53 @@ export class TeamAuthorizationRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, SubmissionRecord);
     return response.rows[0] ?? null;
+  }
+
+  /**
+   * Check whether a user can access a download through its team association.
+   *
+   * Unclaimed downloads have no active `download_team` rows and are authorized by UUID.
+   * Claimed downloads require an authenticated user with active membership in a linked team.
+   *
+   * @param {number | null} systemUserId
+   * @param {string} downloadId
+   * @return {Promise<boolean>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async isUserAuthorizedForDownload(systemUserId: number | null, downloadId: string): Promise<boolean> {
+    const sql = SQL`
+      SELECT EXISTS (
+        SELECT 1
+        FROM download d
+        WHERE d.download_id = ${downloadId}
+          AND (
+            NOT EXISTS (
+              SELECT 1
+              FROM download_team dt
+              WHERE dt.download_id = d.download_id
+                AND dt.record_end_date IS NULL
+            )
+            OR (
+              ${systemUserId}::integer IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM download_team dt
+                JOIN team t ON t.team_id = dt.team_id
+                JOIN team_member tm ON tm.team_id = dt.team_id
+                WHERE dt.download_id = d.download_id
+                  AND tm.system_user_id = ${systemUserId}
+                  AND dt.record_end_date IS NULL
+                  AND t.record_end_date IS NULL
+                  AND tm.record_end_date IS NULL
+              )
+            )
+          )
+      ) AS authorized;
+    `;
+
+    const response = await this.connection.sql(sql, TeamAuthorizationResult);
+
+    return response.rows[0]?.authorized ?? false;
   }
 
   /**

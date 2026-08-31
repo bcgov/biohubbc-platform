@@ -1,15 +1,20 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { HTTP404 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../services/download/download-service';
 import { getLogger } from '../../../utils/logger';
-import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/download/{downloadId}');
 
-export const GET: Operation = [findDownloadById()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }]
+  })),
+  findDownloadById()
+];
 
 export const PUT: Operation = [
   authorizeRequestHandler(() => ({
@@ -119,8 +124,8 @@ GET.apiDoc = {
 /**
  * Get a download request by ID.
  *
- * Unauthenticated requests can access anonymous downloads (team_id IS NULL).
- * Authenticated requests can also access downloads they are authorized for.
+ * Authorization is handled by download-scoped Team middleware. Use the authenticated
+ * connection when a bearer token is present, otherwise fall back to the API user for anonymous links.
  *
  * @returns {RequestHandler}
  */
@@ -130,13 +135,14 @@ export function findDownloadById(): RequestHandler {
     const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
-      const downloadId = req.params.downloadId;
-
       await connection.open();
 
       const downloadService = new DownloadService(connection);
-      const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
-      const download = await downloadService.getAuthorizedDownload(downloadId, systemUserId);
+      const download = await downloadService.findDownloadById(req.params.downloadId);
+
+      if (!download) {
+        throw new HTTP404('Download not found');
+      }
 
       await connection.commit();
 

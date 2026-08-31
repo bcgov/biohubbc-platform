@@ -1,4 +1,5 @@
 import { EXPORT_CONFIG_VERSION, EXPORT_TYPE, ExportMode, MergeType } from 'constants/export-config-constants';
+import { ApiPaginationResponseParams } from 'types/pagination';
 
 /**
  * Status values a `download_export` row can take.
@@ -45,6 +46,11 @@ export interface DownloadExportPart {
  */
 export interface DownloadExportDetail extends DownloadExport {
   parts: DownloadExportPart[];
+}
+
+export interface DownloadExportListResponse {
+  exports: DownloadExport[];
+  pagination: ApiPaginationResponseParams;
 }
 
 /**

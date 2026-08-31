@@ -26,13 +26,22 @@ export class TeamAuthorizationService extends DBService {
    * - `data_request`: membership in the data-request visibility team.
    * - `submission_upload`: membership in the upload's dedicated access team.
    * - `submission`: membership in the submission's team, resolved by its explicitly named ID or UUID.
+   * - `download`: UUID access for unclaimed downloads; otherwise membership in a linked download team.
    *
-   * @param {number} systemUserId
+   * @param {number | null} systemUserId
    * @param {TeamAuthorizationEntity} entity
    * @return {Promise<boolean>}
    * @memberof TeamAuthorizationService
    */
-  async isUserAuthorizedForTeamEntity(systemUserId: number, entity: TeamAuthorizationEntity): Promise<boolean> {
+  async isUserAuthorizedForTeamEntity(systemUserId: number | null, entity: TeamAuthorizationEntity): Promise<boolean> {
+    if (entity.entity === 'download') {
+      return this.teamAuthorizationRepository.isUserAuthorizedForDownload(systemUserId, entity.downloadId);
+    }
+
+    if (!systemUserId) {
+      return false;
+    }
+
     let record: { record_end_date: string | null } | null;
 
     switch (entity.entity) {

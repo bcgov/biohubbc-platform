@@ -116,9 +116,8 @@ describe('SearchResultPage', () => {
     });
 
     mockGetAvailableUsers.mockResolvedValue({ users: [] });
-    // Default to authenticated: the create-download tests below assert the authenticated
-    // snackbar + Downloads-sidebar path. Anonymous-branch behavior is covered in
-    // useSearchResultDownload.test.tsx.
+    // Default to authenticated; successful create-download behavior should still
+    // navigate to the download page.
     mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload },
@@ -224,12 +223,8 @@ describe('SearchResultPage', () => {
         expression: null
       })
     );
-    expect(mockSetSnackbar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        open: true,
-        snackbarMessage: expect.stringMatching(/track its progress in the downloads sidebar/i)
-      })
-    );
+    expect(mockNavigate).toHaveBeenCalledWith('/download/new-uuid');
+    expect(mockSetSnackbar).not.toHaveBeenCalled();
   });
 
   it('does not fire createDownload twice when the save button is double-clicked while in flight', async () => {
@@ -256,13 +251,7 @@ describe('SearchResultPage', () => {
 
     resolveCreate({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
 
-    await waitFor(() =>
-      expect(mockSetSnackbar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          snackbarMessage: expect.stringMatching(/track its progress in the downloads sidebar/i)
-        })
-      )
-    );
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/download/new-uuid'));
     expect(mockCreateDownload).toHaveBeenCalledTimes(1);
   });
 

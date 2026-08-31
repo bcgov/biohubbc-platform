@@ -83,10 +83,12 @@ export const createMockDownloadVersionStatusRecord = (
   download_version_id: 'dddd0000-0000-0000-0000-000000000001',
   download_id: 'aaaa0000-0000-0000-0000-000000000042',
   status: DownloadStatusEnum.PENDING,
+  feature_count: null,
   started_at: null,
   completed_at: null,
   materialized_at: null,
   error_message: null,
+  create_date: '2026-01-01T00:00:00.000Z',
   ...overrides
 });
 

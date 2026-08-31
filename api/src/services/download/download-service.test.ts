@@ -6,7 +6,8 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import {
   createMockDownloadRecord,
   createMockDownloadVersion,
-  createMockDownloadVersionExportListRow
+  createMockDownloadVersionExportListRow,
+  createMockDownloadVersionStatusRecord
 } from '../../__mocks__/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
@@ -38,6 +39,37 @@ describe('DownloadService', () => {
 
       expect(stub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001');
       expect(result).to.be.null;
+    });
+  });
+
+  describe('listDownloadVersions', () => {
+    it('lists versions without applying route-level authorization', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+      const rows = [createMockDownloadVersionStatusRecord({ download_id: downloadId })];
+
+      const listStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersions').resolves(rows);
+
+      const result = await service.listDownloadVersions(downloadId, { page: 1, limit: 10 });
+
+      expect(listStub).to.have.been.calledOnceWith(downloadId, { page: 1, limit: 10 });
+      expect(result).to.eql(rows);
+    });
+  });
+
+  describe('listDownloadVersionsCount', () => {
+    it('counts versions without applying route-level authorization', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+
+      const countStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionsCount').resolves(3);
+
+      const result = await service.listDownloadVersionsCount(downloadId);
+
+      expect(countStub).to.have.been.calledOnceWith(downloadId);
+      expect(result).to.equal(3);
     });
   });
 

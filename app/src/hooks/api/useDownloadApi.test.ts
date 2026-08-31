@@ -4,7 +4,8 @@ import {
   CreateDownloadRequest,
   CreateDownloadResponse,
   DownloadDetail,
-  DownloadListResponse
+  DownloadListResponse,
+  DownloadVersionListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { useDownloadApi } from './useDownloadApi';
 
@@ -133,6 +134,36 @@ describe('useDownloadApi', () => {
       mock.onGet(`/api/download/${downloadId}`).reply(404, { message: 'Not found' });
 
       await expect(useDownloadApi(axios).getDownload(downloadId)).rejects.toThrow();
+    });
+  });
+
+  describe('listDownloadVersions', () => {
+    it('should send GET to /api/download/<id>/version and return response', async () => {
+      const downloadId = '550e8400-e29b-41d4-a716-446655440099';
+      const mockResponse: DownloadVersionListResponse = {
+        versions: [
+          {
+            download_version_id: 'ver-abc-123',
+            download_id: downloadId,
+            status: 'ready',
+            feature_count: 42,
+            started_at: '2026-03-01T00:01:00Z',
+            completed_at: '2026-03-01T00:02:00Z',
+            materialized_at: '2026-03-01T00:02:00Z',
+            error_message: null,
+            create_date: '2026-03-01T00:00:00Z'
+          }
+        ],
+        pagination: { total: 1, current_page: 1, last_page: 1 }
+      };
+
+      mock.onGet(`/api/download/${downloadId}/version`).reply(200, mockResponse);
+
+      const result = await useDownloadApi(axios).listDownloadVersions(downloadId, { page: 1, limit: 10 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].url).toBe(`/api/download/${downloadId}/version`);
+      expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
     });
   });
 });
