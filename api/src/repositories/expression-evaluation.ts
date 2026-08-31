@@ -301,7 +301,7 @@ function buildPredicateEvidenceIdsQuery(
  *   like `telemetry where animal.species = caribou` and
  *   `telemetry where dataset.species = caribou`.
  *
- * This is a candidate-anchor semi-join, not broad evidence graph expansion.
+ * This is a set-based projection from evidence through indexed closure joins, not broad evidence graph expansion.
  * Do not walk `submission_feature_feature` content edges here and do not expand
  * from evidence outward before filtering back to the anchor type, because that
  * can pull in non-matching sibling anchors.
@@ -318,53 +318,49 @@ function projectEvidenceToTargetIdsQuery(
   knex: Knex,
   systemUserId?: number | null
 ): Knex.QueryBuilder {
+  const typedEvidence = knex('evidence')
+    .select('evidence.submission_feature_id', 'evidence_ft.name as feature_type_name')
+    .join('submission_feature as evidence_sf', 'evidence_sf.submission_feature_id', 'evidence.submission_feature_id')
+    .join('feature_type as evidence_ft', 'evidence_ft.feature_type_id', 'evidence_sf.feature_type_id')
+    .whereRaw(isSubmissionFeatureActive('evidence_sf'))
+    .whereNull('evidence_ft.record_end_date');
+
+  // Same-type evidence maps only to itself. Different-type evidence maps through closure in either direction.
+  // UNION deduplicates targets reached by more than one evidence/path before target hydration and security checks.
+  const relatedTargets = knex('typed_evidence')
+    .select('typed_evidence.submission_feature_id')
+    .where('typed_evidence.feature_type_name', anchorFeatureType)
+    .union([
+      knex('typed_evidence')
+        .select('c_forward.source_submission_feature_id as submission_feature_id')
+        .join(
+          'submission_feature_closure as c_forward',
+          'c_forward.target_submission_feature_id',
+          'typed_evidence.submission_feature_id'
+        )
+        .whereNot('typed_evidence.feature_type_name', anchorFeatureType),
+      knex('typed_evidence')
+        .select('c_reverse.target_submission_feature_id as submission_feature_id')
+        .join(
+          'submission_feature_closure as c_reverse',
+          'c_reverse.source_submission_feature_id',
+          'typed_evidence.submission_feature_id'
+        )
+        .whereNot('typed_evidence.feature_type_name', anchorFeatureType)
+    ]);
+
   const query = knex
     .queryBuilder()
     .with('evidence', evidenceQuery.clone())
+    .with('typed_evidence', typedEvidence)
+    .with('related_targets', relatedTargets)
     .select('anchor_sf.submission_feature_id')
-    .from('submission_feature as anchor_sf')
+    .from('related_targets')
+    .join('submission_feature as anchor_sf', 'anchor_sf.submission_feature_id', 'related_targets.submission_feature_id')
     .join('feature_type as anchor_ft', 'anchor_ft.feature_type_id', 'anchor_sf.feature_type_id')
     .where('anchor_ft.name', anchorFeatureType)
     .whereRaw(isSubmissionFeatureActive('anchor_sf'))
-    .whereNull('anchor_ft.record_end_date')
-    .whereExists(
-      knex
-        .select(knex.raw('1'))
-        .from('evidence')
-        .join(
-          'submission_feature as evidence_sf',
-          'evidence_sf.submission_feature_id',
-          'evidence.submission_feature_id'
-        )
-        .join('feature_type as evidence_ft', 'evidence_ft.feature_type_id', 'evidence_sf.feature_type_id')
-        .whereRaw(isSubmissionFeatureActive('evidence_sf'))
-        .whereNull('evidence_ft.record_end_date')
-        .where((qb) => {
-          qb.where((sameType) => {
-            sameType
-              .whereRaw('evidence_ft.name = anchor_ft.name')
-              .whereRaw('evidence_sf.submission_feature_id = anchor_sf.submission_feature_id');
-          }).orWhere((differentType) => {
-            differentType.whereRaw('evidence_ft.name <> anchor_ft.name').where((connected) => {
-              connected
-                .whereExists(
-                  knex
-                    .select(knex.raw('1'))
-                    .from('submission_feature_closure as c_forward')
-                    .whereRaw('c_forward.source_submission_feature_id = anchor_sf.submission_feature_id')
-                    .whereRaw('c_forward.target_submission_feature_id = evidence_sf.submission_feature_id')
-                )
-                .orWhereExists(
-                  knex
-                    .select(knex.raw('1'))
-                    .from('submission_feature_closure as c_reverse')
-                    .whereRaw('c_reverse.source_submission_feature_id = evidence_sf.submission_feature_id')
-                    .whereRaw('c_reverse.target_submission_feature_id = anchor_sf.submission_feature_id')
-                );
-            });
-          });
-        })
-    );
+    .whereNull('anchor_ft.record_end_date');
 
   const targetSecurityFilter = buildSecurityFilter(knex, systemUserId, 'anchor_sf.submission_feature_id');
   if (targetSecurityFilter) {

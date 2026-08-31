@@ -35,10 +35,11 @@ export interface SnapshotFeature {
   data_byte_size: number | null;
 }
 
-/** A scalar property row (string/number/boolean) keyed by the owning feature's uuid + property id. */
+/** A scalar property row keyed by the owning feature and stable property natural key. */
 export interface SnapshotScalarProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   value: string | number | boolean | null;
 }
 
@@ -50,7 +51,8 @@ export interface SnapshotScalarProperty {
  */
 export interface SnapshotTimestampProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   date_value: string | null;
   time_value: string | null;
 }
@@ -58,14 +60,16 @@ export interface SnapshotTimestampProperty {
 /** A code property row; the real column is contributor_codeset_code_id, not a generic code id. */
 export interface SnapshotCodeProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   contributor_codeset_code_id: number;
 }
 
 /** A taxon property row referencing an ITIS TSN. */
 export interface SnapshotTaxonProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   taxon_id: number;
 }
 
@@ -77,7 +81,8 @@ export interface SnapshotTaxonProperty {
  */
 export interface SnapshotGeometryProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   geojson: unknown;
 }
 
@@ -90,7 +95,8 @@ export interface SnapshotGeometryProperty {
  */
 export interface SnapshotFeatureProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   referenced_feature_uuid: string;
 }
 
@@ -327,11 +333,14 @@ async function dumpScalarProperty(
   table: ScalarPropertyTable
 ): Promise<SnapshotScalarProperty[]> {
   const statement = SQL`
-    SELECT sf.uuid AS feature_uuid, prop.feature_type_property_id, prop.value
+    SELECT sf.uuid AS feature_uuid, ft.name AS feature_type_name, fp.name AS property_name, prop.value
   `;
   statement.append(` FROM ${table} prop `);
   statement.append(SQL`
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
+    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
+    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
     WHERE sf.submission_id = ${submissionId};
   `);
 
@@ -354,11 +363,15 @@ async function dumpTimestampProperty(
   const response = await connection.sql<SnapshotTimestampProperty>(SQL`
     SELECT
       sf.uuid AS feature_uuid,
-      prop.feature_type_property_id,
+      ft.name AS feature_type_name,
+      fp.name AS property_name,
       prop.date_value,
       prop.time_value
     FROM submission_feature_property_timestamp prop
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
+    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
+    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
     WHERE sf.submission_id = ${submissionId};
   `);
 
@@ -379,10 +392,14 @@ async function dumpGeometryProperty(
   const response = await connection.sql<SnapshotGeometryProperty>(SQL`
     SELECT
       sf.uuid AS feature_uuid,
-      prop.feature_type_property_id,
+      ft.name AS feature_type_name,
+      fp.name AS property_name,
       ST_AsGeoJSON(prop.value)::json AS geojson
     FROM submission_feature_property_geometry prop
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
+    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
+    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
     WHERE sf.submission_id = ${submissionId};
   `);
 
@@ -403,10 +420,14 @@ async function dumpFeatureProperty(
   const response = await connection.sql<SnapshotFeatureProperty>(SQL`
     SELECT
       owner.uuid AS feature_uuid,
-      prop.feature_type_property_id,
+      ft.name AS feature_type_name,
+      fp.name AS property_name,
       referenced.uuid AS referenced_feature_uuid
     FROM submission_feature_property_feature prop
     JOIN submission_feature owner ON owner.submission_feature_id = prop.submission_feature_id
+    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
+    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
     JOIN submission_feature referenced ON referenced.submission_feature_id = prop.referenced_submission_feature_id
     WHERE owner.submission_id = ${submissionId};
   `);

@@ -77,8 +77,10 @@ describe('Indexed property value read paths (integration)', function () {
   }
 
   describe('taxon values', () => {
-    const featureTypeName = 'species_observation';
-    const propertyName = 'taxon_id';
+    // A taxon value belongs on a taxon-declared property. `species_observation.taxon_id` reads like
+    // one but is declared `number` — 20260820120000 moved it back, storing the public ITIS TSN.
+    const featureTypeName = 'habitat_feature';
+    const propertyName = 'associated_species';
 
     it('returns the same structured taxon value from the search row and the properties list', async () => {
       const submissionId = await createTestSubmission(connection);
