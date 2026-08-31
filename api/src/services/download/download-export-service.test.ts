@@ -794,48 +794,32 @@ describe('DownloadExportService', () => {
     });
   });
 
-  describe('listAuthorizedExportsByDownloadId', () => {
-    it('authorizes the parent download before listing the exports', async () => {
-      // Verifies: team-auth runs against the parent download FIRST, then the list is fetched — the
-      // auth rule lives in exactly one place (the service), not the route handler.
-
-      // Step 1: Stub auth and the list fetch
-      const authStub = sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+  describe('listDownloadVersionExports', () => {
+    it('lists exports without applying route-level authorization', async () => {
       const rows = [createMockDownloadVersionExportListRow({ download_id: DOWNLOAD_ID })];
       const listStub = sinon
-        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadId')
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExports')
         .resolves(rows);
 
-      // Step 2: List the exports
       const service = new DownloadExportService(getMockDBConnection());
-      const result = await service.listAuthorizedExportsByDownloadId(DOWNLOAD_ID, SYSTEM_USER_ID);
+      const result = await service.listDownloadVersionExports(DOWNLOAD_ID);
 
-      // Step 3: Verify auth ran against the parent download BEFORE the list, and rows pass through
-      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, SYSTEM_USER_ID);
       expect(listStub).to.have.been.calledOnceWith(DOWNLOAD_ID);
-      expect(authStub).to.have.been.calledBefore(listStub);
       expect(result).to.eql(rows);
     });
+  });
 
-    it('propagates the auth error and never lists when not authorized', async () => {
-      // Verifies: an auth failure short-circuits — the list is never fetched.
+  describe('listDownloadVersionExportsCount', () => {
+    it('counts exports without applying route-level authorization', async () => {
+      const countStub = sinon
+        .stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsCount')
+        .resolves(2);
 
-      // Step 1: Auth rejects with HTTP403
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-      const listStub = sinon.stub(DownloadVersionExportRepository.prototype, 'listDownloadVersionExportsByDownloadId');
-
-      // Step 2: Attempt to list
       const service = new DownloadExportService(getMockDBConnection());
-      try {
-        await service.listAuthorizedExportsByDownloadId(DOWNLOAD_ID, SYSTEM_USER_ID);
-        expect.fail('Expected throw');
-      } catch (err) {
-        // Step 3: Verify the auth error propagates
-        expect(err).to.be.instanceOf(HTTP403);
-      }
+      const result = await service.listDownloadVersionExportsCount(DOWNLOAD_ID);
 
-      // Step 4: Verify the list was never fetched
-      expect(listStub).to.not.have.been.called;
+      expect(countStub).to.have.been.calledOnceWith(DOWNLOAD_ID);
+      expect(result).to.equal(2);
     });
   });
 

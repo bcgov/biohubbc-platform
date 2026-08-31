@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -10,6 +11,7 @@ import {
 } from '../../models/download-version-export';
 import { DownloadVersionExportArtifactWithFile } from '../../models/download-version-export-artifact';
 import { DownloadVersionExportArtifactGroupRecord } from '../../models/download-version-export-artifact-group';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -393,47 +395,89 @@ export class DownloadVersionExportRepository extends BaseRepository {
    * @return {Promise<DownloadVersionExportListRow[]>}
    * @memberof DownloadVersionExportRepository
    */
-  async listDownloadVersionExportsByDownloadId(downloadId: string): Promise<DownloadVersionExportListRow[]> {
-    const sql = SQL`
-      SELECT
-        de.download_version_export_id,
-        de.format,
-        de.mode,
-        de.max_part_size_bytes,
-        dv.download_id,
-        g.status,
-        g.started_at,
-        g.completed_at,
-        g.error_message,
-        COALESCE(COUNT(dvea.download_version_export_artifact_id), 0)::integer AS part_count
-      FROM download_version_export de
-      INNER JOIN download_version dv ON dv.download_version_id = de.download_version_id
-      INNER JOIN download_version_export_artifact_group g
-        ON g.download_version_export_artifact_group_id = de.download_version_export_artifact_group_id
-      LEFT JOIN download_version_export_artifact dvea
-        ON dvea.download_version_export_artifact_group_id = g.download_version_export_artifact_group_id
-       AND dvea.record_end_date IS NULL
-      WHERE dv.download_id = ${downloadId}
-      GROUP BY
-        de.download_version_export_id,
-        de.format,
-        de.mode,
-        de.max_part_size_bytes,
-        dv.download_id,
-        g.status,
-        g.started_at,
-        g.completed_at,
-        g.error_message,
-        de.create_date
-      ORDER BY de.create_date DESC;
-    `;
+  async listDownloadVersionExports(
+    downloadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadVersionExportListRow[]> {
+    const knex = getKnex();
 
-    const response = await this.connection.sql(sql, DownloadVersionExportListRow);
+    const query = knex
+      .select([
+        'de.download_version_export_id',
+        'de.format',
+        'de.mode',
+        'de.max_part_size_bytes',
+        'dv.download_id',
+        'g.status',
+        'g.started_at',
+        'g.completed_at',
+        'g.error_message',
+        knex.raw('COALESCE(COUNT(dvea.download_version_export_artifact_id), 0)::integer AS part_count')
+      ])
+      .from('download_version_export as de')
+      .innerJoin('download_version as dv', 'dv.download_version_id', 'de.download_version_id')
+      .innerJoin(
+        'download_version_export_artifact_group as g',
+        'g.download_version_export_artifact_group_id',
+        'de.download_version_export_artifact_group_id'
+      )
+      .leftJoin('download_version_export_artifact as dvea', function () {
+        this.on(
+          'dvea.download_version_export_artifact_group_id',
+          '=',
+          'g.download_version_export_artifact_group_id'
+        ).andOnNull('dvea.record_end_date');
+      })
+      .where('dv.download_id', downloadId)
+      .groupBy([
+        'de.download_version_export_id',
+        'de.format',
+        'de.mode',
+        'de.max_part_size_bytes',
+        'dv.download_id',
+        'g.status',
+        'g.started_at',
+        'g.completed_at',
+        'g.error_message',
+        'de.create_date'
+      ]);
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    if (!pagination?.sort) {
+      query.orderBy('de.create_date', 'desc');
+    }
+
+    const response = await this.connection.knex(query, DownloadVersionExportListRow);
+
     return response.rows;
   }
 
   /**
-   * Batch variant of `listDownloadVersionExportsByDownloadId` keyed by an array
+   * Count exports for a download.
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<number>}
+   * @memberof DownloadVersionExportRepository
+   */
+  async listDownloadVersionExportsCount(downloadId: string): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex
+      .table('download_version_export as de')
+      .innerJoin('download_version as dv', 'dv.download_version_id', 'de.download_version_id')
+      .where('dv.download_id', downloadId)
+      .select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Batch variant of `listDownloadVersionExports` keyed by an array
    * of download ids — serves an entire page of downloads in one query, avoiding
    * N+1.
    *

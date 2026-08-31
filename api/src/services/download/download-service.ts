@@ -8,7 +8,7 @@ import {
   DownloadListRecord,
   DownloadParquetPart
 } from '../../models/download';
-import { DownloadVersionRecord } from '../../models/download-version';
+import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
 import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
@@ -118,7 +118,7 @@ export class DownloadService extends DBService {
    * seeded from the same identity at creation: the person the content is filtered for is exactly
    * the person granted access. They diverge only later, via claim.
    *
-   * An anonymous caller's only handle is the download UUID itself; the public download page lets
+   * An anonymous caller's only handle is the download UUID itself; the download page lets
    * them watch status, and any later export is a separate user-initiated action.
    *
    * Authorization is enforced at export time, not create time — the worker re-evaluates
@@ -239,6 +239,23 @@ export class DownloadService extends DBService {
     }));
 
     return { downloads, count };
+  }
+
+  /**
+   * List versions for a download.
+   */
+  async listDownloadVersions(
+    downloadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadVersionStatusRecord[]> {
+    return this.downloadVersionRepository.listDownloadVersions(downloadId, pagination);
+  }
+
+  /**
+   * Count versions for a download.
+   */
+  async listDownloadVersionsCount(downloadId: string): Promise<number> {
+    return this.downloadVersionRepository.listDownloadVersionsCount(downloadId);
   }
 
   /**

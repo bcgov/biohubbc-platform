@@ -228,10 +228,12 @@ describe('DownloadVersionRepository', () => {
         download_version_id: VERSION_ID,
         download_id: DOWNLOAD_ID,
         status: DownloadStatusEnum.READY,
+        feature_count: 42,
         started_at: '2026-01-01T00:00:00.000Z',
         completed_at: '2026-01-01T00:01:00.000Z',
         materialized_at: '2026-01-01T00:01:00.000Z',
-        error_message: null
+        error_message: null,
+        create_date: '2026-01-01T00:00:00.000Z'
       };
       const sqlStub = sinon.stub().resolves(mockQueryResult([statusRow], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -250,10 +252,12 @@ describe('DownloadVersionRepository', () => {
       expect(sqlText).to.include('download_version_id');
       expect(sqlText).to.include('download_id');
       expect(sqlText).to.include('status');
+      expect(sqlText).to.include('feature_count');
       expect(sqlText).to.include('started_at');
       expect(sqlText).to.include('completed_at');
       expect(sqlText).to.include('materialized_at');
       expect(sqlText).to.include('error_message');
+      expect(sqlText).to.include('create_date');
 
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(VERSION_ID);
@@ -301,6 +305,43 @@ describe('DownloadVersionRepository', () => {
 
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(VERSION_ID);
+    });
+  });
+
+  describe('listDownloadVersions', () => {
+    it('returns rows from the paginated list query', async () => {
+      const row = {
+        download_version_id: VERSION_ID,
+        download_id: DOWNLOAD_ID,
+        status: DownloadStatusEnum.READY,
+        feature_count: 42,
+        started_at: '2026-01-01T00:00:00.000Z',
+        completed_at: '2026-01-01T00:01:00.000Z',
+        materialized_at: '2026-01-01T00:01:00.000Z',
+        error_message: null,
+        create_date: '2026-01-01T00:00:00.000Z'
+      };
+      const knexStub = sinon.stub().resolves(mockQueryResult([row]));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadVersionRepository(mockDBConnection);
+      const result = await repo.listDownloadVersions(DOWNLOAD_ID, { page: 1, limit: 10 });
+
+      expect(knexStub).to.have.been.calledOnce;
+      expect(result).to.eql([row]);
+    });
+  });
+
+  describe('listDownloadVersionsCount', () => {
+    it('returns the download version count', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 3 }]));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadVersionRepository(mockDBConnection);
+      const result = await repo.listDownloadVersionsCount(DOWNLOAD_ID);
+
+      expect(knexStub).to.have.been.calledOnce;
+      expect(result).to.equal(3);
     });
   });
 });

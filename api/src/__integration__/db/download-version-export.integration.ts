@@ -912,9 +912,9 @@ describe('Download version export state machine (integration)', function () {
       // The export table has no status column — status + part_count are JOINed
       // from the group, so both exports read `ready` with part_count 2 despite
       // no per-export status write ever happening.
-      const list = await exportService.listDownloadVersionExportsByDownloadId(downloadId);
-      expect(list).to.have.length(2);
-      for (const row of list) {
+      const exports = await exportService.listDownloadVersionExports(downloadId);
+      expect(exports).to.have.length(2);
+      for (const row of exports) {
         expect(row.status).to.equal(DownloadStatusEnum.READY);
         expect(row.part_count).to.equal(2);
       }

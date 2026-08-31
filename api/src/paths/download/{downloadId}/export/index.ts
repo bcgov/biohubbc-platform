@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { CreateDownloadVersionExportRequest } from '../../../../models/download-version-export';
 import {
   CreateDownloadVersionExportRequestSchema,
@@ -8,9 +8,11 @@ import {
   DownloadVersionExportResponseSchema
 } from '../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DownloadExportService } from '../../../../services/download/download-export-service';
 import { getLogger } from '../../../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/download/{downloadId}/export');
 
@@ -20,7 +22,9 @@ export const POST: Operation = [
 ];
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }]
+  })),
   listDownloadVersionExports()
 ];
 
@@ -60,7 +64,7 @@ POST.apiDoc = {
 GET.apiDoc = {
   description: 'List all exports for a download, newest first',
   tags: ['download'],
-  security: [{ Bearer: [] }],
+  security: [{ OptionalBearer: [] }],
   parameters: [
     {
       in: 'path',
@@ -68,11 +72,12 @@ GET.apiDoc = {
       required: true,
       schema: { type: 'string', format: 'uuid' },
       description: 'Download UUID.'
-    }
+    },
+    ...paginationRequestQueryParamSchema
   ],
   responses: {
     200: {
-      description: 'Array of export records, newest first',
+      description: 'Paginated export records, newest first',
       content: {
         'application/json': {
           schema: DownloadVersionExportListResponseSchema
@@ -137,29 +142,30 @@ export function createDownloadVersionExport(): RequestHandler {
 }
 
 /**
- * List all exports for a download.
- *
- * Authorizes against the parent download (same team-membership rule as every
- * other download-scoped endpoint) and returns the full list sorted newest
- * first. `part_count` is pre-joined at the repo layer so the card can decide
- * single-vs-multi-part UI without a per-row detail fetch.
+ * List all exports for a download. Authorization is handled by download-scoped Team middleware.
+ * `part_count` is pre-joined at the repo layer so the UI can decide single-vs-multi-part presentation
+ * without a per-row detail fetch.
  */
 export function listDownloadVersionExports(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
+      const pagination = makePaginationOptionsFromRequest(req);
 
       const exportService = new DownloadExportService(connection);
-      const exports = await exportService.listAuthorizedExportsByDownloadId(downloadId, systemUserId);
+      const [exports, count] = await Promise.all([
+        exportService.listDownloadVersionExports(downloadId, pagination),
+        exportService.listDownloadVersionExportsCount(downloadId)
+      ]);
 
       await connection.commit();
 
-      return res.status(200).json(exports);
+      return res.status(200).json({ exports, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'listDownloadVersionExports', message: 'error', error });
       await connection.rollback();

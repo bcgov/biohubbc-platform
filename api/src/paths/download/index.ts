@@ -237,7 +237,7 @@ POST.apiDoc = {
  * early grants no extra access later.
  *
  * The response shape is `{ download_id, download_url }` for both callers. The download UUID is
- * the credential for the anonymous caller, who watches status on the public download page; the
+ * the credential for the anonymous caller, who watches status on the download page; the
  * authenticated caller drives the explicit two-call export flow (create export, then poll it)
  * from the Downloads UI.
  *

@@ -4,6 +4,7 @@ import {
   CreateExportPayload,
   DownloadExport,
   DownloadExportDetail,
+  DownloadExportListResponse,
   DownloadFeatureType
 } from 'interfaces/useDownloadExportApi.interface';
 import { useDownloadExportApi } from './useDownloadExportApi';
@@ -226,6 +227,36 @@ describe('useDownloadExportApi', () => {
       mock.onGet('/api/download/dl-1/export/missing').reply(404);
 
       await expect(useDownloadExportApi(axios).getExport('dl-1', 'missing')).rejects.toThrow();
+    });
+  });
+
+  describe('getExports', () => {
+    it('GETs the paginated /api/download/{downloadId}/export list path', async () => {
+      const mockResponse: DownloadExportListResponse = {
+        exports: [
+          {
+            download_version_export_id: 'ex-9',
+            download_id: 'dl-1',
+            format: 'csv',
+            mode: 'per_feature_type',
+            status: 'ready',
+            max_part_size_bytes: '524288000',
+            part_count: 1,
+            started_at: '2026-04-22T00:00:00Z',
+            completed_at: '2026-04-22T00:01:00Z',
+            error_message: null
+          }
+        ],
+        pagination: { total: 1, current_page: 1, last_page: 1 }
+      };
+
+      mock.onGet('/api/download/dl-1/export').reply(200, mockResponse);
+
+      const result = await useDownloadExportApi(axios).getExports('dl-1', { page: 2, limit: 25 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].url).toBe('/api/download/dl-1/export');
+      expect(mock.history.get[0].params).toEqual({ page: 2, limit: 25 });
     });
   });
 
