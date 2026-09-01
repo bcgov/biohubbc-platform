@@ -243,7 +243,7 @@ describe('publisher', () => {
       expect(getValidationStub.called).to.be.false;
     });
 
-    it('publishes when submission upload is failed for explicit restart', async () => {
+    it('blocks a failed submission upload from restarting at the process stage', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -260,8 +260,9 @@ describe('publisher', () => {
         status: 'failed'
       });
 
-      expect(result.status).to.equal('published');
-      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('features-job-id');
+      expect(result.status).to.equal('blocked');
+      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('failed');
+      expect(sendStub).not.to.have.been.called;
     });
 
     it('returns blocked status when submission upload is not process-startable', async () => {

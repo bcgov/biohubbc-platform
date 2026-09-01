@@ -8,7 +8,7 @@ import type { Knex } from 'knex';
  *
  * 1) add reconciliation and succession columns to existing feature/upload tables
  * 2) document the new reconciliation and succession fields
- * 3) backfill direct successor history for legacy duplicate current features
+ * 3) backfill linear upload history and direct feature successor history
  * 4) add lookup indexes and current-state uniqueness constraints
  * 5) extend the submission upload processing lifecycle
  */
@@ -58,10 +58,28 @@ export async function up(knex: Knex): Promise<void> {
       'The newer upload that made this upload stale. NULL when the upload has not been superseded.';
 
     --------------------------------------------------------------------------------
-    -- 3) Backfill direct successor history for legacy duplicate current features
-    --    The newest occurrence remains current; every earlier occurrence is ended
-    --    and linked directly to the next occurrence in publication order.
+    -- 3) Backfill linear upload history and direct feature successor history
+    --    Uploads are an append-only chain ordered by creation. Failed and deleted
+    --    uploads remain in the chain because submission processing only moves forward.
     --------------------------------------------------------------------------------
+    WITH ordered_uploads AS (
+      SELECT
+        submission_upload_id,
+        LEAD(submission_upload_id) OVER (
+          PARTITION BY submission_id
+          ORDER BY create_date, submission_upload_id
+        ) AS successor_submission_upload_id
+      FROM submission_upload
+    )
+    UPDATE submission_upload upload
+    SET successor_submission_upload_id = ordered.successor_submission_upload_id
+    FROM ordered_uploads ordered
+    WHERE upload.submission_upload_id = ordered.submission_upload_id
+      AND ordered.successor_submission_upload_id IS NOT NULL;
+
+    -- Legacy duplicate current features are similarly linearized. The newest
+    -- occurrence remains current; every earlier occurrence is ended and linked
+    -- directly to the next occurrence in publication order.
     WITH ordered AS (
       SELECT
         submission_feature_id,

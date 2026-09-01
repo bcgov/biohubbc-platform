@@ -79,8 +79,7 @@ PATCH.apiDoc = {
         'Submission not found (invalid submissionUuid) or submission upload not found (submissionUploadId does not belong to this submission).'
     },
     409: {
-      description:
-        'The upload contains reconciliation conflicts or its prepared unchanged classification is stale, so it cannot be safely activated.'
+      description: 'The review decision conflicts with the upload lifecycle or would reverse published feature state.'
     }
   }
 };

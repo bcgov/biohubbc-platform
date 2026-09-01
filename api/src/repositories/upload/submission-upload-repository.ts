@@ -1,4 +1,5 @@
 import { SQL } from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
@@ -314,7 +315,10 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission_upload record.
+   * Insert a new submission_upload record and link the prior upload as its predecessor.
+   *
+   * The caller must serialize submission upload creation before invoking this method. Failed and
+   * deleted uploads remain eligible predecessors because upload lineage is append-only.
    *
    * @param {CreateSubmissionUploadWithTeam} submissionUpload - The data to create a new submission_upload.
    * @returns {Promise<{ submission_upload_id: string }>} - The ID of the newly created submission_upload.
@@ -325,27 +329,49 @@ export class SubmissionUploadRepository extends BaseRepository {
     submissionUpload: CreateSubmissionUploadWithTeam
   ): Promise<{ submission_upload_id: string }> {
     const sqlStatement = SQL`
-      INSERT INTO submission_upload (
-        submission_id,
-        upload_id,
-        team_id,
-        ticket_id,
-        status,
-        blueprint_id,
-        comment
-      ) VALUES (
-        ${submissionUpload.submission_id},
-        ${submissionUpload.upload_id},
-        ${submissionUpload.team_id},
-        ${submissionUpload.ticket_id},
-        ${submissionUpload.status},
-        ${submissionUpload.blueprint_id},
-        ${submissionUpload.comment ?? null}
+      WITH predecessor AS (
+        SELECT submission_upload_id
+        FROM submission_upload
+        WHERE submission_id = ${submissionUpload.submission_id}
+        ORDER BY create_date DESC, submission_upload_id DESC
+        LIMIT 1
+        FOR UPDATE
+      ),
+      inserted AS (
+        INSERT INTO submission_upload (
+          submission_id,
+          upload_id,
+          team_id,
+          ticket_id,
+          status,
+          blueprint_id,
+          comment
+        ) VALUES (
+          ${submissionUpload.submission_id},
+          ${submissionUpload.upload_id},
+          ${submissionUpload.team_id},
+          ${submissionUpload.ticket_id},
+          ${submissionUpload.status},
+          ${submissionUpload.blueprint_id},
+          ${submissionUpload.comment ?? null}
+        )
+        RETURNING submission_upload_id
+      ),
+      linked AS (
+        UPDATE submission_upload prior
+        SET successor_submission_upload_id = inserted.submission_upload_id
+        FROM predecessor, inserted
+        WHERE prior.submission_upload_id = predecessor.submission_upload_id
+          AND prior.successor_submission_upload_id IS NULL
+        RETURNING prior.submission_upload_id
       )
-      RETURNING submission_upload_id;
+      SELECT inserted.submission_upload_id
+      FROM inserted
+      WHERE NOT EXISTS (SELECT 1 FROM predecessor)
+        OR EXISTS (SELECT 1 FROM linked);
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ submission_upload_id: z.string() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission_upload record', [
@@ -383,7 +409,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       LIMIT 1;
     `;
 
-    const response = await this.connection.sql<{ blueprint_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ blueprint_id: z.number() }));
 
     return response.rows[0]?.blueprint_id ?? null;
   }

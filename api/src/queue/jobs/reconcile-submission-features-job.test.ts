@@ -36,9 +36,9 @@ describe('reconcile-submission-features-job', () => {
   it('routes a valid reconciliation directly to indexing', async () => {
     stubUpload();
     sinon.stub(SubmissionUploadReconciliationService.prototype, 'validateSubmissionFeatureSourceIdentity').resolves(0);
-    sinon
-      .stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures')
-      .resolves({ new: 1, modified: 1, unmodified: 1 });
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves({
+      predecessorSubmissionUploadId: null
+    });
     const reconciled = sinon
       .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToReconciled')
       .resolves();
@@ -50,6 +50,25 @@ describe('reconcile-submission-features-job', () => {
 
     expect(reconciled).to.have.been.calledWith('upload-1');
     expect(publish).to.have.been.calledOnce;
+  });
+
+  it('ends pending features from the predecessor after reconciliation', async () => {
+    stubUpload();
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'validateSubmissionFeatureSourceIdentity').resolves(0);
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'reconcileSubmissionFeatures').resolves({
+      predecessorSubmissionUploadId: 'upload-0'
+    });
+    const endFeatures = sinon
+      .stub(SubmissionUploadReconciliationService.prototype, 'endPendingSubmissionFeatures')
+      .resolves();
+    sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToReconciled').resolves();
+    sinon
+      .stub(reconcileSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+      .resolves({ status: 'published', jobId: 'index-1' });
+
+    await reconcileSubmissionFeaturesJobHandler([job]);
+
+    expect(endFeatures).to.have.been.calledOnceWithExactly('upload-0');
   });
 
   it('marks invalid source identity without reconciling or indexing', async () => {

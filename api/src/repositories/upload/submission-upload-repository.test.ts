@@ -301,6 +301,7 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].values).to.include(7);
       expect(sqlStub.firstCall.args[0].text).to.contain('team_id');
       expect(sqlStub.firstCall.args[0].values).to.include('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+      expect(sqlStub.firstCall.args[0].text).to.contain('successor_submission_upload_id');
     });
   });
 

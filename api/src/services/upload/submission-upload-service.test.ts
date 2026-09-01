@@ -9,6 +9,7 @@ import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { TeamService } from '../access-policy/team-service';
+import { SubmissionService } from '../submission-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 
@@ -169,6 +170,12 @@ describe('SubmissionUploadService', () => {
       const stub = sinon
         .stub(SubmissionUploadRepository.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'artifact-new' });
+      const lockUploads = sinon
+        .stub(SubmissionUploadRepository.prototype, 'lockSubmissionUploadsForSubmissionId')
+        .resolves();
+      const lockSubmission = sinon
+        .stub(SubmissionService.prototype, 'lockSubmissionFeatureStateForSubmissionId')
+        .resolves();
 
       const result = await service.insertSubmissionUpload(fakeInput, 2, [2]);
 
@@ -181,6 +188,9 @@ describe('SubmissionUploadService', () => {
         ...fakeInput,
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
       });
+      expect(lockUploads).to.have.been.calledOnceWith(1);
+      expect(lockSubmission).to.have.been.calledOnceWith(1);
+      expect(lockUploads).to.have.been.calledBefore(lockSubmission);
       expect(result).to.eql({ submission_upload_id: 'artifact-new' });
     });
 
@@ -199,6 +209,8 @@ describe('SubmissionUploadService', () => {
         description: null,
         member_count: 0
       });
+      sinon.stub(SubmissionUploadRepository.prototype, 'lockSubmissionUploadsForSubmissionId').resolves();
+      sinon.stub(SubmissionService.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
       sinon.stub(SubmissionUploadRepository.prototype, 'insertSubmissionUpload').throws(new Error('Insert failed'));
 
       try {

@@ -31,6 +31,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Lock the submission's feature state for the active transaction.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>} Resolves after acquiring the submission-scoped transaction lock.
+   * @memberof SubmissionService
+   */
+  async lockSubmissionFeatureStateForSubmissionId(submissionId: number): Promise<void> {
+    await this.submissionRepository.lockSubmissionFeatureStateForSubmissionId(submissionId);
+  }
+
+  /**
    * Insert a new submission record.
    *
    * @param {ICreateSubmission} submissionData

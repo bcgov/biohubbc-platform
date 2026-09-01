@@ -43,7 +43,14 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
         return;
       }
 
-      await submissionUploadReconciliationService.reconcileSubmissionFeatures(submissionUploadId);
+      const reconciliation = await submissionUploadReconciliationService.reconcileSubmissionFeatures(
+        submissionUploadId
+      );
+      if (reconciliation.predecessorSubmissionUploadId) {
+        await submissionUploadReconciliationService.endPendingSubmissionFeatures(
+          reconciliation.predecessorSubmissionUploadId
+        );
+      }
       await submissionUploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
       await reconcileSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
         submissionUploadId

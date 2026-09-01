@@ -6,34 +6,22 @@ import { BaseRepository } from '../base-repository';
 /** Reconciles upload-owned submission_feature rows with current published state. */
 export class SubmissionFeatureReconciliationRepository extends BaseRepository {
   /**
-   * Find the newest reviewable upload that this upload supersedes.
+   * Find the direct predecessor recorded when this upload was created.
    *
    * @param {string} submissionUploadId Incoming submission upload identifier.
    * @param {number} submissionId Submission identifier.
-   * The selected upload is locked before the caller takes the submission feature-state lock, matching
-   * the lock order used by upload approval.
+   * The predecessor remains eligible when failed or deleted because upload lineage is append-only.
+   * It is locked before the caller takes the submission feature-state lock, matching approval lock order.
    *
-   * @returns {Promise<string | null>} Latest locked, indexed, submitted upload identifier, if one exists.
+   * @returns {Promise<string | null>} Locked direct predecessor upload identifier, if one exists.
    * @memberof SubmissionFeatureReconciliationRepository
    */
-  async getPredecessorSubmissionUploadId(submissionUploadId: string, submissionId: number): Promise<string | null> {
+  async findPredecessorSubmissionUploadId(submissionUploadId: string, submissionId: number): Promise<string | null> {
     const sql = SQL`
       SELECT candidate.submission_upload_id
       FROM submission_upload candidate
-      JOIN LATERAL (
-        SELECT status
-        FROM submission_upload_status
-        WHERE submission_upload_id = candidate.submission_upload_id
-        ORDER BY submission_upload_status_id DESC
-        LIMIT 1
-      ) review ON true
       WHERE candidate.submission_id = ${submissionId}
-        AND candidate.submission_upload_id <> ${submissionUploadId}::uuid
-        AND candidate.status = 'indexed'
-        AND candidate.successor_submission_upload_id IS NULL
-        AND candidate.record_end_date IS NULL
-        AND review.status = 'submitted'
-      ORDER BY candidate.create_date DESC, candidate.submission_upload_id DESC
+        AND candidate.successor_submission_upload_id = ${submissionUploadId}::uuid
       LIMIT 1
       FOR UPDATE OF candidate;
     `;
@@ -221,6 +209,24 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
       counts[row.reconciliation] = row.count;
     }
     return counts;
+  }
+
+  /**
+   * End pending feature occurrences owned by a superseded upload.
+   *
+   * @param {string} submissionUploadId Superseded submission upload identifier.
+   * @returns {Promise<void>} Resolves after its pending feature occurrences are ended.
+   * @memberof SubmissionFeatureReconciliationRepository
+   */
+  async endPendingSubmissionFeatures(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_feature
+      SET record_end_date = now()
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND record_effective_date IS NULL
+        AND record_end_date IS NULL;
+    `;
+    await this.connection.sql(sql);
   }
 
   /**
