@@ -2,8 +2,8 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
-import { SubmissionRepository } from '../../repositories/submission-repository';
-import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
+import { SubmissionService } from '../submission-service';
+import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { SubmissionUploadReconciliationService } from './submission-upload-reconciliation-service';
 
 const UPLOAD_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -12,7 +12,7 @@ describe('SubmissionUploadReconciliationService', () => {
   afterEach(() => sinon.restore());
 
   function stubUpload() {
-    sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUpload').resolves({
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
       submission_upload_id: UPLOAD_ID,
       submission_id: 9,
       upload_id: '660e8400-e29b-41d4-a716-446655440000',
@@ -21,7 +21,7 @@ describe('SubmissionUploadReconciliationService', () => {
       blueprint_id: 1,
       status: 'indexed'
     });
-    sinon.stub(SubmissionRepository.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
+    sinon.stub(SubmissionService.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
   }
 
   it('replaces source identity errors and returns the invalid feature occurrence count', async () => {

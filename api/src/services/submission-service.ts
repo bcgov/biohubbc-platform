@@ -31,7 +31,7 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Lock the submission's feature state for the active transaction.
+   * Lock the submission's current feature state for the active transaction.
    *
    * @param {number} submissionId Submission identifier.
    * @returns {Promise<void>} Resolves after acquiring the submission-scoped transaction lock.

@@ -2,18 +2,18 @@ import { IDBConnection } from '../../database/db';
 import { HTTP500 } from '../../errors/http-error';
 import { ReconciliationCounts, SubmissionUploadReconciliation } from '../../models/reconciliation';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
-import { SubmissionRepository } from '../../repositories/submission-repository';
-import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
+import { SubmissionService } from '../submission-service';
+import { SubmissionUploadService } from '../upload/submission-upload-service';
 
 const defaultLog = getLogger('services/reconciliation/submission-upload-reconciliation-service');
 
 /** Coordinates classification and atomic publication of upload-owned feature rows. */
 export class SubmissionUploadReconciliationService extends DBService {
   submissionFeatureReconciliationRepository: SubmissionFeatureReconciliationRepository;
-  submissionRepository: SubmissionRepository;
-  submissionUploadRepository: SubmissionUploadRepository;
+  submissionService: SubmissionService;
+  submissionUploadService: SubmissionUploadService;
 
   /**
    * Create a submission upload reconciliation service.
@@ -24,8 +24,8 @@ export class SubmissionUploadReconciliationService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionFeatureReconciliationRepository = new SubmissionFeatureReconciliationRepository(connection);
-    this.submissionRepository = new SubmissionRepository(connection);
-    this.submissionUploadRepository = new SubmissionUploadRepository(connection);
+    this.submissionService = new SubmissionService(connection);
+    this.submissionUploadService = new SubmissionUploadService(connection);
   }
 
   /**
@@ -52,13 +52,13 @@ export class SubmissionUploadReconciliationService extends DBService {
    * @memberof SubmissionUploadReconciliationService
    */
   async reconcileSubmissionFeatures(submissionUploadId: string): Promise<SubmissionUploadReconciliation> {
-    const upload = await this.submissionUploadRepository.getSubmissionUpload(submissionUploadId);
+    const upload = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
     const predecessorSubmissionUploadId =
       await this.submissionFeatureReconciliationRepository.findPredecessorSubmissionUploadId(
         submissionUploadId,
         upload.submission_id
       );
-    await this.submissionRepository.lockSubmissionFeatureStateForSubmissionId(upload.submission_id);
+    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(upload.submission_id);
     await this.submissionFeatureReconciliationRepository.reconcileSubmissionFeatures(
       submissionUploadId,
       upload.submission_id,
@@ -87,8 +87,8 @@ export class SubmissionUploadReconciliationService extends DBService {
    * @memberof SubmissionUploadReconciliationService
    */
   async activateSubmissionUploadReconciliation(submissionUploadId: string): Promise<ReconciliationCounts> {
-    const upload = await this.submissionUploadRepository.getSubmissionUpload(submissionUploadId);
-    await this.submissionRepository.lockSubmissionFeatureStateForSubmissionId(upload.submission_id);
+    const upload = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
+    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(upload.submission_id);
 
     const counts = await this.submissionFeatureReconciliationRepository.getSubmissionFeatureReconciliationCounts(
       submissionUploadId
