@@ -4,7 +4,6 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../../../datab
 import { DownloadVersionExportListResponseSchema } from '../../../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../../../../openapi/schemas/pagination';
-import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
 import { DownloadExportService } from '../../../../../../services/download/download-export-service';
 import { DownloadService } from '../../../../../../services/download/download-service';
 import { getLogger } from '../../../../../../utils/logger';
@@ -12,12 +11,7 @@ import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../
 
 const defaultLog = getLogger('paths/download/{downloadId}/version/{downloadVersionId}/export');
 
-export const GET: Operation = [
-  authorizeRequestHandler((req) => ({
-    and: [{ discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }]
-  })),
-  listDownloadVersionExports()
-];
+export const GET: Operation = [listDownloadVersionExports()];
 
 GET.apiDoc = {
   description: 'List exports for a download version, newest first',

@@ -3,18 +3,12 @@ import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
 import { DownloadVersionResponseSchema } from '../../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../../../services/download/download-service';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}/version/{downloadVersionId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler((req) => ({
-    and: [{ discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }]
-  })),
-  getDownloadVersion()
-];
+export const GET: Operation = [getDownloadVersion()];
 
 GET.apiDoc = {
   description: 'Get one version of a download',
@@ -46,8 +40,8 @@ GET.apiDoc = {
 /**
  * Get a single version belonging to the download identified by the route parameters.
  *
- * Authorization is handled by download-scoped Team middleware. Authenticated requests use the
- * caller's database connection; anonymous download links use the API-user connection.
+ * Download-specific authorization middleware is introduced in SIMSBIOHUB-1074c. Authenticated
+ * requests use the caller's database connection; anonymous download links use the API-user connection.
  *
  * @return {RequestHandler} Express request handler that returns the requested download version.
  */
