@@ -483,4 +483,58 @@ describe('useSearchResults', () => {
     const secondSignal = mockSearchFeatures.mock.calls[1][3].signal as AbortSignal;
     expect(secondSignal.aborted).toBe(false);
   });
+
+  it('aborts an active request and immediately starts the next request when sort changes', async () => {
+    vi.useFakeTimers();
+
+    const setSearchParams = vi.fn();
+    const initialSearchParams = new URLSearchParams('page=2&limit=25&sort=create_date&order=asc');
+    const sortedSearchParams = new URLSearchParams('page=1&limit=25&sort=relevancy_score&order=desc');
+
+    (useSearchQueryParams as Mock).mockReturnValue({
+      searchParams: initialSearchParams,
+      setSearchParams
+    });
+    mockSearchFeatures.mockImplementation(
+      () =>
+        new Promise(() => {
+          // Keep the request active until the hook aborts it.
+        })
+    );
+
+    const { rerender } = renderHook(() => useSearchResults('species_observation', true, expressionTree));
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    const firstSignal = mockSearchFeatures.mock.calls[0][3].signal as AbortSignal;
+    expect(firstSignal.aborted).toBe(false);
+
+    (useSearchQueryParams as Mock).mockReturnValue({
+      searchParams: sortedSearchParams,
+      setSearchParams
+    });
+
+    await act(async () => {
+      rerender();
+      await Promise.resolve();
+    });
+
+    expect(firstSignal.aborted).toBe(true);
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      expressionTree,
+      {
+        page: 1,
+        limit: 25,
+        sort: 'relevancy_score',
+        order: 'desc'
+      },
+      expectAbortOptions
+    );
+  });
 });

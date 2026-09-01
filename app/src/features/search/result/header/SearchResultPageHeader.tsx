@@ -38,7 +38,7 @@ export const SearchResultPageHeader = ({
 }: SearchResultPageHeaderProps) => {
   return (
     <PageHeader
-      maxWidth="md"
+      maxWidth="lg"
       subheader={
         <SearchResultSearch
           searchTerm={searchTerm}

@@ -22,7 +22,7 @@ interface SearchResultSecuredAlertProps {
  */
 export const SearchResultSecuredAlert = ({ onRequestAccess }: SearchResultSecuredAlertProps) => {
   return (
-    <Container maxWidth="md" sx={{ pt: 2 }}>
+    <Container maxWidth="lg" sx={{ pt: 2 }}>
       <AlertBanner
         variant="standard"
         icon={<Icon path={mdiLock} size={0.75} style={{ marginTop: '1px' }} />}

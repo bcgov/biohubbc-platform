@@ -8,6 +8,5 @@ export enum SEARCH_RESULT_VIEW {
 
 export const SEARCH_RESULT_VIEW_OPTIONS: ToggleButtonView<SEARCH_RESULT_VIEW>[] = [
   { value: SEARCH_RESULT_VIEW.TABLE, label: 'Table' },
-  { value: SEARCH_RESULT_VIEW.LIST, label: 'List' },
   { value: SEARCH_RESULT_VIEW.MAP, label: 'Map' }
 ];
