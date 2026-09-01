@@ -15,8 +15,9 @@ export interface DownloadRecord {
   download_id: string;
   download_version_id: string;
   download_status: DownloadStatus;
+  name: string;
+  description: string | null;
   create_date: string;
-  feature_count: number;
   started_at: string | null;
   completed_at: string | null;
   downloaded_at: string | null;
