@@ -61,7 +61,7 @@ export const DownloadPage = () => {
                 <Link component={RouterLink} to="/search" underline="hover" color="inherit">
                   Search
                 </Link>
-                <Link component={RouterLink} to="/downloads" underline="hover" color="inherit">
+                <Link component={RouterLink} to="/portal/downloads" underline="hover" color="inherit">
                   Downloads
                 </Link>
                 <Link component={RouterLink} to={`/download/${download.download_id}`} underline="hover" color="inherit">

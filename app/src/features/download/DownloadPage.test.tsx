@@ -110,7 +110,7 @@ describe('DownloadPage', () => {
     expect(getAllByText('Bears in BC')[0]).toBeVisible();
     expect(getByText('All bear observations within BC')).toBeVisible();
     expect(getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
-    expect(getByRole('link', { name: 'Downloads' })).toHaveAttribute('href', '/downloads');
+    expect(getByRole('link', { name: 'Downloads' })).toHaveAttribute('href', '/portal/downloads');
     expect(getByRole('link', { name: 'Bears in BC' })).toHaveAttribute('href', `/download/${DOWNLOAD_ID}`);
     expect(await findByRole('tab', { name: 'Versions' })).toBeVisible();
     expect(await findByRole('tab', { name: 'Exports' })).toBeVisible();
