@@ -133,7 +133,8 @@ describe('DownloadPage', () => {
     await waitFor(() => {
       expect(mockCreateExport).toHaveBeenCalledWith(
         DOWNLOAD_ID,
-        expect.objectContaining({ download_version_id: VERSION_ID, feature_types: ['observation'] })
+        VERSION_ID,
+        expect.objectContaining({ feature_types: ['observation'] })
       );
     });
     expect(queryByText('Version detail destination')).not.toBeInTheDocument();

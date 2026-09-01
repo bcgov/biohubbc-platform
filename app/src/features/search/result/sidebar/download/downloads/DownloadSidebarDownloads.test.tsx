@@ -169,11 +169,9 @@ describe('DownloadSidebarDownloads', () => {
         expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123');
       });
 
-      // Step 4: createExport gets the all-types per_feature_type recipe (type names from the fixture,
-      // empty merge_steps).
+      // Step 4: createExport gets the selected version id plus the all-types per_feature_type recipe.
       await waitFor(() => {
-        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', {
-          download_version_id: 'ver-abc-123',
+        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', 'ver-abc-123', {
           version: 1,
           export_type: 'csv',
           mode: 'per_feature_type',
@@ -267,10 +265,9 @@ describe('DownloadSidebarDownloads', () => {
       // Step 4: Click the dialog's Create button to submit.
       fireEvent.click(getByTestId('edit-dialog-save-button'));
 
-      // Step 5: createExport is called with the form-derived denormalized recipe (all types + the root).
+      // Step 5: createExport is called with the selected version id plus the form-derived recipe.
       await waitFor(() => {
-        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', {
-          download_version_id: 'ver-abc-123',
+        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', 'ver-abc-123', {
           version: 1,
           export_type: 'csv',
           mode: 'denormalized',

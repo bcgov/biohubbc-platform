@@ -122,6 +122,23 @@ export const CreateDownloadVersionExportRequestSchema: OpenAPIV3.SchemaObject = 
   }
 };
 
+const createDownloadVersionExportConfigRequestProperties = {
+  ...CreateDownloadVersionExportRequestSchema.properties
+};
+delete createDownloadVersionExportConfigRequestProperties.download_version_id;
+
+/**
+ * Body schema for `POST /api/download/:downloadId/version/:downloadVersionId/export`.
+ *
+ * The route path identifies the materialized download version. The body remains the export recipe
+ * plus the optional packaging knob.
+ */
+export const CreateDownloadVersionExportConfigRequestSchema: OpenAPIV3.SchemaObject = {
+  ...CreateDownloadVersionExportRequestSchema,
+  required: ['version', 'export_type', 'mode', 'feature_types'],
+  properties: createDownloadVersionExportConfigRequestProperties
+};
+
 /**
  * Response schema for a single download version export record (used by POST and
  * by list items). Detail endpoint extends this with `parts[]`.

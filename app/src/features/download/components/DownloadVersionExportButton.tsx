@@ -42,14 +42,13 @@ export const DownloadVersionExportButton = ({
     try {
       const featureTypes = await api.downloadExport.getDownloadVersionFeatureTypes(downloadId, downloadVersionId);
       const payload: CreateExportPayload = {
-        download_version_id: downloadVersionId,
         version: EXPORT_CONFIG_VERSION,
         export_type: EXPORT_TYPE,
         mode: 'per_feature_type',
         feature_types: featureTypes.map((featureType) => featureType.feature_type),
         merge_steps: []
       };
-      await api.downloadExport.createExport(downloadId, payload);
+      await api.downloadExport.createExport(downloadId, downloadVersionId, payload);
       dialogContext.setSnackbar({ open: true, snackbarMessage: 'Export started.' });
     } catch {
       dialogContext.setErrorDialog({

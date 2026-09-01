@@ -19,17 +19,25 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
  */
 export const useDownloadExportApi = (axios: AxiosInstance) => {
   /**
-   * Creates a new CSV export for a ready download and enqueues the pipeline job.
+   * Creates a new CSV export for a ready download version and enqueues the pipeline job.
    *
    * Backend returns 409 if the parent download is not `ready`, 403 if the caller
    * is not a team member, 401 if unauthenticated.
    *
    * @param {string} downloadId
+   * @param {string} downloadVersionId
    * @param {CreateExportPayload} payload
    * @return {Promise<DownloadExport>}
    */
-  const createExport = async (downloadId: string, payload: CreateExportPayload): Promise<DownloadExport> => {
-    const { data } = await axios.post<DownloadExport>(`/api/download/${downloadId}/export`, payload);
+  const createExport = async (
+    downloadId: string,
+    downloadVersionId: string,
+    payload: CreateExportPayload
+  ): Promise<DownloadExport> => {
+    const { data } = await axios.post<DownloadExport>(
+      `/api/download/${downloadId}/version/${downloadVersionId}/export`,
+      payload
+    );
     return data;
   };
 

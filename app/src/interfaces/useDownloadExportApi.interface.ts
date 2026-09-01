@@ -81,7 +81,7 @@ export interface OutputColumn {
 /**
  * The recipe that drives a CSV export: which feature types to pull, how to join them, and which
  * columns to emit. `per_feature_type` writes one CSV per type; `denormalized` flattens everything
- * onto `root_feature_type` via `merge_steps`. Sent as-is to `POST /api/download/:id/export`.
+ * onto `root_feature_type` via `merge_steps`.
  */
 export interface ExportConfig {
   version: typeof EXPORT_CONFIG_VERSION;
@@ -103,14 +103,9 @@ export interface DownloadFeatureType {
 }
 
 /**
- * Payload for `POST /api/download/:id/export` — the full export config plus an optional part-size cap.
+ * Payload for `POST /api/download/:id/version/:versionId/export` — the full export config plus an optional part-size cap.
  */
 export interface CreateExportPayload extends ExportConfig {
-  /**
-   * The active download version the export is built from. Required — a committed download always
-   * has at least one active version, and the backend rejects a body without it.
-   */
-  download_version_id: string;
   /**
    * Max size per part-zip in bytes. Backend enforces 5 MiB–5 GiB.
    * Omit to use the server-side default (500 MB).

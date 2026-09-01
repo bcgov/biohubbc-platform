@@ -116,10 +116,7 @@ describe('DownloadVersionPage', () => {
     expect(await findByRole('heading', { name: 'Bears in BC' })).toBeVisible();
     expect(getByRole('link', { name: 'Bears in BC' })).toHaveAttribute('href', `/download/${DOWNLOAD_ID}`);
     const breadcrumb = getByRole('navigation', { name: 'download version breadcrumb' });
-    expect(within(breadcrumb).getByRole('link', { name: 'Downloads' })).toHaveAttribute(
-      'href',
-      '/portal/downloads'
-    );
+    expect(within(breadcrumb).getByRole('link', { name: 'Downloads' })).toHaveAttribute('href', '/portal/downloads');
     expect(within(breadcrumb).queryByText('Search')).not.toBeInTheDocument();
     expect(breadcrumb).toHaveTextContent('March 1, 2026');
     expect(within(breadcrumb).queryByRole('link', { name: 'March 1, 2026' })).not.toBeInTheDocument();
@@ -169,7 +166,8 @@ describe('DownloadVersionPage', () => {
       expect(mockGetDownloadVersionFeatureTypes).toHaveBeenCalledWith(DOWNLOAD_ID, VERSION_ID);
       expect(mockCreateExport).toHaveBeenCalledWith(
         DOWNLOAD_ID,
-        expect.objectContaining({ download_version_id: VERSION_ID, feature_types: ['observation'] })
+        VERSION_ID,
+        expect.objectContaining({ feature_types: ['observation'] })
       );
     });
   });

@@ -53,9 +53,9 @@ export const useDownloadExportActions = () => {
   const downloads = downloadsDataLoader.data?.downloads ?? [];
   const lastPage = downloadsDataLoader.data?.pagination?.last_page ?? 1;
 
-  // The export request names an explicit `download_version_id`. The download list row and the
-  // feature-types picker both resolve the same most-recent version, so sourcing the id off the
-  // in-memory row keeps the columns the user picked and the version actually exported in lockstep.
+  // The export route names an explicit download version. The download list row and the feature-types
+  // picker both resolve the same most-recent version, so sourcing the id off the in-memory row keeps
+  // the columns the user picked and the version actually exported in lockstep.
   const resolveDownloadVersionId = (downloadId: string): string | undefined =>
     downloads.find((download) => download.download_id === downloadId)?.download_version_id;
 
@@ -88,14 +88,13 @@ export const useDownloadExportActions = () => {
       }
       const featureTypes = await biohubApi.downloadExport.getDownloadFeatureTypes(downloadId);
       const config: CreateExportPayload = {
-        download_version_id: downloadVersionId,
         version: EXPORT_CONFIG_VERSION,
         export_type: EXPORT_TYPE,
         mode: 'per_feature_type',
         feature_types: featureTypes.map((ft) => ft.feature_type),
         merge_steps: []
       };
-      await biohubApi.downloadExport.createExport(downloadId, config);
+      await biohubApi.downloadExport.createExport(downloadId, downloadVersionId, config);
       await refresh();
     } catch {
       dialogContext.setErrorDialog({
@@ -142,8 +141,8 @@ export const useDownloadExportActions = () => {
     }
     setIsSubmittingConfig(true);
     try {
-      const payload: CreateExportPayload = { ...buildExportConfig(values), download_version_id: downloadVersionId };
-      await biohubApi.downloadExport.createExport(configDownloadId, payload);
+      const payload: CreateExportPayload = buildExportConfig(values);
+      await biohubApi.downloadExport.createExport(configDownloadId, downloadVersionId, payload);
       setConfigDownloadId(null);
       await refresh();
     } catch (error) {
