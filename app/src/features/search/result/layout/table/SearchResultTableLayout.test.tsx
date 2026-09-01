@@ -174,7 +174,9 @@ describe('SearchResultTableLayout', () => {
     expect(getByTestId('columns')).toHaveTextContent('Scientific Name');
     expect(getByTestId('columns')).toHaveTextContent('Count');
     expect(getByTestId('columns')).toHaveTextContent('Tags');
+    expect(getByTestId('columns')).not.toHaveTextContent('Submission');
     expect(getByTestId('column-fields')).toHaveTextContent('1');
+    expect(getByTestId('column-fields')).not.toHaveTextContent('submission_name');
     expect(getByTestId('column-fields')).not.toHaveTextContent('property:scientific_name');
     expect(getByTestId('cell-1')).toHaveTextContent('Canis lupus');
     expect(getByTestId('cell-2')).toHaveTextContent('12');
