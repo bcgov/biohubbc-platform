@@ -1,13 +1,17 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import {
+  SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+  SUBMISSION_ACTIVE_STATE_LOCK_SEED
+} from '../constants/database-lock-keys';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureCurrent } from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -57,6 +61,9 @@ export const SubmissionFeatureRecord = z.object({
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
   data: z.record(z.any()),
+  content_hash: z.string().nullable(),
+  reconciliation: z.enum(['new', 'modified', 'unmodified']).nullable(),
+  successor_submission_feature_id: z.number().nullable(),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
@@ -76,7 +83,6 @@ export const SubmissionFeature = z.object({
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
-  data: z.record(z.any()),
   feature_type_name: z.string(),
   feature_type_display_name: z.string(),
   submission_name: z.string(),
@@ -307,6 +313,24 @@ export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
  */
 export class SubmissionRepository extends BaseRepository {
   /**
+   * Lock the submission's current feature state for the current transaction.
+   *
+   * Reconciliation and publication use the same submission-scoped advisory lock so
+   * that a baseline cannot change while an upload is being classified or published.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async lockSubmissionFeatureStateForSubmissionId(submissionId: number): Promise<void> {
+    await this.connection.sql(SQL`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${SUBMISSION_ACTIVE_STATE_LOCK_PREFIX} || ':' || ${submissionId}::text, ${SUBMISSION_ACTIVE_STATE_LOCK_SEED})
+      );
+    `);
+  }
+
+  /**
    * Insert a new submission record.
    *
    * @param {ICreateSubmissionWithTeam} submissionData
@@ -422,67 +446,10 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission feature record.
-   * Features belong to a submission (submission_id) but are produced by a specific
-   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
-   * (append, replace).
+   * Delete feature relationships owned by features from one upload.
    *
-   * @param {number} submissionId The ID of the submission.
-   * @param {string} submissionUploadId The submission_upload_id that produced these features.
-   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
-   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
-   * @param {string} featureTypeName The name of the feature type.
-   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @returns {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionFeatureRecord(
-    submissionId: number,
-    submissionUploadId: string,
-    parentSubmissionFeatureId: number | null,
-    featureSourceId: string | null,
-    featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties']
-  ): Promise<{ submission_feature_id: number }> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id,
-        source_id,
-        feature_type_id,
-        data,
-        record_effective_date
-      ) VALUES (
-        ${submissionId},
-        ${submissionUploadId},
-        ${parentSubmissionFeatureId},
-        ${featureSourceId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
-        ${featureProperties},
-        now()
-      )
-      RETURNING
-        submission_feature_id;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'SubmissionRepository->insertSubmissionFeatureRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Delete all feature relationships for one upload attempt.
-   *
-   * @param {string} submissionUploadId
-   * @return {Promise<void>}
+   * @param {string} submissionUploadId Submission upload identifier whose pending feature relationships are deleted.
+   * @returns {Promise<void>} Resolves after upload-owned feature relationship rows have been deleted.
    * @memberof SubmissionRepository
    */
   async deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
@@ -491,12 +458,9 @@ export class SubmissionRepository extends BaseRepository {
       WHERE source_feature_id IN (
         SELECT submission_feature_id
         FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      )
-      OR target_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_effective_date IS NULL
+          AND record_end_date IS NULL
       );
     `;
 
@@ -882,6 +846,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -984,6 +952,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -1061,6 +1033,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -1113,10 +1089,14 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       WHERE
         submission_id = ${submissionId}
     `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')}`);
+    sqlStatement.append(` AND ${isSubmissionFeatureCurrent('submission_feature')}`);
     sqlStatement.append(`
       GROUP BY
         submission_feature.submission_feature_id,
@@ -1169,10 +1149,13 @@ export class SubmissionRepository extends BaseRepository {
         this.on('s.team_id', '=', 'tm.team_id').andOnNull('s.record_end_date');
       })
       .leftJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureActive('sf')));
+        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureCurrent('sf')));
       })
       .leftJoin('submission_feature_security as sfs', function () {
-        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'active');
+        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id')
+          .andOnVal('sfs.status', '=', 'active')
+          .andOn(knex.raw('sfs.record_effective_date <= now()'))
+          .andOn(knex.raw('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)'));
       })
       .leftJoin('submission_regions as sr', 'sr.submission_id', 's.submission_id')
       .leftJoin('region_lookup as rl', 'rl.region_id', 'sr.region_id')
@@ -1328,6 +1311,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
@@ -1462,6 +1449,10 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
         submission_feature_security.status = 'active'
+      AND
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       INNER JOIN
         feature_type
       ON
@@ -1676,7 +1667,7 @@ export class SubmissionRepository extends BaseRepository {
       and
         parent_submission_feature_id is null
     `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')};`);
+    sqlStatement.append(` AND ${isSubmissionFeatureCurrent('submission_feature')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
 
@@ -1710,7 +1701,7 @@ export class SubmissionRepository extends BaseRepository {
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
       .where('submission_feature.submission_id', submissionId)
-      .whereRaw(isSubmissionFeatureActive('submission_feature'));
+      .whereRaw(isSubmissionFeatureCurrent('submission_feature'));
 
     const securityFilter = buildSecurityFilter(knex, systemUserId, 'submission_feature.submission_feature_id');
     if (securityFilter) {

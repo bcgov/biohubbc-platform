@@ -9,25 +9,82 @@
 import { Knex } from 'knex';
 
 /**
- * Active-window predicate for submission_feature rows that may surface on read
- * paths or participate in access evaluation.
+ * Predicate for a submission_feature row that has been published at least once.
  *
- * A feature is active only after approval/publication sets record_effective_date
- * and before any end date. NULL record_effective_date rows are drafts/pending
- * review and must not be searchable, downloadable, or security anchors.
+ * For submission features, `record_effective_date` is the publication date: approval sets it,
+ * and NULL identifies a draft that has never been published. Superseding a feature does not
+ * clear its publication date, so previously published features remain available to direct-ID reads.
  *
  * @param alias SQL alias for submission_feature.
  * @returns SQL predicate with zero placeholders.
  */
-export function isSubmissionFeatureActive(alias: string): string {
-  return `${alias}.record_effective_date <= now() AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date)`;
+export function isSubmissionFeaturePublished(alias: string): string {
+  return `${alias}.record_effective_date <= now()`;
+}
+
+/**
+ * Predicate for a current feature: published, not ended, and without a successor.
+ *
+ * Collection, search, and download paths use this predicate to exclude superseded features.
+ * Direct ID lookups use {@link isSubmissionFeaturePublished} instead so previously published
+ * features remain accessible.
+ *
+ * @param alias SQL alias for submission_feature.
+ * @returns SQL predicate with zero placeholders.
+ */
+export function isSubmissionFeatureCurrent(alias: string): string {
+  return `${isSubmissionFeaturePublished(
+    alias
+  )} AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date) AND ${alias}.successor_submission_feature_id IS NULL`;
+}
+
+/**
+ * Resolve a submission_feature row to its same-submission terminal current feature.
+ *
+ * This follows only `successor_submission_feature_id`, rejects cross-submission successor hops,
+ * terminates safely on cycles, and returns no row unless the terminal feature is published, not
+ * ended, and without a successor. The recursive projection contains only stable feature state, so
+ * `UNION` naturally terminates a
+ * malformed cycle without carrying and repeatedly copying a path array.
+ *
+ * @param submissionFeatureId Trusted SQL expression for the starting submission feature ID.
+ * @returns Lateral subquery SQL with one `terminal_submission_feature_id` column and zero placeholders.
+ */
+export function buildSubmissionFeatureTerminalSubquery(submissionFeatureId: string): string {
+  return `(WITH RECURSIVE successor_chain AS (
+    SELECT
+      source.submission_feature_id,
+      source.submission_id,
+      source.successor_submission_feature_id,
+      source.record_effective_date,
+      source.record_end_date
+    FROM submission_feature source
+    WHERE source.submission_feature_id = ${submissionFeatureId}
+
+    UNION
+
+    SELECT
+      successor.submission_feature_id,
+      successor.submission_id,
+      successor.successor_submission_feature_id,
+      successor.record_effective_date,
+      successor.record_end_date
+    FROM successor_chain chain
+    JOIN submission_feature successor
+      ON successor.submission_feature_id = chain.successor_submission_feature_id
+     AND successor.submission_id = chain.submission_id
+  )
+  SELECT chain.submission_feature_id AS terminal_submission_feature_id
+  FROM successor_chain chain
+  WHERE ${isSubmissionFeatureCurrent('chain')}
+  LIMIT 1)`;
 }
 
 /**
  * Closure-based "effectively secured" check used on every security-resolving path —
  * the hot read paths (search / download) and the scope-anchor recompute write
- * path: a feature is effectively secured when it or an ancestor has an active security
- * rule that is past its effective date.
+ * path: a feature is effectively secured when it or an ancestor in the materialized closure
+ * snapshot has a currently enforcing security assignment.
  *
  * Instead of a per-row recursive parent walk, this reads the precomputed
  * `submission_feature_closure` ancestry subset — `is_ancestor = true`, which is the
@@ -37,14 +94,32 @@ export function isSubmissionFeatureActive(alias: string): string {
  * `target_submission_feature_id`. This matters because it runs on every search
  * and download request.
  *
- * Fails closed on missing closure rows. The closure is built by an async recompute job
- * that runs *after* an upload is flipped to `indexed` (and therefore searchable), in a
- * separate transaction; a recompute that has not yet run, or that failed, does not revert
- * that status. So an active, searchable, secured feature can transiently — or, on a failed
- * recompute, indefinitely — have no closure rows. Rather than read "no rows" as "unsecured"
+ * IMPORTANT: closure targets are intentionally NOT filtered through
+ * `isSubmissionFeatureCurrent`. A closure is a materialized graph snapshot, so every target in
+ * that snapshot remains an ancestor for authorization purposes even if the corresponding
+ * `submission_feature` becomes historical before the next closure rebuild.
+ *
+ * This is essential during successor publication. For example, the current closure may contain
+ * `child -> parent_v1` while approval atomically ends `parent_v1` and makes `parent_v2` current.
+ * Until the asynchronous closure worker rewrites that edge to `child -> parent_v2`, requiring
+ * `parent_v1` to remain current would combine the old graph snapshot with the new feature lifecycle.
+ * Its enforcing security would appear to disappear from the child even though the closure still
+ * identifies it as the child's parent. Because the child's `(child, child)` self-loop still exists,
+ * the missing-closure fail-closed guard below would not detect this mixed-state gap.
+ *
+ * Therefore ancestor feature lifecycle is deliberately ignored here. The lifecycle of the
+ * `submission_feature_security` assignment is NOT ignored: it must still be active, effective,
+ * and non-ended. Callers remain responsible for applying `isSubmissionFeatureCurrent` to the
+ * candidate feature being searched, downloaded, or returned; this exception applies only to
+ * ancestor targets reached through the closure snapshot.
+ *
+ * Fails closed on missing closure rows. The closure is rebuilt asynchronously after feature
+ * publication, in a separate transaction. A recompute that has not yet run, or that failed, does
+ * not make the feature non-current. So a current, searchable, secured feature can transiently — or, on a
+ * failed recompute, indefinitely — have no closure rows. Rather than read "no rows" as "unsecured"
  * (which would leak the feature), this check treats the absence of any closure ancestry row
  * as secured: if we cannot prove a feature is unsecured, we hide it. Under normal operation
- * every active feature carries at least its self-loop `(F, F)`, so the fail-closed branch is
+ * every current feature carries at least its self-loop `(F, F)`, so the fail-closed branch is
  * inert on the happy path.
  *
  * Returns an `EXISTS (...)` SQL expression (returns boolean) with zero `?` placeholders.
@@ -58,15 +133,14 @@ export function isEffectivelySecured(featureIdExpr: string): string {
       SELECT 1
       FROM submission_feature_closure c
       JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
-      JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
       WHERE c.source_submission_feature_id = ${featureIdExpr}
         AND c.is_ancestor = true
-        AND sfs.record_end_date IS NULL
         AND sfs.status = 'active'
-        AND ${isSubmissionFeatureActive('sf_sec')}
+        AND sfs.record_effective_date <= now()
+        AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
     )
-    -- Fail closed: the reflexive self-loop (F, F) is written for every non-deleted feature when its upload's
-    -- closure is built, so its absence means the closure is not built (recompute not yet run, or failed).
+    -- Fail closed: the reflexive self-loop (F, F) is written for every current feature when the
+    -- submission closure is built, so its absence means the closure is not built (recompute not yet run, or failed).
     -- We then cannot prove the feature is unsecured — treat it as secured rather than leak it. This is a
     -- direct primary-key probe ((source, target) is the PK).
     OR NOT EXISTS (
@@ -118,7 +192,7 @@ export function isAccessibleToUser(featureIdExpr: string): string {
         JOIN security_scope ss ON ss.security_scope_id = ssa.security_scope_id
         JOIN submission_feature anchor_sf
           ON anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
-          AND ${isSubmissionFeatureActive('anchor_sf')}
+          AND ${isSubmissionFeatureCurrent('anchor_sf')}
         JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor_sf.feature_type_id
         JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
         JOIN team t ON t.team_id = tss.team_id
@@ -153,9 +227,8 @@ export function isAccessibleToUser(featureIdExpr: string): string {
  * For anonymous users (systemUserId is null), only unsecured features pass.
  *
  * Composes the closure-based read-path fragments above:
- * - `isEffectivelySecured` — a feature is "effectively secured" only when it or an
- *   ancestor has an active security rule AND the feature is past its `record_effective_date`,
- *   resolved via the precomputed closure ancestry subset.
+ * - `isEffectivelySecured` — a feature is "effectively secured" when it or an ancestor in the
+ *   closure snapshot has a currently enforcing security assignment.
  * - `isAccessibleToUser` — probes the same closure ancestry for a scope anchor the user's team
  *   can reach.
  *

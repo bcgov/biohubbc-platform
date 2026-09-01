@@ -7,7 +7,7 @@ import {
   NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
-import { buildSecurityFilter, isSubmissionFeatureActive } from './sql-fragments';
+import { buildSecurityFilter, isSubmissionFeatureCurrent } from './sql-fragments';
 
 /**
  * Pure SQL builders that compile a normalized expression tree into Knex
@@ -59,7 +59,7 @@ export function buildExpressionTreeFeatureIdsSubquery(
 }
 
 /**
- * Build a Knex subquery that returns every active submission_feature_id for the given
+ * Build a Knex subquery that returns every current submission_feature_id for the given
  * feature type, with the security filter applied for the given user — the broad,
  * no-expression-filter projection used when a policy statement carries no expression
  * link.
@@ -78,7 +78,7 @@ export function buildBroadFeatureTypeSubquery(featureTypeName: string, systemUse
     .select('sf.submission_feature_id')
     .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
     .where('ft.name', featureTypeName)
-    .whereRaw(isSubmissionFeatureActive('sf'));
+    .whereRaw(isSubmissionFeatureCurrent('sf'));
 
   const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
   if (securityFilter) {
@@ -246,7 +246,7 @@ function buildPredicateEvidenceIdsQuery(
     .join('submission_feature as sf', 'sf.submission_feature_id', 'p.submission_feature_id')
     .join('feature_type_property as ftp', 'ftp.feature_type_property_id', 'p.feature_type_property_id')
     .where('ftp.feature_property_id', clause.feature_property_id)
-    .whereRaw(isSubmissionFeatureActive('sf'))
+    .whereRaw(isSubmissionFeatureCurrent('sf'))
     .whereNull('ftp.record_end_date');
 
   if (clause.feature_type_property_id !== null) {
@@ -322,7 +322,7 @@ function projectEvidenceToTargetIdsQuery(
     .select('evidence.submission_feature_id', 'evidence_ft.name as feature_type_name')
     .join('submission_feature as evidence_sf', 'evidence_sf.submission_feature_id', 'evidence.submission_feature_id')
     .join('feature_type as evidence_ft', 'evidence_ft.feature_type_id', 'evidence_sf.feature_type_id')
-    .whereRaw(isSubmissionFeatureActive('evidence_sf'))
+    .whereRaw(isSubmissionFeatureCurrent('evidence_sf'))
     .whereNull('evidence_ft.record_end_date');
 
   // Same-type evidence maps only to itself. Different-type evidence maps through closure in either direction.
@@ -359,7 +359,7 @@ function projectEvidenceToTargetIdsQuery(
     .join('submission_feature as anchor_sf', 'anchor_sf.submission_feature_id', 'related_targets.submission_feature_id')
     .join('feature_type as anchor_ft', 'anchor_ft.feature_type_id', 'anchor_sf.feature_type_id')
     .where('anchor_ft.name', anchorFeatureType)
-    .whereRaw(isSubmissionFeatureActive('anchor_sf'))
+    .whereRaw(isSubmissionFeatureCurrent('anchor_sf'))
     .whereNull('anchor_ft.record_end_date');
 
   const targetSecurityFilter = buildSecurityFilter(knex, systemUserId, 'anchor_sf.submission_feature_id');

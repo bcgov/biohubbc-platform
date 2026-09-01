@@ -1,9 +1,18 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
-import { ApiExecuteSQLError } from '../../errors/api-error';
 import { FeatureType, FeatureTypeWithProperties } from '../../models/feature-type';
-import { InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
+import { isSubmissionFeatureCurrent } from '../sql-fragments';
+
+type SubmissionFeatureIngestionRecord = {
+  submissionId: number;
+  submissionUploadId: string;
+  sourceId: string;
+  featureTypeId: number;
+  data: unknown;
+  dataByteSize: number;
+  contentHash: string;
+  universalId?: string;
+};
 
 /**
  * A repository class for ingestion-related data access.
@@ -72,29 +81,13 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Bulk insert submission feature rows with pre-resolved feature_type_id.
+   * Bulk insert uploaded feature rows directly into submission_feature.
    *
-   * @param {Array<{
-   *   submissionId: number;
-   *   submissionUploadId: string;
-   *   sourceId: string;
-   *   featureTypeId: number;
-   *   data: unknown;
-   *   dataByteSize: number;
-   * }>} records
-   * @returns {Promise<number>}
+   * @param {SubmissionFeatureIngestionRecord[]} records Feature records prepared from the shallow-validated upload batch.
+   * @returns {Promise<number>} Number of feature rows inserted.
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionFeatureRecordsByTypeId(
-    records: Array<{
-      submissionId: number;
-      submissionUploadId: string;
-      sourceId: string;
-      featureTypeId: number;
-      data: unknown;
-      dataByteSize: number;
-    }>
-  ): Promise<number> {
+  async insertSubmissionFeatures(records: SubmissionFeatureIngestionRecord[]): Promise<number> {
     if (!records.length) {
       return 0;
     }
@@ -105,69 +98,8 @@ export class FeatureIngestionRepository extends BaseRepository {
     const featureTypeIds = records.map((record) => record.featureTypeId);
     const dataValues = records.map((record) => JSON.stringify(record.data));
     const dataByteSizes = records.map((record) => record.dataByteSize);
-
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id,
-        source_id,
-        feature_type_id,
-        data,
-        data_byte_size
-      )
-      SELECT
-        staged.submission_id,
-        staged.submission_upload_id,
-        NULL,
-        staged.source_id,
-        staged.feature_type_id,
-        parsed.data,
-        staged.data_byte_size
-      FROM unnest(
-        ${submissionIds}::integer[],
-        ${submissionUploadIds}::uuid[],
-        ${sourceIds}::text[],
-        ${featureTypeIds}::integer[],
-        ${dataValues}::text[],
-        ${dataByteSizes}::bigint[]
-      ) AS staged(
-        submission_id,
-        submission_upload_id,
-        source_id,
-        feature_type_id,
-        data_text,
-        data_byte_size
-      )
-      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-    return response.rowCount ?? 0;
-  }
-
-  /**
-   * Insert a new submission feature record.
-   * Features belong to a submission (submission_id) but are produced by a specific
-   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
-   * (append, replace).
-   *
-   * @param {InsertSubmissionFeatureRecord} record The submission feature insert payload.
-   * @returns {Promise<{ submission_feature_id: number }>} Inserted submission feature identifier.
-   * @memberof FeatureIngestionRepository
-   */
-  async insertSubmissionFeatureRecord(
-    record: InsertSubmissionFeatureRecord
-  ): Promise<{ submission_feature_id: number }> {
-    const {
-      submissionId,
-      submissionUploadId,
-      parentSubmissionFeatureId,
-      featureSourceId,
-      featureTypeName,
-      featureProperties,
-      dataByteSizeBytes
-    } = record;
+    const contentHashes = records.map((record) => record.contentHash);
+    const universalIds = records.map((record) => record.universalId ?? null);
 
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
@@ -178,77 +110,107 @@ export class FeatureIngestionRepository extends BaseRepository {
         feature_type_id,
         data,
         data_byte_size,
-        record_effective_date
-      ) VALUES (
-        ${submissionId},
-        ${submissionUploadId},
-        ${parentSubmissionFeatureId},
-        ${featureSourceId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
-        ${featureProperties},
-        ${dataByteSizeBytes},
-        now()
+        content_hash,
+        universal_id
       )
-      RETURNING
-        submission_feature_id;
+      SELECT
+        staged.submission_id,
+        staged.submission_upload_id,
+        NULL,
+        staged.source_id,
+        staged.feature_type_id,
+        parsed.data,
+        staged.data_byte_size,
+        staged.content_hash,
+        staged.universal_id
+      FROM unnest(
+        ${submissionIds}::integer[],
+        ${submissionUploadIds}::uuid[],
+        ${sourceIds}::text[],
+        ${featureTypeIds}::integer[],
+        ${dataValues}::text[],
+        ${dataByteSizes}::bigint[],
+        ${contentHashes}::text[],
+        ${universalIds}::text[]
+      ) AS staged(
+        submission_id,
+        submission_upload_id,
+        source_id,
+        feature_type_id,
+        data_text,
+        data_byte_size,
+        content_hash,
+        universal_id
+      )
+      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'FeatureIngestionRepository->insertSubmissionFeatureRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
+    const response = await this.connection.sql(sqlStatement);
+    return response.rowCount ?? 0;
   }
 
   /**
-   * Soft-delete features scoped to a specific upload event.
-   * Multiple uploads produce features under the same submission_id;
-   * re-ingesting one upload must not affect features from other uploads.
+   * Delete never-published feature rows from an incomplete ingestion attempt.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after all never-published feature rows for the upload have been deleted.
    * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET record_end_date = NOW()
-      WHERE submission_upload_id = ${submissionUploadId}
-        AND record_effective_date IS NULL
-        AND record_end_date IS NULL;
+      DELETE FROM submission_feature
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND record_effective_date IS NULL;
     `;
 
     await this.connection.sql(sqlStatement);
   }
 
   /**
-   * Resolve parent feature references for rows produced by one upload.
+   * Resolve parent feature references for rows belonging to one upload.
    *
    * Shallow ingestion stores raw feature payloads first. The indexing stage then
-   * resolves `data.parent` source identifiers to canonical `submission_feature_id`
+   * resolves `data.parent` source identifiers to persisted `submission_feature_id`
    * values after all rows for the upload have been inserted.
    *
+   * Resolution prefers a pending row produced by the current upload, falling back to
+   * the submission's current published rows. Ties resolve to the newest row.
+   *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @returns {Promise<void>}
+   * @param {number} submissionId The submission the upload belongs to.
+   * @returns {Promise<void>} Resolves after parent identifiers have been updated for the upload rows.
    * @memberof FeatureIngestionRepository
    */
-  async updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async updateSubmissionFeatureParentsBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sqlStatement = SQL`
       UPDATE submission_feature AS child
-      SET parent_submission_feature_id = parent.submission_feature_id
-      FROM submission_feature AS parent
-      WHERE child.submission_upload_id = ${submissionUploadId}
-        AND parent.submission_upload_id = child.submission_upload_id
-        AND parent.source_id = child.data->>'parent'
+      SET parent_submission_feature_id = (
+        SELECT parent.submission_feature_id
+        FROM submission_feature AS parent
+        WHERE parent.submission_id = ${submissionId}
+          AND parent.source_id = child.data->>'parent'
+          AND (
+            (
+              parent.submission_upload_id = ${submissionUploadId}::uuid
+              AND parent.record_effective_date IS NULL
+              AND parent.record_end_date IS NULL
+            )
+            OR (`;
+    sqlStatement.append(isSubmissionFeatureCurrent('parent'));
+    sqlStatement.append(SQL`)
+        )
+        ORDER BY
+          (parent.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+          parent.submission_feature_id DESC
+        LIMIT 1
+      )
+      WHERE child.submission_upload_id = ${submissionUploadId}::uuid
         AND child.data->>'parent' IS NOT NULL
-        AND child.record_end_date IS NULL
-        AND parent.record_end_date IS NULL;
-    `;
+        AND child.record_effective_date IS NULL
+        AND child.record_end_date IS NULL;`);
 
     await this.connection.sql(sqlStatement);
   }

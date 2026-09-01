@@ -133,7 +133,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       expect(result).to.eql({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 3 });
     });
 
-    it('excludes inactive features and retired property definitions', async () => {
+    it('excludes unpublished features and retired property definitions', async () => {
       const sqlStub = sinon.stub().callsFake((statement: any) => {
         expect(statement.text).to.contain('record_effective_date <= now()');
         expect(statement.text).to.contain('ftp.record_end_date IS NULL');
@@ -147,7 +147,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       await repository.getActiveGeometryExtent(12, 34);
     });
 
-    it('returns null bounds when the feature has no active spatial properties', async () => {
+    it('returns null bounds when the feature has no published spatial properties', async () => {
       const repository = new SubmissionFeaturePropertyGeometryRepository(
         getMockDBConnection({
           sql: () =>

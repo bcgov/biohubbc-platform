@@ -15,7 +15,6 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         'submission_id',
         'feature_type_id',
         'source_id',
-        'data',
         'feature_type_name',
         'feature_type_display_name',
         'submission_name',
@@ -48,10 +47,6 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
           type: 'string',
           format: 'uuid',
           description: 'UUID identifying the source of this feature.'
-        },
-        data: {
-          type: 'object',
-          description: 'Feature-specific payload for the feature, including feature ID, properties, etc.'
         },
         feature_type_name: {
           type: 'string',

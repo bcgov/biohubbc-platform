@@ -15,7 +15,7 @@ import { BaseRepository } from './base-repository';
  * 1) expands raw JSON properties from `submission_feature.data`
  * 2) resolves metadata and candidate values into upload-scoped staging tables
  * 3) records aggregated validation/resolution errors
- * 4) inserts valid canonical values into typed property tables
+ * 4) inserts valid values into typed property tables
  *
  * Working tables used here are durable (not temporary table definitions), and are
  * partitioned logically by `submission_upload_id`. Callers are expected to clear
@@ -30,7 +30,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * rows in the provided upload scope.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async clearRawPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -41,13 +42,19 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Delete previously derived canonical property rows for one upload.
+   * Delete previously derived property rows for one upload.
    *
    * This keeps reruns idempotent by removing all typed-property rows that
    * were derived from `submission_feature.data.properties` for the upload.
    *
+   * TODO: Replace this hard-delete/reinsert model with lifecycle-dated property rows.
+   * Search, feature-property reads, closure computation, and download Parquet hydration
+   * read these property tables directly; property rows should eventually be inserted as
+   * pending, then activated/end-dated atomically with upload approval.
+   *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async deletePropertyRecordsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -125,7 +132,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * clean counts and summaries from scratch.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async deleteIngestionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -146,7 +154,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Rows are produced only when `data.properties` is a JSON object.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async stageExpandedPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -174,53 +183,19 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Clear upload-scoped rows from `submission_upload_staging_typed_property_value`.
-   *
-   * This table stores one logical value per row (including array-expanded rows)
-   * after property metadata resolution. Clearing it prepares the upload for a
-   * fresh type-validation pass.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearTypedPropertyValueStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_typed_property_value
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Clear upload-scoped rows from `submission_upload_staging_resolved_property`.
-   *
-   * This table links raw staged property names to the selected Blueprint's assignment metadata
-   * (logical type, required/multi flags). Clearing avoids stale resolution rows on retries.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearResolvedPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_resolved_property
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
    * Populate resolved-property staging by resolving raw properties through the selected Blueprint.
    *
    * The selected Blueprint is the one pinned to the upload (`submission_upload.blueprint_id`), passed
    * in by the caller — it is not re-selected here. Property assignment, requiredness, and multiplicity
    * come from the Blueprint; the logical type is still read from `feature_property_type`.
-   * `feature_type_property` supplies only the canonical `feature_type_property_id` surrogate, and only
+   * `feature_type_property` supplies only the shared `feature_type_property_id` surrogate, and only
    * for properties the Blueprint assigns — since that id gates downstream parsing, unassigned
    * properties are kept with a null id for later reporting.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateResolvedPropertyStagingBySubmissionUploadId(
     submissionUploadId: string,
@@ -272,7 +247,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         ON bft.blueprint_id = sb.blueprint_id
        AND bft.feature_type_id = s.feature_type_id
        AND bft.record_end_date IS NULL
-      -- Canonical feature-type/property pool entry; supplies the surrogate id and bridges to the
+      -- Shared feature-type/property pool entry; supplies the surrogate id and bridges to the
       -- Blueprint assignment. Not a source of assignment, requiredness, or multiplicity.
       LEFT JOIN feature_type_property ftp
         ON ftp.feature_type_id = s.feature_type_id
@@ -302,7 +277,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * `allow_multiple` from the selected Blueprint's property assignment.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateTypedPropertyValueStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -358,107 +334,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Clear upload-scoped datetime candidate rows.
-   *
-   * Datetime candidates are intermediate parsed representations produced from
-   * typed values. This reset ensures parsing/normalization can be recomputed.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearDatetimeCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_datetime_candidate
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Clear upload-scoped spatial candidate rows.
-   *
-   * Spatial candidates hold normalized GeoJSON, parsed PostGIS geometry, and
-   * validity metadata for later error recording and insertion.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearSpatialCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_spatial_candidate
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Clear upload-scoped code candidate rows.
-   *
-   * Code candidates store parsed slug parts and resolved
-   * `contributor_codeset_code_id` values for code properties.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearCodeCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_code_candidate
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Clear upload-scoped taxon candidate rows.
-   *
-   * Taxon candidates store parsed TSN values and resolved `taxon_id` values.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearTaxonCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_taxon_candidate
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Clear upload-scoped artifact candidate rows.
-   *
-   * Artifact candidates store normalized artifact references and resolved
-   * `artifact_id` values for artifact-backed properties.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearArtifactCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_artifact_candidate
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Clear upload-scoped feature candidate rows.
-   *
-   * Feature candidates store parsed feature::<source_id> references and the
-   * within-upload features they resolved to.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async clearFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_feature_candidate
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
    * Clear upload property working-set staging tables in one SQL round trip.
    *
    * Removes both:
@@ -468,7 +343,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * This is a convenience reset for the core property normalization pipeline.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async clearUploadPropertyWorkingSetStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -494,7 +370,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * feature candidate tables so candidate generation phases can rerun idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async clearComplexPropertyCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -546,7 +423,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * consumers can represent date/time semantics independently.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateDatetimeCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -621,7 +499,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * `validity_reason`, and computes `is_valid` using PostGIS checks.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateSpatialCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -730,7 +609,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} contributorId Contributor scope for code resolution.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateCodeCandidateStagingBySubmissionUploadId(
     submissionUploadId: string,
@@ -817,7 +697,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * rows; unresolved values are retained for error recording.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateTaxonCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -871,7 +752,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * taxon resolution errors are recorded.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<number[]>}
+   * @returns {Promise<number[]>} Unresolved taxon serial numbers for the upload.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async getUnresolvedTaxonTsnsBySubmissionUploadId(submissionUploadId: string): Promise<number[]> {
     const sql = SQL`
@@ -906,7 +788,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * whose parsed TSN now matches an active `taxon` row. Avoids re-running full candidate population.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async resolveTaxonCandidateTaxonIdsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -935,7 +818,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * downstream phases can insert valid links and record unresolved references.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async populateArtifactCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1010,18 +894,31 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * never contain `::`, so any other shape (`feature::`, `features::x`, `feature::a::b`)
    * is malformed and rejected.
    *
-   * Feature references resolve only against active features in the same upload, matching
-   * by `source_id`; cross-upload references are intentionally not resolved even though the
-   * foreign key permits them. The resolved target feature and its type are captured so later
-   * phases can validate the allowed target type and insert canonical rows.
+   * Feature references resolve against live features by `source_id`, preferring a match
+   * in the same upload and falling back to the submission's published live rows: a
+   * reconciled upload only carries new/changed features, so a referenced feature may be
+   * an unchanged feature owned by an earlier upload. Among published candidates, rows
+   * whose feature type is allowed for the property win (two published features of
+   * different types can legitimately share a `source_id` across uploads — without this
+   * preference the resolver could pick the wrong-type row and fail validation even
+   * though a right-type row exists); remaining ties resolve to the newest row for
+   * determinism. Reconciliation validates source identity before indexing, so a
+   * same-upload match is always the submitter's current intent and wins outright. The
+   * resolved target feature and its type are captured so later phases can validate the
+   * allowed target type and insert typed property rows.
    *
    * Rows remain in candidate staging even when unresolved so later phases can emit
    * aggregated resolution errors.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @param {number} submissionId The submission the upload belongs to.
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
-  async populateFeatureCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async populateFeatureCandidateStagingBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_feature_candidate (
         submission_upload_id, submission_feature_id, property_name, feature_type_property_id, blueprint_feature_type_property_id,
@@ -1056,11 +953,29 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         target.submission_feature_id AS referenced_submission_feature_id,
         target.feature_type_id        AS referenced_feature_type_id
       FROM parsed p
-      LEFT JOIN submission_feature target
-        ON p.is_format_valid
-       AND target.submission_upload_id = ${submissionUploadId}::uuid
-       AND target.record_end_date IS NULL
-       AND target.source_id = p.parsed_source_id;
+      LEFT JOIN LATERAL (
+        SELECT candidate.submission_feature_id, candidate.feature_type_id
+        FROM submission_feature candidate
+        WHERE p.is_format_valid
+          AND candidate.submission_id = ${submissionId}
+          AND candidate.source_id = p.parsed_source_id
+          AND candidate.record_end_date IS NULL
+          AND (
+            candidate.submission_upload_id = ${submissionUploadId}::uuid
+            OR candidate.record_effective_date IS NOT NULL
+          )
+        ORDER BY
+          (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+          EXISTS (
+            SELECT 1
+            FROM feature_type_property_feature ftpf
+            WHERE ftpf.feature_type_property_id = p.feature_type_property_id
+              AND ftpf.target_feature_type_id = candidate.feature_type_id
+              AND ftpf.record_end_date IS NULL
+          ) DESC,
+          candidate.submission_feature_id DESC
+        LIMIT 1
+      ) target ON true;
     `;
     await this.connection.sql(sql);
   }
@@ -1075,7 +990,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordMissingRequiredPropertyErrorsBySubmissionUploadId(
     submissionUploadId: string,
@@ -1106,7 +1022,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
          AND bftp.record_end_date IS NULL
          AND bftp.required_value = TRUE
-        -- Canonical pool entry; bridges the assignment to its feature type / property and surrogate id.
+        -- Shared pool entry; bridges the assignment to its feature type / property and surrogate id.
         -- Constrain to the Blueprint feature type: the FK on bftp.feature_type_property_id only proves
         -- the property exists in the global pool, not that it belongs to bft.feature_type_id.
         JOIN feature_type_property ftp
@@ -1189,7 +1105,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * existing counts for matching `(submission_upload_id, error_code, feature_type_property_id, property_name)`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordPrimitiveValidationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1337,7 +1254,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Counts are aggregated and upserted into `submission_feature_error`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordCodePropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1441,7 +1359,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Counts are aggregated and upserted into `submission_feature_error`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordFeaturePropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1583,7 +1502,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Counts are aggregated and upserted into `submission_feature_error`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordCircularFeatureReferenceErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1672,7 +1592,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * upload/property/feature-type-property and written as `UNRESOLVED_TAXON`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordTaxonPropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1732,7 +1653,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Error counts are aggregated and upserted into `submission_feature_error`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordArtifactPropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1819,7 +1741,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * parsed components are null are flagged as invalid timestamp values.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordDatetimeNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1877,7 +1800,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * `time_value`) is present in datetime candidate staging.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertTimestampPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1912,7 +1836,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * PostGIS geometry contributes to grouped `INVALID_SPATIAL_VALUE` errors.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async recordSpatialNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1973,7 +1898,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * `ST_IsValid(...)`; geometries are forced to 2D with `ST_Force2D(...)`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertGeometryPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2004,7 +1930,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * JSON transport type is also string, then extracted as text via `#>> '{}'`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertStringPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2032,10 +1959,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Insert valid numeric properties into `submission_feature_property_number`.
    *
    * Values are sourced from typed staging where logical and transport types are
-   * numeric, then cast into canonical numeric column storage.
+   * numeric, then cast into the numeric property column.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertNumberPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2063,10 +1991,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Insert valid boolean properties into `submission_feature_property_boolean`.
    *
    * Values are sourced from typed staging where logical and transport types are
-   * boolean, then cast into canonical boolean column storage.
+   * boolean, then cast into the boolean property column.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertBooleanPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2097,7 +2026,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * `contributor_codeset_code_id` from code candidate staging.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertCodePropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2132,7 +2062,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * never cross-write into each other's table.
    *
    * A multi-valued property may submit the same reference more than once; the unique constraint plus
-   * `ON CONFLICT DO NOTHING` keeps exactly one canonical row per `(source feature, property, referenced
+   * `ON CONFLICT DO NOTHING` keeps exactly one row per `(source feature, property, referenced
    * feature)` so downstream traversal does not double-count.
    *
    * Self-references are also rejected upstream with an error so the upload is blocked, but they remain
@@ -2141,11 +2071,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * Resolution happens once at staging time; this insert runs later in the job. As a staleness guard
    * it rejoins `submission_feature` for both endpoints with `record_end_date IS NULL`, so if a source
-   * or target feature is soft-deleted between staging and insert, no canonical row pointing at (or
+   * or target feature is soft-deleted between staging and insert, no property row pointing at (or
    * from) an inactive feature can land.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertFeaturePropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2198,7 +2129,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Inserts candidate rows where TSN successfully resolved to a non-null `taxon_id`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertTaxonPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2230,7 +2162,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * preserving both the feature property and Blueprint assignment that produced the value.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async insertArtifactPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -2263,13 +2196,22 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert resolved feature-to-feature relationships for one upload.
    *
-   * Relationships are extracted from `submission_feature.data.content` string references, resolved
-   * within the same upload by `source_id`, filtered to exclude self-links, and inserted idempotently.
+   * Relationships are extracted from `submission_feature.data.content` string references,
+   * resolved by `source_id` — preferring a live match in the same upload and falling back
+   * to the submission's published live rows (a reconciled upload only carries new/changed
+   * features, so a referenced feature may be an unchanged feature owned by an earlier
+   * upload). Exactly one target is picked per reference (ties resolve to the newest row),
+   * self-links are excluded, and rows are inserted idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @param {number} submissionId The submission the upload belongs to.
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
-  async insertFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async insertFeatureRelationshipsBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sql = SQL`
       WITH expanded AS (
         SELECT
@@ -2295,10 +2237,21 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           e.source_feature_id,
           target.submission_feature_id AS target_feature_id
         FROM expanded e
-        JOIN submission_feature target
-          ON target.submission_upload_id = ${submissionUploadId}::uuid
-         AND target.record_end_date IS NULL
-         AND target.source_id = e.reference_source_id
+        CROSS JOIN LATERAL (
+          SELECT candidate.submission_feature_id
+          FROM submission_feature candidate
+          WHERE candidate.submission_id = ${submissionId}
+            AND candidate.source_id = e.reference_source_id
+            AND candidate.record_end_date IS NULL
+            AND (
+              candidate.submission_upload_id = ${submissionUploadId}::uuid
+              OR candidate.record_effective_date IS NOT NULL
+            )
+          ORDER BY
+            (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+            candidate.submission_feature_id DESC
+          LIMIT 1
+        ) AS target
         WHERE target.submission_feature_id <> e.source_feature_id
       )
       INSERT INTO submission_feature_feature (
@@ -2319,13 +2272,20 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Record unresolved or invalid feature-reference errors from `data.content`.
    *
    * This phase captures:
-   * - unresolved target source-id references within the upload
+   * - unresolved target source-id references (no live match in the upload or in the
+   *   submission's published live rows)
    * - self-reference violations
    *
+   * Resolution mirrors {@link insertFeatureRelationshipsBySubmissionUploadId}: one target
+   * per reference, preferring a live match in the same upload and falling back to the
+   * submission's published live rows.
+   *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @param {number} submissionId The submission the upload belongs to.
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
-  async recordReferenceErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async recordReferenceErrorsBySubmissionUploadId(submissionUploadId: string, submissionId: number): Promise<void> {
     const sql = SQL`
       WITH expanded AS (
         SELECT
@@ -2353,14 +2313,25 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             ELSE 'INVALID_SELF_REFERENCE'
           END AS error_code,
           CASE
-            WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload'
+            WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload or published submission state'
             ELSE 'Feature reference cannot point to itself'
           END AS error_message
         FROM expanded e
-        LEFT JOIN submission_feature target
-          ON target.submission_upload_id = ${submissionUploadId}::uuid
-         AND target.record_end_date IS NULL
-         AND target.source_id = e.reference_source_id
+        LEFT JOIN LATERAL (
+          SELECT candidate.submission_feature_id
+          FROM submission_feature candidate
+          WHERE candidate.submission_id = ${submissionId}
+            AND candidate.source_id = e.reference_source_id
+            AND candidate.record_end_date IS NULL
+            AND (
+              candidate.submission_upload_id = ${submissionUploadId}::uuid
+              OR candidate.record_effective_date IS NOT NULL
+            )
+          ORDER BY
+            (candidate.submission_upload_id = ${submissionUploadId}::uuid) DESC,
+            candidate.submission_feature_id DESC
+          LIMIT 1
+        ) target ON true
         WHERE target.submission_feature_id IS NULL
            OR target.submission_feature_id = e.source_feature_id
       ),
@@ -2409,21 +2380,32 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record unresolved parent source-id references for the upload.
    *
-   * A parent error is recorded when `child.data.parent` is non-empty but no active
-   * feature in the same upload has a matching `source_id`.
+   * A parent error is recorded when `child.data.parent` is non-empty but no live
+   * feature in the same upload — and no published live feature of the submission —
+   * has a matching `source_id`. This mirrors the resolution scope used by
+   * `FeatureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @param {number} submissionId The submission the upload belongs to.
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
-  async recordUnresolvedParentErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async recordUnresolvedParentErrorsBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<void> {
     const sql = SQL`
       WITH unresolved AS (
         SELECT
           child.submission_upload_id
         FROM submission_feature child
         LEFT JOIN submission_feature parent
-          ON parent.submission_upload_id = child.submission_upload_id
+          ON parent.submission_id = ${submissionId}
          AND parent.record_end_date IS NULL
+         AND (
+           parent.submission_upload_id = child.submission_upload_id
+           OR parent.record_effective_date IS NOT NULL
+         )
          AND parent.source_id = NULLIF(child.data ->> 'parent', '')
         WHERE child.submission_upload_id = ${submissionUploadId}::uuid
           AND child.record_end_date IS NULL
@@ -2434,7 +2416,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         SELECT
           unresolved.submission_upload_id,
           'UNRESOLVED_PARENT'::text AS error_code,
-          'Failed to resolve parent feature source_id within upload'::text AS error_message,
+          'Failed to resolve parent feature source_id within upload or published submission state'::text AS error_message,
           COUNT(*)::integer AS count
         FROM unresolved
         GROUP BY unresolved.submission_upload_id
@@ -2473,80 +2455,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Record duplicate `source_id` errors for the upload.
-   *
-   * A duplicate-source-id error is recorded once per `source_id` value that appears in
-   * two or more active rows of `submission_feature` within the same upload. NULL
-   * `source_id` rows are excluded — Postgres NULL semantics make them non-equal, and
-   * the downstream `feature::<source_id>` resolver cannot match NULLs either, so they
-   * cannot produce the resolution ambiguity this check prevents.
-   *
-   * One row per distinct duplicated `source_id` is written so that the colliding
-   * identifier is recoverable from `details->>'source_id'`. `count` is the literal
-   * duplicate-row count (e.g., three colliding rows → `count = 3`).
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   * @memberof SubmissionFeaturePropertyIngestionRepository
-   */
-  async recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      WITH grouped_errors AS (
-        SELECT
-          submission_upload_id,
-          source_id,
-          COUNT(*)::integer AS count
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND record_end_date IS NULL
-          -- Load-bearing, not defensive: GROUP BY collapses all NULL source_id rows into a
-          -- single group, so omitting this would make HAVING COUNT(*) > 1 report distinct
-          -- NULL-source_id features as a false duplicate collision.
-          AND source_id IS NOT NULL
-        GROUP BY submission_upload_id, source_id
-        HAVING COUNT(*) > 1
-      )
-      INSERT INTO submission_feature_error (
-        submission_upload_id,
-        property_name,
-        feature_type_property_id,
-        error_code,
-        error_message,
-        count,
-        details
-      )
-      SELECT
-        submission_upload_id,
-        NULL::text,
-        NULL::integer,
-        'DUPLICATE_FEATURE_SOURCE_ID',
-        'Multiple active submission_feature rows share the same source_id within this upload',
-        count,
-        jsonb_build_object('source_id', source_id)
-      FROM grouped_errors
-      ON CONFLICT (
-        submission_upload_id,
-        error_code,
-        feature_type_property_id,
-        property_name
-      )
-      DO UPDATE SET
-        count = submission_feature_error.count + EXCLUDED.count,
-        error_message = EXCLUDED.error_message,
-        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
    * Get total number of ingestion error rows for one upload.
    *
    * Returns the aggregated sum of `submission_feature_error.count` rather than row
    * cardinality. If no errors exist, returns `0`.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<number>}
+   * @returns {Promise<number>} Number of ingestion errors for the upload.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async getIngestionErrorCountBySubmissionUploadId(submissionUploadId: string): Promise<number> {
     const sql = SQL`
@@ -2571,7 +2487,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * API responses and tests.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<IngestionErrorCount[]>}
+   * @returns {Promise<IngestionErrorCount[]>} Ingestion error counts grouped by error code.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async getIngestionErrorCountsByCode(submissionUploadId: string): Promise<IngestionErrorCount[]> {
     const sql = SQL`
@@ -2596,7 +2513,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} [limit=25] Max rows to return.
-   * @returns {Promise<IngestionErrorSummary[]>}
+   * @returns {Promise<IngestionErrorSummary[]>} Paginated ingestion error summaries for the upload.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
    */
   async getIngestionErrorSummariesBySubmissionUploadId(
     submissionUploadId: string,

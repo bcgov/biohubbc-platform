@@ -279,7 +279,7 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('urn_submission_id');
       expect(sql).to.include('anchor_sf');
       // "unfiltered" drops only the access/security filter, never validity: the candidate set still
-      // requires active features (isSubmissionFeatureActive → record_effective_date / record_end_date).
+      // requires current features (isSubmissionFeatureCurrent → record_effective_date / record_end_date / no successor).
       expect(sql).to.include('record_effective_date');
     });
 

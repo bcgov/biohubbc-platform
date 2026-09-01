@@ -301,6 +301,7 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].values).to.include(7);
       expect(sqlStub.firstCall.args[0].text).to.contain('team_id');
       expect(sqlStub.firstCall.args[0].values).to.include('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+      expect(sqlStub.firstCall.args[0].text).to.contain('successor_submission_upload_id');
     });
   });
 
@@ -425,6 +426,19 @@ describe('SubmissionUploadRepository', () => {
 
       expect(result).to.equal(2);
       expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('lockSubmissionUploadsForSubmissionId', () => {
+    it('locks active upload rows in deterministic order', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ sql: sqlStub }));
+
+      await repo.lockSubmissionUploadsForSubmissionId(123);
+
+      const text = sqlStub.firstCall.args[0].text as string;
+      expect(text).to.include('ORDER BY submission_upload_id');
+      expect(text).to.include('FOR UPDATE');
     });
   });
 });

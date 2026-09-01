@@ -1,4 +1,5 @@
 import { SQL } from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
@@ -19,6 +20,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
    * @throws {ApiNotFoundError} - If the record is not found.
    * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   * @memberof SubmissionUploadRepository
    */
   async getSubmissionUpload(submissionUploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
@@ -65,6 +67,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @returns {Promise<SubmissionUpload>} - The locked submission_upload record.
    * @throws {ApiNotFoundError} - If the record is not found.
    * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   * @memberof SubmissionUploadRepository
    */
   async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
@@ -76,6 +79,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         status,
         ticket_id,
         blueprint_id,
+        successor_submission_upload_id,
         comment
       FROM
         submission_upload
@@ -111,6 +115,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
    * @throws {ApiNotFoundError} - If the record is not found or does not belong to the submission.
    * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   * @memberof SubmissionUploadRepository
    */
   async getSubmissionUploadBySubmissionUuid(
     submissionUuid: string,
@@ -161,6 +166,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @param {SubmissionUploadFilters} filters - Filters to apply to the query (e.g., type).
    * @param {ApiPaginationOptions} [pagination] - Pagination options to limit and offset results.
    * @returns {Promise<SubmissionUpload[]>} - A list of submission_upload records matching the filters.
+   * @memberof SubmissionUploadRepository
    */
   async getSubmissionUploadsBySubmissionId(
     submissionId: number,
@@ -202,7 +208,8 @@ export class SubmissionUploadRepository extends BaseRepository {
    * Find ticket-scoped submission upload timeline records.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @returns {Promise<TicketSubmissionUpload[]>}
+   * @returns {Promise<TicketSubmissionUpload[]>} Submission upload timeline records associated with the ticket.
+   * @memberof SubmissionUploadRepository
    */
   async findSubmissionUploadsByTicketId(ticketId: string): Promise<TicketSubmissionUpload[]> {
     const sqlStatement = SQL`
@@ -308,37 +315,63 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission_upload record.
+   * Insert a new submission_upload record and link the prior upload as its predecessor.
+   *
+   * The caller must serialize submission upload creation before invoking this method. Failed and
+   * deleted uploads remain eligible predecessors because upload lineage is append-only.
    *
    * @param {CreateSubmissionUploadWithTeam} submissionUpload - The data to create a new submission_upload.
    * @returns {Promise<{ submission_upload_id: string }>} - The ID of the newly created submission_upload.
    * @throws {ApiExecuteSQLError} - If the insert fails.
+   * @memberof SubmissionUploadRepository
    */
   async insertSubmissionUpload(
     submissionUpload: CreateSubmissionUploadWithTeam
   ): Promise<{ submission_upload_id: string }> {
     const sqlStatement = SQL`
-      INSERT INTO submission_upload (
-        submission_id,
-        upload_id,
-        team_id,
-        ticket_id,
-        status,
-        blueprint_id,
-        comment
-      ) VALUES (
-        ${submissionUpload.submission_id},
-        ${submissionUpload.upload_id},
-        ${submissionUpload.team_id},
-        ${submissionUpload.ticket_id},
-        ${submissionUpload.status},
-        ${submissionUpload.blueprint_id},
-        ${submissionUpload.comment ?? null}
+      WITH predecessor AS (
+        SELECT submission_upload_id
+        FROM submission_upload
+        WHERE submission_id = ${submissionUpload.submission_id}
+        ORDER BY create_date DESC, submission_upload_id DESC
+        LIMIT 1
+        FOR UPDATE
+      ),
+      inserted AS (
+        INSERT INTO submission_upload (
+          submission_id,
+          upload_id,
+          team_id,
+          ticket_id,
+          status,
+          blueprint_id,
+          comment
+        ) VALUES (
+          ${submissionUpload.submission_id},
+          ${submissionUpload.upload_id},
+          ${submissionUpload.team_id},
+          ${submissionUpload.ticket_id},
+          ${submissionUpload.status},
+          ${submissionUpload.blueprint_id},
+          ${submissionUpload.comment ?? null}
+        )
+        RETURNING submission_upload_id
+      ),
+      linked AS (
+        UPDATE submission_upload prior
+        SET successor_submission_upload_id = inserted.submission_upload_id
+        FROM predecessor, inserted
+        WHERE prior.submission_upload_id = predecessor.submission_upload_id
+          AND prior.successor_submission_upload_id IS NULL
+        RETURNING prior.submission_upload_id
       )
-      RETURNING submission_upload_id;
+      SELECT inserted.submission_upload_id
+      FROM inserted
+      WHERE NOT EXISTS (SELECT 1 FROM predecessor)
+        OR EXISTS (SELECT 1 FROM linked);
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ submission_upload_id: z.string() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission_upload record', [
@@ -360,6 +393,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    *
    * @param {number} submissionId - The submission whose prior uploads should be inspected.
    * @returns {Promise<number | null>} - The prior upload's `blueprint_id`, or null if none exists.
+   * @memberof SubmissionUploadRepository
    */
   async findMostRecentBlueprintIdBySubmissionId(submissionId: number): Promise<number | null> {
     const sqlStatement = SQL`
@@ -375,7 +409,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       LIMIT 1;
     `;
 
-    const response = await this.connection.sql<{ blueprint_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ blueprint_id: z.number() }));
 
     return response.rows[0]?.blueprint_id ?? null;
   }
@@ -387,6 +421,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @param {UpdateSubmissionUpload} submissionUpload - The updated data for the record.
    * @returns {Promise<{ submission_upload_id: string }>} - The ID of the updated submission_upload.
    * @throws {ApiExecuteSQLError} - If the update fails.
+   * @memberof SubmissionUploadRepository
    */
   async updateSubmissionUpload(
     submissionUploadId: string,
@@ -423,6 +458,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @returns {Promise<SubmissionUpload>} - The submission_upload record.
    * @throws {ApiNotFoundError} - If the record is not found.
    * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   * @memberof SubmissionUploadRepository
    */
   async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
@@ -465,7 +501,9 @@ export class SubmissionUploadRepository extends BaseRepository {
    * Soft-delete a single active submission_upload record by setting record_end_date to now.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @returns {Promise<void>} Resolves after the active upload row has been soft-deleted.
    * @throws {ApiExecuteSQLError} - If no active record is found.
+   * @memberof SubmissionUploadRepository
    */
   async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
@@ -491,6 +529,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    *
    * @param {number} submissionId - The submission ID whose uploads should be soft-deleted.
    * @returns {Promise<number>} - The number of records soft-deleted.
+   * @memberof SubmissionUploadRepository
    */
   async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
     const sqlStatement = SQL`
@@ -507,10 +546,34 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Lock all active upload rows for a submission in a deterministic order.
+   *
+   * This serializes bulk upload mutations with single-upload approval and deletion operations.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>} Resolves after every active upload row for the submission is locked.
+   * @memberof SubmissionUploadRepository
+   */
+  async lockSubmissionUploadsForSubmissionId(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      SELECT submission_upload_id
+      FROM submission_upload
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL
+      ORDER BY submission_upload_id
+      FOR UPDATE;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Soft-delete a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @returns {Promise<void>} Resolves after the active upload row has been soft-deleted.
    * @throws {ApiExecuteSQLError} - If the soft-delete fails.
+   * @memberof SubmissionUploadRepository
    */
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`

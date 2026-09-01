@@ -41,6 +41,11 @@ import {
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
 import {
+  IReconcileSubmissionFeaturesJobData,
+  reconcileSubmissionFeaturesFailedHandler,
+  reconcileSubmissionFeaturesJobHandler
+} from './jobs/reconcile-submission-features-job';
+import {
   ISubmissionUploadSecurityJobData,
   submissionUploadSecurityFailedHandler,
   submissionUploadSecurityJobHandler
@@ -60,6 +65,8 @@ export interface WorkerDependencies {
   getPgBoss: typeof getPgBoss;
   processSubmissionFeaturesJobHandler: typeof processSubmissionFeaturesJobHandler;
   processSubmissionFeaturesFailedHandler: typeof processSubmissionFeaturesFailedHandler;
+  reconcileSubmissionFeaturesJobHandler: typeof reconcileSubmissionFeaturesJobHandler;
+  reconcileSubmissionFeaturesFailedHandler: typeof reconcileSubmissionFeaturesFailedHandler;
   malwareScanJobHandler: typeof malwareScanJobHandler;
   malwareScanFailedHandler: typeof malwareScanFailedHandler;
   processDownloadJobHandler: typeof processDownloadJobHandler;
@@ -84,6 +91,8 @@ export const workerDependencies: WorkerDependencies = {
   getPgBoss,
   processSubmissionFeaturesJobHandler,
   processSubmissionFeaturesFailedHandler,
+  reconcileSubmissionFeaturesJobHandler,
+  reconcileSubmissionFeaturesFailedHandler,
   malwareScanJobHandler,
   malwareScanFailedHandler,
   processDownloadJobHandler,
@@ -150,6 +159,23 @@ export const registerWorkers = async (): Promise<void> => {
     workerDependencies.processSubmissionFeaturesFailedHandler
   );
 
+  await boss.createQueue(JobQueues.RECONCILE_SUBMISSION_FEATURES_FAILED);
+  await boss.createQueue(JobQueues.RECONCILE_SUBMISSION_FEATURES, {
+    deadLetter: JobQueues.RECONCILE_SUBMISSION_FEATURES_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+  await boss.work<IReconcileSubmissionFeaturesJobData>(
+    JobQueues.RECONCILE_SUBMISSION_FEATURES,
+    workerDependencies.reconcileSubmissionFeaturesJobHandler
+  );
+  await boss.work<IReconcileSubmissionFeaturesJobData>(
+    JobQueues.RECONCILE_SUBMISSION_FEATURES_FAILED,
+    workerDependencies.reconcileSubmissionFeaturesFailedHandler
+  );
+
   // Register malware scan job handler
   await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN, workerDependencies.malwareScanJobHandler);
 
@@ -211,7 +237,8 @@ export const registerWorkers = async (): Promise<void> => {
     deadLetter: JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
     retryLimit: 3,
     retryDelay: 60,
-    retryBackoff: true
+    retryBackoff: true,
+    policy: 'short'
   });
 
   // Register index submission features job handler

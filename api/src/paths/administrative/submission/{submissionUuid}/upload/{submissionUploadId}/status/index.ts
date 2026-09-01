@@ -8,7 +8,6 @@ import {
   UpdateSubmissionUploadReviewStatusRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
 import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
@@ -71,9 +70,16 @@ PATCH.apiDoc = {
       }
     },
     ...defaultErrorResponses,
+    400: {
+      description:
+        'Approval preconditions not met: automated validation has not completed, or indexing has not completed.'
+    },
     404: {
       description:
         'Submission not found (invalid submissionUuid) or submission upload not found (submissionUploadId does not belong to this submission).'
+    },
+    409: {
+      description: 'The review decision conflicts with the upload lifecycle or would reverse published feature state.'
     }
   }
 };
@@ -97,8 +103,7 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
       const submissionUploadService = new SubmissionUploadService(connection);
       await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
 
-      const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
-      const result = await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });
+      const result = await submissionUploadService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });
 
       await connection.commit();
 

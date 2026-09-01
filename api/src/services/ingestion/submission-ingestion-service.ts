@@ -96,16 +96,16 @@ export class SubmissionIngestionService {
       objectKey
     });
 
-    // Step 1: Remove previously-ingested feature rows for this submission upload attempt.
-    // Retries can re-run after partial success; scoping by submission_upload_id ensures
-    // we only reset rows produced by this upload attempt, not other uploads.
+    // Step 1: Replace never-activated rows from a partial ingestion attempt.
+    // Processing retries are scoped to the ingesting stage, so no activated row may
+    // be reset or removed. Fresh inserts naturally retain a NULL effective date.
     await withConnection(async (connection) => {
-      const featureIngestionService = new SubmissionFeatureIngestionService(connection);
-      await featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+      const submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
+      await submissionFeatureIngestionService.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
     });
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
-      message: 'Deleted existing features by submission upload id',
+      message: 'Deleted existing raw staged features by submission upload id',
       submissionUploadId
     });
 
@@ -141,8 +141,8 @@ export class SubmissionIngestionService {
     // Resolve known active and retired feature-type ids once per ingestion run so
     // feature batches do not re-query the mapping for every callback invocation.
     const knownFeatureTypeMap = await withConnection(async (connection) => {
-      const featureIngestionService = new SubmissionFeatureIngestionService(connection);
-      return featureIngestionService.getKnownFeatureTypeMap();
+      const submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
+      return submissionFeatureIngestionService.getKnownFeatureTypeMap();
     });
 
     // Step 4: Stream tarball once and fan out entry processing by folder:
@@ -180,8 +180,8 @@ export class SubmissionIngestionService {
           featureRowsPersisted += featureBatch.length;
 
           await withConnection(async (connection) => {
-            const featureIngestionService = new SubmissionFeatureIngestionService(connection);
-            await featureIngestionService.ingestFeatureBatch(
+            const submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
+            await submissionFeatureIngestionService.ingestFeatureBatch(
               submissionId,
               submissionUploadId,
               featureBatch,

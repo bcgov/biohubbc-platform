@@ -8,6 +8,7 @@ import { SecurityRepository } from '../repositories/security-repository';
 import { SecurityScopeService } from './access-policy/security-scope-service';
 import { ArtifactService } from './old-artifact-service';
 import { SecurityService } from './security-service';
+import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
@@ -402,6 +403,8 @@ describe('SecurityService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
+      const lockStub = sinon.stub(SubmissionService.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
+
       const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([
         {
           submission_feature_security_id: 1,
@@ -425,6 +428,9 @@ describe('SecurityService', () => {
 
       await service.patchSecurityRulesOnSubmission(1, [4, 5], [6, 7]);
 
+      expect(lockStub).to.be.calledOnceWith(1);
+      expect(lockStub).to.be.calledBefore(removeStub);
+      expect(lockStub).to.be.calledBefore(applyStub);
       expect(removeStub).to.be.calledWith(1, [6, 7]);
       expect(applyStub).to.be.calledWith(1, [4, 5]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
@@ -503,6 +509,8 @@ describe('SecurityService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
+      const lockStub = sinon.stub(SubmissionService.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
+
       const removeStub = sinon
         .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
         .resolves([]);
@@ -515,6 +523,9 @@ describe('SecurityService', () => {
 
       await service.patchSecurityRulesOnSubmissionFeatures(1, [1, 2, 3], [4, 5], [6, 7]);
 
+      expect(lockStub).to.be.calledOnceWith(1);
+      expect(lockStub).to.be.calledBefore(removeStub);
+      expect(lockStub).to.be.calledBefore(applyStub);
       expect(removeStub).to.be.calledWith(1, [1, 2, 3], [6, 7]);
       expect(applyStub).to.be.calledWith(1, [1, 2, 3], [4, 5]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);

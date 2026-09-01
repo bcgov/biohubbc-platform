@@ -8,6 +8,8 @@ export const SubmissionUploadJobStatus = z.enum([
   'uploaded',
   'ingesting',
   'ingested',
+  'reconciling',
+  'reconciled',
   'indexing',
   'indexed',
   // Terminal failure states
@@ -27,6 +29,7 @@ export const SubmissionUpload = z.object({
   status: SubmissionUploadJobStatus,
   ticket_id: z.string().uuid(),
   blueprint_id: z.number(),
+  successor_submission_upload_id: z.string().uuid().nullable().optional(),
   comment: z.string().nullable().optional(),
   record_end_date: z.coerce.date().nullable().optional()
 });

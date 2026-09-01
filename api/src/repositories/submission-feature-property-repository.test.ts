@@ -39,6 +39,8 @@ describe('SubmissionFeaturePropertyRepository', () => {
       expect(sqlText).to.include('t.record_end_date IS NULL');
       expect(sqlText).to.not.include('COALESCE(t.itis_scientific_name');
       expect(sqlText).to.include('HAVING COUNT(*) = 1');
+      expect(sqlText).to.include('sf.record_effective_date <= now()');
+      expect(sqlText).to.not.include('sf.successor_submission_feature_id IS NULL');
       expect(sqlText).to.include('SELECT id, property, value');
       expect(sqlText).to.include('ORDER BY sort asc NULLS LAST, property ASC, value_text ASC, id ASC');
       expect(sqlText).to.include("a.artifact_status = 'uploaded'");

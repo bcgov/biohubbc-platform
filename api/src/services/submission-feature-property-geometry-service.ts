@@ -59,7 +59,7 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
   }
 
   /**
-   * Get the combined extent and count of a submission feature's active spatial properties.
+   * Get the combined extent and count of a submission feature's published spatial properties.
    *
    * Answers whether a feature can be mapped at all, and where the map should open. The geometry
    * values themselves are deliberately not returned: they reach the browser as vector tiles from the

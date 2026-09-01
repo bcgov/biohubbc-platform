@@ -8,11 +8,20 @@ import {
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
+import {
+  SubmissionUploadReviewStatus,
+  UpdateSubmissionUploadReviewStatus
+} from '../../models/submission-upload-review-status';
+import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
+import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
+import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
+import { SubmissionService } from '../submission-service';
+import { SubmissionValidationService } from '../submission-validation-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 
 export class SubmissionUploadService extends DBService {
@@ -20,6 +29,13 @@ export class SubmissionUploadService extends DBService {
   blueprintRepository: BlueprintRepository;
   submissionUploadReviewStatusService: SubmissionUploadReviewStatusService;
   teamService: TeamService;
+  submissionService: SubmissionService;
+  submissionFeatureClosureService: SubmissionFeatureClosureService;
+
+  /** Mutable dependency bag used by tests to stub queue publication under ESM. */
+  static readonly dependencies = {
+    publishComputeSubmissionFeatureClosureJob
+  };
 
   /**
    * Creates an instance of SubmissionUploadService.
@@ -33,6 +49,8 @@ export class SubmissionUploadService extends DBService {
     this.blueprintRepository = new BlueprintRepository(connection);
     this.submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(connection);
     this.teamService = new TeamService(connection);
+    this.submissionService = new SubmissionService(connection);
+    this.submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
   }
 
   /**
@@ -173,7 +191,7 @@ export class SubmissionUploadService extends DBService {
    * @param {CreateSubmissionUpload} submissionUpload The artifact data to insert
    * @param {number} requestorSystemUserId Authenticated user who initiated the upload
    * @param {number[]} [submitterSystemUserIds] Additional users who may access the upload
-   * @returns {Promise<{ submission_upload_artipfact_id: string }>} Newly created artifact ID
+   * @returns {Promise<{ submission_upload_id: string }>} Newly created submission upload ID.
    * @memberof SubmissionUploadService
    */
   async insertSubmissionUpload(
@@ -186,6 +204,11 @@ export class SubmissionUploadService extends DBService {
       description: `Auto-generated access team for submission upload ${submissionUpload.upload_id}.`,
       system_user_ids: [...new Set([requestorSystemUserId, ...submitterSystemUserIds])]
     });
+
+    // Match approval's row-lock-before-submission-lock order. The insert then atomically links the
+    // latest upload as its predecessor; the advisory lock also serializes concurrent first uploads.
+    await this.submissionUploadRepository.lockSubmissionUploadsForSubmissionId(submissionUpload.submission_id);
+    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionUpload.submission_id);
 
     return this.submissionUploadRepository.insertSubmissionUpload({
       ...submissionUpload,
@@ -205,6 +228,7 @@ export class SubmissionUploadService extends DBService {
     submissionUploadId: string,
     submissionUpload: UpdateSubmissionUpload
   ): Promise<{ submission_upload_id: string }> {
+    await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
     return this.submissionUploadRepository.updateSubmissionUpload(submissionUploadId, submissionUpload);
   }
 
@@ -214,21 +238,19 @@ export class SubmissionUploadService extends DBService {
    * @private
    * @param {string} submissionUploadId Submission upload identifier.
    * @param {SubmissionUpload['status']} currentStatus Current persisted status.
-   * @param {SubmissionUpload['status']} nextStatus Target status for transition.
    * @param {SubmissionUpload['status'][]} allowedCurrentStatuses Allowed source statuses.
    * @returns {void}
    * @memberof SubmissionUploadService
    */
-  private assertSubmissionUploadStatusTransition(
+  private assertStatusCanChange(
     submissionUploadId: string,
     currentStatus: SubmissionUpload['status'],
-    nextStatus: SubmissionUpload['status'],
     allowedCurrentStatuses: SubmissionUpload['status'][]
   ): void {
     if (!allowedCurrentStatuses.includes(currentStatus)) {
       throw new ApiConflictError('Invalid submission upload status transition', [
         'SubmissionUploadService->transitionSubmissionUploadStatus',
-        { submissionUploadId, currentStatus, nextStatus, allowedCurrentStatuses }
+        { submissionUploadId, currentStatus, allowedCurrentStatuses }
       ]);
     }
   }
@@ -236,21 +258,26 @@ export class SubmissionUploadService extends DBService {
   /**
    * Transition submission upload status after asserting the current status is allowed.
    *
-   * @param {string} submissionUploadId
-   * @param {SubmissionUpload['status']} nextStatus
-   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses
-   * @returns {Promise<void>}
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {SubmissionUpload['status']} nextStatus Status to persist after validation.
+   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses Current statuses permitted to make the transition.
+   * @returns {Promise<void>} Resolves after the validated status transition is persisted.
+   * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadStatus(
     submissionUploadId: string,
     nextStatus: SubmissionUpload['status'],
     allowedCurrentStatuses: SubmissionUpload['status'][]
   ): Promise<void> {
-    const current = await this.getSubmissionUpload(submissionUploadId);
+    const current = await this.getSubmissionUploadWithLock(submissionUploadId);
 
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, nextStatus, allowedCurrentStatuses);
+    if (current.status === nextStatus) {
+      return;
+    }
 
-    await this.updateSubmissionUpload(submissionUploadId, { status: nextStatus });
+    this.assertStatusCanChange(submissionUploadId, current.status, allowedCurrentStatuses);
+
+    await this.submissionUploadRepository.updateSubmissionUpload(submissionUploadId, { status: nextStatus });
   }
 
   /**
@@ -260,62 +287,46 @@ export class SubmissionUploadService extends DBService {
    * - all other statuses -> conflict
    *
    * @param {string} submissionUploadId Submission upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after transition to `ingested`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadToIngested(submissionUploadId: string): Promise<void> {
-    const current = await this.getSubmissionUpload(submissionUploadId);
-
-    if (current.status === 'ingested') {
-      return;
-    }
-
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'ingested', ['ingesting']);
-    await this.updateSubmissionUpload(submissionUploadId, { status: 'ingested' });
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'ingested', ['ingesting']);
   }
 
   /**
    * Transition to invalid for deterministic validation failure.
-   * - uploaded|ingesting|ingested|indexing -> invalid
+   * - any active processing stage -> invalid
    * - invalid -> invalid (no-op)
    * - all other statuses -> conflict
    *
    * @param {string} submissionUploadId Submission upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after transition to `invalid`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadToInvalid(submissionUploadId: string): Promise<void> {
-    const current = await this.getSubmissionUpload(submissionUploadId);
-
-    if (current.status === 'invalid') {
-      return;
-    }
-
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'invalid', [
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'invalid', [
       'uploaded',
       'ingesting',
       'ingested',
+      'reconciling',
+      'reconciled',
       'indexing'
     ]);
-    await this.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
   }
 
   /**
    * Transition to indexing when the indexing stage starts.
-   * - ingested -> indexing
+   * - reconciled -> indexing
    * - indexing -> indexing (no-op)
    * - all other statuses -> conflict
    *
    * @param {string} submissionUploadId Submission upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after transition to `indexing`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadToIndexing(submissionUploadId: string): Promise<void> {
-    const current = await this.getSubmissionUpload(submissionUploadId);
-
-    if (current.status === 'indexing') {
-      return;
-    }
-
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexing', ['ingested']);
-    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexing' });
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'indexing', ['reconciled']);
   }
 
   /**
@@ -325,27 +336,165 @@ export class SubmissionUploadService extends DBService {
    * - all other statuses -> conflict
    *
    * @param {string} submissionUploadId Submission upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after transition to `indexed`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadToIndexed(submissionUploadId: string): Promise<void> {
-    const current = await this.getSubmissionUpload(submissionUploadId);
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'indexed', ['indexing']);
+  }
 
-    if (current.status === 'indexed') {
-      return;
+  /**
+   * Transition an ingested upload into reconciliation, allowing idempotent resume.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves after transition to `reconciling`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
+   */
+  async transitionSubmissionUploadToReconciling(submissionUploadId: string): Promise<void> {
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciling', ['ingested']);
+  }
+
+  /**
+   * Complete reconciliation for a submission upload.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves after transition to `reconciled`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
+   */
+  async transitionSubmissionUploadToReconciled(submissionUploadId: string): Promise<void> {
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciled', ['reconciling']);
+  }
+
+  /**
+   * Record a review decision and apply its submission-feature lifecycle effects.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {UpdateSubmissionUploadReviewStatus} data Requested review decision.
+   * @returns {Promise<SubmissionUploadReviewStatus>} Persisted review status.
+   * @memberof SubmissionUploadService
+   */
+  async updateSubmissionUploadReviewStatus(
+    submissionUploadId: string,
+    data: UpdateSubmissionUploadReviewStatus
+  ): Promise<SubmissionUploadReviewStatus> {
+    const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
+
+    const currentReviewStatus = await this.submissionUploadReviewStatusService.getSubmissionUploadReviewStatus(
+      submissionUploadId
+    );
+
+    if (data.status === 'approved') {
+      return this.approveSubmissionUpload(upload, currentReviewStatus);
     }
 
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexed', ['indexing']);
-    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexed' });
+    return this.recordNonApprovalStatus(upload.submission_upload_id, data.status);
+  }
+
+  /**
+   * Validate and apply an approval, or return the existing decision idempotently.
+   *
+   * @param {SubmissionUpload} upload Locked submission upload.
+   * @param {SubmissionUploadReviewStatus} currentReviewStatus Current review decision.
+   * @returns {Promise<SubmissionUploadReviewStatus>} Approved review status.
+   * @memberof SubmissionUploadService
+   */
+  private async approveSubmissionUpload(
+    upload: SubmissionUpload,
+    currentReviewStatus: SubmissionUploadReviewStatus
+  ): Promise<SubmissionUploadReviewStatus> {
+    if (currentReviewStatus.status === 'approved') {
+      return currentReviewStatus;
+    }
+
+    await this.assertSubmissionUploadCanBeApproved(upload);
+    const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(this.connection);
+    await submissionUploadReconciliationService.activateSubmissionUploadReconciliation(upload.submission_upload_id);
+
+    // Feature activation changes the graph consumed by authorization. Remove the prior derived snapshot
+    // in the same transaction so readers can never combine newly-active features with stale closure
+    // self-loops. Until the asynchronous rebuild commits, canonical authorization fails closed.
+    await this.submissionFeatureClosureService.invalidateClosureForSubmission(upload.submission_id);
+
+    const approvedStatus = await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
+      submission_upload_id: upload.submission_upload_id,
+      status: 'approved'
+    });
+
+    await this.publishSubmissionFeatureClosure(upload, approvedStatus.submission_upload_status_id);
+    return approvedStatus;
+  }
+
+  /**
+   * Queue closure recomputation for one approved feature-state revision.
+   *
+   * @param {SubmissionUpload} upload Approved submission upload.
+   * @param {number} closureRevision Review-status revision used to make the queued job idempotent.
+   * @returns {Promise<void>} Resolves after the closure recomputation job has been queued transactionally.
+   * @memberof SubmissionUploadService
+   */
+  private async publishSubmissionFeatureClosure(upload: SubmissionUpload, closureRevision: number): Promise<void> {
+    await SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob(
+      this.connection,
+      {
+        submissionUploadId: upload.submission_upload_id
+      },
+      { singletonKey: `closure-recompute-${upload.submission_upload_id}-${closureRevision}` }
+    );
+  }
+
+  /**
+   * Persist a non-approval decision.
+   *
+   * @param {string} submissionUploadId Locked submission upload identifier.
+   * @param {Exclude<UpdateSubmissionUploadReviewStatus['status'], 'approved'>} status Requested decision.
+   * @returns {Promise<SubmissionUploadReviewStatus>} Persisted review status.
+   * @memberof SubmissionUploadService
+   */
+  private async recordNonApprovalStatus(
+    submissionUploadId: string,
+    status: Exclude<UpdateSubmissionUploadReviewStatus['status'], 'approved'>
+  ): Promise<SubmissionUploadReviewStatus> {
+    return this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
+      submission_upload_id: submissionUploadId,
+      status
+    });
+  }
+
+  /**
+   * Assert that upload processing and automated validation have completed before feature activation.
+   *
+   * @param {SubmissionUpload} upload Locked submission upload.
+   * @returns {Promise<void>} Resolves when processing and automated validation permit approval.
+   * @memberof SubmissionUploadService
+   */
+  private async assertSubmissionUploadCanBeApproved(upload: SubmissionUpload): Promise<void> {
+    if (upload.status !== 'indexed') {
+      throw new HTTP400('Submission upload must be indexed before approval');
+    }
+
+    if (upload.successor_submission_upload_id) {
+      throw new HTTP400('Submission upload has been superseded by a newer upload');
+    }
+
+    const submissionValidationService = new SubmissionValidationService(this.connection);
+    const validation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
+      upload.submission_upload_id
+    );
+
+    if (validation?.status !== 'completed') {
+      throw new HTTP400('Submission upload validation must be completed before approval');
+    }
   }
 
   /**
    * Soft-deletes a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId The ID of the record to soft-delete
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the active submission upload has been soft-deleted.
    * @memberof SubmissionUploadService
    */
   async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
+    await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
     return this.submissionUploadRepository.softDeleteSubmissionUpload(submissionUploadId);
   }
 
@@ -357,7 +506,25 @@ export class SubmissionUploadService extends DBService {
    * @memberof SubmissionUploadService
    */
   async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
+    await this.submissionUploadRepository.lockSubmissionUploadsForSubmissionId(submissionId);
+    await this.submissionUploadReviewStatusService.assertSubmissionHasNoActivatedFeatures(submissionId);
     return this.submissionUploadRepository.softDeleteSubmissionUploadsBySubmissionId(submissionId);
+  }
+
+  /**
+   * Assert that a submission upload can still be changed or removed.
+   *
+   * The upload row is locked before checking review status, matching approval lock ordering and
+   * preventing a concurrent approval from racing the immutability check.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves when the locked upload remains mutable.
+   * @throws {HTTP409} When the upload has already been approved.
+   * @memberof SubmissionUploadService
+   */
+  private async assertSubmissionUploadCanBeChanged(submissionUploadId: string): Promise<void> {
+    await this.getSubmissionUploadWithLock(submissionUploadId);
+    await this.submissionUploadReviewStatusService.assertSubmissionUploadHasNoActivatedFeatures(submissionUploadId);
   }
 
   /**
@@ -369,12 +536,13 @@ export class SubmissionUploadService extends DBService {
    *
    * @param {string} submissionUuid Submission UUID from the request path.
    * @param {string} submissionUploadId Submission upload UUID from the request path.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the upload, review status, and dedicated team are retired.
    * @throws {HTTP409} If the upload has already been reviewed.
    * @memberof SubmissionUploadService
    */
   async deleteSubmissionUpload(submissionUuid: string, submissionUploadId: string): Promise<void> {
     const submissionUpload = await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+    await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
     const reviewStatus = await this.submissionUploadReviewStatusService.getSubmissionUploadReviewStatus(
       submissionUploadId
     );
@@ -385,10 +553,13 @@ export class SubmissionUploadService extends DBService {
       );
     }
 
-    await this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
-    await this.submissionUploadReviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, {
+    // Record the status directly rather than routing through updateSubmissionUploadReviewStatus: that
+    // method drives reconciliation/activation of the upload's features, which a delete must not trigger.
+    await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
+      submission_upload_id: submissionUploadId,
       status: 'deleted'
     });
+    await this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
     await this.teamService.deleteTeam(submissionUpload.team_id);
   }
 }

@@ -8,6 +8,8 @@ export type SubmissionUploadJobStatus =
   | 'uploaded'
   | 'ingesting'
   | 'ingested'
+  | 'reconciling'
+  | 'reconciled'
   | 'indexing'
   | 'indexed'
   | 'invalid'
