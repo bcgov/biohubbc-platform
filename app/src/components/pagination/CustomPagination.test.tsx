@@ -52,6 +52,31 @@ describe('CustomPagination', () => {
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
+  it('shows a four-page window around the current page when available', () => {
+    const { getByRole, queryByRole } = render(<CustomPagination {...defaultProps} currentPage={5} lastPage={10} />);
+
+    [3, 4, 5, 6].forEach((page) => {
+      expect(getByRole('button', { name: new RegExp(`page ${page}`, 'i') })).toBeInTheDocument();
+    });
+    expect(queryByRole('button', { name: /page 7/i })).not.toBeInTheDocument();
+  });
+
+  it('always shows the final page instead of ending with an ellipsis', () => {
+    const { getByRole } = render(<CustomPagination {...defaultProps} currentPage={1} lastPage={99} />);
+
+    expect(getByRole('button', { name: /page 99/i })).toBeInTheDocument();
+  });
+
+  it('caps the leading page run before the ellipsis at four pages', () => {
+    const { getByRole, queryByRole } = render(<CustomPagination {...defaultProps} currentPage={1} lastPage={99} />);
+
+    [1, 2, 3, 4].forEach((page) => {
+      expect(getByRole('button', { name: new RegExp(`page ${page}`, 'i') })).toBeInTheDocument();
+    });
+    expect(queryByRole('button', { name: /page 5/i })).not.toBeInTheDocument();
+    expect(getByRole('button', { name: /page 99/i })).toBeInTheDocument();
+  });
+
   it('calls onPageSizeChange when the page size select changes', () => {
     const onPageSizeChange = vi.fn();
     const { getByRole } = render(<CustomPagination {...defaultProps} onPageSizeChange={onPageSizeChange} />);

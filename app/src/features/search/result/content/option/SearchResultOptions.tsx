@@ -1,6 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonList } from 'components/loading/SkeletonLoaders';
+import { SkeletonTable } from 'components/loading/SkeletonLoaders';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
@@ -39,26 +39,28 @@ export const SearchResultOptions = ({
   const hasResults = rows.length > 0;
 
   return (
-    <LoadingGuard
-      isLoading={isLoading}
-      isLoadingFallback={<SkeletonList />}
-      hasNoData={!hasResults}
-      hasNoDataFallback={
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-          <Typography variant="body2" color="text.secondary">
-            No results found
-          </Typography>
-        </Box>
-      }>
-      <ComponentSwitch<SEARCH_RESULT_VIEW>
-        switch={view}
-        components={{
-          [SEARCH_RESULT_VIEW.TABLE]: (
-            <SearchResultTableLayout results={rows} featureTypeProperties={featureTypeProperties} onClick={onClick} />
-          ),
-          [SEARCH_RESULT_VIEW.LIST]: <SearchResultCardLayout results={rows} onClick={onClick} />
-        }}
-      />
-    </LoadingGuard>
+    <Box data-testid="search-result-options-content" sx={{ width: '100%', minWidth: 0 }}>
+      <LoadingGuard
+        isLoading={isLoading}
+        isLoadingFallback={<SkeletonTable />}
+        hasNoData={!hasResults}
+        hasNoDataFallback={
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} width="100%" p={2}>
+            <Typography variant="body2" color="text.secondary">
+              No results found
+            </Typography>
+          </Box>
+        }>
+        <ComponentSwitch<SEARCH_RESULT_VIEW>
+          switch={view}
+          components={{
+            [SEARCH_RESULT_VIEW.TABLE]: (
+              <SearchResultTableLayout results={rows} featureTypeProperties={featureTypeProperties} onClick={onClick} />
+            ),
+            [SEARCH_RESULT_VIEW.LIST]: <SearchResultCardLayout results={rows} onClick={onClick} />
+          }}
+        />
+      </LoadingGuard>
+    </Box>
   );
 };

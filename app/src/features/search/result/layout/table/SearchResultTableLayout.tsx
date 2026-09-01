@@ -31,14 +31,6 @@ interface SearchResultTableLayoutProps {
  */
 export const SearchResultTableLayout = ({ results, featureTypeProperties, onClick }: SearchResultTableLayoutProps) => {
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
-    const renderEllipsisCell = (displayValue: string) => {
-      return (
-        <Typography variant="body2" noWrap title={displayValue} sx={{ width: '100%' }}>
-          {displayValue}
-        </Typography>
-      );
-    };
-
     const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map((property) => ({
       field: String(property.feature_type_property_id),
       headerName: property.display_name,
@@ -82,13 +74,6 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
             </Box>
           );
         }
-      },
-      {
-        field: 'submission_name',
-        headerName: 'Submission',
-        flex: 1,
-        sortable: true,
-        renderCell: (params) => renderEllipsisCell(typeof params.value === 'string' ? params.value : '')
       },
       ...propertyColumns
     ];

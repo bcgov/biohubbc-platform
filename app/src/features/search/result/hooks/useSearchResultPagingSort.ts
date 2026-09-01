@@ -1,5 +1,5 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { type SearchResultSortOption } from '../content/toolbar/SearchResultToolbar';
 
@@ -20,8 +20,16 @@ interface UseSearchResultPagingSortProps {
  * @returns Active sort field, toolbar sort options, and handlers for sort, page, and page-size changes.
  */
 export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSearchResultPagingSortProps) => {
-  const activeSort = pagination?.sort ?? 'relevancy_score';
-  const sortOrder = pagination?.order ?? 'desc';
+  const serverSort = pagination?.sort ?? 'relevancy_score';
+  const serverOrder = pagination?.order ?? 'desc';
+  const [optimisticSort, setOptimisticSort] = useState({ sort: serverSort, order: serverOrder });
+
+  useEffect(() => {
+    setOptimisticSort({ sort: serverSort, order: serverOrder });
+  }, [serverSort, serverOrder]);
+
+  const activeSort = optimisticSort.sort;
+  const sortOrder = optimisticSort.order;
 
   const sortOptions = useMemo<SearchResultSortOption[]>(
     () => [
@@ -44,6 +52,7 @@ export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSe
    */
   const handleSortChange = useCallback(
     (sort: string, direction: 'asc' | 'desc') => {
+      setOptimisticSort({ sort, order: direction });
       setSearchParams({ [URL_PARAMS.SORT]: sort, [URL_PARAMS.ORDER]: direction }, true);
     },
     [setSearchParams]

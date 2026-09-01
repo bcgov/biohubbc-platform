@@ -55,6 +55,7 @@ describe('SearchResultPanel', () => {
 
       expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Table' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'List' })).not.toBeInTheDocument();
     });
 
     it('does not build the map until the map view is first opened', () => {
@@ -82,9 +83,9 @@ describe('SearchResultPanel', () => {
     });
   });
 
-  describe('table and list views', () => {
-    it.each([SEARCH_RESULT_VIEW.TABLE, SEARCH_RESULT_VIEW.LIST])('renders results and pagination for %s', (view) => {
-      renderPanel(view);
+  describe('table view', () => {
+    it('renders results and pagination', () => {
+      renderPanel(SEARCH_RESULT_VIEW.TABLE);
 
       expect(screen.getByTestId('search-result-options')).toBeInTheDocument();
       expect(screen.queryByTestId('map-content')).not.toBeInTheDocument();

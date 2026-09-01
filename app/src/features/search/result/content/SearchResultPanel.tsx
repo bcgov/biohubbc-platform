@@ -97,7 +97,7 @@ export const SearchResultPanel = ({
 
   return (
     <Container
-      maxWidth="md"
+      maxWidth="lg"
       sx={{
         display: 'flex',
         flexDirection: 'column',
