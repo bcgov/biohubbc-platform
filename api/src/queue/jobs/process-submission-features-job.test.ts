@@ -63,7 +63,12 @@ describe('process-submission-features-job', () => {
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
-      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionUploadFeaturesForSubmissionUploadId')
+        .resolves();
+      sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'hasSubmissionFeaturesForSubmissionUploadId')
+        .resolves(false);
       sinon
         .stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId')
         .resolves([{ upload_archive_id: 'archive-1' }]);
@@ -72,7 +77,7 @@ describe('process-submission-features-job', () => {
     it('transitions uploaded -> ingesting -> ingested and publishes index job', async () => {
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       const publishStub = sinon
-        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'index-job-id' });
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
@@ -84,27 +89,31 @@ describe('process-submission-features-job', () => {
       expect(publishStub.calledOnce).to.be.true;
       expect(toIngestedStub.calledBefore(publishStub)).to.be.true;
       expect(publishStub.firstCall.args[1]).to.eql({
-        submissionId: 123,
         submissionUploadId: 'test-sub-upload-id'
       });
     });
 
-    it('finalizes upload as ingested when indexing publish throws (warn-and-commit)', async () => {
+    it('retries the process stage when transactional reconciliation enqueue fails', async () => {
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       sinon
-        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob')
         .rejects(new Error('pg-boss unavailable'));
 
-      await processSubmissionFeaturesJobHandler([createMockJob()]);
+      try {
+        await processSubmissionFeaturesJobHandler([createMockJob()]);
+        expect.fail('Expected enqueue failure');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
 
       const toIngestedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIngested as sinon.SinonStub;
       const updateValidationStub = SubmissionValidationService.prototype
         .updateSubmissionValidationStatus as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteFeaturesBySubmissionUploadId as sinon.SinonStub;
+        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
       expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(updateValidationStub.calledWith('test-job-id', 'completed')).to.be.true;
-      expect(deleteFeaturesStub.called).to.be.false;
+      expect(deleteFeaturesStub.calledOnceWith('test-sub-upload-id')).to.be.true;
     });
 
     it('marks upload invalid when ingestion returns deterministic validation errors', async () => {
@@ -118,7 +127,7 @@ describe('process-submission-features-job', () => {
         errors: [validationError]
       });
 
-      const publishStub = sinon.stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob');
+      const publishStub = sinon.stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob');
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
@@ -151,7 +160,7 @@ describe('process-submission-features-job', () => {
 
       const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteFeaturesBySubmissionUploadId as sinon.SinonStub;
+        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
       expect(toFailedStub.called).to.be.false;
       expect(deleteFeaturesStub.calledWith('test-sub-upload-id')).to.be.true;
     });
@@ -159,8 +168,11 @@ describe('process-submission-features-job', () => {
     it('rethrows original processing error when cleanup fails', async () => {
       const testError = new Error('S3 unavailable');
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').rejects(testError);
+      (
+        SubmissionFeatureIngestionService.prototype.hasSubmissionFeaturesForSubmissionUploadId as sinon.SinonStub
+      ).resolves(false);
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteFeaturesBySubmissionUploadId as sinon.SinonStub;
+        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
       deleteFeaturesStub.rejects(new Error('cleanup failed'));
 
       try {
@@ -169,6 +181,25 @@ describe('process-submission-features-job', () => {
       } catch (error) {
         expect(error).to.equal(testError);
       }
+    });
+
+    it('skips retained raw feature cleanup when promoted submission features already exist', async () => {
+      const testError = new Error('S3 unavailable');
+      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').rejects(testError);
+      (
+        SubmissionFeatureIngestionService.prototype.hasSubmissionFeaturesForSubmissionUploadId as sinon.SinonStub
+      ).resolves(true);
+
+      try {
+        await processSubmissionFeaturesJobHandler([createMockJob()]);
+        expect.fail('expected an error');
+      } catch (error) {
+        expect(error).to.equal(testError);
+      }
+
+      const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
+        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
+      expect(deleteFeaturesStub).not.to.have.been.called;
     });
 
     it('skips processing when current status is terminal', async () => {
@@ -192,7 +223,7 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       sinon
-        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'index-job-id' });
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
@@ -211,7 +242,7 @@ describe('process-submission-features-job', () => {
         .stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload')
         .resolves({ valid: true, errors: [] });
       sinon
-        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'index-job-id' });
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);

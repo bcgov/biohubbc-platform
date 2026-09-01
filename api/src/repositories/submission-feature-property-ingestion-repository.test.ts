@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
+import { isSubmissionFeatureActive } from './sql-fragments';
 import { SubmissionFeaturePropertyIngestionRepository } from './submission-feature-property-ingestion-repository';
 
 describe('SubmissionFeaturePropertyIngestionRepository', () => {
@@ -21,52 +22,66 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
-  describe('canonical property inserts', () => {
-    const cases: { name: string; method: keyof SubmissionFeaturePropertyIngestionRepository; stagedAlias: string }[] = [
+  describe('property table inserts', () => {
+    const cases: {
+      name: string;
+      method: keyof SubmissionFeaturePropertyIngestionRepository;
+      stagedAlias: string;
+      featureAlias: string;
+    }[] = [
       {
         name: 'timestamp',
         method: 'insertTimestampPropertiesBySubmissionUploadId',
-        stagedAlias: 'p'
+        stagedAlias: 'p',
+        featureAlias: 'feature'
       },
       {
         name: 'geometry',
         method: 'insertGeometryPropertiesBySubmissionUploadId',
-        stagedAlias: 'p'
+        stagedAlias: 'p',
+        featureAlias: 'feature'
       },
       {
         name: 'string',
         method: 'insertStringPropertiesBySubmissionUploadId',
-        stagedAlias: 'v'
+        stagedAlias: 'v',
+        featureAlias: 'feature'
       },
       {
         name: 'number',
         method: 'insertNumberPropertiesBySubmissionUploadId',
-        stagedAlias: 'v'
+        stagedAlias: 'v',
+        featureAlias: 'feature'
       },
       {
         name: 'boolean',
         method: 'insertBooleanPropertiesBySubmissionUploadId',
-        stagedAlias: 'v'
+        stagedAlias: 'v',
+        featureAlias: 'feature'
       },
       {
         name: 'code',
         method: 'insertCodePropertiesBySubmissionUploadId',
-        stagedAlias: 'c'
+        stagedAlias: 'c',
+        featureAlias: 'feature'
       },
       {
         name: 'feature',
         method: 'insertFeaturePropertiesBySubmissionUploadId',
-        stagedAlias: 'c'
+        stagedAlias: 'c',
+        featureAlias: 'src'
       },
       {
         name: 'taxon',
         method: 'insertTaxonPropertiesBySubmissionUploadId',
-        stagedAlias: 'c'
+        stagedAlias: 'c',
+        featureAlias: 'feature'
       },
       {
         name: 'artifact',
         method: 'insertArtifactPropertiesBySubmissionUploadId',
-        stagedAlias: 'n'
+        stagedAlias: 'n',
+        featureAlias: 'feature'
       }
     ];
 
@@ -83,6 +98,15 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
 
         const sqlText = sqlStub.firstCall.args[0].text as string;
         expect(sqlText).to.include(`${testCase.stagedAlias}.blueprint_feature_type_property_id`);
+        expect(sqlText).to.include('submission_feature');
+        expect(sqlText).to.include(
+          `${testCase.featureAlias}.submission_feature_id = ${testCase.stagedAlias}.submission_feature_id`
+        );
+        expect(sqlText).to.include(isSubmissionFeatureActive(testCase.featureAlias));
+        expect(sqlText).to.include('FROM submission_upload_feature staged');
+        expect(sqlText).to.include('staged.submission_upload_id =');
+        expect(sqlText).to.include(`staged.submission_feature_id = ${testCase.stagedAlias}.submission_feature_id`);
+        expect(sqlText).to.not.include(`${testCase.featureAlias}.submission_upload_id =`);
         expect(sqlText).to.not.include('bftp_audit');
       });
     }
@@ -114,6 +138,9 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('FROM submission_upload_feature staged');
+      expect(sqlText).to.include('staged.submission_feature_id IS NOT NULL');
+      expect(sqlText).to.include(isSubmissionFeatureActive('feature'));
       expect(sqlText).to.include('DELETE FROM submission_feature_property_artifact');
       expect(sqlText).to.not.include('DELETE FROM submission_feature_artifact');
     });
@@ -262,7 +289,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.populateFeatureCandidateStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.populateFeatureCandidateStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
@@ -272,8 +299,17 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include("WHERE v.property_type_name = 'feature'");
       expect(sqlText).to.include("jsonb_typeof(v.logical_value) = 'string'");
       expect(sqlText).to.include("regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::')");
-      expect(sqlText).to.include('LEFT JOIN submission_feature target');
-      expect(sqlText).to.include('target.source_id = p.parsed_source_id');
+      // Resolution prefers the same upload's live rows and falls back to the submission's
+      // published live rows, picking exactly one target.
+      expect(sqlText).to.include('LEFT JOIN LATERAL');
+      expect(sqlText).to.include('candidate.submission_id =');
+      expect(sqlText).to.include('candidate.source_id = p.parsed_source_id');
+      expect(sqlText).to.include(isSubmissionFeatureActive('candidate'));
+      expect(sqlText).to.include('LIMIT 1');
+      // Among published candidates, rows whose type is allowed for the property win —
+      // guards against cross-type source_id collisions picking a wrong-type row.
+      expect(sqlText).to.include('FROM feature_type_property_feature ftpf');
+      expect(sqlText).to.include('ftpf.target_feature_type_id = candidate.feature_type_id');
     });
   });
 
@@ -414,7 +450,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.recordReferenceErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.recordReferenceErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
@@ -437,22 +473,23 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       return sqlStub.firstCall.args[0].text as string;
     }
 
-    it('groups by source_id and emits one error row per collision', async () => {
+    it('groups by source_id and emits one error row per tarball-wide collision', async () => {
       const sqlText = await runAndGetSqlText();
 
       expect(sqlText).to.include('grouped_errors AS');
+      expect(sqlText).to.include('GROUP BY submission_upload_id, source_id');
       expect(sqlText).to.include('HAVING COUNT(*) > 1');
     });
 
-    it('excludes NULL source_ids and soft-deleted feature rows from the grouping', async () => {
+    it('excludes NULL source_ids from the retained upload grouping', async () => {
       const sqlText = await runAndGetSqlText();
 
+      expect(sqlText).to.include('FROM submission_upload_feature');
       expect(sqlText).to.include('source_id IS NOT NULL');
-      expect(sqlText).to.include('record_end_date IS NULL');
       expect(sqlText).to.not.include('NULLIF');
     });
 
-    it('labels rows DUPLICATE_FEATURE_SOURCE_ID and stores source_id in details jsonb', async () => {
+    it('labels rows DUPLICATE_FEATURE_SOURCE_ID and stores source_id in details', async () => {
       const sqlText = await runAndGetSqlText();
 
       expect(sqlText).to.include("'DUPLICATE_FEATURE_SOURCE_ID'");
@@ -568,10 +605,10 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('NOT EXISTS');
-      expect(sqlText).to.include('FROM submission_feature');
+      expect(sqlText).to.include('feature_scope AS');
       expect(sqlText).to.include('FROM submission_upload_staging_raw_property raw');
       expect(sqlText).to.include('raw.submission_upload_id');
-      expect(sqlText).to.include('raw.submission_feature_id = sf.submission_feature_id');
+      expect(sqlText).to.include('raw.submission_feature_id = staged_feature.submission_feature_id');
       expect(sqlText).to.include('raw.property_name = rp.property_name');
       expect(sqlText).to.not.include('present_properties AS');
       expect(sqlText).to.not.include('FROM submission_upload_staging_raw_property\n        WHERE submission_upload_id');
@@ -609,33 +646,45 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.recordUnresolvedParentErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.recordUnresolvedParentErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('WITH unresolved AS');
-      expect(sqlText).to.include('FROM unresolved');
-      expect(sqlText).to.include('GROUP BY unresolved.submission_upload_id');
+      expect(sqlText).to.include('WITH feature_scope AS');
+      expect(sqlText).to.include('invalid_parent AS');
+      expect(sqlText).to.include('FROM invalid_parent');
+      expect(sqlText).to.include('resolution.candidate_count <> 1');
       expect(sqlText).to.include('UNRESOLVED_PARENT');
+      expect(sqlText).to.include('AMBIGUOUS_PARENT');
+      // Resolution falls back to the submission's published live rows.
+      expect(sqlText).to.include('parent.submission_id =');
+      expect(sqlText).to.include(isSubmissionFeatureActive('parent'));
     });
   });
 
   describe('insertFeatureRelationshipsBySubmissionUploadId', () => {
-    it('ignores exact and inverse duplicate feature relationship conflicts', async () => {
+    it('rebuilds staged feature relationships and ignores exact and inverse duplicate conflicts', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.insertFeatureRelationshipsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.insertFeatureRelationshipsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('jsonb_array_elements');
-      expect(sqlText).to.include("sf.data -> 'content'");
+      expect(sqlText).to.include('FROM submission_upload_feature staged');
+      expect(sqlText).to.include('feature.submission_feature_id = staged.submission_feature_id');
+      expect(sqlText).to.include("feature.data -> 'content'");
+      expect(sqlText).to.include(isSubmissionFeatureActive('feature'));
       expect(sqlText).to.include('SELECT DISTINCT');
       expect(sqlText).to.include('FROM resolved');
-      expect(sqlText).to.include('target.source_id = e.reference_source_id');
-      expect(sqlText).to.include('target.submission_upload_id');
+      // Resolution picks exactly one target: same-upload live rows first, else the
+      // submission's published live rows.
+      expect(sqlText).to.include('CROSS JOIN LATERAL');
+      expect(sqlText).to.include('candidate.submission_id =');
+      expect(sqlText).to.include('candidate.source_id = e.reference_source_id');
+      expect(sqlText).to.include('LIMIT 1');
       expect(sqlText).to.include('ON CONFLICT DO NOTHING');
       expect(sqlText).to.not.include('ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING');
     });

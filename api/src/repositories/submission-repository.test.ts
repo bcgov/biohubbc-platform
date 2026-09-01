@@ -7,6 +7,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
+import { isSubmissionFeatureActive } from './sql-fragments';
 import { SubmissionFeatureRepository } from './submission-feature-repository';
 import {
   ISourceTransformModel,
@@ -25,66 +26,17 @@ import {
 chai.use(sinonChai);
 
 describe('SubmissionRepository', () => {
-  describe('insertSubmissionFeatureRecord', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
+  describe('submission feature state lock', () => {
+    afterEach(() => sinon.restore());
 
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+    it('locks the submission feature state with one repository call', async () => {
+      const sql = sinon.stub().resolves({ rowCount: 1, rows: [{}] });
+      const repository = new SubmissionRepository(getMockDBConnection({ sql }));
 
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
+      await repository.lockSubmissionFeatureStateForSubmissionId(12);
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const mockSurveyProperties = {
-        name: 'survey name',
-        start_date: '2023-12-22'
-      };
-
-      try {
-        await submissionRepository.insertSubmissionFeatureRecord(
-          1,
-          '123-456-789',
-          1,
-          '123-456-799',
-          'name',
-          mockSurveyProperties
-        );
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_feature_id: 5 }] } as any as Promise<
-        QueryResult<any>
-      >;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const mockSurveyProperties = {
-        name: 'survey name',
-        start_date: '2023-12-22'
-      };
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.insertSubmissionFeatureRecord(
-        1,
-        '123-456-789',
-        1,
-        '123-456-799',
-        'name',
-        mockSurveyProperties
-      );
-
-      expect(response.submission_feature_id).to.equal(5);
+      expect(sql).to.have.been.calledOnce;
+      expect(sql.firstCall.args[0].text).to.include('pg_advisory_xact_lock');
     });
   });
 
@@ -1164,85 +1116,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('unsetRecordDatesBySubmissionUploadId', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should set record effective dates for submission features from an upload', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [{ submission_feature_id: 1 }]
-      } as any as Promise<QueryResult<any>>;
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      await submissionFeatureRepository.setRecordEffectiveDateBySubmissionUploadId(
-        '550e8400-e29b-41d4-a716-446655440000'
-      );
-
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_effective_date = now()');
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = NULL');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
-      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
-    });
-
-    it('should set record end dates for submission features from an upload', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [{ submission_feature_id: 1 }]
-      } as any as Promise<QueryResult<any>>;
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      await submissionFeatureRepository.setRecordEndDateBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
-
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
-      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
-    });
-
-    it('should clear record dates for submission features from an upload', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [{ submission_feature_id: 1 }]
-      } as any as Promise<QueryResult<any>>;
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      await submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
-
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_effective_date = NULL');
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = NULL');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_id = $1');
-      expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_feature_id');
-    });
-
-    it('should throw when no rows are updated', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: sinon.stub().resolves(mockQueryResponse) });
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      try {
-        await submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
-
-        expect.fail('Expected ApiExecuteSQLError');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to unset submission feature record dates');
-      }
-    });
-  });
-
   describe('findSubmissionFeatures', () => {
     afterEach(() => {
       sinon.restore();
@@ -1499,7 +1372,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should delete relationship rows for features belonging to submission upload', async () => {
+    it('should delete relationship rows for the upload staged feature scope', async () => {
       const mockQueryResponse: QueryResult<never> = {
         rowCount: 5,
         rows: [],
@@ -1520,7 +1393,9 @@ describe('SubmissionRepository', () => {
       expect(sqlStub).to.have.been.calledOnce;
       const calledSql = sqlStub.args[0][0];
       expect(calledSql.text).to.include('submission_feature_feature');
-      expect(calledSql.text).to.include('submission_upload_id');
+      expect(calledSql.text).to.include('FROM submission_upload_feature staged');
+      expect(calledSql.text).to.include('staged.submission_feature_id');
+      expect(calledSql.text).to.include(isSubmissionFeatureActive('feature'));
     });
   });
 

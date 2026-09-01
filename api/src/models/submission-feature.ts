@@ -38,15 +38,6 @@ export const CreateSubmissionFeatureSchema = z.object({
 
 export type CreateSubmissionFeature = z.infer<typeof CreateSubmissionFeatureSchema>;
 
-export interface CreateSubmissionFeatureIngestionRecord {
-  submissionId: number;
-  submissionUploadId: string;
-  sourceId: string;
-  featureTypeName: string;
-  data: IFlattenedBlock;
-  dataByteSize: number;
-}
-
 export interface DroppedSubmissionFeatureReason {
   reason: 'unknown_feature_type_ignored' | 'feature_not_inserted';
   count: number;
@@ -60,15 +51,15 @@ export interface SubmissionFeatureBatchInsertResult {
   droppedReasons: DroppedSubmissionFeatureReason[];
 }
 
-export interface InsertSubmissionFeatureRecord {
-  submissionId: number;
-  submissionUploadId: string;
-  parentSubmissionFeatureId: number | null;
-  featureSourceId: string | null;
-  featureTypeName: string;
-  featureProperties: Record<string, unknown>;
-  dataByteSizeBytes: number;
-}
+/**
+ * Counts returned when revoking submission features and restoring predecessors.
+ */
+export const SubmissionFeatureRevocationResult = z.object({
+  revokedFeatureCount: z.number(),
+  restoredFeatureCount: z.number()
+});
+
+export type SubmissionFeatureRevocationResult = z.infer<typeof SubmissionFeatureRevocationResult>;
 
 /**
  * Flat submission feature structure matching SIMS IFlattenedBlock.
@@ -80,6 +71,7 @@ export interface IFlattenedBlock {
   properties: Record<string, unknown>;
   content: string[];
   parent: string | null;
+  universal_id?: string;
 }
 
 /**

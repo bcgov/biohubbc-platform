@@ -22,14 +22,13 @@ describe('indexSubmissionFeaturesJobHandler', () => {
   });
 
   const createMockJob = (
-    submissionId: number,
     submissionUploadId = 'submission-upload-1',
     id = 'job-1'
   ): PgBoss.Job<IIndexSubmissionFeaturesJobData> =>
     ({
       id,
       name: 'index-submission-features',
-      data: { submissionId, submissionUploadId }
+      data: { submissionUploadId }
     } as PgBoss.Job<IIndexSubmissionFeaturesJobData>);
 
   const stubConnections = () => {
@@ -45,13 +44,16 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
   beforeEach(() => {
     stubConnections();
-    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
+    const upload = {
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
-      status: 'ingested',
-      ticket_id: '11111111-1111-1111-1111-111111111111'
-    });
+      status: 'promoted',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
+    } as const;
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves(upload);
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadWithLock').resolves(upload);
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexing').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
@@ -66,7 +68,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
@@ -77,7 +79,6 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(toIndexedStub.calledWith('submission-upload-1')).to.be.true;
     expect(publishStub.calledOnce).to.be.true;
     expect(publishStub.firstCall.args[1]).to.deep.equal({
-      submissionId: 777,
       submissionUploadId: 'submission-upload-1'
     });
     // The closure recompute must be queued only after the upload reaches `indexed`.
@@ -94,7 +95,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
         errorSummaries: []
       });
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
     const publishStub =
@@ -105,12 +106,13 @@ describe('indexSubmissionFeaturesJobHandler', () => {
   });
 
   it('skips work when status is terminal', async () => {
-    (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
       status: 'indexed',
-      ticket_id: '11111111-1111-1111-1111-111111111111'
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
     });
 
     const indexStub = sinon.stub(
@@ -118,7 +120,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       'indexSubmissionPropertiesBySubmissionUploadId'
     );
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
@@ -126,12 +128,13 @@ describe('indexSubmissionFeaturesJobHandler', () => {
   });
 
   it('skips work when status is not index-startable', async () => {
-    (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
       status: 'uploaded',
-      ticket_id: '11111111-1111-1111-1111-111111111111'
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
     });
 
     const indexStub = sinon.stub(
@@ -139,7 +142,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       'indexSubmissionPropertiesBySubmissionUploadId'
     );
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
@@ -153,7 +156,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       .rejects(testError);
 
     try {
-      await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+      await indexSubmissionFeaturesJobHandler([createMockJob()]);
       expect.fail('expected throw');
     } catch (error) {
       expect(error).to.equal(testError);
@@ -164,30 +167,32 @@ describe('indexSubmissionFeaturesJobHandler', () => {
   });
 
   it('allows retry/resume when status is already indexing', async () => {
-    (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
       status: 'indexing',
-      ticket_id: '11111111-1111-1111-1111-111111111111'
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
     });
 
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     expect(indexStub.calledOnceWith(777, 'submission-upload-1')).to.be.true;
   });
 
   it('skips retry when status is failed because failed uploads restart from processing', async () => {
-    (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
       status: 'failed',
-      ticket_id: '11111111-1111-1111-1111-111111111111'
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
     });
 
     const indexStub = sinon.stub(
@@ -195,7 +200,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       'indexSubmissionPropertiesBySubmissionUploadId'
     );
 
-    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     expect(indexStub.called).to.be.false;
@@ -203,14 +208,30 @@ describe('indexSubmissionFeaturesJobHandler', () => {
   });
 
   it('processes multiple jobs in sequence', async () => {
+    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub)
+      .onFirstCall()
+      .resolves({
+        submission_upload_id: 'upload-1',
+        submission_id: 1,
+        upload_id: 'artifact-1',
+        status: 'promoted',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
+      })
+      .onSecondCall()
+      .resolves({
+        submission_upload_id: 'upload-2',
+        submission_id: 2,
+        upload_id: 'artifact-2',
+        status: 'promoted',
+        ticket_id: '22222222-2222-2222-2222-222222222222',
+        blueprint_id: 1
+      });
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
 
-    await indexSubmissionFeaturesJobHandler([
-      createMockJob(1, 'upload-1', 'job-1'),
-      createMockJob(2, 'upload-2', 'job-2')
-    ]);
+    await indexSubmissionFeaturesJobHandler([createMockJob('upload-1', 'job-1'), createMockJob('upload-2', 'job-2')]);
 
     expect(indexStub.callCount).to.equal(2);
     expect(indexStub.firstCall.calledWith(1, 'upload-1')).to.be.true;
@@ -252,7 +273,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     const job = {
       id: 'job-1',
       name: 'index-submission-features-failed',
-      data: { submissionId: 777, submissionUploadId: 'submission-upload-1' },
+      data: { submissionUploadId: 'submission-upload-1' },
       output: { message: 'failed after retries' }
     } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>;
 
@@ -264,7 +285,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('submission-upload-1', 'failed', ['ingested', 'indexing', 'failed'])).to.be
+    expect(transitionStatusStub.calledWith('submission-upload-1', 'failed', ['promoted', 'indexing', 'failed'])).to.be
       .true;
   });
 
@@ -277,7 +298,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     const job = {
       id: 'job-2',
       name: 'index-submission-features-failed',
-      data: { submissionId: 888, submissionUploadId: 'submission-upload-2' },
+      data: { submissionUploadId: 'submission-upload-2' },
       output: null
     } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>;
 
@@ -289,7 +310,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('submission-upload-2', 'failed', ['ingested', 'indexing', 'failed'])).to.be
+    expect(transitionStatusStub.calledWith('submission-upload-2', 'failed', ['promoted', 'indexing', 'failed'])).to.be
       .true;
   });
 });

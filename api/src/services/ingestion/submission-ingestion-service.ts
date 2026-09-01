@@ -101,11 +101,11 @@ export class SubmissionIngestionService {
     // we only reset rows produced by this upload attempt, not other uploads.
     await withConnection(async (connection) => {
       const featureIngestionService = new SubmissionFeatureIngestionService(connection);
-      await featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+      await featureIngestionService.deleteSubmissionUploadFeaturesForSubmissionUploadId(submissionUploadId);
     });
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
-      message: 'Deleted existing features by submission upload id',
+      message: 'Deleted existing raw staged features by submission upload id',
       submissionUploadId
     });
 

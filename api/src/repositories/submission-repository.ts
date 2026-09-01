@@ -1,6 +1,10 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import {
+  SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+  SUBMISSION_ACTIVE_STATE_LOCK_SEED
+} from '../constants/database-lock-keys';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
@@ -307,6 +311,24 @@ export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
  */
 export class SubmissionRepository extends BaseRepository {
   /**
+   * Lock the submission's active feature state for the current transaction.
+   *
+   * Reconciliation and activation use the same submission-scoped advisory lock so
+   * that a baseline cannot change while an upload is being classified or published.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async lockSubmissionFeatureStateForSubmissionId(submissionId: number): Promise<void> {
+    await this.connection.sql(SQL`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${SUBMISSION_ACTIVE_STATE_LOCK_PREFIX} || ':' || ${submissionId}::text, ${SUBMISSION_ACTIVE_STATE_LOCK_SEED})
+      );
+    `);
+  }
+
+  /**
    * Insert a new submission record.
    *
    * @param {ICreateSubmissionWithTeam} submissionData
@@ -422,64 +444,11 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission feature record.
-   * Features belong to a submission (submission_id) but are produced by a specific
-   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
-   * (append, replace).
+   * Delete feature relationships for the upload's staged feature scope.
    *
-   * @param {number} submissionId The ID of the submission.
-   * @param {string} submissionUploadId The submission_upload_id that produced these features.
-   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
-   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
-   * @param {string} featureTypeName The name of the feature type.
-   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @returns {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionFeatureRecord(
-    submissionId: number,
-    submissionUploadId: string,
-    parentSubmissionFeatureId: number | null,
-    featureSourceId: string | null,
-    featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties']
-  ): Promise<{ submission_feature_id: number }> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id,
-        source_id,
-        feature_type_id,
-        data,
-        record_effective_date
-      ) VALUES (
-        ${submissionId},
-        ${submissionUploadId},
-        ${parentSubmissionFeatureId},
-        ${featureSourceId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
-        ${featureProperties},
-        now()
-      )
-      RETURNING
-        submission_feature_id;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'SubmissionRepository->insertSubmissionFeatureRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Delete all feature relationships for one upload attempt.
+   * Relationship ownership follows the source feature. The staged scope includes
+   * unchanged source features owned by earlier uploads so their logical references
+   * can be repointed when a target is superseded.
    *
    * @param {string} submissionUploadId
    * @return {Promise<void>}
@@ -489,16 +458,19 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       DELETE FROM submission_feature_feature
       WHERE source_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      )
-      OR target_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `;
+        SELECT staged.submission_feature_id
+        FROM submission_upload_feature staged
+        JOIN submission_feature feature
+          ON feature.submission_feature_id = staged.submission_feature_id
+        WHERE staged.submission_upload_id = ${submissionUploadId}::uuid
+          AND staged.submission_feature_id IS NOT NULL
+          AND (
+            (feature.record_effective_date IS NULL AND feature.record_end_date IS NULL)
+            OR (`;
+    sqlStatement.append(isSubmissionFeatureActive('feature'));
+    sqlStatement.append(`)
+          )
+      );`);
 
     await this.connection.sql(sqlStatement);
   }

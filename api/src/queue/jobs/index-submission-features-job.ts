@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { INDEX_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
+import { IDBConnection } from '../../database/db';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
@@ -19,13 +20,10 @@ export const indexSubmissionFeaturesJobDependencies: IndexSubmissionFeaturesJobD
 /**
  * Payload carried by each `index-submission-features` queue job.
  *
- * The pair `(submissionId, submissionUploadId)` defines:
- * - the submission-level scope used by indexing routines
- * - the exact upload lifecycle row whose status is guarded and transitioned
+ * The upload ID is the sole queue identity. The handler resolves its submission
+ * scope from the locked database row.
  */
 export interface IIndexSubmissionFeaturesJobData {
-  /** The submission ID whose features should be indexed for search */
-  submissionId: number;
   /** The submission upload ID whose rows should be validated/indexed */
   submissionUploadId: string;
 }
@@ -49,7 +47,7 @@ function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): b
  * Determine whether indexing is allowed to start or resume from the current status.
  *
  * Indexing is allowed only from:
- * - `ingested`: first entry into the indexing stage
+ * - `promoted`: first entry into the indexing stage
  * - `indexing`: retry/resume of an interrupted indexing attempt
  *
  * @param {SubmissionUpload['status']} status Submission upload status.
@@ -71,40 +69,43 @@ function isIndexStartableSubmissionUploadStatus(status: SubmissionUpload['status
  * This method is intentionally idempotent for retries: if a job is retried while
  * already `indexing`, the stage is allowed to proceed again.
  *
+ * @param {IDBConnection} connection Active database connection.
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
- * @returns {Promise<boolean>} `true` when indexing should proceed; `false` when skipped by guard checks.
+ * @returns {Promise<SubmissionUpload | null>} Locked upload row when indexing should proceed; `null` when skipped.
  */
-async function initializeIndexSubmissionFeaturesStage(submissionUploadId: string, jobId: string): Promise<boolean> {
-  return withConnection(async (connection) => {
-    const submissionUploadService = new SubmissionUploadService(connection);
-    const currentUpload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
+async function initializeIndexSubmissionFeaturesStage(
+  connection: IDBConnection,
+  submissionUploadId: string,
+  jobId: string
+): Promise<SubmissionUpload | null> {
+  const submissionUploadService = new SubmissionUploadService(connection);
+  const currentUpload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
 
-    if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
-      defaultLog.info({
-        label: 'initializeIndexSubmissionFeaturesStage',
-        message: 'Skipping index job because submission upload is terminal',
-        jobId,
-        submissionUploadId,
-        status: currentUpload.status
-      });
-      return false;
-    }
+  if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
+    defaultLog.info({
+      label: 'initializeIndexSubmissionFeaturesStage',
+      message: 'Skipping index job because submission upload is terminal',
+      jobId,
+      submissionUploadId,
+      status: currentUpload.status
+    });
+    return null;
+  }
 
-    if (!isIndexStartableSubmissionUploadStatus(currentUpload.status)) {
-      defaultLog.warn({
-        label: 'initializeIndexSubmissionFeaturesStage',
-        message: 'Skipping index job because submission upload is not index-startable',
-        jobId,
-        submissionUploadId,
-        status: currentUpload.status
-      });
-      return false;
-    }
+  if (!isIndexStartableSubmissionUploadStatus(currentUpload.status)) {
+    defaultLog.warn({
+      label: 'initializeIndexSubmissionFeaturesStage',
+      message: 'Skipping index job because submission upload is not index-startable',
+      jobId,
+      submissionUploadId,
+      status: currentUpload.status
+    });
+    return null;
+  }
 
-    await submissionUploadService.transitionSubmissionUploadToIndexing(submissionUploadId);
-    return true;
-  });
+  await submissionUploadService.transitionSubmissionUploadToIndexing(submissionUploadId);
+  return currentUpload;
 }
 
 /**
@@ -114,21 +115,21 @@ async function initializeIndexSubmissionFeaturesStage(submissionUploadId: string
  * inside a DB connection scope and returns a normalized outcome describing whether
  * the upload is valid for indexing completion.
  *
+ * @param {IDBConnection} connection Active database connection.
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
  * @returns {Promise<SubmissionFeaturePropertyValidationOutcome>} Structured indexing outcome used for final status transition.
  */
 async function executeIndexSubmissionFeaturesIngestion(
+  connection: IDBConnection,
   submissionId: number,
   submissionUploadId: string
 ): Promise<SubmissionFeaturePropertyValidationOutcome> {
-  return withConnection(async (connection) => {
-    const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
-    return featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
-      submissionId,
-      submissionUploadId
-    );
-  });
+  const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
+  return featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
+    submissionId,
+    submissionUploadId
+  );
 }
 
 /**
@@ -140,6 +141,7 @@ async function executeIndexSubmissionFeaturesIngestion(
  *
  * This is the stage-commit step after heavy indexing work has finished.
  *
+ * @param {IDBConnection} connection Active database connection.
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
@@ -147,49 +149,47 @@ async function executeIndexSubmissionFeaturesIngestion(
  * @returns {Promise<void>}
  */
 async function finalizeIndexSubmissionFeaturesStage(
+  connection: IDBConnection,
   submissionId: number,
   submissionUploadId: string,
   jobId: string,
   outcome: SubmissionFeaturePropertyValidationOutcome
 ): Promise<void> {
-  await withConnection(async (connection) => {
-    const submissionUploadService = new SubmissionUploadService(connection);
+  const submissionUploadService = new SubmissionUploadService(connection);
 
-    if (outcome.status === 'invalid') {
-      await submissionUploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
+  if (outcome.status === 'invalid') {
+    await submissionUploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
 
-      defaultLog.warn({
-        label: 'finalizeIndexSubmissionFeaturesStage',
-        message: 'Index submission features job completed with validation errors',
-        jobId,
-        submissionId,
-        submissionUploadId,
-        errorCount: outcome.errorCount,
-        errorCounts: outcome.errorCounts
-      });
-
-      return;
-    }
-
-    await submissionUploadService.transitionSubmissionUploadToIndexed(submissionUploadId);
-
-    // Queue the closure recompute only on success, in the same transaction as the `indexed` transition.
-    // There is no upload status that tracks closure freshness, so binding the enqueue to this commit is
-    // what guarantees that reaching `indexed` always implies a recompute was queued — an `invalid` outcome
-    // leaves any prior closure rows untouched until re-indexing succeeds. The recompute is derived and
-    // idempotent, so the retry triggered by a rollback on any failure here is safe.
-    await indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob(connection, {
-      submissionId,
-      submissionUploadId
-    });
-
-    defaultLog.info({
+    defaultLog.warn({
       label: 'finalizeIndexSubmissionFeaturesStage',
-      message: 'Index submission features job completed successfully',
+      message: 'Index submission features job completed with validation errors',
       jobId,
       submissionId,
-      submissionUploadId
+      submissionUploadId,
+      errorCount: outcome.errorCount,
+      errorCounts: outcome.errorCounts
     });
+
+    return;
+  }
+
+  await submissionUploadService.transitionSubmissionUploadToIndexed(submissionUploadId);
+
+  // Queue the closure recompute only on success, in the same transaction as the `indexed` transition.
+  // There is no upload status that tracks closure freshness, so binding the enqueue to this commit is
+  // what guarantees that reaching `indexed` always implies a recompute was queued — an `invalid` outcome
+  // leaves any prior closure rows untouched until re-indexing succeeds. The recompute is derived and
+  // idempotent, so the retry triggered by a rollback on any failure here is safe.
+  await indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob(connection, {
+    submissionUploadId
+  });
+
+  defaultLog.info({
+    label: 'finalizeIndexSubmissionFeaturesStage',
+    message: 'Index submission features job completed successfully',
+    jobId,
+    submissionId,
+    submissionUploadId
   });
 }
 
@@ -201,25 +201,26 @@ async function finalizeIndexSubmissionFeaturesStage(
  * 2) execute indexing
  * 3) finalize lifecycle status
  *
- * If initialization returns `false`, processing is intentionally skipped without error.
+ * If initialization returns `null`, processing is intentionally skipped without error.
  *
- * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
  * @returns {Promise<void>}
  */
-async function runIndexSubmissionFeaturesStage(
-  submissionId: number,
-  submissionUploadId: string,
-  jobId: string
-): Promise<void> {
-  const shouldRun = await initializeIndexSubmissionFeaturesStage(submissionUploadId, jobId);
-  if (!shouldRun) {
-    return;
-  }
+async function runIndexSubmissionFeaturesStage(submissionUploadId: string, jobId: string): Promise<void> {
+  await withConnection(async (connection) => {
+    // The upload row lock is held through indexing and finalization. This prevents
+    // duplicate or expiry-overlap workers from concurrently deleting/rebuilding the
+    // same derived rows and makes the job payload's submission id non-authoritative.
+    const upload = await initializeIndexSubmissionFeaturesStage(connection, submissionUploadId, jobId);
+    if (!upload) {
+      return;
+    }
 
-  const outcome = await executeIndexSubmissionFeaturesIngestion(submissionId, submissionUploadId);
-  await finalizeIndexSubmissionFeaturesStage(submissionId, submissionUploadId, jobId, outcome);
+    const submissionId = upload.submission_id;
+    const outcome = await executeIndexSubmissionFeaturesIngestion(connection, submissionId, submissionUploadId);
+    await finalizeIndexSubmissionFeaturesStage(connection, submissionId, submissionUploadId, jobId, outcome);
+  });
 }
 
 /**
@@ -236,24 +237,22 @@ async function runIndexSubmissionFeaturesStage(
  */
 export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (jobs) => {
   for (const job of jobs) {
-    const { submissionId, submissionUploadId } = job.data;
+    const { submissionUploadId } = job.data;
 
     defaultLog.info({
       label: 'indexSubmissionFeaturesJobHandler',
       message: 'Processing index submission features job',
       jobId: job.id,
-      submissionId,
       submissionUploadId
     });
 
     try {
-      await runIndexSubmissionFeaturesStage(submissionId, submissionUploadId, job.id);
+      await runIndexSubmissionFeaturesStage(submissionUploadId, job.id);
     } catch (error) {
       defaultLog.error({
         label: 'indexSubmissionFeaturesJobHandler',
         message: 'Index submission features job failed',
         jobId: job.id,
-        submissionId,
         submissionUploadId,
         error
       });
@@ -278,7 +277,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
   jobs
 ) => {
   for (const job of jobs) {
-    const { submissionId, submissionUploadId } = job.data;
+    const { submissionUploadId } = job.data;
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IIndexSubmissionFeaturesJobData>).output;
@@ -286,7 +285,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
     await withConnection(async (connection) => {
       const submissionUploadService = new SubmissionUploadService(connection);
       await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
-        'ingested',
+        'promoted',
         'indexing',
         'failed'
       ]);
@@ -296,7 +295,6 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
       label: 'indexSubmissionFeaturesFailedHandler',
       message: 'Index submission features job failed after all retries',
       jobId: job.id,
-      submissionId,
       submissionUploadId,
       output: jobOutput ?? 'Job failed after all retries'
     });
