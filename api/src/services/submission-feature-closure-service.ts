@@ -23,9 +23,9 @@ export class SubmissionFeatureClosureService extends DBService {
    *
    * The closure is reachability over the union of parent and property (feature-reference) edges,
    * recomputed wholesale for the submission so it always reflects the current live feature graph across
-   * all of the submission's uploads rather than an accumulation of prior states. Reconciled uploads only
-   * carry new/changed features, so cross-upload edges (a live feature parented by or referencing an
-   * unchanged feature from an earlier upload) are part of the graph. Content edges are intentionally
+   * all of the submission's uploads rather than an accumulation of prior states. Successive uploads
+   * create new physical occurrences, so cross-upload edges (a live feature parented by or referencing a
+   * current feature from an earlier upload) are part of the graph. Content edges are intentionally
    * excluded (closing over parent + content is O(N^2)). Reachability is stored as directed
    * `(source, target)` rows probed in both directions: the composite `(source, target)` primary key
    * serves forward probes by source (auth's ancestor walk; what an evidence feature reaches), and a
@@ -48,11 +48,26 @@ export class SubmissionFeatureClosureService extends DBService {
    * @memberof SubmissionFeatureClosureService
    */
   async computeClosureForSubmission(submissionId: number): Promise<{ insertedCount: number }> {
-    await this.submissionFeatureClosureRepository.deleteClosureForSubmission(submissionId);
+    await this.submissionFeatureClosureRepository.invalidateClosureForSubmission(submissionId);
 
     const insertedCount = await this.submissionFeatureClosureRepository.computeClosureForSubmission(submissionId);
 
     return { insertedCount };
+  }
+
+  /**
+   * Invalidate the derived graph for a submission.
+   *
+   * Approval calls this after feature activation in the same transaction. Once committed, the
+   * absence of closure self-loops makes authorization fail closed until the asynchronous rebuild
+   * completes. Closure rows are derived state and are hard-deleted rather than temporally retired.
+   *
+   * @param {number} submissionId Submission identifier whose derived closure rows are removed.
+   * @returns {Promise<void>} Resolves after the submission's closure rows have been deleted.
+   * @memberof SubmissionFeatureClosureService
+   */
+  async invalidateClosureForSubmission(submissionId: number): Promise<void> {
+    await this.submissionFeatureClosureRepository.invalidateClosureForSubmission(submissionId);
   }
 
   /**

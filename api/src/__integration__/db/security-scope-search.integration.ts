@@ -1529,10 +1529,10 @@ describe('Security scope search (integration)', function () {
   // ── record_effective_date → search visibility ───────────────────────
 
   describe('record_effective_date → search visibility', () => {
-    // Read-path security reads the closure. The closure's active universe is record_end_date IS NULL only
-    // (it does NOT filter on record_effective_date), so the self-loop / ancestry rows exist regardless of
-    // approval; the effective-date predicate lives in isEffectivelySecured (sf_sec.record_effective_date
-    // <= now()). Each fixture seeds under a SHARED upload and rebuilds the closure before searching.
+    // Read-path security consumes closure ancestry as a materialized graph snapshot. Candidate search
+    // results still require an active feature occurrence, while ancestor targets are evaluated only through
+    // the lifecycle of their security assignments. Each fixture seeds under a shared upload and rebuilds
+    // the closure before searching.
     //
     // Per SIMSBIOHUB-1080 (#499), search results are filtered to active features
     // (isSubmissionFeatureActive: record_effective_date <= now() AND not end-dated). A draft (NULL) or
@@ -1591,10 +1591,10 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(featureId);
     });
 
-    it('does not hide an active child when its parent is secured but inactive (NULL date)', async () => {
-      // Parent has a security rule but NULL record_effective_date, so it is inactive: it is not a
-      // search result itself (SIMSBIOHUB-1080), and — because isEffectivelySecured only counts security
-      // from an active ancestor — it does not secure its child. The active, unsecured child stays visible.
+    it('hides an active child while its closure snapshot references a secured historical parent', async () => {
+      // The closure is built while the parent is current, then the parent is ended without rebuilding it.
+      // The historical parent is not itself a search result, but its enforcing security assignment still
+      // protects the child because the materialized snapshot establishes it as the child's ancestor.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
@@ -1605,15 +1605,44 @@ describe('Security scope search (integration)', function () {
         parentFeatureId: parent
       });
       await secureFeature(connection, parent);
-      await markFeatureUnapproved(parent);
-
       await rebuildClosure(uploadId);
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now()
+        WHERE submission_feature_id = ${parent};
+      `);
 
       const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.not.include(parent); // inactive → not a search result
-      expect(featureIds).to.include(child); // active + not effectively secured → visible
+      expect(featureIds).to.not.include(parent); // historical → not a search result
+      expect(featureIds).to.not.include(child); // closure ancestor has enforcing security → hidden
+    });
+
+    it('does not enforce an ended security assignment from a historical closure target', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const child = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: parent
+      });
+      await secureFeature(connection, parent);
+      await rebuildClosure(uploadId);
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now()
+        WHERE submission_feature_id = ${parent};
+      `);
+      await unsecureFeature(parent);
+
+      const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.not.include(parent);
+      expect(featureIds).to.include(child);
     });
 
     it('should hide child from anonymous when parent is secured and approved', async () => {

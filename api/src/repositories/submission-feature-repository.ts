@@ -108,8 +108,8 @@ export class SubmissionFeatureRepository extends BaseRepository {
    * ancestry has not been built yet, so the securing rules cannot be resolved — the UI then reveals
    * only that the feature is secured and exposes no sensitive detail.
    *
-   * Only active, non-end-dated security rows are counted, so draft or retired security never drives
-   * the UI.
+   * Only currently enforcing security assignments are counted. Closure targets are not independently
+   * filtered against feature lifecycle state because the closure is the graph snapshot being evaluated.
    *
    * @param {number} submissionFeatureId
    * @returns {Promise<SubmissionFeature>}
@@ -137,13 +137,12 @@ export class SubmissionFeatureRepository extends BaseRepository {
           SELECT ARRAY_REMOVE(ARRAY_AGG(DISTINCT sr.name ORDER BY sr.name), NULL)
           FROM submission_feature_closure c
           JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
-          JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
           JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id
           WHERE c.source_submission_feature_id = sf.submission_feature_id
             AND c.is_ancestor = true
-            AND sfs.record_end_date IS NULL
             AND sfs.status = 'active'
-            AND ${isSubmissionFeatureActive('sf_sec')}
+            AND sfs.record_effective_date <= now()
+            AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
         ), ARRAY[]::varchar[]) AS security_reasons
       FROM
         submission_feature sf

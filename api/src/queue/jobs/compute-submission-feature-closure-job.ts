@@ -3,6 +3,7 @@ import {
   SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
   SUBMISSION_ACTIVE_STATE_LOCK_SEED
 } from '../../constants/database-lock-keys';
+import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
@@ -40,8 +41,8 @@ export interface IComputeSubmissionFeatureClosureJobData {
  * Compute submission feature closure job handler.
  *
  * The closure is the precomputed directed reachability over the union of the submission's parent and
- * property (feature-reference) edges, spanning the submission's live rows across ALL uploads
- * (reconciled uploads only carry new/changed features, so cross-upload edges are part of the reach).
+ * property (feature-reference) edges, spanning the submission's live rows across all uploads.
+ * Successive uploads create new physical occurrences, so cross-upload edges are part of the reach.
  * It is recomputed wholesale so search can replace recursive edge traversal with indexed probes
  * against a flat `(source, target)` table. Content edges are intentionally excluded (parent + content
  * is O(N^2)). Reachability is stored as directed `(source, target)` rows probed in both directions:
@@ -71,20 +72,25 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
     });
 
     try {
-      await withConnection(async (conn) => {
-        const submissionUploadService = new SubmissionUploadService(conn);
+      await withConnection(async (connection) => {
+        const submissionUploadService = new SubmissionUploadService(connection);
         const upload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
         const submissionId = upload.submission_id;
         // The recompute is DELETE-all + recursive-CTE INSERT in one transaction. Wait for every
         // feature-state writer; every upload must reach the downstream security job.
-        await conn.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
+        await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
           SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
           submissionId,
           SUBMISSION_ACTIVE_STATE_LOCK_SEED
         ]);
 
-        const submissionFeatureClosureService = new SubmissionFeatureClosureService(conn);
+        const submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
         const result = await submissionFeatureClosureService.computeClosureForSubmission(submissionId);
+
+        // Anchor writers may have skipped this submission while closure was invalidated. Queue the
+        // existing derived-cache refresh only after the resolved graph has been rebuilt successfully.
+        const securityScopeService = new SecurityScopeService(connection);
+        await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
 
         defaultLog.info({
           label: 'computeSubmissionFeatureClosureJobHandler',
@@ -98,7 +104,7 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
         // Enqueue screening in the same transaction as the closure write so the job
         // is only visible if the closure rows commit. This guarantees AC1: screening
         // never starts before closure population is complete.
-        await computeSubmissionFeatureClosureJobDependencies.publishSubmissionUploadSecurityJob(conn, {
+        await computeSubmissionFeatureClosureJobDependencies.publishSubmissionUploadSecurityJob(connection, {
           submissionId,
           submissionUploadId
         });

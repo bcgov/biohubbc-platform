@@ -19,6 +19,7 @@ import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
+import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
@@ -29,6 +30,7 @@ export class SubmissionUploadService extends DBService {
   submissionUploadReviewStatusService: SubmissionUploadReviewStatusService;
   teamService: TeamService;
   submissionService: SubmissionService;
+  submissionFeatureClosureService: SubmissionFeatureClosureService;
 
   /** Mutable dependency bag used by tests to stub queue publication under ESM. */
   static readonly dependencies = {
@@ -48,6 +50,7 @@ export class SubmissionUploadService extends DBService {
     this.submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(connection);
     this.teamService = new TeamService(connection);
     this.submissionService = new SubmissionService(connection);
+    this.submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
   }
 
   /**
@@ -406,6 +409,11 @@ export class SubmissionUploadService extends DBService {
     await this.assertSubmissionUploadCanBeApproved(upload);
     const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(this.connection);
     await submissionUploadReconciliationService.activateSubmissionUploadReconciliation(upload.submission_upload_id);
+
+    // Feature activation changes the graph consumed by authorization. Remove the prior derived snapshot
+    // in the same transaction so readers can never combine newly-active features with stale closure
+    // self-loops. Until the asynchronous rebuild commits, canonical authorization fails closed.
+    await this.submissionFeatureClosureService.invalidateClosureForSubmission(upload.submission_id);
 
     const approvedStatus = await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
       submission_upload_id: upload.submission_upload_id,

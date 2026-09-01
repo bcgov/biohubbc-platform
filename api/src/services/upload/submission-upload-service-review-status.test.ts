@@ -6,6 +6,7 @@ import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { SubmissionFeatureRepository } from '../../repositories/submission-feature-repository';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
+import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
 import { SubmissionValidationService } from '../submission-validation-service';
 import { SubmissionUploadService } from './submission-upload-service';
 
@@ -34,6 +35,7 @@ describe('SubmissionUploadService review decisions', () => {
     sinon
       .stub(SubmissionFeatureRepository.prototype, 'getActivatedSubmissionFeatureCountBySubmissionUploadId')
       .resolves(0);
+    sinon.stub(SubmissionFeatureClosureService.prototype, 'invalidateClosureForSubmission').resolves();
   });
 
   afterEach(() => {
@@ -113,6 +115,13 @@ describe('SubmissionUploadService review decisions', () => {
 
       expect(result.status).to.equal('approved');
       expect(reconcileStub).to.have.been.calledOnceWith('550e8400-e29b-41d4-a716-446655440000');
+      expect(SubmissionFeatureClosureService.prototype.invalidateClosureForSubmission).to.have.been.calledOnceWith(1);
+      expect(reconcileStub).to.have.been.calledBefore(
+        SubmissionFeatureClosureService.prototype.invalidateClosureForSubmission as sinon.SinonStub
+      );
+      expect(SubmissionFeatureClosureService.prototype.invalidateClosureForSubmission).to.have.been.calledBefore(
+        insertStatusStub
+      );
       expect(updateUploadStub).not.to.have.been.called;
       expect(insertStatusStub).to.have.been.calledOnceWith({
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
