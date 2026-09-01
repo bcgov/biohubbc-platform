@@ -187,7 +187,7 @@ describe('SearchResultSearch', () => {
 
     await user.click(screen.getByPlaceholderText('Search...'));
     await addPropertyFilter('Species name');
-    await user.type(screen.getByLabelText('Value'), 'wolf');
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'wolf' } });
 
     await user.click(screen.getByRole('button', { name: /cancel/i }));
 

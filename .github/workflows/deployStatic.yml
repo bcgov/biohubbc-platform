@@ -95,16 +95,22 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the app image
       - name: Build and Push App Image
@@ -140,16 +146,22 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the database image using Docker
       - name: Build and Push Database Image
@@ -185,16 +197,22 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
       # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
-      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. The egress IP is logged here so
-      # failed and successful runs can be correlated with source IPs.
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
       - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
         run: |
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
-          echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
       # Build and push the database setup image using Docker
       - name: Build and Push Database Setup Image
@@ -230,6 +248,56 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Authenticate Docker with OpenShift registry.
+      # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
+      # oc login timeouts). In-step retries can't recover — the egress IP is fixed for the job's lifetime —
+      # so retryFailedJobs.yml re-runs the job on a fresh runner instead. It keys that retry on this step's
+      # name, so renaming the step disables the retry. The egress IP is logged here so failed and successful
+      # runs can be correlated with source IPs.
+      - name: Authenticate Docker with OpenShift registry
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
+        run: |
+          echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
+
+      # Build and push the API image using Docker
+      - name: Build and Push API Image
+        working-directory: api
+        run: |
+          docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
+          docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
+
+  buildAndPushMartinGateway:
+    name: Build Martin Gateway Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
+    env:
+      IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
+      BRANCH: ${{ github.base_ref || github.ref_name }}
+      APP_NAME: "biohub-platform-martin-gateway"
+    needs:
+      - checkoutRepo
+    steps:
+      # Load repo from cache
+      - name: Cache repo
+        uses: actions/cache@v5
+        id: cache-repo
+        env:
+          cache-name: cache-repo
+        with:
+          path: ${{ github.workspace }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Checkout the branch if not restored via cache
+      - name: Checkout Target Branch
+        if: steps.cache-repo.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
 
       # Authenticate Docker with OpenShift registry.
       # The registry route intermittently times out from some runner egress IPs (same source-IP drop as the
@@ -242,8 +310,8 @@ jobs:
           echo ${{ secrets.TOOLS_SA_TOKEN }} | docker login -u unused --password-stdin ${{ vars.OPENSHIFT_REGISTRY }}
 
       # Build and push the API image using Docker
-      - name: Build and Push API Image
-        working-directory: api
+      - name: Build and Push Martin Gateway Image
+        working-directory: martin-gateway
         run: |
           docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
           docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
@@ -263,6 +331,7 @@ jobs:
       - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
+      - buildAndPushMartinGateway
     steps:
       # Load repo from cache
       - name: Cache repo
@@ -278,6 +347,8 @@ jobs:
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Install oc (see .github/actions/setup-openshift-cli). Fork PRs have no secrets — oc commands will fail.
       - uses: ./.github/actions/setup-openshift-cli
@@ -320,6 +391,8 @@ jobs:
             --set-string biohub-platform-db.app.postgresUserPassword=${{ secrets.DATABASE_USER_PASSWORD }} \
             --set-string biohub-platform-db.app.postgresUserApi=${{ secrets.DATABASE_USER_API }} \
             --set-string biohub-platform-db.app.postgresUserApiPassword=${{ secrets.DATABASE_USER_API_PASSWORD }} \
+            --set-string biohub-platform-db.app.postgresUserMartin=${{ secrets.DATABASE_USER_MARTIN }} \
+            --set-string biohub-platform-db.app.postgresUserMartinPassword=${{ secrets.DATABASE_USER_MARTIN_PASSWORD }} \
             --set-string biohub-platform-db.app.postgresDb=${{ secrets.DATABASE_NAME }} \
             --set-string biohub-platform-db-setup.environment.ts=$TS \
             --set-string biohub-platform-db-setup.environment.changeId=$BUILD_TAG \
@@ -327,6 +400,8 @@ jobs:
             --set-string biohub-platform-api.environment.changeId=$BUILD_TAG \
             --set-string biohub-platform-queue.environment.ts=$TS \
             --set-string biohub-platform-queue.environment.changeId=$BUILD_TAG \
+            --set-string biohub-platform-martin.environment.ts=$TS \
+            --set-string biohub-platform-martin.environment.changeId=$BUILD_TAG \
             --wait --timeout=600s
           
           echo "Helm chart deployment completed for branch $BRANCH"
@@ -345,6 +420,8 @@ jobs:
     steps:
       - name: Checkout Target Branch
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-openshift-cli
         env:
@@ -359,7 +436,7 @@ jobs:
           set -e
           KEEP=3
           SUFFIX="-$BRANCH"
-          IMAGES="biohub-platform-app biohub-platform-api biohub-platform-db biohub-platform-db-setup"
+          IMAGES="biohub-platform-app biohub-platform-api biohub-platform-db biohub-platform-db-setup biohub-platform-martin-gateway"
           echo "Pruning image tags for environment $BRANCH in $TOOLS_NAMESPACE (keeping $KEEP most recent by date)"
           for IMAGE in $IMAGES; do
             echo "Checking image stream $IMAGE..."

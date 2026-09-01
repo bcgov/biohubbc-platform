@@ -3,10 +3,12 @@ import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
   ISearchAllFilters,
   ISearchPropertyFilters,
+  ISearchTaxonFilters,
   SearchFeatureResponse,
   SearchPropertyResponse,
   SearchResponse,
-  SearchSummaryResponse
+  SearchSummaryResponse,
+  SearchTaxonResponse
 } from 'interfaces/useSearchApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -58,6 +60,23 @@ export const useSearchApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Search local taxon records by filter.
+   *
+   * @param {ISearchTaxonFilters} filters - Search parameters
+   * @param {ApiPaginationRequestOptions} pagination
+   * @return {Promise<SearchTaxonResponse>} Matching local taxon records
+   */
+  const searchTaxon = async (
+    filters: ISearchTaxonFilters,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<SearchTaxonResponse> => {
+    const body = { filters, pagination };
+    const { data } = await axios.post<SearchTaxonResponse>('/api/search/taxon', body);
+
+    return data;
+  };
+
+  /**
    * Fetch all published features with optional search terms and pagination.
    *
    * @param {ISearchAllFilters} params
@@ -97,6 +116,7 @@ export const useSearchApi = (axios: AxiosInstance) => {
     searchFeatures,
     searchAll,
     searchProperties,
+    searchTaxon,
     searchSummary
   };
 };

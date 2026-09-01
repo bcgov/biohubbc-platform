@@ -5,6 +5,10 @@ export interface SearchParams {
   feature_type_name?: string;
 }
 
+export interface SearchTaxonFilters {
+  keyword?: string;
+}
+
 export interface WithCount<T> {
   data: T[];
   total: number;

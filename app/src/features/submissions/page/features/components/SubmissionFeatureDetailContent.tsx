@@ -12,18 +12,19 @@ import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { AlertBanner } from 'components/notifications/AlertBanner';
+import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
-import { IRelatedSubmissionFeature, ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
+import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { SubmissionFeatureProperties } from './SubmissionFeatureProperties';
-import { SubmissionFeatureRelated } from './SubmissionFeatureRelated';
+import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 
 interface SubmissionFeatureDetailContentProps {
   isLoading: boolean;
   feature?: ISubmissionFeature;
-  relatedFeatures: IRelatedSubmissionFeature[];
-  submissionId?: string;
+  submissionId: number;
+  /** Feature whose indexed properties the Properties section lists. */
+  submissionFeatureId: number;
   rootBreadcrumbLabel: string;
   rootBreadcrumbTo: string;
   submissionDetailBasePath: string;
@@ -35,8 +36,8 @@ interface SubmissionFeatureDetailContentProps {
 export const SubmissionFeatureDetailContent = ({
   isLoading,
   feature,
-  relatedFeatures,
   submissionId,
+  submissionFeatureId,
   rootBreadcrumbLabel,
   rootBreadcrumbTo,
   submissionDetailBasePath,
@@ -101,15 +102,18 @@ export const SubmissionFeatureDetailContent = ({
           </AlertBanner>
         )}
         <Stack spacing={3} py={4}>
-          <PageSection id="submission-feature-properties" label="Properties">
-            <SubmissionFeatureProperties data={feature?.data ?? {}} />
-          </PageSection>
-          <PageSection id="submission-feature-related" label="Related">
-            <SubmissionFeatureRelated
-              submissionId={submissionId}
-              relatedFeatures={relatedFeatures}
-              featureRouteBasePath={featureRouteBasePath}
-            />
+          <FeaturePropertiesSection
+            submissionId={submissionId}
+            submissionFeatureId={submissionFeatureId}
+            featureRouteBasePath={featureRouteBasePath}
+          />
+          <PageSection id="submission-feature-map" label="Map">
+            {feature && (
+              <SubmissionFeatureMap
+                submissionId={feature.submission_id}
+                submissionFeatureId={feature.submission_feature_id}
+              />
+            )}
           </PageSection>
         </Stack>
       </Container>

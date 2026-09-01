@@ -119,6 +119,7 @@ export const CreateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
 export const UpdateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'UpdateFeaturePropertyRequest',
   type: 'object',
+  additionalProperties: false,
   properties: {
     name: {
       type: 'string',

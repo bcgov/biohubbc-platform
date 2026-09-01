@@ -7,6 +7,7 @@ import {
   paginationRequestQueryParamSchema,
   paginationResponseSchema
 } from '../../../../../../openapi/schemas/pagination';
+import { submissionFeaturePropertyValueSchema } from '../../../../../../openapi/schemas/submission-feature-property-value';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
 import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
 import { getLogger } from '../../../../../../utils/logger';
@@ -71,7 +72,8 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'A paginated list of feature properties.',
+      description:
+        'A paginated list of feature properties. Scalar-typed values are strings; reference-typed values are structured objects carrying a display label and stable identifiers.',
       content: {
         'application/json': {
           schema: {
@@ -88,7 +90,7 @@ GET.apiDoc = {
                   properties: {
                     id: { type: 'string' },
                     property: { type: 'string' },
-                    value: { type: 'string' }
+                    value: submissionFeaturePropertyValueSchema
                   }
                 }
               },

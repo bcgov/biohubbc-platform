@@ -1,10 +1,12 @@
 import userEvent from '@testing-library/user-event';
 import { SearchPropertyResponse } from 'interfaces/useSearchApi.interface';
-import { act, fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from 'test-helpers/test-utils';
 import { ExpressionBuilder as BaseExpressionBuilder } from './ExpressionBuilder';
 import { SearchExpressionBuilder as ExpressionBuilder } from './SearchExpressionBuilder';
+import { useExpressionBuilderProperties } from './hooks/useExpressionBuilderProperties';
 
 const searchPropertiesMock = vi.hoisted(() => vi.fn());
+const searchTaxonMock = vi.hoisted(() => vi.fn());
 const searchSpeciesMock = vi.hoisted(() => vi.fn());
 const setSnackbarMock = vi.hoisted(() => vi.fn());
 let user: ReturnType<typeof userEvent.setup>;
@@ -27,7 +29,8 @@ const setupUser = () =>
 vi.mock('hooks/useApi', () => ({
   useApi: () => ({
     search: {
-      searchProperties: searchPropertiesMock
+      searchProperties: searchPropertiesMock,
+      searchTaxon: searchTaxonMock
     },
     taxonomy: {
       searchSpecies: searchSpeciesMock
@@ -148,9 +151,14 @@ describe('ExpressionBuilder', () => {
   beforeEach(() => {
     user = setupUser();
     searchPropertiesMock.mockReset();
+    searchTaxonMock.mockReset();
     searchSpeciesMock.mockReset();
     setSnackbarMock.mockReset();
     searchPropertiesMock.mockResolvedValue(defaultSearchPropertyResponse);
+    searchTaxonMock.mockResolvedValue({
+      taxonomy: [],
+      pagination: { total: 0, per_page: 25, current_page: 1, last_page: 1 }
+    });
     searchSpeciesMock.mockResolvedValue({ searchResponse: [] });
   });
 
@@ -210,6 +218,285 @@ describe('ExpressionBuilder', () => {
           feature_type_property_id: null,
           operator: 'ILike',
           value: 'wolf'
+        }
+      ]
+    });
+  });
+
+  it('selects taxon predicate values from local taxonomy search as numeric TSNs', async () => {
+    const onApply = vi.fn();
+
+    searchPropertiesMock.mockResolvedValue({
+      properties: {
+        string: [],
+        number: [],
+        boolean: [],
+        datetime: [],
+        taxon: [
+          {
+            feature_property_id: 7,
+            property_name: 'taxon_id',
+            property_display_name: 'Taxonomic identifier',
+            feature_property_type: 'taxon',
+            operators: ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom', 'Exists'],
+            relevancy_score: 5
+          }
+        ],
+        spatial: [],
+        code: []
+      },
+      pagination: {
+        total: 1,
+        per_page: 25,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
+    searchTaxonMock.mockResolvedValue({
+      taxonomy: [
+        {
+          taxon_id: 12,
+          itis_tsn: 180701,
+          itis_scientific_name: 'Ovis canadensis',
+          common_name: 'bighorn sheep',
+          rank: 'Species',
+          relevancy_score: 2
+        }
+      ],
+      pagination: { total: 1, per_page: 25, current_page: 1, last_page: 1 }
+    });
+
+    render(<ExpressionBuilder onApply={onApply} />);
+
+    await addPropertyFilter('Taxonomic identifier');
+    fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '180701' } });
+
+    expect(searchTaxonMock).not.toHaveBeenCalled();
+    expect(searchSpeciesMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
+    expect(searchTaxonMock).toHaveBeenLastCalledWith({ keyword: '180701' }, { page: 1, limit: 25 });
+    expect(searchSpeciesMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Taxon')).toHaveValue('180701');
+    fireEvent.click(await screen.findByRole('option', { name: 'Ovis canadensis' }));
+    expect(screen.getByLabelText('Taxon')).toHaveValue('Ovis canadensis');
+    await user.click(screen.getByRole('button', { name: /apply/i }));
+
+    expect(onApply).toHaveBeenCalledWith({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 7,
+          feature_type_property_id: null,
+          operator: 'Equals',
+          value: 180701
+        }
+      ]
+    });
+  });
+
+  it('preserves selected taxon predicate values when changing between value operators', async () => {
+    const onApply = vi.fn();
+
+    searchPropertiesMock.mockResolvedValue({
+      properties: {
+        string: [],
+        number: [],
+        boolean: [],
+        datetime: [],
+        taxon: [
+          {
+            feature_property_id: 7,
+            property_name: 'taxon_id',
+            property_display_name: 'Taxonomic identifier',
+            feature_property_type: 'taxon',
+            operators: ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom', 'Exists'],
+            relevancy_score: 5
+          }
+        ],
+        spatial: [],
+        code: []
+      },
+      pagination: {
+        total: 1,
+        per_page: 25,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
+    searchTaxonMock.mockResolvedValue({
+      taxonomy: [
+        {
+          taxon_id: 12,
+          itis_tsn: 180701,
+          itis_scientific_name: 'Ovis canadensis',
+          common_name: 'bighorn sheep',
+          rank: 'Species',
+          relevancy_score: 2
+        }
+      ],
+      pagination: { total: 1, per_page: 25, current_page: 1, last_page: 1 }
+    });
+
+    render(<ExpressionBuilder onApply={onApply} />);
+
+    await addPropertyFilter('Taxonomic identifier');
+    fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '180701' } });
+
+    await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole('option', { name: 'Ovis canadensis' }));
+
+    await selectOption(screen.getByRole('combobox', { name: 'Operator' }), 'descends from');
+
+    expect(screen.getByLabelText('Taxon')).toHaveValue('Ovis canadensis');
+    await user.click(screen.getByRole('button', { name: /apply/i }));
+
+    expect(onApply).toHaveBeenCalledWith({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 7,
+          feature_type_property_id: null,
+          operator: 'DescendsFrom',
+          value: 180701
+        }
+      ]
+    });
+  });
+
+  it('converts preserved scalar values to the selected property value type', async () => {
+    const onApply = vi.fn();
+
+    searchPropertiesMock.mockResolvedValue({
+      properties: {
+        string: [
+          {
+            feature_property_id: 15,
+            property_name: 'device_key',
+            property_display_name: 'Device Key',
+            feature_property_type: 'string',
+            operators: ['Equals', 'ILike', 'Exists'],
+            relevancy_score: 4
+          }
+        ],
+        number: [],
+        boolean: [],
+        datetime: [],
+        taxon: [
+          {
+            feature_property_id: 7,
+            property_name: 'taxon_id',
+            property_display_name: 'Taxonomic identifier',
+            feature_property_type: 'taxon',
+            operators: ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom', 'Exists'],
+            relevancy_score: 5
+          }
+        ],
+        spatial: [],
+        code: []
+      },
+      pagination: {
+        total: 2,
+        per_page: 25,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
+    searchTaxonMock.mockResolvedValue({
+      taxonomy: [],
+      pagination: { total: 0, per_page: 25, current_page: 1, last_page: 1 }
+    });
+
+    render(<ExpressionBuilder onApply={onApply} />);
+
+    await addPropertyFilter('Taxonomic identifier');
+    fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '179913' } });
+
+    await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
+    await selectOption(screen.getByRole('combobox', { name: 'Property' }), 'Device Key');
+
+    expect(screen.getByLabelText('Value')).toHaveValue('179913');
+    await user.click(screen.getByRole('button', { name: /apply/i }));
+
+    expect(onApply).toHaveBeenCalledWith({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 15,
+          feature_type_property_id: null,
+          operator: 'Equals',
+          value: '179913'
+        }
+      ]
+    });
+  });
+
+  it('accepts typed taxon TSNs that are not returned by local taxonomy search', async () => {
+    const onApply = vi.fn();
+
+    searchPropertiesMock.mockResolvedValue({
+      properties: {
+        string: [],
+        number: [],
+        boolean: [],
+        datetime: [],
+        taxon: [
+          {
+            feature_property_id: 7,
+            property_name: 'taxon_id',
+            property_display_name: 'Taxonomic identifier',
+            feature_property_type: 'taxon',
+            operators: ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom', 'Exists'],
+            relevancy_score: 5
+          }
+        ],
+        spatial: [],
+        code: []
+      },
+      pagination: {
+        total: 1,
+        per_page: 25,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
+    searchTaxonMock.mockResolvedValue({
+      taxonomy: [],
+      pagination: { total: 0, per_page: 25, current_page: 1, last_page: 0 }
+    });
+
+    render(<ExpressionBuilder onApply={onApply} />);
+
+    await addPropertyFilter('Taxonomic identifier');
+    fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '999999' } });
+
+    await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
+    expect(searchTaxonMock).toHaveBeenLastCalledWith({ keyword: '999999' }, { page: 1, limit: 25 });
+    await user.click(screen.getByRole('button', { name: /apply/i }));
+
+    expect(onApply).toHaveBeenCalledWith({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 7,
+          feature_type_property_id: null,
+          operator: 'Equals',
+          value: 999999
         }
       ]
     });
@@ -381,7 +668,7 @@ describe('ExpressionBuilder', () => {
     });
   });
 
-  it('sets a suggested species chip as taxon_id equals TSN without an extra property search when taxon_id is already loaded', async () => {
+  it('sets a suggested species chip as an Equals predicate on the taxon_id property using the species TSN without an extra property search when the taxon_id property is already loaded', async () => {
     const onApply = vi.fn();
 
     searchSpeciesMock.mockResolvedValue({
@@ -545,20 +832,20 @@ describe('ExpressionBuilder', () => {
   it('adds an editable predicate token from a suggested property chip', async () => {
     searchPropertiesMock.mockResolvedValue({
       properties: {
-        string: [],
-        number: [],
-        boolean: [],
-        datetime: [],
-        taxon: [
+        string: [
           {
             feature_property_id: 3,
-            property_name: 'species',
+            property_name: 'species_name',
             property_display_name: 'Species',
-            feature_property_type: 'taxon',
-            operators: ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom', 'Exists'],
+            feature_property_type: 'string',
+            operators: ['Equals', 'ILike', 'Exists'],
             relevancy_score: 5
           }
         ],
+        number: [],
+        boolean: [],
+        datetime: [],
+        taxon: [],
         spatial: [],
         code: []
       },
@@ -581,7 +868,7 @@ describe('ExpressionBuilder', () => {
     await user.click(await screen.findByText('Species'));
 
     expect(screen.getByRole('combobox', { name: 'Property' })).toHaveValue('Species');
-    expect(screen.getByRole('combobox', { name: 'Operator' })).toHaveValue('equals');
+    expect(screen.getByRole('combobox', { name: 'Operator' })).toHaveValue('contains, case-insensitive');
     expect(screen.getByLabelText('Value')).toHaveValue('');
     expect(screen.getByLabelText('Value')).toHaveAttribute('placeholder', 'Value');
     expect(screen.getByRole('button', { name: /apply/i })).toBeEnabled();
@@ -799,6 +1086,39 @@ describe('ExpressionBuilder', () => {
       fireEvent.click(within(listbox).getByRole('option', { name: 'Habitat name' }));
 
       expect(screen.getAllByRole('combobox', { name: 'Property' })[0]).toHaveValue('Habitat name');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels pending property searches and loads default property options once when search is cleared', async () => {
+    vi.useFakeTimers();
+    searchPropertiesMock.mockResolvedValue(defaultSearchPropertyResponse);
+
+    try {
+      const { result } = renderHook(() => useExpressionBuilderProperties(undefined, new Set(), true));
+
+      await flushAsyncUpdates();
+
+      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        result.current.refreshPropertyOptions('habitat');
+        result.current.refreshPropertyOptions('habita');
+        result.current.refreshPropertyOptions('');
+        result.current.refreshPropertyOptions('');
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(searchPropertiesMock).toHaveBeenCalledTimes(2);
+      expect(searchPropertiesMock.mock.calls.filter(([filters]) => Object.keys(filters).length === 0)).toHaveLength(2);
+      expect(searchPropertiesMock.mock.calls.filter(([filters]) => filters.keyword)).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }

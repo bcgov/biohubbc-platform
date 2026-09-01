@@ -10,7 +10,7 @@ import {
   SearchSummaryTaxon,
   SearchTaxonResult
 } from '../models/search';
-import { SearchParams, WithCount } from '../services/search-service.interface';
+import { SearchParams, SearchTaxonFilters, WithCount } from '../services/search-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { isSubmissionFeatureActive } from './sql-fragments';
@@ -114,23 +114,33 @@ export class SearchRepository extends BaseRepository {
   }
 
   /**
-   * Builds a query to find taxon records matching a search term.
-   * Searches against scientific name, common name, BC taxon code, and ITIS TSN.
+   * Builds a query to find local taxon records.
    *
-   * @param {string} keyword - The search term to match against
-   * @return {Knex.QueryBuilder} Query builder for finding taxon records
+   * @param {string} keyword - Taxon search keyword.
+   * @return {Knex.QueryBuilder} Query builder for finding local taxon records.
    * @memberof SearchRepository
    */
   private _makeFindTaxonQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
-    return knex('taxon')
-      .where((qb) => {
-        qb.whereILike('itis_scientific_name', `%${keyword}%`)
-          .orWhereILike('common_name', `%${keyword}%`)
-          .orWhereILike('bc_taxon_code', `%${keyword}%`)
-          .orWhereRaw('CAST(itis_tsn AS TEXT) ILIKE ?', [`%${keyword}%`]);
-      })
-      .select('taxon_id', knex.raw('itis_scientific_name'));
+    const searchTerm = keyword.trim();
+    const pattern = `%${searchTerm}%`;
+
+    const query = knex('taxon')
+      .select('taxon_id', 'itis_tsn', 'itis_scientific_name', 'common_name', 'rank', knex.raw('1.0 as relevancy_score'))
+      .whereNull('record_end_date')
+      .orderBy('relevancy_score', 'desc')
+      .orderBy('itis_scientific_name', 'asc');
+
+    if (searchTerm) {
+      query.where((qb) => {
+        qb.whereILike('itis_scientific_name', pattern)
+          .orWhereILike('common_name', pattern)
+          .orWhereILike('bc_taxon_code', pattern)
+          .orWhereRaw('itis_tsn::text ILIKE ?', [pattern]);
+      });
+    }
+
+    return query;
   }
 
   /**
@@ -214,17 +224,28 @@ export class SearchRepository extends BaseRepository {
   }
 
   /**
-   * Finds taxon records matching the search term with pagination support.
-   * Returns paginated results with total count.
+   * Finds local taxon records with pagination support.
    *
-   * @param {SearchParams} params - Object containing the search term
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
-   * @return {Promise<WithCount<SearchTaxonResult>>} Paginated taxon results and total count
+   * @param {SearchTaxonFilters} filters - Taxon search filters.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters.
+   * @return {Promise<WithCount<SearchTaxonResult>>} Paginated local taxon records and total count.
    * @memberof SearchRepository
    */
-  async findTaxon(params: SearchParams, pagination?: ApiPaginationOptions): Promise<WithCount<SearchTaxonResult>> {
-    const base = this._makeFindTaxonQuery(params.keyword);
-    const jsonbObject = `jsonb_build_object('taxon_id', taxon_id, 'itis_scientific_name', itis_scientific_name)`;
+  async findTaxon(
+    filters: SearchTaxonFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<WithCount<SearchTaxonResult>> {
+    const base = this._makeFindTaxonQuery(filters.keyword ?? '');
+    const jsonbObject = `
+      jsonb_build_object(
+        'taxon_id', taxon_id,
+        'itis_tsn', itis_tsn,
+        'itis_scientific_name', itis_scientific_name,
+        'common_name', common_name,
+        'rank', rank,
+        'relevancy_score', relevancy_score
+      )
+    `;
     const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
 
     const result = await this.connection.knex(query);
@@ -323,6 +344,7 @@ export class SearchRepository extends BaseRepository {
   async findTaxonSummary(params: SearchParams): Promise<SearchSummaryTaxon> {
     const knex = getKnex();
     const query = knex('taxon')
+      .whereNull('record_end_date')
       .whereILike('itis_scientific_name', `%${params.keyword}%`)
       .select(knex.raw('COUNT(*)::int as total'));
 

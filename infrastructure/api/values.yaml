@@ -40,7 +40,46 @@ app:
     caSecretName: "pgo-root-cacert"
     caSecretKey: "root.crt"
 
-  # Keycloak
+  # Martin tile token minting (SIMSBIOHUB-1102)
+  martin:
+    # Disabled by default: enabling mounts the martin-token-private secret, which is created
+    # manually per namespace (see infrastructure/martin/README.md), and a missing secret would
+    # leave the whole api pod stuck in ContainerCreating. Each environment opts in explicitly in
+    # the umbrella chart's values-{dev,test,prod,pr}.yaml once its secret exists.
+    enabled: false
+    # Secret holding the RS256 PRIVATE signing key. Created manually per namespace; see
+    # infrastructure/martin/README.md for the generation and rotation runbook.
+    privateKeySecretName: martin-token-private
+    privateKeySecretKey: private.pem
+    # Key id embedded in the token header, so the gateway can pick the right public key. It must
+    # match a `<kid>.pem` in the martin-token-public secret, and the kid the gateway verifies with.
+    #
+    # FALLBACK ONLY. In the umbrella chart this is overridden by `global.martin.keyId`, which the
+    # gateway reads too - one value, so the two cannot drift. Change it there, not here; this exists
+    # so the api chart still renders standalone.
+    keyId: "2026-07"
+    audience: biohub-tiles
+    issuer: biohub-api
+    # Tile token lifetime, seconds. Must not exceed contextTtlSeconds below: a token outliving its
+    # context would still verify against tiles the database has stopped generating. The API
+    # validates the pair on startup.
+    tokenTtlSeconds: 900
+    # Relative: the Martin Gateway is served on /martin of this environment's app hostname, so tiles
+    # are same origin and no per-environment host has to be threaded through.
+    externalUrl: /martin
+    # Per IP budget for the unauthenticated mint endpoint. Coarse on purpose: BC government
+    # networks NAT heavily.
+    mintRateLimit: 60
+    mintRateLimitWindowMinutes: 5
+    # Context lifetime, seconds. Enforced by the tile function on every tile and never extended by
+    # reuse. Must be at least tokenTtlSeconds, since a session stops re-minting once it holds a
+    # token.
+    contextTtlSeconds: 1800
+    # Maximum live (unexpired) contexts. Bounds the database growth an anonymous caller can force by
+    # varying the search per mint. At the cap a new context evicts the one closest to expiry rather
+    # than being refused, so no caller can lock the others out of new searches.
+    contextMaxLive: 200
+
   keycloak:
     host: "" # Keycloak login url
     realm: standard # Realm identifier or name

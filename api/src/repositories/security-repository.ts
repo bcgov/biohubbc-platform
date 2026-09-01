@@ -215,29 +215,32 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Attaches all of the given security rules to the given submission features.
    *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} securityRuleIds
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @param {number} submissionId ID of the submission that must own every affected feature.
+   * @param {number[]} submissionFeatureIds IDs of the submission features to secure.
+   * @param {number[]} securityRuleIds IDs of the security rules to apply.
+   * @returns {Promise<SubmissionFeatureSecurityRecord[]>} Inserted or promoted security assignments.
    * @memberof SecurityRepository
    */
   async applySecurityRulesToSubmissionFeatures(
+    submissionId: number,
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    // Dedupe inputs — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair
-    // appears twice in one INSERT ("cannot affect row a second time")
-    const queryValues = [...new Set(submissionFeatureIds)].flatMap((submissionFeatureId) => {
-      return [...new Set(securityRuleIds)].flatMap(
-        (securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`
-      );
-    });
+    const uniqueFeatureIds = [...new Set(submissionFeatureIds)];
+    const uniqueRuleIds = [...new Set(securityRuleIds)];
+    if (!uniqueFeatureIds.length || !uniqueRuleIds.length) {
+      return [];
+    }
 
     const insertSQL = SQL`
-      INSERT INTO
-        submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
-      VALUES `;
-
-    insertSQL.append(queryValues.join(', '));
+      INSERT INTO submission_feature_security
+        (submission_feature_id, security_rule_id, record_effective_date)
+      SELECT sf.submission_feature_id, rules.security_rule_id, NOW()
+      FROM submission_feature sf
+      CROSS JOIN unnest(${uniqueRuleIds}::integer[]) AS rules(security_rule_id)
+      WHERE sf.submission_feature_id = ANY(${uniqueFeatureIds}::integer[])
+        AND sf.submission_id = ${submissionId}
+    `;
     // A conflicting row may be a 'draft' inserted by automatic screening — manual application
     // must promote it to 'active' or the rule would silently remain unenforced. Rows already
     // 'active' are left untouched (and excluded from RETURNING) to avoid audit churn.
@@ -417,23 +420,34 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Removes the given security rules for a given set of given submission features.
    *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} removeRuleIds
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @param {number} submissionId ID of the submission that must own every affected feature.
+   * @param {number[]} submissionFeatureIds IDs of the submission features to update.
+   * @param {number[]} removeRuleIds IDs of the security rules to remove.
+   * @returns {Promise<SubmissionFeatureSecurityRecord[]>} Removed security assignments.
    * @memberof SecurityRepository
    */
   async removeSecurityRulesFromSubmissionFeatures(
+    submissionId: number,
     submissionFeatureIds: number[],
     removeRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds });
 
-    const queryBuilder = getKnex()
+    const knex = getKnex();
+    const featureBelongsToSubmission = knex
+      .queryBuilder()
+      .select(knex.raw('1'))
+      .from('submission_feature as sf')
+      .whereRaw('sf.submission_feature_id = sfs.submission_feature_id')
+      .where('sf.submission_id', submissionId);
+
+    const queryBuilder = knex
       .queryBuilder()
       .delete()
       .fromRaw('submission_feature_security sfs')
       .whereIn('sfs.submission_feature_id', submissionFeatureIds)
       .and.whereIn('sfs.security_rule_id', removeRuleIds)
+      .whereExists(featureBelongsToSubmission)
       .returning('*');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);

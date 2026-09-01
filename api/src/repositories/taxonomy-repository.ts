@@ -1,7 +1,12 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
-import { AddItisTaxonRecord, TaxonParentLinkRecord, TaxonRankPatchRecord, TaxonRecord } from '../models/taxon';
+import {
+  AddItisTaxonRecord,
+  FindTaxonFilters,
+  TaxonParentLinkRecord,
+  TaxonRankPatchRecord,
+  TaxonRecord
+} from '../models/taxon';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
 
@@ -29,13 +34,13 @@ const taxonRecordColumns = [
  */
 export class TaxonomyRepository extends BaseRepository {
   /**
-   * Get taxon records by TSN id.
+   * Find taxon records by TSN id.
    *
    * @param {number[]} tsnIds
-   * @return {*}  {Promise<TaxonRecord>}
+   * @return {*}  {Promise<TaxonRecord[]>}
    * @memberof TaxonomyRepository
    */
-  async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonRecord[]> {
+  async findTaxonByTsnIds(tsnIds: number[]): Promise<TaxonRecord[]> {
     if (!tsnIds.length) {
       return [];
     }
@@ -46,6 +51,41 @@ export class TaxonomyRepository extends BaseRepository {
       .from('taxon')
       .whereIn('itis_tsn', tsnIds)
       .whereNull('record_end_date');
+
+    const response = await this.connection.knex(queryBuilder, TaxonRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Find active taxon records matching a TSN or scientific name.
+   *
+   * Supplied values are matched directly against `itis_tsn` or, case-insensitively, against `itis_scientific_name`.
+   * Callers should treat an empty result as "not found".
+   *
+   * @param {FindTaxonFilters} filters
+   * @return {*}  {Promise<TaxonRecord[]>}
+   * @memberof TaxonomyRepository
+   */
+  async findTaxon(filters: FindTaxonFilters): Promise<TaxonRecord[]> {
+    if (filters.itis_tsn === undefined && filters.itis_scientific_name === undefined) {
+      return [];
+    }
+
+    const queryBuilder = getKnex()
+      .queryBuilder()
+      .select(taxonRecordColumns)
+      .from('taxon')
+      .whereNull('record_end_date')
+      .where((query) => {
+        if (filters.itis_tsn !== undefined) {
+          query.where('itis_tsn', filters.itis_tsn);
+        }
+
+        if (filters.itis_scientific_name !== undefined) {
+          query.orWhereRaw('LOWER(itis_scientific_name) = LOWER(?)', [filters.itis_scientific_name]);
+        }
+      });
 
     const response = await this.connection.knex(queryBuilder, TaxonRecord);
 
@@ -141,13 +181,6 @@ export class TaxonomyRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, TaxonRecord);
-
-    if (response.rowCount !== records.length) {
-      throw new ApiExecuteSQLError('Failed to insert new taxon records', [
-        'TaxonomyRepository->insertTaxonRecords',
-        `rowCount was ${response.rowCount}, expected rowCount = ${records.length}`
-      ]);
-    }
 
     return response.rows;
   }

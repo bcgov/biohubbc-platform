@@ -11,7 +11,7 @@ export const rootAPIDoc = {
   },
   servers: [
     {
-      url: 'http://localhost:6100/api',
+      url: 'http://localhost:6200/api',
       description: 'local api via docker'
     },
     {

@@ -62,6 +62,27 @@ export const ExpressionBuilderPropertySearch = ({
     setInputValue(value?.label ?? '');
   }, [hasControlledValue, value]);
 
+  // Use for autocomplete text edits so only direct typing refreshes remote property options.
+  const handleInputChange = (_: unknown, nextInputValue: string, reason: string) => {
+    if (reason !== 'input') {
+      setInputValue(nextInputValue);
+      return;
+    }
+
+    setInputValue(nextInputValue);
+    onSearchInputChange(nextInputValue);
+  };
+
+  // Use when a property is selected so the parent can reset the predicate draft.
+  const handleChange = (_: unknown, property: ExpressionBuilderProperty | null) => {
+    if (!property) {
+      return;
+    }
+
+    onSelectProperty(property);
+    setInputValue(hasControlledValue ? property.label : '');
+  };
+
   return (
     <InlineAutocomplete
       ariaLabel={ariaLabel}
@@ -78,23 +99,8 @@ export const ExpressionBuilderPropertySearch = ({
         option.feature_property_id === selectedValue.feature_property_id &&
         option.feature_type_property_id === selectedValue.feature_type_property_id
       }
-      onInputChange={(_, nextInputValue, reason) => {
-        if (reason !== 'input') {
-          setInputValue(nextInputValue);
-          return;
-        }
-
-        setInputValue(nextInputValue);
-        onSearchInputChange(nextInputValue);
-      }}
-      onChange={(_, property) => {
-        if (!property) {
-          return;
-        }
-
-        onSelectProperty(property);
-        setInputValue(hasControlledValue ? property.label : '');
-      }}
+      onInputChange={handleInputChange}
+      onChange={handleChange}
       placeholder={placeholder}
       startAdornment={
         showSearchIcon ? (

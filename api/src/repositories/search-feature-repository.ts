@@ -8,9 +8,12 @@ import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
   buildSecurityFilter,
+  codePropertyValueJson,
+  featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
-  isSubmissionFeatureActive
+  isSubmissionFeatureActive,
+  taxonPropertyValueJson
 } from './sql-fragments';
 
 /**
@@ -362,6 +365,13 @@ export class SearchFeatureRepository extends BaseRepository {
    * typed property tables. Multiple rows for the same property, or properties configured
    * as allow_multiple, are surfaced as JSON arrays.
    *
+   * Scalar-typed values are emitted as JSON scalars. Reference-typed values are emitted as
+   * structured objects carrying a display `label` plus stable identifiers, built by the shared
+   * `sql-fragments` builders so search rows and the feature-detail properties list agree:
+   * - taxon: `{ taxon_id, tsn, rank, label }`
+   * - code: `{ codeset_key, codeset_label, code_key, code_label, label }`
+   * - feature: `{ urn, label }`
+   *
    * @return {string} LEFT JOIN LATERAL SQL fragment
    */
   private buildTypedPropertiesLateralJoinSql(): string {
@@ -392,6 +402,9 @@ export class SearchFeatureRepository extends BaseRepository {
             JOIN feature_property fp
               ON fp.feature_property_id = ftp.feature_property_id
              AND fp.record_end_date IS NULL
+            JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+             AND fpt.name = 'number'
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -463,7 +476,7 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_code_id AS ordinal,
-              to_jsonb(ccc.label) AS value
+              ${codePropertyValueJson('ccc', 'cs')} AS value
             FROM submission_feature_property_code p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id
@@ -474,6 +487,9 @@ export class SearchFeatureRepository extends BaseRepository {
              AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
+             AND ccc.record_end_date IS NULL
+            JOIN contributor_codeset cs
+              ON cs.contributor_codeset_id = ccc.contributor_codeset_id
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -483,7 +499,7 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_taxon_id AS ordinal,
-              to_jsonb(t.itis_scientific_name) AS value
+              ${taxonPropertyValueJson('t')} AS value
             FROM submission_feature_property_taxon p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id
@@ -492,8 +508,12 @@ export class SearchFeatureRepository extends BaseRepository {
             JOIN feature_property fp
               ON fp.feature_property_id = ftp.feature_property_id
              AND fp.record_end_date IS NULL
+            JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+             AND fpt.name = 'taxon'
             JOIN taxon t
               ON t.taxon_id = p.taxon_id
+             AND t.record_end_date IS NULL
             WHERE p.submission_feature_id = sf.submission_feature_id
 
             UNION ALL
@@ -521,7 +541,7 @@ export class SearchFeatureRepository extends BaseRepository {
               ftp.sort,
               ftp.allow_multiple,
               p.submission_feature_property_feature_id AS ordinal,
-              to_jsonb(referenced_sf.urn) AS value
+              ${featureReferencePropertyValueJson('referenced_sf')} AS value
             FROM submission_feature_property_feature p
             JOIN feature_type_property ftp
               ON ftp.feature_type_property_id = p.feature_type_property_id

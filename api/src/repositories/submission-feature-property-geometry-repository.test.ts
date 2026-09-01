@@ -115,4 +115,51 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       expect(result).to.eql([mockRow]);
     });
   });
+
+  describe('getActiveGeometryExtent', () => {
+    it('returns the combined bounds and count', async () => {
+      const sqlStub = sinon.stub().callsFake((statement: any) => {
+        expect(statement.text).to.contain('ST_Extent');
+        // Both identifiers constrain the query, so a feature id from another submission cannot match.
+        expect(statement.values).to.eql([12, 34]);
+        return Promise.resolve(
+          mockQueryResult([{ min_x: -125.1, min_y: 49.1, max_x: -125.0, max_y: 49.2, geometry_count: 3 }])
+        );
+      });
+      const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.getActiveGeometryExtent(12, 34);
+
+      expect(result).to.eql({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 3 });
+    });
+
+    it('excludes inactive features and retired property definitions', async () => {
+      const sqlStub = sinon.stub().callsFake((statement: any) => {
+        expect(statement.text).to.contain('record_effective_date <= now()');
+        expect(statement.text).to.contain('ftp.record_end_date IS NULL');
+        expect(statement.text).to.contain('fp.record_end_date IS NULL');
+        return Promise.resolve(
+          mockQueryResult([{ min_x: null, min_y: null, max_x: null, max_y: null, geometry_count: 0 }])
+        );
+      });
+      const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
+
+      await repository.getActiveGeometryExtent(12, 34);
+    });
+
+    it('returns null bounds when the feature has no active spatial properties', async () => {
+      const repository = new SubmissionFeaturePropertyGeometryRepository(
+        getMockDBConnection({
+          sql: () =>
+            Promise.resolve(
+              mockQueryResult([{ min_x: null, min_y: null, max_x: null, max_y: null, geometry_count: 0 }])
+            )
+        })
+      );
+
+      const result = await repository.getActiveGeometryExtent(12, 34);
+
+      expect(result).to.eql({ bbox: null, geometry_count: 0 });
+    });
+  });
 });

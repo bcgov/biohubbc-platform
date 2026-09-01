@@ -95,7 +95,7 @@ describe('TaxonomyRepository (integration)', function () {
     });
   });
 
-  describe('getTaxonByTsnIds', () => {
+  describe('findTaxonByTsnIds', () => {
     it('should retrieve inserted taxon records by TSN', async () => {
       const tsn = 777777;
       await repo.insertTaxonRecords([
@@ -109,14 +109,14 @@ describe('TaxonomyRepository (integration)', function () {
         }
       ]);
 
-      const results = await repo.getTaxonByTsnIds([tsn]);
+      const results = await repo.findTaxonByTsnIds([tsn]);
 
       expect(results).to.be.an('array').with.lengthOf(1);
       expect(results[0].itis_tsn).to.equal(tsn);
     });
 
     it('should return empty array for non-existent TSN', async () => {
-      const results = await repo.getTaxonByTsnIds([0]);
+      const results = await repo.findTaxonByTsnIds([0]);
 
       expect(results).to.be.an('array').with.lengthOf(0);
     });
@@ -148,7 +148,7 @@ describe('TaxonomyRepository (integration)', function () {
 
       await repo.updateTaxonParentLinks([{ itis_tsn: childTsn, parent_itis_tsn: parentTsn }]);
 
-      const [child] = await repo.getTaxonByTsnIds([childTsn]);
+      const [child] = await repo.findTaxonByTsnIds([childTsn]);
 
       expect(child.parent_itis_tsn).to.equal(parentTsn);
       expect(child.parent_taxon_id).to.equal(parent.taxon_id);

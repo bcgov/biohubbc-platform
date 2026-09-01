@@ -5,6 +5,7 @@ import { getKnex } from '../database/db';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { SearchFeatureRepository } from './search-feature-repository';
+import { codePropertyValueJson, featureReferencePropertyValueJson, taxonPropertyValueJson } from './sql-fragments';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -127,9 +128,55 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_code');
       expect(sql).to.include('submission_feature_property_taxon');
       expect(sql).to.include('submission_feature_property_feature');
+      expect(sql).to.include("fpt.name = 'number'");
+      expect(sql).to.include("fpt.name = 'taxon'");
+      expect(sql).to.include(`${taxonPropertyValueJson('t')} AS value`);
       expect(sql).to.include('contributor_codeset_code');
       expect(sql).to.include('public.ST_AsGeoJSON');
       expect(sql).to.include('referenced_sf.urn');
+    });
+
+    it('should hydrate taxon-valued properties as structured values built by the shared fragment', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      // The taxon branch emits the same object as the feature-detail properties read path
+      expect(sql).to.include(taxonPropertyValueJson('t'));
+      expect(sql).to.not.include('to_jsonb(t.itis_scientific_name)');
+      // ...and hides end-dated taxa, so search and feature detail agree on which rows exist
+      expect(sql).to.include('t.record_end_date IS NULL');
+    });
+
+    it('should hydrate code-valued properties as structured values with their codeset', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include(codePropertyValueJson('ccc', 'cs'));
+      expect(sql).to.include('JOIN contributor_codeset cs');
+      expect(sql).to.include('ON cs.contributor_codeset_id = ccc.contributor_codeset_id');
+      expect(sql).to.not.include('to_jsonb(ccc.label)');
+      // ...and hides end-dated codes, so search and feature detail agree on which rows exist
+      expect(sql).to.include('ccc.record_end_date IS NULL');
+    });
+
+    it('should hydrate feature-valued properties as structured values carrying the referenced urn', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ knex: knexSpy });
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include(featureReferencePropertyValueJson('referenced_sf'));
+      expect(sql).to.not.include('to_jsonb(referenced_sf.urn)');
     });
   });
 
@@ -228,8 +275,9 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('NOT EXISTS');
       expect(sql).to.include('team_member');
       expect(sql).to.include('security_scope_anchor');
-      // anchor-only: no direct URN scope grant probe is emitted (consistent with the visible-results filter)
-      expect(sql).to.not.include('urn_submission_id');
+      // Cached anchors are revalidated against their immutable scope components before granting.
+      expect(sql).to.include('urn_submission_id');
+      expect(sql).to.include('anchor_sf');
       // "unfiltered" drops only the access/security filter, never validity: the candidate set still
       // requires active features (isSubmissionFeatureActive → record_effective_date / record_end_date).
       expect(sql).to.include('record_effective_date');

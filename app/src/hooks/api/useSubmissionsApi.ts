@@ -1,7 +1,6 @@
 import { AxiosInstance } from 'axios';
 import {
   ICreateSubmission,
-  IGetDownloadSubmissionResponse,
   IGetSubmissionsForUserResponse,
   ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
@@ -22,49 +21,18 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
  */
 const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
-   * repackages and retrieves json data from self and each child under submission
+   * Fetch the paginated submission features visible to the requesting user.
    *
-   * @async
-   * @returns {Promise<IGetDownloadSubmissionResponse[]>} json data repackaged from each level of children
-   */
-  const getSubmissionDownloadPackage = async (submissionId: number): Promise<IGetDownloadSubmissionResponse[]> => {
-    const { data } = await axios.get(`/api/submission/${submissionId}/download`);
-
-    return data;
-  };
-
-  /**
-   * repackages and retrieves json data from self and each child under submission for published data
-   *
-   * @async
-   * @returns {Promise<IGetDownloadSubmissionResponse[]>} json data repackaged from each level of children
-   */
-  const getSubmissionPublishedDownloadPackage = async (
-    submissionId: number
-  ): Promise<IGetDownloadSubmissionResponse[]> => {
-    const { data } = await axios.get(`/api/submission/${submissionId}/published/download`);
-
-    return data;
-  };
-
-  /**
-   * For the given submission, fetches all features for a submission (flat),
-   * with server-side pagination + sorting support.
-   *
-   * @param {number} submissionId
-   * @param {ApiPaginationRequestOptions} pagination
-   * @return {Promise<ISubmissionFeatureForReviewResponse>}
+   * @param {number} submissionId ID of the submission whose features should be returned.
+   * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
+   * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated visible submission features.
    */
   const getSubmissionFeatures = async (
     submissionId: number,
-    pagination?: ApiPaginationRequestOptions & { search?: string }
+    pagination?: ApiPaginationRequestOptions
   ): Promise<ISubmissionFeatureForReviewResponse> => {
-    const params = {
-      ...pagination
-    };
-
-    const { data } = await axios.get(`/api/submission/${submissionId}/features`, {
-      params,
+    const { data } = await axios.get(`/api/submission/${submissionId}/feature`, {
+      params: pagination,
       paramsSerializer: (params) => qs.stringify(params)
     });
 
@@ -199,8 +167,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   return {
-    getSubmissionDownloadPackage,
-    getSubmissionPublishedDownloadPackage,
     getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
     getUnreviewedSubmissionsForAdmins,

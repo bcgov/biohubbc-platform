@@ -3631,2507 +3631,2991 @@
   "property_string": [
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 122,
+      "feature_type_name": "survey",
+      "property_name": "name",
       "value": "Boreal Moose"
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 123,
+      "feature_type_name": "survey",
+      "property_name": "partnerships",
       "value": "BC Ministry of Water, Land and Resource Stewardship; Fort Nelson First Nation"
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 124,
+      "feature_type_name": "survey",
+      "property_name": "description",
       "value": "GPS-collar telemetry study monitoring boreal moose movement, survival, and habitat use in the boreal region of northeastern British Columbia (2015-2017)."
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 126,
+      "feature_type_name": "survey",
+      "property_name": "objectives",
       "value": "Collaring Moose "
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 127,
+      "feature_type_name": "survey",
+      "property_name": "eco_variables",
       "value": "Snow depth, browse availability, predator density, seismic line density"
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 129,
+      "feature_type_name": "survey",
+      "property_name": "indigenous_partnerships",
       "value": "Fort Nelson First Nation Lands Department"
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 130,
+      "feature_type_name": "survey",
+      "property_name": "stakeholder_partnerships",
       "value": "Canadian Association of Petroleum Producers wildlife program"
     },
     {
       "feature_uuid": "e49833af-cdb4-4da7-a7a9-f147e420d3d8",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Chest Girth"
     },
     {
       "feature_uuid": "e49833af-cdb4-4da7-a7a9-f147e420d3d8",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Chest girth measured behind the forelegs, in centimetres."
     },
     {
       "feature_uuid": "6fceecdf-791a-4672-b35b-463e6d0cc493",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Hind Leg Length"
     },
     {
       "feature_uuid": "6fceecdf-791a-4672-b35b-463e6d0cc493",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Hind leg length measured from hock to hoof, in centimetres."
     },
     {
       "feature_uuid": "6654c07e-f912-4dfc-9dfb-a8ad0ed3e32c",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Chest Girth"
     },
     {
       "feature_uuid": "6654c07e-f912-4dfc-9dfb-a8ad0ed3e32c",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Chest girth measured behind the forelegs, in centimetres."
     },
     {
       "feature_uuid": "e315e4db-862a-45cb-a6de-964200dc824b",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "e315e4db-862a-45cb-a6de-964200dc824b",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Total body mass recorded at capture, in kilograms."
     },
     {
       "feature_uuid": "79bbb6f4-dee5-43a2-b1e0-1f5ec8671f80",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Hind Leg Length"
     },
     {
       "feature_uuid": "79bbb6f4-dee5-43a2-b1e0-1f5ec8671f80",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Hind leg length measured from hock to hoof, in centimetres."
     },
     {
       "feature_uuid": "056d14d4-ab04-4392-ab98-0589839583d9",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Chest Girth"
     },
     {
       "feature_uuid": "056d14d4-ab04-4392-ab98-0589839583d9",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Chest girth measured behind the forelegs, in centimetres."
     },
     {
       "feature_uuid": "d649a009-9f8c-4a67-990d-458f6dc20522",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "d649a009-9f8c-4a67-990d-458f6dc20522",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Total body mass recorded at capture, in kilograms."
     },
     {
       "feature_uuid": "5ae08327-9514-4001-a1c5-55b1ce70d095",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Hind Leg Length"
     },
     {
       "feature_uuid": "5ae08327-9514-4001-a1c5-55b1ce70d095",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Hind leg length measured from hock to hoof, in centimetres."
     },
     {
       "feature_uuid": "357249f0-3d0a-4dfa-9655-9a29274e0ab5",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Chest Girth"
     },
     {
       "feature_uuid": "357249f0-3d0a-4dfa-9655-9a29274e0ab5",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Chest girth measured behind the forelegs, in centimetres."
     },
     {
       "feature_uuid": "1112c740-bf5f-44c2-a8de-e8576e71cee9",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "1112c740-bf5f-44c2-a8de-e8576e71cee9",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Total body mass recorded at capture, in kilograms."
     },
     {
       "feature_uuid": "d711759d-4285-4d6e-b6e3-0a43bc31cc50",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Hind Leg Length"
     },
     {
       "feature_uuid": "d711759d-4285-4d6e-b6e3-0a43bc31cc50",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Hind leg length measured from hock to hoof, in centimetres."
     },
     {
       "feature_uuid": "1d4dc4a4-76a1-4ceb-84ab-b2b343132228",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Chest Girth"
     },
     {
       "feature_uuid": "1d4dc4a4-76a1-4ceb-84ab-b2b343132228",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Chest girth measured behind the forelegs, in centimetres."
     },
     {
       "feature_uuid": "d8a2a7e8-8024-4a7b-b5b2-a6c2c680bb4b",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "d8a2a7e8-8024-4a7b-b5b2-a6c2c680bb4b",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Total body mass recorded at capture, in kilograms."
     },
     {
       "feature_uuid": "cedf027e-9a77-44eb-92c4-f49b36aedf33",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Hind Leg Length"
     },
     {
       "feature_uuid": "cedf027e-9a77-44eb-92c4-f49b36aedf33",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Hind leg length measured from hock to hoof, in centimetres."
     },
     {
       "feature_uuid": "1bb99d8d-e5ed-4ac6-a884-c6140d770ebe",
-      "feature_type_property_id": 48,
+      "feature_type_name": "stratum",
+      "property_name": "name",
       "value": "High Density Stratum"
     },
     {
       "feature_uuid": "1bb99d8d-e5ed-4ac6-a884-c6140d770ebe",
-      "feature_type_property_id": 87,
+      "feature_type_name": "stratum",
+      "property_name": "description",
       "value": "Riparian and wetland complexes with high expected moose density."
     },
     {
       "feature_uuid": "543c736c-fd4f-47e9-9c9d-17cf83da5d5a",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     },
     {
       "feature_uuid": "7eb9b996-3545-4a05-bb88-b315e7c6913c",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     },
     {
       "feature_uuid": "cbd5ef10-ce7c-4472-9a63-48d5a4b05b1c",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     },
     {
       "feature_uuid": "edf538e1-e1d1-445d-b64c-6fac8a3dfc1c",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     },
     {
       "feature_uuid": "f84ab0db-c406-4469-8c58-8409189555ae",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "15-5593"
     },
     {
       "feature_uuid": "f84ab0db-c406-4469-8c58-8409189555ae",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Adult cow, pregnancy confirmed at capture"
     },
     {
       "feature_uuid": "f84ab0db-c406-4469-8c58-8409189555ae",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "female"
     },
     {
       "feature_uuid": "9b63b0df-62e7-4c38-8884-79f28baf57ae",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "15-5594"
     },
     {
       "feature_uuid": "9b63b0df-62e7-4c38-8884-79f28baf57ae",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Adult cow, pregnancy confirmed at capture"
     },
     {
       "feature_uuid": "9b63b0df-62e7-4c38-8884-79f28baf57ae",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "female"
     },
     {
       "feature_uuid": "0121f7bd-fbd2-4c46-99dc-2c9707fca547",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "15-5595"
     },
     {
       "feature_uuid": "0121f7bd-fbd2-4c46-99dc-2c9707fca547",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Adult bull in good body condition at capture"
     },
     {
       "feature_uuid": "0121f7bd-fbd2-4c46-99dc-2c9707fca547",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "male"
     },
     {
       "feature_uuid": "c4da9ace-0b2d-4093-abed-eea6ac560bf7",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "15-5596"
     },
     {
       "feature_uuid": "c4da9ace-0b2d-4093-abed-eea6ac560bf7",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Adult cow, pregnancy confirmed at capture"
     },
     {
       "feature_uuid": "c4da9ace-0b2d-4093-abed-eea6ac560bf7",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "female"
     },
     {
       "feature_uuid": "63e801c2-c065-4f1e-bde5-76d81958bb52",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "15-5592"
     },
     {
       "feature_uuid": "63e801c2-c065-4f1e-bde5-76d81958bb52",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Adult bull in good body condition at capture"
     },
     {
       "feature_uuid": "63e801c2-c065-4f1e-bde5-76d81958bb52",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "male"
     },
     {
       "feature_uuid": "146a9c8e-de80-4037-b8d5-28349bc9e503",
-      "feature_type_property_id": 53,
+      "feature_type_name": "animal",
+      "property_name": "animal_identifier",
       "value": "15-5597"
     },
     {
       "feature_uuid": "146a9c8e-de80-4037-b8d5-28349bc9e503",
-      "feature_type_property_id": 92,
+      "feature_type_name": "animal",
+      "property_name": "description",
       "value": "Adult cow, pregnancy confirmed at capture"
     },
     {
       "feature_uuid": "146a9c8e-de80-4037-b8d5-28349bc9e503",
-      "feature_type_property_id": 1,
+      "feature_type_name": "animal",
+      "property_name": "sex",
       "value": "female"
     },
     {
       "feature_uuid": "8830a691-3b70-4de8-a936-35545a52e3cc",
-      "feature_type_property_id": 30,
+      "feature_type_name": "block",
+      "property_name": "name",
       "value": "Block A"
     },
     {
       "feature_uuid": "8830a691-3b70-4de8-a936-35545a52e3cc",
-      "feature_type_property_id": 18,
+      "feature_type_name": "block",
+      "property_name": "description",
       "value": "Northwest survey block, 240 square kilometres."
     },
     {
       "feature_uuid": "d399489c-7ddb-4e62-8a88-c3c5f853a0c6",
-      "feature_type_property_id": 30,
+      "feature_type_name": "block",
+      "property_name": "name",
       "value": "Block B"
     },
     {
       "feature_uuid": "d399489c-7ddb-4e62-8a88-c3c5f853a0c6",
-      "feature_type_property_id": 18,
+      "feature_type_name": "block",
+      "property_name": "description",
       "value": "Central survey block, 180 square kilometres."
     },
     {
       "feature_uuid": "602c076e-c6ec-4ebf-bd6b-d83054700981",
-      "feature_type_property_id": 30,
+      "feature_type_name": "block",
+      "property_name": "name",
       "value": "Block C"
     },
     {
       "feature_uuid": "602c076e-c6ec-4ebf-bd6b-d83054700981",
-      "feature_type_property_id": 18,
+      "feature_type_name": "block",
+      "property_name": "description",
       "value": "Southeast survey block, 305 square kilometres."
     },
     {
       "feature_uuid": "c93c4260-5425-48fb-ab95-12432fc9a466",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Chest Girth"
     },
     {
       "feature_uuid": "c93c4260-5425-48fb-ab95-12432fc9a466",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Chest girth measured behind the forelegs, in centimetres."
     },
     {
       "feature_uuid": "4b3c5bfd-4234-4a70-9083-a4611be41840",
-      "feature_type_property_id": 62,
+      "feature_type_name": "capture",
+      "property_name": "comment",
       "value": "moose capture"
     },
     {
       "feature_uuid": "ce936bce-5774-420a-87e6-c38a19ab6604",
-      "feature_type_property_id": 62,
+      "feature_type_name": "capture",
+      "property_name": "comment",
       "value": "moose capture"
     },
     {
       "feature_uuid": "34ac34e1-2f4f-407c-b285-8a1d7cd75fbe",
-      "feature_type_property_id": 62,
+      "feature_type_name": "capture",
+      "property_name": "comment",
       "value": "moose capture"
     },
     {
       "feature_uuid": "a8cd4f6d-c12e-4ecc-be60-4173e67f3bcb",
-      "feature_type_property_id": 62,
+      "feature_type_name": "capture",
+      "property_name": "comment",
       "value": "moose capture"
     },
     {
       "feature_uuid": "7485a090-47ee-4309-b271-0059e730908b",
-      "feature_type_property_id": 62,
+      "feature_type_name": "capture",
+      "property_name": "comment",
       "value": "moose capture"
     },
     {
       "feature_uuid": "8c10050d-c9cc-4c62-97e8-d85d93b3652f",
-      "feature_type_property_id": 62,
+      "feature_type_name": "capture",
+      "property_name": "comment",
       "value": "moose capture"
     },
     {
       "feature_uuid": "de3d68bd-c5e7-4870-a35f-14c8bd6e694e",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "BWBSmw1"
     },
     {
       "feature_uuid": "de3d68bd-c5e7-4870-a35f-14c8bd6e694e",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Biogeoclimatic Zone"
     },
     {
       "feature_uuid": "6466b05f-622f-4ef3-8faa-1ea69347111d",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "BWBSdk1"
     },
     {
       "feature_uuid": "6466b05f-622f-4ef3-8faa-1ea69347111d",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Biogeoclimatic Zone"
     },
     {
       "feature_uuid": "130130bc-92d3-476e-b8d6-63fc18a477f5",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "Fort Nelson Lowland"
     },
     {
       "feature_uuid": "130130bc-92d3-476e-b8d6-63fc18a477f5",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Ecosection"
     },
     {
       "feature_uuid": "9185a7e0-4440-4013-b4bb-d3bba91df43b",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "Muskwa Plateau"
     },
     {
       "feature_uuid": "9185a7e0-4440-4013-b4bb-d3bba91df43b",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Ecosection"
     },
     {
       "feature_uuid": "d11ce478-c14f-4af6-89a8-348b37e8dbee",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "Boreal White and Black Spruce"
     },
     {
       "feature_uuid": "d11ce478-c14f-4af6-89a8-348b37e8dbee",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Broad Ecosystem Unit"
     },
     {
       "feature_uuid": "3ab7ca74-0663-44f6-98f8-1ad02a8f538d",
-      "feature_type_property_id": 26,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_value",
       "value": "Wetland Complex"
     },
     {
       "feature_uuid": "3ab7ca74-0663-44f6-98f8-1ad02a8f538d",
-      "feature_type_property_id": 59,
+      "feature_type_name": "ecological_unit",
+      "property_name": "ecological_unit_type",
       "value": "Broad Ecosystem Unit"
     },
     {
       "feature_uuid": "0035f7be-f5a2-4d36-9b14-1863e593126a",
-      "feature_type_property_id": 94,
+      "feature_type_name": "file",
+      "property_name": "file_type",
       "value": "Other"
     },
     {
       "feature_uuid": "0035f7be-f5a2-4d36-9b14-1863e593126a",
-      "feature_type_property_id": 80,
+      "feature_type_name": "file",
+      "property_name": "filename",
       "value": "Moose_Walklines (1).zip"
     },
     {
       "feature_uuid": "a340022c-9595-4c06-8c57-24884158af49",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "a340022c-9595-4c06-8c57-24884158af49",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Total body mass recorded at capture, in kilograms."
     },
     {
       "feature_uuid": "e42e1bbd-f8db-4b76-9220-95f2220e1275",
-      "feature_type_property_id": 79,
+      "feature_type_name": "habitat_feature",
+      "property_name": "name",
       "value": "Mineral Lick"
     },
     {
       "feature_uuid": "6b83bc5d-b5a0-4d94-b0c1-b74d50fec056",
-      "feature_type_property_id": 79,
+      "feature_type_name": "habitat_feature",
+      "property_name": "name",
       "value": "Willow Browse Complex"
     },
     {
       "feature_uuid": "79ad886b-a3f9-4c04-8eb5-80d40e91054c",
-      "feature_type_property_id": 79,
+      "feature_type_name": "habitat_feature",
+      "property_name": "name",
       "value": "Beaver Pond"
     },
     {
       "feature_uuid": "f738100c-4d0b-4261-9127-e30db0be0876",
-      "feature_type_property_id": 79,
+      "feature_type_name": "habitat_feature",
+      "property_name": "name",
       "value": "Aspen Stand"
     },
     {
       "feature_uuid": "441dbd3d-fcaf-41d4-9c64-379917d0d3c4",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Tag"
     },
     {
       "feature_uuid": "441dbd3d-fcaf-41d4-9c64-379917d0d3c4",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Primary identification tag."
     },
     {
       "feature_uuid": "441dbd3d-fcaf-41d4-9c64-379917d0d3c4",
-      "feature_type_property_id": 6,
+      "feature_type_name": "marking",
+      "property_name": "secondary_colour",
       "value": "Black"
     },
     {
       "feature_uuid": "441dbd3d-fcaf-41d4-9c64-379917d0d3c4",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Left Ear"
     },
     {
       "feature_uuid": "441dbd3d-fcaf-41d4-9c64-379917d0d3c4",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Yellow"
     },
     {
       "feature_uuid": "441dbd3d-fcaf-41d4-9c64-379917d0d3c4",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "TAG-0117"
     },
     {
       "feature_uuid": "d65e9fbf-a887-4808-b0c6-899e0631e353",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Tag"
     },
     {
       "feature_uuid": "d65e9fbf-a887-4808-b0c6-899e0631e353",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Duplicate tag applied at capture."
     },
     {
       "feature_uuid": "d65e9fbf-a887-4808-b0c6-899e0631e353",
-      "feature_type_property_id": 6,
+      "feature_type_name": "marking",
+      "property_name": "secondary_colour",
       "value": "White"
     },
     {
       "feature_uuid": "d65e9fbf-a887-4808-b0c6-899e0631e353",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Right Ear"
     },
     {
       "feature_uuid": "d65e9fbf-a887-4808-b0c6-899e0631e353",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Orange"
     },
     {
       "feature_uuid": "d65e9fbf-a887-4808-b0c6-899e0631e353",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "TAG-0118"
     },
     {
       "feature_uuid": "7c9afe89-fda5-4e3b-94a9-22d88ead213b",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Tag"
     },
     {
       "feature_uuid": "7c9afe89-fda5-4e3b-94a9-22d88ead213b",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Replacement for a shed tag."
     },
     {
       "feature_uuid": "7c9afe89-fda5-4e3b-94a9-22d88ead213b",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Left Ear"
     },
     {
       "feature_uuid": "7c9afe89-fda5-4e3b-94a9-22d88ead213b",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Blue"
     },
     {
       "feature_uuid": "7c9afe89-fda5-4e3b-94a9-22d88ead213b",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "TAG-0231"
     },
     {
       "feature_uuid": "d5c1b8b8-609a-4cae-a9a6-76881c849b86",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Collar"
     },
     {
       "feature_uuid": "d5c1b8b8-609a-4cae-a9a6-76881c849b86",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "GPS collar band marking."
     },
     {
       "feature_uuid": "d5c1b8b8-609a-4cae-a9a6-76881c849b86",
-      "feature_type_property_id": 6,
+      "feature_type_name": "marking",
+      "property_name": "secondary_colour",
       "value": "Grey"
     },
     {
       "feature_uuid": "d5c1b8b8-609a-4cae-a9a6-76881c849b86",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Neck"
     },
     {
       "feature_uuid": "d5c1b8b8-609a-4cae-a9a6-76881c849b86",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Green"
     },
     {
       "feature_uuid": "d5c1b8b8-609a-4cae-a9a6-76881c849b86",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "COLLAR-5595"
     },
     {
       "feature_uuid": "92734f9e-c8f2-4033-9baa-43ec8de2eb5d",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Notch"
     },
     {
       "feature_uuid": "92734f9e-c8f2-4033-9baa-43ec8de2eb5d",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Notch pattern, four notches."
     },
     {
       "feature_uuid": "92734f9e-c8f2-4033-9baa-43ec8de2eb5d",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Right Ear"
     },
     {
       "feature_uuid": "92734f9e-c8f2-4033-9baa-43ec8de2eb5d",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "White"
     },
     {
       "feature_uuid": "92734f9e-c8f2-4033-9baa-43ec8de2eb5d",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "NOTCH-04"
     },
     {
       "feature_uuid": "4cdc95b3-475a-46db-9220-36f8eab8fbdc",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Collar"
     },
     {
       "feature_uuid": "4cdc95b3-475a-46db-9220-36f8eab8fbdc",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "VHF beacon collar band."
     },
     {
       "feature_uuid": "4cdc95b3-475a-46db-9220-36f8eab8fbdc",
-      "feature_type_property_id": 6,
+      "feature_type_name": "marking",
+      "property_name": "secondary_colour",
       "value": "Grey"
     },
     {
       "feature_uuid": "4cdc95b3-475a-46db-9220-36f8eab8fbdc",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Neck"
     },
     {
       "feature_uuid": "4cdc95b3-475a-46db-9220-36f8eab8fbdc",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Red"
     },
     {
       "feature_uuid": "4cdc95b3-475a-46db-9220-36f8eab8fbdc",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "COLLAR-5593"
     },
     {
       "feature_uuid": "16b89ad4-436b-4c02-a486-b70bc8671522",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Tag"
     },
     {
       "feature_uuid": "16b89ad4-436b-4c02-a486-b70bc8671522",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Re-tagged following recapture."
     },
     {
       "feature_uuid": "16b89ad4-436b-4c02-a486-b70bc8671522",
-      "feature_type_property_id": 6,
+      "feature_type_name": "marking",
+      "property_name": "secondary_colour",
       "value": "Blue"
     },
     {
       "feature_uuid": "16b89ad4-436b-4c02-a486-b70bc8671522",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Left Ear"
     },
     {
       "feature_uuid": "16b89ad4-436b-4c02-a486-b70bc8671522",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Yellow"
     },
     {
       "feature_uuid": "16b89ad4-436b-4c02-a486-b70bc8671522",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "TAG-0342"
     },
     {
       "feature_uuid": "4244b70d-b9a6-4368-b6e0-fe6d686bc457",
-      "feature_type_property_id": 89,
+      "feature_type_name": "marking",
+      "property_name": "marking_type",
       "value": "Ear Tag"
     },
     {
       "feature_uuid": "4244b70d-b9a6-4368-b6e0-fe6d686bc457",
-      "feature_type_property_id": 42,
+      "feature_type_name": "marking",
+      "property_name": "comment",
       "value": "Secondary tag, right ear."
     },
     {
       "feature_uuid": "4244b70d-b9a6-4368-b6e0-fe6d686bc457",
-      "feature_type_property_id": 74,
+      "feature_type_name": "marking",
+      "property_name": "body_position",
       "value": "Right Ear"
     },
     {
       "feature_uuid": "4244b70d-b9a6-4368-b6e0-fe6d686bc457",
-      "feature_type_property_id": 66,
+      "feature_type_name": "marking",
+      "property_name": "primary_colour",
       "value": "Orange"
     },
     {
       "feature_uuid": "4244b70d-b9a6-4368-b6e0-fe6d686bc457",
-      "feature_type_property_id": 77,
+      "feature_type_name": "marking",
+      "property_name": "identifier",
       "value": "TAG-0343"
     },
     {
       "feature_uuid": "4d1d3ebf-472d-489a-9b79-946d06d31bdb",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Body Mass"
     },
     {
       "feature_uuid": "4d1d3ebf-472d-489a-9b79-946d06d31bdb",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Total body mass recorded at capture, in kilograms."
     },
     {
       "feature_uuid": "36a65fc9-07b5-457d-98d2-52ad3c717617",
-      "feature_type_property_id": 76,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_type",
       "value": "Hind Leg Length"
     },
     {
       "feature_uuid": "36a65fc9-07b5-457d-98d2-52ad3c717617",
-      "feature_type_property_id": 107,
+      "feature_type_name": "measurement",
+      "property_name": "description",
       "value": "Hind leg length measured from hock to hoof, in centimetres."
     },
     {
       "feature_uuid": "f16d55fc-fc27-4915-835b-fd539f90c1dd",
-      "feature_type_property_id": 57,
+      "feature_type_name": "mortality",
+      "property_name": "cause_of_death",
       "value": "Predation"
     },
     {
       "feature_uuid": "f16d55fc-fc27-4915-835b-fd539f90c1dd",
-      "feature_type_property_id": 2,
+      "feature_type_name": "mortality",
+      "property_name": "comment",
       "value": "Wolf predation confirmed by site investigation; caching observed."
     },
     {
       "feature_uuid": "9665b2b9-ea95-472e-93d1-a0d3d111e6a3",
-      "feature_type_property_id": 57,
+      "feature_type_name": "mortality",
+      "property_name": "cause_of_death",
       "value": "Hunter Harvest"
     },
     {
       "feature_uuid": "9665b2b9-ea95-472e-93d1-a0d3d111e6a3",
-      "feature_type_property_id": 2,
+      "feature_type_name": "mortality",
+      "property_name": "comment",
       "value": "Reported by licensed hunter; collar returned."
     },
     {
       "feature_uuid": "b41725d8-5865-4c5a-9680-b22096b864ff",
-      "feature_type_property_id": 57,
+      "feature_type_name": "mortality",
+      "property_name": "cause_of_death",
       "value": "Unknown"
     },
     {
       "feature_uuid": "b41725d8-5865-4c5a-9680-b22096b864ff",
-      "feature_type_property_id": 2,
+      "feature_type_name": "mortality",
+      "property_name": "comment",
       "value": "Collar mortality signal only; carcass never located."
     },
     {
       "feature_uuid": "4bddf40f-326b-4106-a5af-056d3c04ab8b",
-      "feature_type_property_id": 33,
+      "feature_type_name": "sample_period",
+      "property_name": "site_identifier",
       "value": "KR-01"
     },
     {
       "feature_uuid": "6d3bdabc-2f38-43d9-bb9a-982cc373f2ad",
-      "feature_type_property_id": 33,
+      "feature_type_name": "sample_period",
+      "property_name": "site_identifier",
       "value": "SYR-02"
     },
     {
       "feature_uuid": "5f95722a-f008-41ce-9aac-594078d2631f",
-      "feature_type_property_id": 33,
+      "feature_type_name": "sample_period",
+      "property_name": "site_identifier",
       "value": "EP-03"
     },
     {
       "feature_uuid": "0ada557f-3fbb-4eca-bd67-d9919b5bb6ca",
-      "feature_type_property_id": 45,
+      "feature_type_name": "sample_site",
+      "property_name": "name",
       "value": "Kahntah River Site"
     },
     {
       "feature_uuid": "0ada557f-3fbb-4eca-bd67-d9919b5bb6ca",
-      "feature_type_property_id": 9,
+      "feature_type_name": "sample_site",
+      "property_name": "description",
       "value": "Riparian willow complex along the Kahntah River."
     },
     {
       "feature_uuid": "5e86af64-e09e-4300-bdbf-3033161181b4",
-      "feature_type_property_id": 45,
+      "feature_type_name": "sample_site",
+      "property_name": "name",
       "value": "Sierra Yoyo Ridge"
     },
     {
       "feature_uuid": "5e86af64-e09e-4300-bdbf-3033161181b4",
-      "feature_type_property_id": 9,
+      "feature_type_name": "sample_site",
+      "property_name": "description",
       "value": "Upland cutblock mosaic north of the Sierra Yoyo Desan road."
     },
     {
       "feature_uuid": "cfe9d637-fc7f-4fb6-89fe-d8c3f52d16b1",
-      "feature_type_property_id": 45,
+      "feature_type_name": "sample_site",
+      "property_name": "name",
       "value": "Etsho Plateau Site"
     },
     {
       "feature_uuid": "cfe9d637-fc7f-4fb6-89fe-d8c3f52d16b1",
-      "feature_type_property_id": 9,
+      "feature_type_name": "sample_site",
+      "property_name": "description",
       "value": "Black spruce muskeg on the Etsho Plateau."
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 116,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_value",
       "value": "Bell 206"
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 17,
+      "feature_type_name": "sample_technique",
+      "property_name": "response_metric",
       "value": "Count"
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 24,
+      "feature_type_name": "sample_technique",
+      "property_name": "name",
       "value": "Aerial Transect Survey"
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 13,
+      "feature_type_name": "sample_technique",
+      "property_name": "description",
       "value": "Fixed-width aerial transect flown at low elevation."
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 115,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_attribute",
       "value": "Aircraft Type"
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 49,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_name",
       "value": "Aerial Transect"
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 117,
+      "feature_type_name": "sample_technique",
+      "property_name": "vantage_method_attribute",
       "value": "Vantage Height"
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 118,
+      "feature_type_name": "sample_technique",
+      "property_name": "vantage_method_value",
       "value": "150m AGL"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 116,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_value",
       "value": "Reconyx HP2X"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 17,
+      "feature_type_name": "sample_technique",
+      "property_name": "response_metric",
       "value": "Detection Rate"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 24,
+      "feature_type_name": "sample_technique",
+      "property_name": "name",
       "value": "Camera Trap Grid"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 13,
+      "feature_type_name": "sample_technique",
+      "property_name": "description",
       "value": "Passive infrared camera grid on game trails."
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 115,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_attribute",
       "value": "Camera Model"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 49,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_name",
       "value": "Camera Trap"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 117,
+      "feature_type_name": "sample_technique",
+      "property_name": "vantage_method_attribute",
       "value": "Vantage Height"
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 118,
+      "feature_type_name": "sample_technique",
+      "property_name": "vantage_method_value",
       "value": "1.5m"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 116,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_value",
       "value": "Fresh Snow"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 17,
+      "feature_type_name": "sample_technique",
+      "property_name": "response_metric",
       "value": "Count"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 24,
+      "feature_type_name": "sample_technique",
+      "property_name": "name",
       "value": "Ground Track Count"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 13,
+      "feature_type_name": "sample_technique",
+      "property_name": "description",
       "value": "Snow-track transects walked after fresh snowfall."
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 115,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_attribute",
       "value": "Substrate"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 49,
+      "feature_type_name": "sample_technique",
+      "property_name": "method_name",
       "value": "Track Count"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 117,
+      "feature_type_name": "sample_technique",
+      "property_name": "vantage_method_attribute",
       "value": "Vantage Height"
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 118,
+      "feature_type_name": "sample_technique",
+      "property_name": "vantage_method_value",
       "value": "Ground"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 86,
+      "feature_type_name": "species_observation",
+      "property_name": "sign",
       "value": "code::observation_sign::1"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 109,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition",
       "value": "cloud_cover"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 110,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition_value",
       "value": "30%"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 95,
+      "feature_type_name": "species_observation",
+      "property_name": "description",
       "value": "Incidental observation recorded during telemetry relocation flight"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 111,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_comment",
       "value": "Single subcount group"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 113,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_type",
       "value": "group_size"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 86,
+      "feature_type_name": "species_observation",
+      "property_name": "sign",
       "value": "code::observation_sign::2"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 109,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition",
       "value": "cloud_cover"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 110,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition_value",
       "value": "30%"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 95,
+      "feature_type_name": "species_observation",
+      "property_name": "description",
       "value": "Incidental observation recorded during telemetry relocation flight"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 111,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_comment",
       "value": "Single subcount group"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 113,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_type",
       "value": "group_size"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 86,
+      "feature_type_name": "species_observation",
+      "property_name": "sign",
       "value": "code::observation_sign::1"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 109,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition",
       "value": "snow_depth"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 110,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition_value",
       "value": "0cm"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 95,
+      "feature_type_name": "species_observation",
+      "property_name": "description",
       "value": "Cow with twin calves along riparian willow browse"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 111,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_comment",
       "value": "Two calves of the year"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 113,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_type",
       "value": "estimated_age_months"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 86,
+      "feature_type_name": "species_observation",
+      "property_name": "sign",
       "value": "code::observation_sign::1"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 109,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition",
       "value": "snow_depth"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 110,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition_value",
       "value": "62cm"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 95,
+      "feature_type_name": "species_observation",
+      "property_name": "description",
       "value": "Lone bull in cutblock regeneration, antlers shed"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 111,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_comment",
       "value": "Sunk to belly in drifted snow"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 113,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_type",
       "value": "body_condition_score"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 86,
+      "feature_type_name": "species_observation",
+      "property_name": "sign",
       "value": "code::observation_sign::2"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 109,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition",
       "value": "temperature"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 110,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition_value",
       "value": "-18C"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 95,
+      "feature_type_name": "species_observation",
+      "property_name": "description",
       "value": "Caribou tracks crossing seismic line, incidental to moose survey"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 111,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_comment",
       "value": "Track group aged under 24 hours"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 113,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_type",
       "value": "track_group_size"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 86,
+      "feature_type_name": "species_observation",
+      "property_name": "sign",
       "value": "code::observation_sign::1"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 109,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition",
       "value": "snow_depth"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 110,
+      "feature_type_name": "species_observation",
+      "property_name": "environmental_condition_value",
       "value": "48cm"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 95,
+      "feature_type_name": "species_observation",
+      "property_name": "description",
       "value": "Aggregation on south-facing slope, heavy browse sign on willow"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 111,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_comment",
       "value": "Three cows, one calf, one yearling bull"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 113,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_type",
       "value": "group_composition_count"
     },
     {
       "feature_uuid": "48433807-19c0-458a-b0b4-e81278a2d6df",
-      "feature_type_property_id": 48,
+      "feature_type_name": "stratum",
+      "property_name": "name",
       "value": "Moderate Density Stratum"
     },
     {
       "feature_uuid": "48433807-19c0-458a-b0b4-e81278a2d6df",
-      "feature_type_property_id": 87,
+      "feature_type_name": "stratum",
+      "property_name": "description",
       "value": "Mixed upland forest with moderate expected moose density."
     },
     {
       "feature_uuid": "18e5444a-90f8-43fd-8fa9-1ed984b64f0d",
-      "feature_type_property_id": 48,
+      "feature_type_name": "stratum",
+      "property_name": "name",
       "value": "Low Density Stratum"
     },
     {
       "feature_uuid": "18e5444a-90f8-43fd-8fa9-1ed984b64f0d",
-      "feature_type_property_id": 87,
+      "feature_type_name": "stratum",
+      "property_name": "description",
       "value": "Closed-canopy black spruce with low expected moose density."
     },
     {
       "feature_uuid": "8bd373b7-8fdb-4fa6-88d6-0f98b5055d2a",
-      "feature_type_property_id": 68,
+      "feature_type_name": "study_area",
+      "property_name": "name",
       "value": "Boreal Moose Study Area"
     },
     {
       "feature_uuid": "8bd373b7-8fdb-4fa6-88d6-0f98b5055d2a",
-      "feature_type_property_id": 81,
+      "feature_type_name": "study_area",
+      "property_name": "description",
       "value": "Study area for Boreal Moose"
     },
     {
       "feature_uuid": "770d2556-e02f-4701-947c-1808c54ce54e",
-      "feature_type_property_id": 5,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "animal_identifier",
       "value": "15-5595"
     },
     {
       "feature_uuid": "770d2556-e02f-4701-947c-1808c54ce54e",
-      "feature_type_property_id": 40,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "device_key",
       "value": "vectronic:18323"
     },
     {
       "feature_uuid": "64a2c5a5-7012-4ffb-89c5-0db064137104",
-      "feature_type_property_id": 5,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "animal_identifier",
       "value": "15-5593"
     },
     {
       "feature_uuid": "64a2c5a5-7012-4ffb-89c5-0db064137104",
-      "feature_type_property_id": 40,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "device_key",
       "value": "vectronic:18334"
     },
     {
       "feature_uuid": "78112244-53cf-43ab-b747-ba7fa6e9009d",
-      "feature_type_property_id": 5,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "animal_identifier",
       "value": "15-5592"
     },
     {
       "feature_uuid": "78112244-53cf-43ab-b747-ba7fa6e9009d",
-      "feature_type_property_id": 40,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "device_key",
       "value": "vectronic:18344"
     },
     {
       "feature_uuid": "2adc9b4e-e3f7-4fe3-b9df-37c167e37732",
-      "feature_type_property_id": 5,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "animal_identifier",
       "value": "15-5594"
     },
     {
       "feature_uuid": "2adc9b4e-e3f7-4fe3-b9df-37c167e37732",
-      "feature_type_property_id": 40,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "device_key",
       "value": "vectronic:18340"
     },
     {
       "feature_uuid": "cf072072-5f3c-415c-bc2d-3b8bf11a6382",
-      "feature_type_property_id": 5,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "animal_identifier",
       "value": "15-5596"
     },
     {
       "feature_uuid": "cf072072-5f3c-415c-bc2d-3b8bf11a6382",
-      "feature_type_property_id": 40,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "device_key",
       "value": "vectronic:18342"
     },
     {
       "feature_uuid": "a6bc479a-6475-448a-aa49-d5fa7fa98efa",
-      "feature_type_property_id": 5,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "animal_identifier",
       "value": "15-5597"
     },
     {
       "feature_uuid": "a6bc479a-6475-448a-aa49-d5fa7fa98efa",
-      "feature_type_property_id": 40,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "device_key",
       "value": "vectronic:18335"
     },
     {
       "feature_uuid": "63c3ace7-79af-4c0b-a776-48b0e9e20798",
-      "feature_type_property_id": 10,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_model",
       "value": "Vertex Plus Iridium"
     },
     {
       "feature_uuid": "63c3ace7-79af-4c0b-a776-48b0e9e20798",
-      "feature_type_property_id": 23,
+      "feature_type_name": "telemetry_device",
+      "property_name": "serial_number",
       "value": "18323"
     },
     {
       "feature_uuid": "63c3ace7-79af-4c0b-a776-48b0e9e20798",
-      "feature_type_property_id": 46,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_manufacturer",
       "value": "code::device_make::5"
     },
     {
       "feature_uuid": "63c3ace7-79af-4c0b-a776-48b0e9e20798",
-      "feature_type_property_id": 44,
+      "feature_type_name": "telemetry_device",
+      "property_name": "description",
       "value": "GPS collar, serial 18323, 4h fix schedule"
     },
     {
       "feature_uuid": "575cfcce-9b1a-4f8e-8386-efae88d691f1",
-      "feature_type_property_id": 10,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_model",
       "value": "Vertex Plus Iridium"
     },
     {
       "feature_uuid": "575cfcce-9b1a-4f8e-8386-efae88d691f1",
-      "feature_type_property_id": 23,
+      "feature_type_name": "telemetry_device",
+      "property_name": "serial_number",
       "value": "18334"
     },
     {
       "feature_uuid": "575cfcce-9b1a-4f8e-8386-efae88d691f1",
-      "feature_type_property_id": 46,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_manufacturer",
       "value": "code::device_make::5"
     },
     {
       "feature_uuid": "575cfcce-9b1a-4f8e-8386-efae88d691f1",
-      "feature_type_property_id": 44,
+      "feature_type_name": "telemetry_device",
+      "property_name": "description",
       "value": "GPS collar, serial 18334, 4h fix schedule"
     },
     {
       "feature_uuid": "3b9640eb-6027-40f7-95e2-1374c6511f96",
-      "feature_type_property_id": 10,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_model",
       "value": "Vertex Plus Iridium"
     },
     {
       "feature_uuid": "3b9640eb-6027-40f7-95e2-1374c6511f96",
-      "feature_type_property_id": 23,
+      "feature_type_name": "telemetry_device",
+      "property_name": "serial_number",
       "value": "18344"
     },
     {
       "feature_uuid": "3b9640eb-6027-40f7-95e2-1374c6511f96",
-      "feature_type_property_id": 46,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_manufacturer",
       "value": "code::device_make::5"
     },
     {
       "feature_uuid": "3b9640eb-6027-40f7-95e2-1374c6511f96",
-      "feature_type_property_id": 44,
+      "feature_type_name": "telemetry_device",
+      "property_name": "description",
       "value": "GPS collar, serial 18344, 4h fix schedule"
     },
     {
       "feature_uuid": "4efa9945-57a9-4d56-afeb-c0a807fc79ff",
-      "feature_type_property_id": 10,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_model",
       "value": "Vertex Plus Iridium"
     },
     {
       "feature_uuid": "4efa9945-57a9-4d56-afeb-c0a807fc79ff",
-      "feature_type_property_id": 23,
+      "feature_type_name": "telemetry_device",
+      "property_name": "serial_number",
       "value": "18340"
     },
     {
       "feature_uuid": "4efa9945-57a9-4d56-afeb-c0a807fc79ff",
-      "feature_type_property_id": 46,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_manufacturer",
       "value": "code::device_make::5"
     },
     {
       "feature_uuid": "4efa9945-57a9-4d56-afeb-c0a807fc79ff",
-      "feature_type_property_id": 44,
+      "feature_type_name": "telemetry_device",
+      "property_name": "description",
       "value": "GPS collar, serial 18340, 4h fix schedule"
     },
     {
       "feature_uuid": "ff053a08-ea05-4301-965e-47f039c37bea",
-      "feature_type_property_id": 10,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_model",
       "value": "Vertex Plus Iridium"
     },
     {
       "feature_uuid": "ff053a08-ea05-4301-965e-47f039c37bea",
-      "feature_type_property_id": 23,
+      "feature_type_name": "telemetry_device",
+      "property_name": "serial_number",
       "value": "18342"
     },
     {
       "feature_uuid": "ff053a08-ea05-4301-965e-47f039c37bea",
-      "feature_type_property_id": 46,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_manufacturer",
       "value": "code::device_make::5"
     },
     {
       "feature_uuid": "ff053a08-ea05-4301-965e-47f039c37bea",
-      "feature_type_property_id": 44,
+      "feature_type_name": "telemetry_device",
+      "property_name": "description",
       "value": "GPS collar, serial 18342, 4h fix schedule"
     },
     {
       "feature_uuid": "c806a88c-43bf-401f-a7e8-1a3fa6ef98ca",
-      "feature_type_property_id": 10,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_model",
       "value": "Vertex Plus Iridium"
     },
     {
       "feature_uuid": "c806a88c-43bf-401f-a7e8-1a3fa6ef98ca",
-      "feature_type_property_id": 23,
+      "feature_type_name": "telemetry_device",
+      "property_name": "serial_number",
       "value": "18335"
     },
     {
       "feature_uuid": "c806a88c-43bf-401f-a7e8-1a3fa6ef98ca",
-      "feature_type_property_id": 46,
+      "feature_type_name": "telemetry_device",
+      "property_name": "device_manufacturer",
       "value": "code::device_make::5"
     },
     {
       "feature_uuid": "c806a88c-43bf-401f-a7e8-1a3fa6ef98ca",
-      "feature_type_property_id": 44,
+      "feature_type_name": "telemetry_device",
+      "property_name": "description",
       "value": "GPS collar, serial 18335, 4h fix schedule"
     },
     {
       "feature_uuid": "e599acb4-30bf-46fc-b7bd-070d428c0a81",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     },
     {
       "feature_uuid": "c6271c3a-3313-4583-b5dc-74d465069601",
-      "feature_type_property_id": 99,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency_unit",
       "value": "MHz"
     }
   ],
   "property_number": [
     {
       "feature_uuid": "e49833af-cdb4-4da7-a7a9-f147e420d3d8",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 153
     },
     {
       "feature_uuid": "6fceecdf-791a-4672-b35b-463e6d0cc493",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 90.2
     },
     {
       "feature_uuid": "6654c07e-f912-4dfc-9dfb-a8ad0ed3e32c",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 176
     },
     {
       "feature_uuid": "e315e4db-862a-45cb-a6de-964200dc824b",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 466.9
     },
     {
       "feature_uuid": "79bbb6f4-dee5-43a2-b1e0-1f5ec8671f80",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 80.6
     },
     {
       "feature_uuid": "056d14d4-ab04-4392-ab98-0589839583d9",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 178
     },
     {
       "feature_uuid": "d649a009-9f8c-4a67-990d-458f6dc20522",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 356.1
     },
     {
       "feature_uuid": "5ae08327-9514-4001-a1c5-55b1ce70d095",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 86.1
     },
     {
       "feature_uuid": "357249f0-3d0a-4dfa-9655-9a29274e0ab5",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 150
     },
     {
       "feature_uuid": "1112c740-bf5f-44c2-a8de-e8576e71cee9",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 420
     },
     {
       "feature_uuid": "d711759d-4285-4d6e-b6e3-0a43bc31cc50",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 92.8
     },
     {
       "feature_uuid": "1d4dc4a4-76a1-4ceb-84ab-b2b343132228",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 155
     },
     {
       "feature_uuid": "d8a2a7e8-8024-4a7b-b5b2-a6c2c680bb4b",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 512
     },
     {
       "feature_uuid": "cedf027e-9a77-44eb-92c4-f49b36aedf33",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 85.9
     },
     {
       "feature_uuid": "543c736c-fd4f-47e9-9c9d-17cf83da5d5a",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 151.017
     },
     {
       "feature_uuid": "7eb9b996-3545-4a05-bb88-b315e7c6913c",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 151.442
     },
     {
       "feature_uuid": "cbd5ef10-ce7c-4472-9a63-48d5a4b05b1c",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 148.76
     },
     {
       "feature_uuid": "edf538e1-e1d1-445d-b64c-6fac8a3dfc1c",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 149.338
     },
     {
       "feature_uuid": "f84ab0db-c406-4469-8c58-8409189555ae",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "9b63b0df-62e7-4c38-8884-79f28baf57ae",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "0121f7bd-fbd2-4c46-99dc-2c9707fca547",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "c4da9ace-0b2d-4093-abed-eea6ac560bf7",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "63e801c2-c065-4f1e-bde5-76d81958bb52",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "146a9c8e-de80-4037-b8d5-28349bc9e503",
-      "feature_type_property_id": 78,
+      "feature_type_name": "animal",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "c93c4260-5425-48fb-ab95-12432fc9a466",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 186
     },
     {
       "feature_uuid": "0035f7be-f5a2-4d36-9b14-1863e593126a",
-      "feature_type_property_id": 31,
+      "feature_type_name": "file",
+      "property_name": "file_size",
       "value": 8019964
     },
     {
       "feature_uuid": "a340022c-9595-4c06-8c57-24884158af49",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 510.2
     },
     {
       "feature_uuid": "e42e1bbd-f8db-4b76-9220-95f2220e1275",
-      "feature_type_property_id": 8,
+      "feature_type_name": "habitat_feature",
+      "property_name": "count",
       "value": 3
     },
     {
       "feature_uuid": "6b83bc5d-b5a0-4d94-b0c1-b74d50fec056",
-      "feature_type_property_id": 8,
+      "feature_type_name": "habitat_feature",
+      "property_name": "count",
       "value": 12
     },
     {
       "feature_uuid": "79ad886b-a3f9-4c04-8eb5-80d40e91054c",
-      "feature_type_property_id": 8,
+      "feature_type_name": "habitat_feature",
+      "property_name": "count",
       "value": 5
     },
     {
       "feature_uuid": "f738100c-4d0b-4261-9127-e30db0be0876",
-      "feature_type_property_id": 8,
+      "feature_type_name": "habitat_feature",
+      "property_name": "count",
       "value": 8
     },
     {
       "feature_uuid": "4d1d3ebf-472d-489a-9b79-946d06d31bdb",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 510.8
     },
     {
       "feature_uuid": "36a65fc9-07b5-457d-98d2-52ad3c717617",
-      "feature_type_property_id": 29,
+      "feature_type_name": "measurement",
+      "property_name": "measurement_value",
       "value": 88
     },
     {
       "feature_uuid": "c672efd0-1ab8-4dbb-9cd3-03503908d947",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 610
     },
     {
       "feature_uuid": "c672efd0-1ab8-4dbb-9cd3-03503908d947",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 5.5
     },
     {
       "feature_uuid": "834f889d-00c8-4b59-9499-b98f0b98a0a9",
-      "feature_type_property_id": 90,
+      "feature_type_name": "sample_technique",
+      "property_name": "detect_distance",
       "value": 800
     },
     {
       "feature_uuid": "5b6515da-ff97-4115-90ef-e47fb78c4cc7",
-      "feature_type_property_id": 90,
+      "feature_type_name": "sample_technique",
+      "property_name": "detect_distance",
       "value": 25
     },
     {
       "feature_uuid": "c91f922f-cb18-4870-83cf-f24bba920e20",
-      "feature_type_property_id": 90,
+      "feature_type_name": "sample_technique",
+      "property_name": "detect_distance",
       "value": 50
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 108,
+      "feature_type_name": "species_observation",
+      "property_name": "count",
       "value": 2
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 82,
+      "feature_type_name": "species_observation",
+      "property_name": "taxon_id",
       "value": 625197
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 112,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_count",
       "value": 2
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 114,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_value",
       "value": 2
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 108,
+      "feature_type_name": "species_observation",
+      "property_name": "count",
       "value": 1
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 82,
+      "feature_type_name": "species_observation",
+      "property_name": "taxon_id",
       "value": 177925
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 112,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_count",
       "value": 1
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 114,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_value",
       "value": 1
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 108,
+      "feature_type_name": "species_observation",
+      "property_name": "count",
       "value": 3
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 82,
+      "feature_type_name": "species_observation",
+      "property_name": "taxon_id",
       "value": 180702
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 112,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_count",
       "value": 2
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 114,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_value",
       "value": 1
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 108,
+      "feature_type_name": "species_observation",
+      "property_name": "count",
       "value": 1
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 82,
+      "feature_type_name": "species_observation",
+      "property_name": "taxon_id",
       "value": 180703
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 112,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_count",
       "value": 1
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 114,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_value",
       "value": 3
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 108,
+      "feature_type_name": "species_observation",
+      "property_name": "count",
       "value": 7
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 82,
+      "feature_type_name": "species_observation",
+      "property_name": "taxon_id",
       "value": 625197
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 112,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_count",
       "value": 7
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 114,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_value",
       "value": 7
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 108,
+      "feature_type_name": "species_observation",
+      "property_name": "count",
       "value": 5
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 82,
+      "feature_type_name": "species_observation",
+      "property_name": "taxon_id",
       "value": 180702
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 112,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_count",
       "value": 5
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 114,
+      "feature_type_name": "species_observation",
+      "property_name": "subcount_measurement_value",
       "value": 5
     },
     {
       "feature_uuid": "4579ba8d-7599-4a02-b4f0-f2542683d03d",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 478
     },
     {
       "feature_uuid": "4579ba8d-7599-4a02-b4f0-f2542683d03d",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 8.6
     },
     {
       "feature_uuid": "3c28308c-3e90-4cf8-b316-f47cae11a37c",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 603
     },
     {
       "feature_uuid": "3c28308c-3e90-4cf8-b316-f47cae11a37c",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 8.3
     },
     {
       "feature_uuid": "ac8d87ca-6c50-4ed2-8d77-b49ec6a77014",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 802
     },
     {
       "feature_uuid": "ac8d87ca-6c50-4ed2-8d77-b49ec6a77014",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 2.3
     },
     {
       "feature_uuid": "e5fc9d32-0a5b-41b9-9814-051875a93d1d",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 478
     },
     {
       "feature_uuid": "e5fc9d32-0a5b-41b9-9814-051875a93d1d",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 4.1
     },
     {
       "feature_uuid": "8469a61f-8ff5-4749-aa4c-8e47794f244b",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 359
     },
     {
       "feature_uuid": "8469a61f-8ff5-4749-aa4c-8e47794f244b",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 7.4
     },
     {
       "feature_uuid": "5bc9bd93-d826-49d9-8aa3-e97b9047420f",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 496
     },
     {
       "feature_uuid": "5bc9bd93-d826-49d9-8aa3-e97b9047420f",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 4.3
     },
     {
       "feature_uuid": "3d4abcd3-e46b-4d83-b985-d17c54a53dbf",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 674
     },
     {
       "feature_uuid": "3d4abcd3-e46b-4d83-b985-d17c54a53dbf",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 6.3
     },
     {
       "feature_uuid": "2e7fccf4-4b77-45ec-86ae-257568c965c6",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 672
     },
     {
       "feature_uuid": "2e7fccf4-4b77-45ec-86ae-257568c965c6",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 9.5
     },
     {
       "feature_uuid": "4ba564c6-b83f-4acd-ae68-b6911d277518",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 740
     },
     {
       "feature_uuid": "4ba564c6-b83f-4acd-ae68-b6911d277518",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 4.7
     },
     {
       "feature_uuid": "8d73598a-f770-4e1a-8588-572675632488",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 866
     },
     {
       "feature_uuid": "8d73598a-f770-4e1a-8588-572675632488",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 4.1
     },
     {
       "feature_uuid": "3da55cd8-b040-4c98-9112-e344de13c073",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 841
     },
     {
       "feature_uuid": "3da55cd8-b040-4c98-9112-e344de13c073",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 8.6
     },
     {
       "feature_uuid": "d381aa75-2c46-42f5-80f0-d4c441b32abb",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 843
     },
     {
       "feature_uuid": "d381aa75-2c46-42f5-80f0-d4c441b32abb",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 5.2
     },
     {
       "feature_uuid": "6f8b0714-8bb7-4404-9064-f8668b30c28b",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 689
     },
     {
       "feature_uuid": "6f8b0714-8bb7-4404-9064-f8668b30c28b",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 3.8
     },
     {
       "feature_uuid": "f629c807-8cc9-4ac0-80e4-3be0c79f5731",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 619
     },
     {
       "feature_uuid": "f629c807-8cc9-4ac0-80e4-3be0c79f5731",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 6.2
     },
     {
       "feature_uuid": "a06f7216-ffaa-4c9a-83ae-155aef30d8ae",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 408
     },
     {
       "feature_uuid": "a06f7216-ffaa-4c9a-83ae-155aef30d8ae",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 2.1
     },
     {
       "feature_uuid": "58b39cfc-c5e5-4ebf-93a1-665c4d8bf16a",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 816
     },
     {
       "feature_uuid": "58b39cfc-c5e5-4ebf-93a1-665c4d8bf16a",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 8.6
     },
     {
       "feature_uuid": "f7299b9b-982a-44f0-b9ed-0825f87c89f6",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 561
     },
     {
       "feature_uuid": "f7299b9b-982a-44f0-b9ed-0825f87c89f6",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 6.8
     },
     {
       "feature_uuid": "1a9c27b0-163c-41bb-99c0-ebfce490ab01",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 710
     },
     {
       "feature_uuid": "1a9c27b0-163c-41bb-99c0-ebfce490ab01",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 8.8
     },
     {
       "feature_uuid": "42935a27-10b3-428b-b16b-6cf4b12caa12",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 722
     },
     {
       "feature_uuid": "42935a27-10b3-428b-b16b-6cf4b12caa12",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 8.5
     },
     {
       "feature_uuid": "8af1100c-eb82-4dbb-9711-e88f75241e29",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 709
     },
     {
       "feature_uuid": "8af1100c-eb82-4dbb-9711-e88f75241e29",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 3.8
     },
     {
       "feature_uuid": "8512e7dc-ae49-498e-b555-b9f0bbcd1451",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 635
     },
     {
       "feature_uuid": "8512e7dc-ae49-498e-b555-b9f0bbcd1451",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 7.6
     },
     {
       "feature_uuid": "45f0fb39-c728-4e49-98cd-3317716e236d",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 342
     },
     {
       "feature_uuid": "45f0fb39-c728-4e49-98cd-3317716e236d",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 6.8
     },
     {
       "feature_uuid": "fc11a6c2-df15-4719-b241-d0f3934d065e",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 489
     },
     {
       "feature_uuid": "fc11a6c2-df15-4719-b241-d0f3934d065e",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 6
     },
     {
       "feature_uuid": "11622eb3-a5ce-4865-b4fa-6d7f39519515",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 334
     },
     {
       "feature_uuid": "11622eb3-a5ce-4865-b4fa-6d7f39519515",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 7.4
     },
     {
       "feature_uuid": "62134f17-a309-40dc-acad-264da8cdb664",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 561
     },
     {
       "feature_uuid": "62134f17-a309-40dc-acad-264da8cdb664",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 2.9
     },
     {
       "feature_uuid": "b7445e37-8a10-48bf-a6f3-5efd89140fd0",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 574
     },
     {
       "feature_uuid": "b7445e37-8a10-48bf-a6f3-5efd89140fd0",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 1.8
     },
     {
       "feature_uuid": "42ca12e7-e0aa-4148-a19e-9739b4f2dfb5",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 620
     },
     {
       "feature_uuid": "42ca12e7-e0aa-4148-a19e-9739b4f2dfb5",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 4.6
     },
     {
       "feature_uuid": "b4770b44-dfeb-4aa8-a5f2-066ef4a0460d",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 722
     },
     {
       "feature_uuid": "b4770b44-dfeb-4aa8-a5f2-066ef4a0460d",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 1.4
     },
     {
       "feature_uuid": "9bc7facb-1790-4ce5-8f1d-47a2698d976f",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 837
     },
     {
       "feature_uuid": "9bc7facb-1790-4ce5-8f1d-47a2698d976f",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 3.1
     },
     {
       "feature_uuid": "ea3fadc8-29e2-4c84-a170-0d26d92c1e86",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 886
     },
     {
       "feature_uuid": "ea3fadc8-29e2-4c84-a170-0d26d92c1e86",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 6.9
     },
     {
       "feature_uuid": "ab6eb315-b7a2-4348-86e6-962cffd1e02d",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 587
     },
     {
       "feature_uuid": "ab6eb315-b7a2-4348-86e6-962cffd1e02d",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 2.5
     },
     {
       "feature_uuid": "feb39615-b876-4b53-9529-6edecdbd58ba",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 734
     },
     {
       "feature_uuid": "feb39615-b876-4b53-9529-6edecdbd58ba",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 2.7
     },
     {
       "feature_uuid": "f254f751-49c7-4641-aeea-1df4c7a2b2c1",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 799
     },
     {
       "feature_uuid": "f254f751-49c7-4641-aeea-1df4c7a2b2c1",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 5.1
     },
     {
       "feature_uuid": "80f19ee6-7010-4f86-81a7-995e39ed9d52",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 392
     },
     {
       "feature_uuid": "80f19ee6-7010-4f86-81a7-995e39ed9d52",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 9.3
     },
     {
       "feature_uuid": "4e38bdfe-f5c9-49fe-aaa0-b6a730b77767",
-      "feature_type_property_id": 39,
+      "feature_type_name": "telemetry",
+      "property_name": "elevation",
       "value": 550
     },
     {
       "feature_uuid": "4e38bdfe-f5c9-49fe-aaa0-b6a730b77767",
-      "feature_type_property_id": 38,
+      "feature_type_name": "telemetry",
+      "property_name": "dop",
       "value": 5.6
     },
     {
       "feature_uuid": "e599acb4-30bf-46fc-b7bd-070d428c0a81",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 150.125
     },
     {
       "feature_uuid": "c6271c3a-3313-4583-b5dc-74d465069601",
-      "feature_type_property_id": 3,
+      "feature_type_name": "telemetry_frequency",
+      "property_name": "frequency",
       "value": 150.284
     }
   ],
   "property_boolean": [
     {
       "feature_uuid": "4b3c5bfd-4234-4a70-9083-a4611be41840",
-      "feature_type_property_id": 131,
+      "feature_type_name": "capture",
+      "property_name": "is_recapture",
       "value": false
     },
     {
       "feature_uuid": "ce936bce-5774-420a-87e6-c38a19ab6604",
-      "feature_type_property_id": 131,
+      "feature_type_name": "capture",
+      "property_name": "is_recapture",
       "value": true
     },
     {
       "feature_uuid": "34ac34e1-2f4f-407c-b285-8a1d7cd75fbe",
-      "feature_type_property_id": 131,
+      "feature_type_name": "capture",
+      "property_name": "is_recapture",
       "value": false
     },
     {
       "feature_uuid": "a8cd4f6d-c12e-4ecc-be60-4173e67f3bcb",
-      "feature_type_property_id": 131,
+      "feature_type_name": "capture",
+      "property_name": "is_recapture",
       "value": false
     },
     {
       "feature_uuid": "7485a090-47ee-4309-b271-0059e730908b",
-      "feature_type_property_id": 131,
+      "feature_type_name": "capture",
+      "property_name": "is_recapture",
       "value": true
     },
     {
       "feature_uuid": "8c10050d-c9cc-4c62-97e8-d85d93b3652f",
-      "feature_type_property_id": 131,
+      "feature_type_name": "capture",
+      "property_name": "is_recapture",
       "value": false
     },
     {
       "feature_uuid": "f16d55fc-fc27-4915-835b-fd539f90c1dd",
-      "feature_type_property_id": 132,
+      "feature_type_name": "mortality",
+      "property_name": "is_confirmed",
       "value": true
     },
     {
       "feature_uuid": "9665b2b9-ea95-472e-93d1-a0d3d111e6a3",
-      "feature_type_property_id": 132,
+      "feature_type_name": "mortality",
+      "property_name": "is_confirmed",
       "value": true
     },
     {
       "feature_uuid": "b41725d8-5865-4c5a-9680-b22096b864ff",
-      "feature_type_property_id": 132,
+      "feature_type_name": "mortality",
+      "property_name": "is_confirmed",
       "value": false
     }
   ],
   "property_timestamp": [
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 121,
+      "feature_type_name": "survey",
+      "property_name": "end_date",
       "date_value": "2017-12-31",
       "time_value": null
     },
     {
       "feature_uuid": "0a3794dc-d8b2-410e-9dd7-cf395e4d7f27",
-      "feature_type_property_id": 128,
+      "feature_type_name": "survey",
+      "property_name": "start_date",
       "date_value": "2015-01-01",
       "time_value": null
     },
     {
       "feature_uuid": "4b3c5bfd-4234-4a70-9083-a4611be41840",
-      "feature_type_property_id": 51,
+      "feature_type_name": "capture",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "ce936bce-5774-420a-87e6-c38a19ab6604",
-      "feature_type_property_id": 51,
+      "feature_type_name": "capture",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "34ac34e1-2f4f-407c-b285-8a1d7cd75fbe",
-      "feature_type_property_id": 51,
+      "feature_type_name": "capture",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "a8cd4f6d-c12e-4ecc-be60-4173e67f3bcb",
-      "feature_type_property_id": 51,
+      "feature_type_name": "capture",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "7485a090-47ee-4309-b271-0059e730908b",
-      "feature_type_property_id": 51,
+      "feature_type_name": "capture",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "8c10050d-c9cc-4c62-97e8-d85d93b3652f",
-      "feature_type_property_id": 51,
+      "feature_type_name": "capture",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "e42e1bbd-f8db-4b76-9220-95f2220e1275",
-      "feature_type_property_id": 69,
+      "feature_type_name": "habitat_feature",
+      "property_name": "timestamp",
       "date_value": "2015-05-22",
       "time_value": "11:00:00"
     },
     {
       "feature_uuid": "6b83bc5d-b5a0-4d94-b0c1-b74d50fec056",
-      "feature_type_property_id": 69,
+      "feature_type_name": "habitat_feature",
+      "property_name": "timestamp",
       "date_value": "2016-06-08",
       "time_value": "13:30:00"
     },
     {
       "feature_uuid": "79ad886b-a3f9-4c04-8eb5-80d40e91054c",
-      "feature_type_property_id": 69,
+      "feature_type_name": "habitat_feature",
+      "property_name": "timestamp",
       "date_value": "2016-08-19",
       "time_value": "09:45:00"
     },
     {
       "feature_uuid": "f738100c-4d0b-4261-9127-e30db0be0876",
-      "feature_type_property_id": 69,
+      "feature_type_name": "habitat_feature",
+      "property_name": "timestamp",
       "date_value": "2017-05-30",
       "time_value": "16:10:00"
     },
     {
       "feature_uuid": "f16d55fc-fc27-4915-835b-fd539f90c1dd",
-      "feature_type_property_id": 15,
+      "feature_type_name": "mortality",
+      "property_name": "timestamp",
       "date_value": "2016-03-12",
       "time_value": "07:15:00"
     },
     {
       "feature_uuid": "9665b2b9-ea95-472e-93d1-a0d3d111e6a3",
-      "feature_type_property_id": 15,
+      "feature_type_name": "mortality",
+      "property_name": "timestamp",
       "date_value": "2016-10-04",
       "time_value": "15:40:00"
     },
     {
       "feature_uuid": "b41725d8-5865-4c5a-9680-b22096b864ff",
-      "feature_type_property_id": 15,
+      "feature_type_name": "mortality",
+      "property_name": "timestamp",
       "date_value": "2017-02-27",
       "time_value": "04:05:00"
     },
     {
       "feature_uuid": "c7510f8f-0dd1-4627-9eea-12d45c248e75",
-      "feature_type_property_id": 58,
+      "feature_type_name": "release",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "50ec5fed-2c07-4689-8005-3081a5fb4408",
-      "feature_type_property_id": 58,
+      "feature_type_name": "release",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "b013f4c5-d2d9-4cfc-8e6b-1b847e5391b7",
-      "feature_type_property_id": 58,
+      "feature_type_name": "release",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "a6ab6e8a-d7e4-48a3-9025-9b748051bf98",
-      "feature_type_property_id": 58,
+      "feature_type_name": "release",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "297add8e-6078-4c50-a3fc-95d162c91ad7",
-      "feature_type_property_id": 58,
+      "feature_type_name": "release",
+      "property_name": "timestamp",
       "date_value": "2015-03-05",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "4bddf40f-326b-4106-a5af-056d3c04ab8b",
-      "feature_type_property_id": 93,
+      "feature_type_name": "sample_period",
+      "property_name": "end_date",
       "date_value": "2015-03-30",
       "time_value": null
     },
     {
       "feature_uuid": "4bddf40f-326b-4106-a5af-056d3c04ab8b",
-      "feature_type_property_id": 37,
+      "feature_type_name": "sample_period",
+      "property_name": "start_date",
       "date_value": "2015-01-15",
       "time_value": null
     },
     {
       "feature_uuid": "6d3bdabc-2f38-43d9-bb9a-982cc373f2ad",
-      "feature_type_property_id": 93,
+      "feature_type_name": "sample_period",
+      "property_name": "end_date",
       "date_value": "2016-03-25",
       "time_value": null
     },
     {
       "feature_uuid": "6d3bdabc-2f38-43d9-bb9a-982cc373f2ad",
-      "feature_type_property_id": 37,
+      "feature_type_name": "sample_period",
+      "property_name": "start_date",
       "date_value": "2016-01-10",
       "time_value": null
     },
     {
       "feature_uuid": "5f95722a-f008-41ce-9aac-594078d2631f",
-      "feature_type_property_id": 93,
+      "feature_type_name": "sample_period",
+      "property_name": "end_date",
       "date_value": "2017-03-28",
       "time_value": null
     },
     {
       "feature_uuid": "5f95722a-f008-41ce-9aac-594078d2631f",
-      "feature_type_property_id": 37,
+      "feature_type_name": "sample_period",
+      "property_name": "start_date",
       "date_value": "2017-01-20",
       "time_value": null
     },
     {
       "feature_uuid": "c672efd0-1ab8-4dbb-9cd3-03503908d947",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2018-01-22",
       "time_value": "03:00:48"
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 96,
+      "feature_type_name": "species_observation",
+      "property_name": "timestamp",
       "date_value": "2016-01-01",
       "time_value": "10:00:00"
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 96,
+      "feature_type_name": "species_observation",
+      "property_name": "timestamp",
       "date_value": "2016-05-01",
       "time_value": "08:00:00"
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 96,
+      "feature_type_name": "species_observation",
+      "property_name": "timestamp",
       "date_value": "2015-06-14",
       "time_value": "09:30:00"
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 96,
+      "feature_type_name": "species_observation",
+      "property_name": "timestamp",
       "date_value": "2016-02-21",
       "time_value": "14:15:00"
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 96,
+      "feature_type_name": "species_observation",
+      "property_name": "timestamp",
       "date_value": "2016-11-03",
       "time_value": "11:45:00"
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 96,
+      "feature_type_name": "species_observation",
+      "property_name": "timestamp",
       "date_value": "2017-01-18",
       "time_value": "16:20:00"
     },
     {
       "feature_uuid": "4579ba8d-7599-4a02-b4f0-f2542683d03d",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-01-01",
       "time_value": "15:00:31"
     },
     {
       "feature_uuid": "3c28308c-3e90-4cf8-b316-f47cae11a37c",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-08-11",
       "time_value": "15:02:35"
     },
     {
       "feature_uuid": "ac8d87ca-6c50-4ed2-8d77-b49ec6a77014",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-23",
       "time_value": "03:02:04"
     },
     {
       "feature_uuid": "e5fc9d32-0a5b-41b9-9814-051875a93d1d",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-10-19",
       "time_value": "03:01:20"
     },
     {
       "feature_uuid": "8469a61f-8ff5-4749-aa4c-8e47794f244b",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-04-06",
       "time_value": "03:00:55"
     },
     {
       "feature_uuid": "5bc9bd93-d826-49d9-8aa3-e97b9047420f",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-01-02",
       "time_value": "03:00:31"
     },
     {
       "feature_uuid": "3d4abcd3-e46b-4d83-b985-d17c54a53dbf",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-06-13",
       "time_value": "15:01:20"
     },
     {
       "feature_uuid": "2e7fccf4-4b77-45ec-86ae-257568c965c6",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-08-26",
       "time_value": "15:01:26"
     },
     {
       "feature_uuid": "4ba564c6-b83f-4acd-ae68-b6911d277518",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-01-05",
       "time_value": "03:01:31"
     },
     {
       "feature_uuid": "8d73598a-f770-4e1a-8588-572675632488",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-08-25",
       "time_value": "03:02:31"
     },
     {
       "feature_uuid": "3da55cd8-b040-4c98-9112-e344de13c073",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2018-04-26",
       "time_value": "15:00:30"
     },
     {
       "feature_uuid": "d381aa75-2c46-42f5-80f0-d4c441b32abb",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-01-02",
       "time_value": "03:00:32"
     },
     {
       "feature_uuid": "6f8b0714-8bb7-4404-9064-f8668b30c28b",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-06-15",
       "time_value": "03:01:33"
     },
     {
       "feature_uuid": "f629c807-8cc9-4ac0-80e4-3be0c79f5731",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-05-29",
       "time_value": "03:00:33"
     },
     {
       "feature_uuid": "a06f7216-ffaa-4c9a-83ae-155aef30d8ae",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-01-14",
       "time_value": "15:00:32"
     },
     {
       "feature_uuid": "58b39cfc-c5e5-4ebf-93a1-665c4d8bf16a",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-09-19",
       "time_value": "15:00:54"
     },
     {
       "feature_uuid": "f7299b9b-982a-44f0-b9ed-0825f87c89f6",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2018-04-26",
       "time_value": "15:01:28"
     },
     {
       "feature_uuid": "1a9c27b0-163c-41bb-99c0-ebfce490ab01",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-01-01",
       "time_value": "15:00:34"
     },
     {
       "feature_uuid": "42935a27-10b3-428b-b16b-6cf4b12caa12",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-03-14",
       "time_value": "15:01:32"
     },
     {
       "feature_uuid": "8af1100c-eb82-4dbb-9711-e88f75241e29",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-11-28",
       "time_value": "03:02:08"
     },
     {
       "feature_uuid": "8512e7dc-ae49-498e-b555-b9f0bbcd1451",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-01-18",
       "time_value": "15:00:34"
     },
     {
       "feature_uuid": "45f0fb39-c728-4e49-98cd-3317716e236d",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2017-09-11",
       "time_value": "03:01:01"
     },
     {
       "feature_uuid": "fc11a6c2-df15-4719-b241-d0f3934d065e",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2018-04-26",
       "time_value": "15:00:32"
     },
     {
       "feature_uuid": "11622eb3-a5ce-4865-b4fa-6d7f39519515",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-01-01",
       "time_value": "15:00:25"
     },
     {
       "feature_uuid": "62134f17-a309-40dc-acad-264da8cdb664",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-07",
       "time_value": "15:01:23"
     },
     {
       "feature_uuid": "b7445e37-8a10-48bf-a6f3-5efd89140fd0",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-06-14",
       "time_value": "03:01:03"
     },
     {
       "feature_uuid": "42ca12e7-e0aa-4148-a19e-9739b4f2dfb5",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-11-19",
       "time_value": "03:00:50"
     },
     {
       "feature_uuid": "b4770b44-dfeb-4aa8-a5f2-066ef4a0460d",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-03-26",
       "time_value": "03:01:57"
     },
     {
       "feature_uuid": "9bc7facb-1790-4ce5-8f1d-47a2698d976f",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2016-01-01",
       "time_value": "03:01:02"
     },
     {
       "feature_uuid": "ea3fadc8-29e2-4c84-a170-0d26d92c1e86",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-01",
       "time_value": "15:00:37"
     },
     {
       "feature_uuid": "ab6eb315-b7a2-4348-86e6-962cffd1e02d",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-03-08",
       "time_value": "15:00:33"
     },
     {
       "feature_uuid": "feb39615-b876-4b53-9529-6edecdbd58ba",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-13",
       "time_value": "03:01:03"
     },
     {
       "feature_uuid": "f254f751-49c7-4641-aeea-1df4c7a2b2c1",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-22",
       "time_value": "03:02:34"
     },
     {
       "feature_uuid": "80f19ee6-7010-4f86-81a7-995e39ed9d52",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-26",
       "time_value": "15:00:36"
     },
     {
       "feature_uuid": "4e38bdfe-f5c9-49fe-aaa0-b6a730b77767",
-      "feature_type_property_id": 61,
+      "feature_type_name": "telemetry",
+      "property_name": "timestamp",
       "date_value": "2015-04-01",
       "time_value": "03:01:21"
     },
     {
       "feature_uuid": "770d2556-e02f-4701-947c-1808c54ce54e",
-      "feature_type_property_id": 32,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "end_date",
       "date_value": "2017-03-31",
       "time_value": null
     },
     {
       "feature_uuid": "770d2556-e02f-4701-947c-1808c54ce54e",
-      "feature_type_property_id": 98,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "start_date",
       "date_value": "2015-03-05",
       "time_value": null
     },
     {
       "feature_uuid": "64a2c5a5-7012-4ffb-89c5-0db064137104",
-      "feature_type_property_id": 32,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "end_date",
       "date_value": "2017-03-31",
       "time_value": null
     },
     {
       "feature_uuid": "64a2c5a5-7012-4ffb-89c5-0db064137104",
-      "feature_type_property_id": 98,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "start_date",
       "date_value": "2015-03-05",
       "time_value": null
     },
     {
       "feature_uuid": "78112244-53cf-43ab-b747-ba7fa6e9009d",
-      "feature_type_property_id": 32,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "end_date",
       "date_value": "2017-03-31",
       "time_value": null
     },
     {
       "feature_uuid": "78112244-53cf-43ab-b747-ba7fa6e9009d",
-      "feature_type_property_id": 98,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "start_date",
       "date_value": "2015-03-05",
       "time_value": null
     },
     {
       "feature_uuid": "2adc9b4e-e3f7-4fe3-b9df-37c167e37732",
-      "feature_type_property_id": 32,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "end_date",
       "date_value": "2017-03-31",
       "time_value": null
     },
     {
       "feature_uuid": "2adc9b4e-e3f7-4fe3-b9df-37c167e37732",
-      "feature_type_property_id": 98,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "start_date",
       "date_value": "2015-03-05",
       "time_value": null
     },
     {
       "feature_uuid": "cf072072-5f3c-415c-bc2d-3b8bf11a6382",
-      "feature_type_property_id": 32,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "end_date",
       "date_value": "2017-03-31",
       "time_value": null
     },
     {
       "feature_uuid": "cf072072-5f3c-415c-bc2d-3b8bf11a6382",
-      "feature_type_property_id": 98,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "start_date",
       "date_value": "2015-03-05",
       "time_value": null
     },
     {
       "feature_uuid": "a6bc479a-6475-448a-aa49-d5fa7fa98efa",
-      "feature_type_property_id": 32,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "end_date",
       "date_value": "2017-03-31",
       "time_value": null
     },
     {
       "feature_uuid": "a6bc479a-6475-448a-aa49-d5fa7fa98efa",
-      "feature_type_property_id": 98,
+      "feature_type_name": "telemetry_deployment",
+      "property_name": "start_date",
       "date_value": "2015-03-05",
       "time_value": null
     }
@@ -6141,7 +6625,8 @@
   "property_geometry": [
     {
       "feature_uuid": "4b3c5bfd-4234-4a70-9083-a4611be41840",
-      "feature_type_property_id": 55,
+      "feature_type_name": "capture",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6154,7 +6639,8 @@
     },
     {
       "feature_uuid": "ce936bce-5774-420a-87e6-c38a19ab6604",
-      "feature_type_property_id": 55,
+      "feature_type_name": "capture",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6167,7 +6653,8 @@
     },
     {
       "feature_uuid": "34ac34e1-2f4f-407c-b285-8a1d7cd75fbe",
-      "feature_type_property_id": 55,
+      "feature_type_name": "capture",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6180,7 +6667,8 @@
     },
     {
       "feature_uuid": "a8cd4f6d-c12e-4ecc-be60-4173e67f3bcb",
-      "feature_type_property_id": 55,
+      "feature_type_name": "capture",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6193,7 +6681,8 @@
     },
     {
       "feature_uuid": "7485a090-47ee-4309-b271-0059e730908b",
-      "feature_type_property_id": 55,
+      "feature_type_name": "capture",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6206,7 +6695,8 @@
     },
     {
       "feature_uuid": "8c10050d-c9cc-4c62-97e8-d85d93b3652f",
-      "feature_type_property_id": 55,
+      "feature_type_name": "capture",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6219,7 +6709,8 @@
     },
     {
       "feature_uuid": "e42e1bbd-f8db-4b76-9220-95f2220e1275",
-      "feature_type_property_id": 60,
+      "feature_type_name": "habitat_feature",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6232,7 +6723,8 @@
     },
     {
       "feature_uuid": "6b83bc5d-b5a0-4d94-b0c1-b74d50fec056",
-      "feature_type_property_id": 60,
+      "feature_type_name": "habitat_feature",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6245,7 +6737,8 @@
     },
     {
       "feature_uuid": "79ad886b-a3f9-4c04-8eb5-80d40e91054c",
-      "feature_type_property_id": 60,
+      "feature_type_name": "habitat_feature",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6258,7 +6751,8 @@
     },
     {
       "feature_uuid": "f738100c-4d0b-4261-9127-e30db0be0876",
-      "feature_type_property_id": 60,
+      "feature_type_name": "habitat_feature",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6271,7 +6765,8 @@
     },
     {
       "feature_uuid": "f16d55fc-fc27-4915-835b-fd539f90c1dd",
-      "feature_type_property_id": 19,
+      "feature_type_name": "mortality",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6284,7 +6779,8 @@
     },
     {
       "feature_uuid": "9665b2b9-ea95-472e-93d1-a0d3d111e6a3",
-      "feature_type_property_id": 19,
+      "feature_type_name": "mortality",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6297,7 +6793,8 @@
     },
     {
       "feature_uuid": "b41725d8-5865-4c5a-9680-b22096b864ff",
-      "feature_type_property_id": 19,
+      "feature_type_name": "mortality",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6310,7 +6807,8 @@
     },
     {
       "feature_uuid": "c7510f8f-0dd1-4627-9eea-12d45c248e75",
-      "feature_type_property_id": 52,
+      "feature_type_name": "release",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6323,7 +6821,8 @@
     },
     {
       "feature_uuid": "50ec5fed-2c07-4689-8005-3081a5fb4408",
-      "feature_type_property_id": 52,
+      "feature_type_name": "release",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6336,7 +6835,8 @@
     },
     {
       "feature_uuid": "b013f4c5-d2d9-4cfc-8e6b-1b847e5391b7",
-      "feature_type_property_id": 52,
+      "feature_type_name": "release",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6349,7 +6849,8 @@
     },
     {
       "feature_uuid": "a6ab6e8a-d7e4-48a3-9025-9b748051bf98",
-      "feature_type_property_id": 52,
+      "feature_type_name": "release",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6362,7 +6863,8 @@
     },
     {
       "feature_uuid": "297add8e-6078-4c50-a3fc-95d162c91ad7",
-      "feature_type_property_id": 52,
+      "feature_type_name": "release",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6375,7 +6877,8 @@
     },
     {
       "feature_uuid": "0ada557f-3fbb-4eca-bd67-d9919b5bb6ca",
-      "feature_type_property_id": 4,
+      "feature_type_name": "sample_site",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6388,7 +6891,8 @@
     },
     {
       "feature_uuid": "c672efd0-1ab8-4dbb-9cd3-03503908d947",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6401,7 +6905,8 @@
     },
     {
       "feature_uuid": "5e86af64-e09e-4300-bdbf-3033161181b4",
-      "feature_type_property_id": 4,
+      "feature_type_name": "sample_site",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6414,7 +6919,8 @@
     },
     {
       "feature_uuid": "cfe9d637-fc7f-4fb6-89fe-d8c3f52d16b1",
-      "feature_type_property_id": 4,
+      "feature_type_name": "sample_site",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6427,7 +6933,8 @@
     },
     {
       "feature_uuid": "ea2ec6fd-018f-44d6-a58b-1886224727e6",
-      "feature_type_property_id": 88,
+      "feature_type_name": "species_observation",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6440,7 +6947,8 @@
     },
     {
       "feature_uuid": "b1bc9b53-2052-43a8-a361-f041ac3d1557",
-      "feature_type_property_id": 88,
+      "feature_type_name": "species_observation",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6453,7 +6961,8 @@
     },
     {
       "feature_uuid": "0cff15f2-8903-45f7-9eb7-32aca3802765",
-      "feature_type_property_id": 88,
+      "feature_type_name": "species_observation",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6466,7 +6975,8 @@
     },
     {
       "feature_uuid": "8ca90ed5-9406-4beb-8855-f25f0d12ede3",
-      "feature_type_property_id": 88,
+      "feature_type_name": "species_observation",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6479,7 +6989,8 @@
     },
     {
       "feature_uuid": "51cb4c28-ac5b-4092-8dc2-33e8a30ad3d8",
-      "feature_type_property_id": 88,
+      "feature_type_name": "species_observation",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6492,7 +7003,8 @@
     },
     {
       "feature_uuid": "25ad5516-c798-44b7-bc21-3a96a829116c",
-      "feature_type_property_id": 88,
+      "feature_type_name": "species_observation",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6505,7 +7017,8 @@
     },
     {
       "feature_uuid": "8bd373b7-8fdb-4fa6-88d6-0f98b5055d2a",
-      "feature_type_property_id": 75,
+      "feature_type_name": "study_area",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6531,7 +7044,8 @@
     },
     {
       "feature_uuid": "4579ba8d-7599-4a02-b4f0-f2542683d03d",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6544,7 +7058,8 @@
     },
     {
       "feature_uuid": "3c28308c-3e90-4cf8-b316-f47cae11a37c",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6557,7 +7072,8 @@
     },
     {
       "feature_uuid": "ac8d87ca-6c50-4ed2-8d77-b49ec6a77014",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6570,7 +7086,8 @@
     },
     {
       "feature_uuid": "e5fc9d32-0a5b-41b9-9814-051875a93d1d",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6583,7 +7100,8 @@
     },
     {
       "feature_uuid": "8469a61f-8ff5-4749-aa4c-8e47794f244b",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6596,7 +7114,8 @@
     },
     {
       "feature_uuid": "5bc9bd93-d826-49d9-8aa3-e97b9047420f",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6609,7 +7128,8 @@
     },
     {
       "feature_uuid": "3d4abcd3-e46b-4d83-b985-d17c54a53dbf",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6622,7 +7142,8 @@
     },
     {
       "feature_uuid": "2e7fccf4-4b77-45ec-86ae-257568c965c6",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6635,7 +7156,8 @@
     },
     {
       "feature_uuid": "4ba564c6-b83f-4acd-ae68-b6911d277518",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6648,7 +7170,8 @@
     },
     {
       "feature_uuid": "8d73598a-f770-4e1a-8588-572675632488",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6661,7 +7184,8 @@
     },
     {
       "feature_uuid": "3da55cd8-b040-4c98-9112-e344de13c073",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6674,7 +7198,8 @@
     },
     {
       "feature_uuid": "d381aa75-2c46-42f5-80f0-d4c441b32abb",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6687,7 +7212,8 @@
     },
     {
       "feature_uuid": "6f8b0714-8bb7-4404-9064-f8668b30c28b",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6700,7 +7226,8 @@
     },
     {
       "feature_uuid": "f629c807-8cc9-4ac0-80e4-3be0c79f5731",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6713,7 +7240,8 @@
     },
     {
       "feature_uuid": "a06f7216-ffaa-4c9a-83ae-155aef30d8ae",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6726,7 +7254,8 @@
     },
     {
       "feature_uuid": "58b39cfc-c5e5-4ebf-93a1-665c4d8bf16a",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6739,7 +7268,8 @@
     },
     {
       "feature_uuid": "f7299b9b-982a-44f0-b9ed-0825f87c89f6",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6752,7 +7282,8 @@
     },
     {
       "feature_uuid": "1a9c27b0-163c-41bb-99c0-ebfce490ab01",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6765,7 +7296,8 @@
     },
     {
       "feature_uuid": "42935a27-10b3-428b-b16b-6cf4b12caa12",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6778,7 +7310,8 @@
     },
     {
       "feature_uuid": "8af1100c-eb82-4dbb-9711-e88f75241e29",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6791,7 +7324,8 @@
     },
     {
       "feature_uuid": "8512e7dc-ae49-498e-b555-b9f0bbcd1451",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6804,7 +7338,8 @@
     },
     {
       "feature_uuid": "45f0fb39-c728-4e49-98cd-3317716e236d",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6817,7 +7352,8 @@
     },
     {
       "feature_uuid": "fc11a6c2-df15-4719-b241-d0f3934d065e",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6830,7 +7366,8 @@
     },
     {
       "feature_uuid": "11622eb3-a5ce-4865-b4fa-6d7f39519515",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6843,7 +7380,8 @@
     },
     {
       "feature_uuid": "62134f17-a309-40dc-acad-264da8cdb664",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6856,7 +7394,8 @@
     },
     {
       "feature_uuid": "b7445e37-8a10-48bf-a6f3-5efd89140fd0",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6869,7 +7408,8 @@
     },
     {
       "feature_uuid": "42ca12e7-e0aa-4148-a19e-9739b4f2dfb5",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6882,7 +7422,8 @@
     },
     {
       "feature_uuid": "b4770b44-dfeb-4aa8-a5f2-066ef4a0460d",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6895,7 +7436,8 @@
     },
     {
       "feature_uuid": "9bc7facb-1790-4ce5-8f1d-47a2698d976f",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6908,7 +7450,8 @@
     },
     {
       "feature_uuid": "ea3fadc8-29e2-4c84-a170-0d26d92c1e86",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6921,7 +7464,8 @@
     },
     {
       "feature_uuid": "ab6eb315-b7a2-4348-86e6-962cffd1e02d",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6934,7 +7478,8 @@
     },
     {
       "feature_uuid": "feb39615-b876-4b53-9529-6edecdbd58ba",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6947,7 +7492,8 @@
     },
     {
       "feature_uuid": "f254f751-49c7-4641-aeea-1df4c7a2b2c1",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6960,7 +7506,8 @@
     },
     {
       "feature_uuid": "80f19ee6-7010-4f86-81a7-995e39ed9d52",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [
@@ -6973,7 +7520,8 @@
     },
     {
       "feature_uuid": "4e38bdfe-f5c9-49fe-aaa0-b6a730b77767",
-      "feature_type_property_id": 67,
+      "feature_type_name": "telemetry",
+      "property_name": "geometry",
       "geojson": {
         "type": "GeometryCollection",
         "geometries": [

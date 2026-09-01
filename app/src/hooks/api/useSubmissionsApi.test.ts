@@ -15,6 +15,22 @@ describe('useSubmissionApi', () => {
     mock.restore();
   });
 
+  describe('getSubmissionFeatures', () => {
+    it('uses the user-scoped submission-feature endpoint', async () => {
+      const mockResponse = {
+        features: [],
+        pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+      };
+
+      mock.onGet('/api/submission/1/feature').reply(200, mockResponse);
+
+      const result = await useSubmissionsApi(axios).getSubmissionFeatures(1, { page: 1, limit: 10 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
+    });
+  });
+
   describe('getSubmissionsForUser', () => {
     it('should return submissions for the current user', async () => {
       const mockSubmissions: SubmissionSummary[] = [

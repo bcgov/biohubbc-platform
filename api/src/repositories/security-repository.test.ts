@@ -338,13 +338,14 @@ describe('SecurityRepository', () => {
         ]
       } as any as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
+      const sqlSpy = sinon.spy(() => mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
 
       const repo = new SecurityRepository(mockDBConnection);
-      const response = await repo.applySecurityRulesToSubmissionFeatures([1, 2, 3], [1, 2]);
+      const response = await repo.applySecurityRulesToSubmissionFeatures(99, [1, 2, 3], [1, 2]);
       expect(response).to.have.lengthOf(6);
+      expect(sqlSpy.firstCall.args[0].text).to.include('sf.submission_id');
+      expect(sqlSpy.firstCall.args[0].values).to.include(99);
     });
   });
 

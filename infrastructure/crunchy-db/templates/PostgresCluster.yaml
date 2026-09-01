@@ -88,6 +88,16 @@ spec:
     - name: postgres
       databases:
         - {{ template "crunchy-postgres.fullname" . }}
+    # Least-privilege role for the Martin vector tile server. The operator creates the role and
+    # publishes a <cluster>-pguser-martin secret consumed by the biohub-platform-martin chart.
+    # AlphaNumeric keeps the generated password safe to embed in Martin's connection URL without
+    # percent-encoding. Grants (CONNECT, USAGE on biohub, EXECUTE on tile functions only) are
+    # applied by the database migrations - this role is deliberately granted no table access.
+    - name: martin
+      databases:
+        - {{ template "crunchy-postgres.fullname" . }}
+      password:
+        type: AlphaNumeric
 
   {{ if .Values.dataSource.enabled }}
   dataSource:

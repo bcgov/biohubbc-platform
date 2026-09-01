@@ -124,14 +124,6 @@ export interface SubmissionFilters {
   search?: string;
 }
 
-export interface IGetDownloadSubmissionResponse {
-  submission_feature_id: number;
-  parent_submission_feature_id: number;
-  feature_type_name: string;
-  data: Record<string, any>;
-  level: number;
-}
-
 export interface PresignedUrl {
   partNumber: number;
   url: string;

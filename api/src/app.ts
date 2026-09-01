@@ -13,6 +13,7 @@ import { authenticateRequest, authenticateRequestOptional } from './request-hand
 import { initRequestStorage } from './utils/async-request-storage';
 import { scanFileForVirus } from './utils/file-utils';
 import { getLogger } from './utils/logger';
+import { getMartinConfig } from './utils/martin-config';
 
 const defaultLog = getLogger('app');
 
@@ -159,6 +160,10 @@ app.use('/api-docs', swaggerUIExperss.serve, swaggerUIExperss.setup(openAPIFrame
 
 // Start api
 async function main() {
+  // Validated before anything is served, so a deployment whose tile settings contradict each other
+  // is rejected here rather than by the first tile request of a session it already handed out.
+  getMartinConfig();
+
   initDBPool(getDefaultPoolConfig());
   await initDBConstants();
   await initPgBoss();
@@ -169,7 +174,13 @@ async function main() {
 }
 
 main().catch((error) => {
-  defaultLog.error({ label: 'start api', message: 'error', error });
+  // An Error serializes to `{}` through the logger's JSON formatter, so the reason the API refused
+  // to start is spelled out here: this line is the only account of the failure an operator gets.
+  defaultLog.error({
+    label: 'start api',
+    message: error instanceof Error ? error.message : 'error',
+    error
+  });
   process.exit(1);
 });
 

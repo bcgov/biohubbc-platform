@@ -114,47 +114,37 @@ describe('SearchRepository', () => {
   });
 
   describe('findTaxon', () => {
-    it('returns paginated taxon results with data and total', async () => {
+    it('returns paginated local taxon results', async () => {
       const mockTaxonData: SearchTaxonResult[] = [
-        { taxon_id: 100, itis_scientific_name: 'TaxonA' },
-        { taxon_id: 101, itis_scientific_name: 'TaxonB' }
+        {
+          taxon_id: 100,
+          itis_tsn: 180702,
+          itis_scientific_name: 'Ovis dalli',
+          common_name: "Dall's sheep",
+          rank: 'Species',
+          relevancy_score: 1
+        }
       ];
-
-      const mockRows: WithCount<typeof SearchTaxonResult>[] = [{ data: mockTaxonData, total: 8 }];
+      const mockRows: WithCount<typeof SearchTaxonResult>[] = [{ data: mockTaxonData, total: 1 }];
 
       const mockQueryResponse = {
         rowCount: 1,
         rows: mockRows.map((r) => ({ result: r }))
       } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
+      const knexStub = Sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findTaxon({ keyword: 'test' });
+      const result = await repo.findTaxon({ keyword: 'Ovis dalli' });
 
       expect(result).to.eql(mockRows[0]);
-    });
-
-    it('returns empty data and total 0 when no results', async () => {
-      const mockRows: WithCount<typeof SearchTaxonResult>[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new SearchRepository(mockDBConnection);
-
-      const result = await repo.findTaxon({ keyword: 'none' });
-
-      expect(result).to.eql({ data: [], total: 0 });
+      expect(knexStub).to.have.been.calledOnce;
+      const sql = knexStub.firstCall.args[0].toSQL().sql;
+      expect(sql).to.include('"record_end_date" is null');
+      expect(sql).to.include('1.0 as relevancy_score');
+      expect(sql).to.not.include('case when');
     });
   });
 
@@ -250,15 +240,16 @@ describe('SearchRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
+      const knexStub = Sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new SearchRepository(mockDBConnection);
 
       const result = await repo.findTaxonSummary({ keyword: 'test' });
 
       expect(result).to.eql(mockRows[0]);
+      expect(knexStub).to.have.been.calledOnce;
+      expect(knexStub.firstCall.args[0].toSQL().sql).to.include('"record_end_date" is null');
     });
 
     it('returns total 0 when no rows', async () => {

@@ -1,10 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { SubmissionFeatureRepository } from '../repositories/submission-feature-repository';
-import {
-  RelatedSubmissionFeature,
-  SubmissionFeature,
-  SubmissionFeatureRecord
-} from '../repositories/submission-repository';
+import { SubmissionFeature, SubmissionFeatureRecord } from '../repositories/submission-repository';
 import { DBService } from './db-service';
 
 /**
@@ -75,16 +71,5 @@ export class SubmissionFeatureService extends DBService {
    */
   async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
     return this.submissionFeatureRepository.getSubmissionFeatureById(submissionFeatureId);
-  }
-
-  /**
-   * Get all related submission features with their type names.
-   *
-   * @param {number} submissionFeatureId
-   * @returns {Promise<RelatedSubmissionFeature[]>}
-   * @memberof SubmissionFeatureService
-   */
-  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
-    return this.submissionFeatureRepository.getRelatedSubmissionFeatures(submissionFeatureId);
   }
 }

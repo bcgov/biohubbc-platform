@@ -1,7 +1,3 @@
-import { mdiMagnify } from '@mdi/js';
-import Icon from '@mdi/react';
-import InputAdornment from '@mui/material/InputAdornment';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
@@ -13,8 +9,6 @@ export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
     rows,
     rowCount,
     isLoading,
-    searchTerm,
-    onSearch,
     onRowClick,
     paginationModel,
     onPaginationModelChange,
@@ -37,24 +31,6 @@ export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
             ({rowCount})
           </Typography>
         </>
-      }
-      headerContent={
-        <TextField
-          size="small"
-          placeholder="Search by feature name"
-          value={searchTerm}
-          onChange={(event) => onSearch(event.target.value)}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Icon path={mdiMagnify} size={0.875} />
-                </InputAdornment>
-              )
-            }
-          }}
-          sx={{ width: 250 }}
-        />
       }>
       <CustomDataGrid
         autoHeight

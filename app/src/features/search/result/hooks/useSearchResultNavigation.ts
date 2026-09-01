@@ -21,10 +21,13 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
    * Opens the detail page for a selected search result.
    * Preserves the current query string for back-navigation context.
    *
-   * @param {SearchFeatureResultWithRelevancy} result - Result row selected by the user.
+   * Accepts only the identifiers it needs, so a feature selected on the map (whose tiles carry ids and nothing else)
+   * navigates through exactly the same path as a table row.
+   *
+   * @param {Pick<SearchFeatureResultWithRelevancy, 'submission_id' | 'submission_feature_id'>} result - Selection.
    */
   const handleResultClick = useCallback(
-    (result: SearchFeatureResultWithRelevancy) => {
+    (result: Pick<SearchFeatureResultWithRelevancy, 'submission_id' | 'submission_feature_id'>) => {
       navigate(`/submission/${result.submission_id}/feature/${result.submission_feature_id}${location.search}`);
     },
     [location.search, navigate]

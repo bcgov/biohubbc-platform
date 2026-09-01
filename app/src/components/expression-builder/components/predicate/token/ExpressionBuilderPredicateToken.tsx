@@ -1,7 +1,7 @@
 import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import { IconButton, Stack, TextField } from '@mui/material';
+import { IconButton, Stack } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { InlineSelect } from 'components/select/InlineSelect';
 import { EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS } from 'constants/expression';
@@ -9,14 +9,9 @@ import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { useState } from 'react';
 import { getExpressionBuilderPropertyKeyFromProperty, hasPredicateValue } from 'utils/expression';
 import { ExpressionBuilderPropertySearch } from '../../property/search/ExpressionBuilderPropertySearch';
-import {
-  ExpressionBuilderPredicateDatetimeValueFieldParams,
-  ExpressionBuilderPredicateTextValueInputParams,
-  ExpressionBuilderPredicateTokenProps
-} from './ExpressionBuilderPredicateToken.interface';
-import { getTextInputValue, isDatetimeValue, updateDatetimeValue } from './ExpressionBuilderPredicateToken.utils';
+import { ExpressionBuilderPredicateTokenProps } from './ExpressionBuilderPredicateToken.interface';
 import { ExpressionBuilderPredicateTokenSkeleton } from './ExpressionBuilderPredicateTokenSkeleton';
-import { ExpressionBuilderPredicateValueClearAdornment } from './ExpressionBuilderPredicateValueClearAdornment';
+import { ExpressionBuilderPredicateTokenValue } from './ExpressionBuilderPredicateTokenValue';
 import { useExpressionBuilderPredicateProperty } from './useExpressionBuilderPredicateProperty';
 
 /**
@@ -62,15 +57,7 @@ export const ExpressionBuilderPredicateToken = ({
     !hasPredicateValue(predicate.value);
   const canDropOnPredicate = !readOnly && !!draggedPredicateId && draggedPredicateId !== node.ui_id;
 
-  /**
-   * Handles drag-over events for predicate-to-predicate moves.
-   *
-   * Use this on the token root so the row can show local drop highlighting while
-   * the parent expression builder still owns the actual tree mutation.
-   *
-   * @param {React.DragEvent} event - Browser drag event from the token root.
-   * @returns {void}
-   */
+  // Use on the token root to highlight valid predicate-to-predicate drop targets.
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -83,15 +70,7 @@ export const ExpressionBuilderPredicateToken = ({
     setIsDropTarget(true);
   };
 
-  /**
-   * Clears local predicate drop highlighting when the dragged item leaves the row.
-   *
-   * Use this on the token root. It ignores movement between child elements of
-   * the same token so the drop highlight does not flicker.
-   *
-   * @param {React.DragEvent} event - Browser drag event from the token root.
-   * @returns {void}
-   */
+  // Use on the token root to clear drop highlighting after the pointer exits the row.
   const handleDragLeave = (event: React.DragEvent) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
       return;
@@ -100,15 +79,7 @@ export const ExpressionBuilderPredicateToken = ({
     setIsDropTarget(false);
   };
 
-  /**
-   * Completes a predicate drop onto this token.
-   *
-   * Use this on the token root to clear local highlighting and notify the parent
-   * expression builder which predicate should receive the dragged predicate.
-   *
-   * @param {React.DragEvent} event - Browser drop event from the token root.
-   * @returns {void}
-   */
+  // Use on the token root to commit the active predicate drop onto this predicate.
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -119,245 +90,6 @@ export const ExpressionBuilderPredicateToken = ({
     }
 
     onDropOnPredicate(node.ui_id);
-  };
-
-  /**
-   * Renders the text-backed predicate value input.
-   *
-   * Use this for incomplete predicates, Exists predicates, strings, numbers, and
-   * fallback draft values that should remain visible as editable text.
-   *
-   * @param {ExpressionBuilderPredicateTextValueInputParams} params - Text value, validation state, and optional input mode.
-   * @returns {JSX.Element} Text field for the predicate value.
-   */
-  const renderTextValueInput = ({ value, error, inputMode }: ExpressionBuilderPredicateTextValueInputParams) => (
-    <TextField
-      size="small"
-      variant="outlined"
-      type="text"
-      value={value ?? ''}
-      placeholder="Value"
-      error={error}
-      disabled={readOnly}
-      onChange={(event) => onValueChange(node.ui_id, event.target.value)}
-      InputProps={{
-        endAdornment:
-          !readOnly && hasPredicateValue(value) ? (
-            <ExpressionBuilderPredicateValueClearAdornment onClear={() => onValueChange(node.ui_id, '')} />
-          ) : undefined
-      }}
-      inputProps={{
-        'aria-label': 'Value',
-        inputMode
-      }}
-      sx={{
-        flex: '1 1 180px',
-        minWidth: 0,
-        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-          bgcolor: 'background.paper',
-          borderRadius: 1,
-          boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-          fontSize: '0.875rem',
-          height: 36,
-          minHeight: 36,
-          padding: '0 4px 0 6px !important',
-          transition: 'box-shadow 120ms ease'
-        },
-        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
-          height: 24,
-          lineHeight: '24px',
-          padding: '8px !important'
-        }
-      }}
-    />
-  );
-
-  /**
-   * Renders the boolean predicate value selector.
-   *
-   * Use this when the selected property's predicate type is boolean so the draft
-   * stores actual boolean values instead of user-entered strings.
-   *
-   * @returns {JSX.Element} Boolean value select control.
-   */
-  const renderBooleanValueInput = () => {
-    const booleanValue = typeof predicate?.value === 'boolean' ? String(predicate.value) : '';
-
-    return (
-      <InlineSelect
-        ariaLabel="Value"
-        placeholder="Value"
-        disabled={readOnly}
-        sx={{
-          flex: '1 1 180px',
-          minWidth: 0,
-          '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-            transition: 'box-shadow 120ms ease'
-          }
-        }}
-        options={[
-          { value: 'true', label: 'true' },
-          { value: 'false', label: 'false' }
-        ]}
-        value={booleanValue}
-        onChange={(value) => onValueChange(node.ui_id, value === '' ? undefined : value === 'true')}
-      />
-    );
-  };
-
-  /**
-   * Renders a single datetime draft input.
-   *
-   * Use this for the date and time fields inside datetime predicates. The field
-   * parameter controls which part of the datetime draft is updated.
-   *
-   * @param {ExpressionBuilderPredicateDatetimeValueFieldParams} params - Datetime field configuration and layout sizing.
-   * @returns {JSX.Element} Native date or time text field.
-   */
-  const renderDatetimeValueField = ({
-    field,
-    type,
-    value,
-    error,
-    ariaLabel,
-    flex,
-    minWidth
-  }: ExpressionBuilderPredicateDatetimeValueFieldParams) => (
-    <TextField
-      size="small"
-      variant="outlined"
-      type={type}
-      value={value ?? ''}
-      error={error}
-      disabled={readOnly}
-      onChange={(event) => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, event.target.value))}
-      InputProps={{
-        endAdornment:
-          !readOnly && hasPredicateValue(value) ? (
-            <ExpressionBuilderPredicateValueClearAdornment
-              onClear={() => onValueChange(node.ui_id, updateDatetimeValue(predicate?.value, field, ''))}
-            />
-          ) : undefined
-      }}
-      inputProps={{ 'aria-label': ariaLabel }}
-      sx={{
-        flex,
-        minWidth,
-        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': {
-          bgcolor: 'background.paper',
-          borderRadius: 1,
-          boxShadow: '0 1px 1px rgba(0, 0, 0, 0.04)',
-          fontSize: '0.875rem',
-          height: 36,
-          minHeight: 36,
-          padding: '0 4px 0 6px !important',
-          transition: 'box-shadow 120ms ease'
-        },
-        '&& .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiInputBase-input': {
-          height: 24,
-          lineHeight: '24px',
-          padding: '8px 0 8px 8px !important'
-        },
-        '&& input[type="date"], && input[type="time"]': {
-          paddingRight: '0 !important'
-        },
-        '&& input[type="date"]::-webkit-calendar-picker-indicator, && input[type="time"]::-webkit-calendar-picker-indicator':
-          {
-            cursor: 'pointer',
-            margin: 0,
-            padding: 0,
-            position: 'absolute',
-            right: 28,
-            width: 24
-          }
-      }}
-    />
-  );
-
-  /**
-   * Renders the datetime predicate value controls.
-   *
-   * Use this when the selected property's predicate type is datetime. The
-   * selected operator determines whether the row shows date, time, or both
-   * fields.
-   *
-   * @returns {JSX.Element} Date/time field group for the predicate value.
-   */
-  const renderDatetimeValueInput = () => {
-    const datetimeValue = isDatetimeValue(predicate?.value) ? predicate.value : {};
-    const showDate =
-      predicate?.operator === 'OnDate' || predicate?.operator === 'Before' || predicate?.operator === 'After';
-    const showTime =
-      predicate?.operator === 'OnTime' || predicate?.operator === 'Before' || predicate?.operator === 'After';
-    const datetimeMissingValue =
-      !hasPredicateValue(datetimeValue.date_value) && !hasPredicateValue(datetimeValue.time_value);
-    const datetimeInputCount = Number(showDate) + Number(showTime);
-
-    return (
-      <Stack
-        direction="row"
-        gap={1}
-        sx={{
-          flex: datetimeInputCount > 1 ? '2 1 360px' : '1 1 180px',
-          minWidth: datetimeInputCount > 1 ? 340 : 160
-        }}>
-        {showDate &&
-          renderDatetimeValueField({
-            field: 'date_value',
-            type: 'date',
-            value: datetimeValue.date_value,
-            error: datetimeMissingValue,
-            ariaLabel: 'Date',
-            flex: '1 1 180px',
-            minWidth: 180
-          })}
-        {showTime &&
-          renderDatetimeValueField({
-            field: 'time_value',
-            type: 'time',
-            value: datetimeValue.time_value,
-            error: datetimeMissingValue,
-            ariaLabel: 'Time',
-            flex: '1 1 150px',
-            minWidth: 150
-          })}
-      </Stack>
-    );
-  };
-
-  /**
-   * Renders the appropriate value editor for the current predicate row.
-   *
-   * Use this from the token layout after property and operator controls. It
-   * dispatches to type-specific render helpers while keeping incomplete and
-   * Exists predicates visually stable with an enabled text input.
-   *
-   * @returns {JSX.Element} Value editor for the current predicate state.
-   */
-  const renderValueInput = () => {
-    // Keep the value field enabled even when the predicate is incomplete or the
-    // operator is Exists. Exists still serializes without value, but enabled
-    // fields keep the row visually stable and avoid focus traps.
-    if (!property || !predicate?.operator || predicate.operator === 'Exists') {
-      return renderTextValueInput({ value: getTextInputValue(predicate?.value) });
-    }
-
-    if (property.predicate_type === 'boolean') {
-      return renderBooleanValueInput();
-    }
-
-    if (property.predicate_type === 'datetime') {
-      return renderDatetimeValueInput();
-    }
-
-    return renderTextValueInput({
-      value: getTextInputValue(predicate.value),
-      error: missingValue,
-      inputMode: property.predicate_type === 'number' ? 'decimal' : undefined
-    });
   };
 
   return (
@@ -497,7 +229,13 @@ export const ExpressionBuilderPredicateToken = ({
           onChange={(value) => onOperatorChange(node.ui_id, value === '' ? null : value)}
         />
 
-        {renderValueInput()}
+        <ExpressionBuilderPredicateTokenValue
+          property={property}
+          predicate={predicate}
+          missingValue={missingValue}
+          readOnly={readOnly}
+          onChange={(value) => onValueChange(node.ui_id, value)}
+        />
 
         {!readOnly && (
           <IconButton

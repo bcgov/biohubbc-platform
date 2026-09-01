@@ -1,10 +1,13 @@
 # Reconcile PR environments against GitHub PR state.
 #
-# Why this exists: cleanPR.yml is event-driven, and a PR is closed exactly once. If that run
-# fails for every attempt (the OpenShift connection timeout retried by retryFailedJobs.yml is
-# the usual cause), nothing ever tries again and the PR's Helm release and PVCs sit in -dev
+# Why this exists: cleanPR.yml is event-driven, and each of its triggers fires once. If that
+# run fails for every attempt (the OpenShift connection timeout retried by retryFailedJobs.yml
+# is the usual cause), nothing ever tries again and the PR's Helm release and PVCs sit in -dev
 # consuming the namespace storage quota indefinitely. This job re-derives the desired state
 # daily instead of relying on a single event, so a leak survives at most one day.
+#
+# The desired state is deploy.yml's rule: open, not draft, not labelled "No Preview". Draft and
+# labelled PRs are still open, so nothing else would ever retry a failed teardown for them.
 #
 # Scope is deliberately narrow: only "pr-<number>" Helm releases and only PVCs whose name ends
 # in "-dev-<number>", both in the -dev namespace. Static environments ("-dev-deploy"), the
@@ -34,12 +37,14 @@ env:
 
 jobs:
   sweep:
-    name: Remove PR environments whose pull request is closed or merged
+    name: Remove PR environments whose pull request is closed, draft, or labelled No Preview
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout Target Branch
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Install oc (see .github/actions/setup-openshift-cli).
       - uses: ./.github/actions/setup-openshift-cli
@@ -61,31 +66,41 @@ jobs:
           set -euo pipefail
 
           echo "Sweeping PR environments in ${DEV_NAMESPACE} (dry_run=${DRY_RUN})"
-          removed=0; kept=0; skipped=0
+          removed_closed=0; removed_draft=0; removed_label=0; kept=0; skipped=0
 
-          # Resolve a PR's state, echoing "open", "closed", or "" when it cannot be determined.
-          # GitHub reports merged PRs as "closed"; both mean the environment should be gone.
-          pr_state() {
-            gh api "repos/${REPO}/pulls/$1" --jq '.state' 2>/dev/null || true
+          # Echo "keep", or why the environment should go: the PR's closed state, "draft", or
+          # "labelled No Preview". Echo "" when the PR cannot be resolved. GitHub reports merged
+          # PRs as "closed". The label match is case-insensitive, matching deploy.yml.
+          pr_verdict() {
+            gh api "repos/${REPO}/pulls/$1" --jq '
+              if .state != "open" then .state
+              elif .draft then "draft"
+              elif ([.labels[].name | ascii_downcase] | index("no preview")) then "labelled No Preview"
+              else "keep"
+              end' 2>/dev/null || true
           }
 
           echo "--- Helm releases ---"
           for release in $(helm list --namespace "${DEV_NAMESPACE}" --short --filter '^pr-[0-9]+$' || true); do
             pr="${release#pr-}"
-            state="$(pr_state "${pr}")"
+            verdict="$(pr_verdict "${pr}")"
 
-            if [ -z "${state}" ]; then
+            if [ -z "${verdict}" ]; then
               echo "  ${release}: cannot resolve PR #${pr}; skipping"
               skipped=$((skipped + 1))
-            elif [ "${state}" = "open" ]; then
-              echo "  ${release}: PR #${pr} is open; keeping"
+            elif [ "${verdict}" = "keep" ]; then
+              echo "  ${release}: PR #${pr} is open and ready; keeping"
               kept=$((kept + 1))
             else
-              echo "  ${release}: PR #${pr} is ${state}; uninstalling"
+              echo "  ${release}: PR #${pr} is ${verdict}; uninstalling"
               if [ "${DRY_RUN}" != "true" ]; then
                 helm uninstall "${release}" --namespace "${DEV_NAMESPACE}" --wait --timeout 10m
               fi
-              removed=$((removed + 1))
+              case "${verdict}" in
+                "draft") removed_draft=$((removed_draft + 1)) ;;
+                "labelled No Preview") removed_label=$((removed_label + 1)) ;;
+                *) removed_closed=$((removed_closed + 1)) ;;
+              esac
             fi
           done
 
@@ -96,18 +111,22 @@ jobs:
           for pvc in $(oc -n "${DEV_NAMESPACE}" get pvc -o name 2>/dev/null | grep -E -- '-dev-[0-9]+$' || true); do
             pr="$(printf '%s' "${pvc}" | sed -E 's/.*-dev-([0-9]+)$/\1/')"
 
-            # Still owned by a release: handled above, or the PR is open. Leave it alone.
+            # Still owned by a release: handled above, or the PR is open and ready. Leave it alone.
             if helm status "pr-${pr}" --namespace "${DEV_NAMESPACE}" >/dev/null 2>&1; then
               continue
             fi
 
-            state="$(pr_state "${pr}")"
-            if [ -z "${state}" ] || [ "${state}" = "open" ]; then
-              echo "  ${pvc}: PR #${pr} is ${state:-unresolvable}; keeping"
+            verdict="$(pr_verdict "${pr}")"
+            if [ -z "${verdict}" ]; then
+              echo "  ${pvc}: cannot resolve PR #${pr}; keeping"
+              continue
+            fi
+            if [ "${verdict}" = "keep" ]; then
+              echo "  ${pvc}: PR #${pr} is open and ready; keeping"
               continue
             fi
 
-            echo "  ${pvc}: orphaned, PR #${pr} is ${state}; deleting"
+            echo "  ${pvc}: orphaned, PR #${pr} is ${verdict}; deleting"
             if [ "${DRY_RUN}" != "true" ]; then
               oc -n "${DEV_NAMESPACE}" delete "${pvc}"
             fi
@@ -120,8 +139,10 @@ jobs:
             echo "### PR environment sweep (${DEV_NAMESPACE})"
             echo ""
             echo "- dry run: \`${DRY_RUN}\`"
-            echo "- releases removed: ${removed}"
-            echo "- releases kept (PR open): ${kept}"
+            echo "- releases removed (PR closed or merged): ${removed_closed}"
+            echo "- releases removed (PR draft): ${removed_draft}"
+            echo "- releases removed (PR labelled No Preview): ${removed_label}"
+            echo "- releases kept (PR open and ready): ${kept}"
             echo "- releases skipped (PR state unresolvable): ${skipped}"
             echo "- orphaned PVCs deleted: ${orphans}"
           } >> "${GITHUB_STEP_SUMMARY}"
