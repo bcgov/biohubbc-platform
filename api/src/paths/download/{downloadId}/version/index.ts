@@ -4,13 +4,19 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db
 import { DownloadVersionListResponseSchema } from '../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../../openapi/schemas/pagination';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../../services/download/download-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/download/{downloadId}/version');
 
-export const GET: Operation = [listDownloadVersions()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Download', downloadId: req.params.downloadId }]
+  })),
+  listDownloadVersions()
+];
 
 GET.apiDoc = {
   description: 'List versions for a download, newest first',
@@ -40,7 +46,7 @@ GET.apiDoc = {
 };
 
 /**
- * List versions for a download. Download-specific authorization is introduced in SIMSBIOHUB-1074c.
+ * List versions for a download after Download authorization middleware succeeds.
  */
 export function listDownloadVersions(): RequestHandler {
   return async (req, res) => {

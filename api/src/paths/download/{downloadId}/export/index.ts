@@ -4,13 +4,19 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db
 import { DownloadVersionExportListResponseSchema } from '../../../../openapi/schemas/download-version-export';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../../openapi/schemas/pagination';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DownloadExportService } from '../../../../services/download/download-export-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/download/{downloadId}/export');
 
-export const GET: Operation = [listDownloadVersionExports()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Download', downloadId: req.params.downloadId }]
+  })),
+  listDownloadVersionExports()
+];
 
 GET.apiDoc = {
   description: 'List all exports for a download, newest first',
@@ -40,7 +46,7 @@ GET.apiDoc = {
 };
 
 /**
- * List all exports for a download. Download-specific authorization is introduced in SIMSBIOHUB-1074c.
+ * List all exports for a download after Download authorization middleware succeeds.
  * `part_count` is pre-joined at the repo layer so the UI can decide single-vs-multi-part presentation
  * without a per-row detail fetch.
  */

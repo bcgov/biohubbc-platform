@@ -9,7 +9,12 @@ import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}');
 
-export const GET: Operation = [findDownloadById()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Download', downloadId: req.params.downloadId }]
+  })),
+  findDownloadById()
+];
 
 export const PUT: Operation = [
   authorizeRequestHandler(() => ({
@@ -119,8 +124,8 @@ GET.apiDoc = {
 /**
  * Get a download request by ID.
  *
- * Download-specific authorization middleware is introduced in SIMSBIOHUB-1074c. Use the
- * authenticated connection when a bearer token is present, otherwise fall back to the API user.
+ * The Download authorization rule grants UUID access to unclaimed downloads and linked-team access
+ * to claimed downloads.
  *
  * @returns {RequestHandler}
  */

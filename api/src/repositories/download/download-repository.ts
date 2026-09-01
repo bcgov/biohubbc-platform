@@ -321,14 +321,10 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Check if a user is authorized to access a specific download.
-   *
-   * Single authorization path: download_team → team → team_member.
-   * Anonymous downloads (no download_team rows) are not checked here —
-   * callers handle that separately via isDownloadClaimedByTeam.
+   * Check whether a user belongs to an active team linked to a download.
    *
    * @param {string} downloadId - The download ID.
-   * @param {number} systemUserId - The user ID.
+   * @param {number} systemUserId - The authenticated user's ID.
    * @return {Promise<boolean>}
    * @memberof DownloadRepository
    */

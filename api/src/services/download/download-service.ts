@@ -16,12 +16,15 @@ import { DownloadRepository } from '../../repositories/download/download-reposit
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
+import { getLogger } from '../../utils/logger';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPolicyService } from './download-policy-service';
+
+const defaultLog = getLogger('services/download/download-service');
 
 export interface CreateDownloadRequestPayload {
   name: string;
@@ -358,6 +361,56 @@ export class DownloadService extends DBService {
     }
 
     return download;
+  }
+
+  /**
+   * Check whether a request can access a download by UUID or linked-team membership.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number | null} systemUserId - The authenticated user's ID, or null.
+   * @return {Promise<boolean>}
+   */
+  async isUserAuthorizedForDownload(downloadId: string, systemUserId: number | null): Promise<boolean> {
+    const download = await this.downloadRepository.findDownloadById(downloadId);
+
+    if (!download) {
+      defaultLog.warn({
+        label: 'isUserAuthorizedForDownload',
+        message: 'Download authorization denied because the download was not found',
+        downloadId
+      });
+
+      return false;
+    }
+
+    const hasTeams = await this.downloadRepository.isDownloadClaimedByTeam(downloadId);
+
+    if (!hasTeams) {
+      return true;
+    }
+
+    if (systemUserId === null) {
+      defaultLog.warn({
+        label: 'isUserAuthorizedForDownload',
+        message: 'Download authorization denied because authentication is required',
+        downloadId
+      });
+
+      return false;
+    }
+
+    const authorized = await this.downloadRepository.isUserAuthorizedForDownload(downloadId, systemUserId);
+
+    if (!authorized) {
+      defaultLog.warn({
+        label: 'isUserAuthorizedForDownload',
+        message: 'Download authorization denied because the user is not a member of a linked team',
+        downloadId,
+        systemUserId
+      });
+    }
+
+    return authorized;
   }
 
   /**
