@@ -5,7 +5,7 @@ import { PortalRouter } from './PortalRouter';
 
 vi.mock('features/portal/PortalPage', () => ({
   default: ({ initialTab }: { initialTab?: string }) => (
-    <div data-testid="portal-page">{initialTab ? `Portal Page (${initialTab})` : 'Portal Page'}</div>
+    <div data-testid="portal-page">Portal Page ({initialTab ?? 'downloads'})</div>
   )
 }));
 
@@ -45,7 +45,7 @@ describe('PortalRouter routes', () => {
 
     await waitFor(() => {
       expect(getByTestId('portal-page')).toBeVisible();
-      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page');
+      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (downloads)');
     });
   });
 
@@ -64,6 +64,15 @@ describe('PortalRouter routes', () => {
     await waitFor(() => {
       expect(getByTestId('portal-page')).toBeVisible();
       expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (submissions)');
+    });
+  });
+
+  it('renders downloads tab route', async () => {
+    const { getByTestId } = renderPortalRouter('/portal/download');
+
+    await waitFor(() => {
+      expect(getByTestId('portal-page')).toBeVisible();
+      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (downloads)');
     });
   });
 

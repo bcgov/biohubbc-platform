@@ -243,9 +243,7 @@ export class DownloadRepository extends BaseRepository {
       .whereNull('t.record_end_date')
       .whereNull('tm.record_end_date');
 
-    if (pagination) {
-      this.applyPagination(query, pagination);
-    }
+    this.applyPagination(query, pagination);
 
     // Default sort when no pagination sort is specified
     if (!pagination?.sort) {
