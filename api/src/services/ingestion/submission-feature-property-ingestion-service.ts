@@ -1,5 +1,4 @@
 import { IDBConnection } from '../../database/db';
-import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
@@ -8,6 +7,7 @@ import { DBService } from '../db-service';
 import { TaxonomyService } from '../taxonomy-service';
 import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
+import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
@@ -22,7 +22,7 @@ const defaultLog = getLogger('services/ingestion/submission-feature-property-ing
 export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;
   submissionRepository: SubmissionRepository;
-  featureIngestionRepository: FeatureIngestionRepository;
+  submissionFeatureIngestionService: SubmissionFeatureIngestionService;
   contributorService: ContributorService;
   submissionUploadReviewService: SubmissionUploadReviewService;
   submissionUploadService: SubmissionUploadService;
@@ -39,7 +39,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
 
     this.submissionFeaturePropertyIngestionRepository = new SubmissionFeaturePropertyIngestionRepository(connection);
     this.submissionRepository = new SubmissionRepository(connection);
-    this.featureIngestionRepository = new FeatureIngestionRepository(connection);
+    this.submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
     this.contributorService = new ContributorService(connection);
     this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
@@ -221,9 +221,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.submissionFeaturePropertyIngestionRepository.recordDuplicateFeatureSourceIdErrorsBySubmissionUploadId(
-        submissionUploadId
-      );
       await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
         submissionUploadId,
         submissionId
@@ -313,7 +310,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.deletePropertyRecordsBySubmissionUploadId(
         submissionUploadId
       );
-      await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(
+      await this.submissionFeatureIngestionService.updateSubmissionFeatureParentsBySubmissionUploadId(
         submissionUploadId,
         submissionId
       );
@@ -394,7 +391,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * Initialize upload-scoped staging and diagnostics working rows.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped property-ingestion operation completes.
    * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async initializePropertyIngestionStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
@@ -411,7 +408,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped property-ingestion operation completes.
    * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async populateUploadPropertyWorkingSetBySubmissionUploadId(
@@ -441,7 +438,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * @param {string} submissionUploadId Upload scope.
    * @param {number} submissionId The submission the upload belongs to (for feature-reference resolution).
    * @param {number} contributorId Contributor scope for contributor-owned code resolution.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped property-ingestion operation completes.
    * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async populateComplexPropertyCandidateStagingBySubmissionUploadId(
@@ -483,7 +480,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * failing ingestion.
    *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Resolves after the scoped property-ingestion operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(
     submissionUploadId: string

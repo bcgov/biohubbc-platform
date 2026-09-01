@@ -64,11 +64,8 @@ describe('process-submission-features-job', () => {
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
       sinon
-        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionUploadFeaturesForSubmissionUploadId')
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
         .resolves();
-      sinon
-        .stub(SubmissionFeatureIngestionService.prototype, 'hasSubmissionFeaturesForSubmissionUploadId')
-        .resolves(false);
       sinon
         .stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId')
         .resolves([{ upload_archive_id: 'archive-1' }]);
@@ -110,7 +107,7 @@ describe('process-submission-features-job', () => {
       const updateValidationStub = SubmissionValidationService.prototype
         .updateSubmissionValidationStatus as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
+        .deleteSubmissionFeaturesBySubmissionUploadId as sinon.SinonStub;
       expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(updateValidationStub.calledWith('test-job-id', 'completed')).to.be.true;
       expect(deleteFeaturesStub.calledOnceWith('test-sub-upload-id')).to.be.true;
@@ -160,7 +157,7 @@ describe('process-submission-features-job', () => {
 
       const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
+        .deleteSubmissionFeaturesBySubmissionUploadId as sinon.SinonStub;
       expect(toFailedStub.called).to.be.false;
       expect(deleteFeaturesStub.calledWith('test-sub-upload-id')).to.be.true;
     });
@@ -168,11 +165,8 @@ describe('process-submission-features-job', () => {
     it('rethrows original processing error when cleanup fails', async () => {
       const testError = new Error('S3 unavailable');
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').rejects(testError);
-      (
-        SubmissionFeatureIngestionService.prototype.hasSubmissionFeaturesForSubmissionUploadId as sinon.SinonStub
-      ).resolves(false);
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
+        .deleteSubmissionFeaturesBySubmissionUploadId as sinon.SinonStub;
       deleteFeaturesStub.rejects(new Error('cleanup failed'));
 
       try {
@@ -181,25 +175,6 @@ describe('process-submission-features-job', () => {
       } catch (error) {
         expect(error).to.equal(testError);
       }
-    });
-
-    it('skips retained raw feature cleanup when promoted submission features already exist', async () => {
-      const testError = new Error('S3 unavailable');
-      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').rejects(testError);
-      (
-        SubmissionFeatureIngestionService.prototype.hasSubmissionFeaturesForSubmissionUploadId as sinon.SinonStub
-      ).resolves(true);
-
-      try {
-        await processSubmissionFeaturesJobHandler([createMockJob()]);
-        expect.fail('expected an error');
-      } catch (error) {
-        expect(error).to.equal(testError);
-      }
-
-      const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
-        .deleteSubmissionUploadFeaturesForSubmissionUploadId as sinon.SinonStub;
-      expect(deleteFeaturesStub).not.to.have.been.called;
     });
 
     it('skips processing when current status is terminal', async () => {

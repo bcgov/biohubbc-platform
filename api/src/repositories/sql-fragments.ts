@@ -20,7 +20,7 @@ import { Knex } from 'knex';
  * @returns SQL predicate with zero placeholders.
  */
 export function isSubmissionFeatureActive(alias: string): string {
-  return `${alias}.record_effective_date <= now() AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date)`;
+  return `${alias}.record_effective_date <= now() AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date) AND ${alias}.successor_submission_feature_id IS NULL`;
 }
 
 /**

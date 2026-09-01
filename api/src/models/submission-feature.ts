@@ -28,39 +28,6 @@ export const PostSubmissionFeatureArraySchema = z.array(PostSubmissionFeatureSch
 export type PostSubmissionFeature = z.infer<typeof PostSubmissionFeatureSchema>;
 export type PostSubmissionFeatureArray = z.infer<typeof PostSubmissionFeatureArraySchema>;
 
-export const CreateSubmissionFeatureSchema = z.object({
-  id: z.string().min(1, 'Feature id is required'),
-  type: z.string().min(1, 'Feature type is required'),
-  properties: z.record(z.unknown()),
-  content: z.array(z.string()),
-  parent: z.string().nullable()
-});
-
-export type CreateSubmissionFeature = z.infer<typeof CreateSubmissionFeatureSchema>;
-
-export interface DroppedSubmissionFeatureReason {
-  reason: 'unknown_feature_type_ignored' | 'feature_not_inserted';
-  count: number;
-  featureTypeCounts?: Record<string, number>;
-}
-
-export interface SubmissionFeatureBatchInsertResult {
-  expectedCount: number;
-  insertedCount: number;
-  droppedCount: number;
-  droppedReasons: DroppedSubmissionFeatureReason[];
-}
-
-/**
- * Counts returned when revoking submission features and restoring predecessors.
- */
-export const SubmissionFeatureRevocationResult = z.object({
-  revokedFeatureCount: z.number(),
-  restoredFeatureCount: z.number()
-});
-
-export type SubmissionFeatureRevocationResult = z.infer<typeof SubmissionFeatureRevocationResult>;
-
 /**
  * Flat submission feature structure matching SIMS IFlattenedBlock.
  * Parent-child relationships are expressed via UUID references.

@@ -21,6 +21,9 @@ describe('SubmissionUploadService', () => {
   beforeEach(() => {
     mockDBConnection = getMockDBConnection();
     service = new SubmissionUploadService(mockDBConnection);
+    sinon
+      .stub(SubmissionUploadReviewStatusService.prototype, 'assertSubmissionUploadHasNoActivatedFeatures')
+      .resolves();
   });
 
   afterEach(() => {
@@ -283,6 +286,14 @@ describe('SubmissionUploadService', () => {
       const stub = sinon
         .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload')
         .resolves({ submission_upload_id: 'artifact-1' });
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
+      });
 
       const result = await service.updateSubmissionUpload('artifact-1', fakeInput);
 
@@ -298,6 +309,14 @@ describe('SubmissionUploadService', () => {
       };
 
       sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').throws(new Error('Update failed'));
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
+      });
 
       try {
         await service.updateSubmissionUpload('artifact-1', fakeInput);
@@ -305,6 +324,29 @@ describe('SubmissionUploadService', () => {
       } catch (err) {
         expect((err as Error).message).to.equal('Update failed');
       }
+    });
+
+    it('rejects updates after the upload has been approved', async () => {
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'indexed',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
+      });
+      const guard = SubmissionUploadReviewStatusService.prototype
+        .assertSubmissionUploadHasNoActivatedFeatures as sinon.SinonStub;
+      guard.rejects(new HTTP409('Approved submission uploads are immutable'));
+      const update = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload');
+
+      try {
+        await service.updateSubmissionUpload('artifact-1', { comment: 'changed' });
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
+      expect(update).not.to.have.been.called;
     });
   });
 
@@ -315,6 +357,16 @@ describe('SubmissionUploadService', () => {
 
     beforeEach(() => {
       sinon.stub(service, 'getSubmissionUploadBySubmissionUuid').resolves({
+        submission_upload_id: submissionUploadId,
+        submission_id: 1,
+        upload_id: '44444444-4444-4444-4444-444444444444',
+        team_id: teamId,
+        status: 'uploaded',
+        ticket_id: '55555555-5555-5555-5555-555555555555',
+        blueprint_id: 1,
+        comment: null
+      });
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: submissionUploadId,
         submission_id: 1,
         upload_id: '44444444-4444-4444-4444-444444444444',
@@ -378,11 +430,31 @@ describe('SubmissionUploadService', () => {
         expect(deleteTeamStub).not.to.have.been.called;
       }
     });
+
+    it('rejects deletion when the upload has been approved', async () => {
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: submissionUploadId,
+        status: 'submitted'
+      });
+      const guard = SubmissionUploadReviewStatusService.prototype
+        .assertSubmissionUploadHasNoActivatedFeatures as sinon.SinonStub;
+      guard.rejects(new HTTP409('Approved submission uploads are immutable'));
+      const deleteUpload = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
+
+      try {
+        await service.deleteSubmissionUpload(submissionId, submissionUploadId);
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
+      expect(deleteUpload).not.to.have.been.called;
+    });
   });
 
-  describe('transitionSubmissionUploadStatus', () => {
-    it('updates status when current status is in the allowed set', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+  describe('soft delete immutability', () => {
+    it('guards a single upload before soft deletion', async () => {
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -390,7 +462,40 @@ describe('SubmissionUploadService', () => {
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+      const remove = sinon.stub(SubmissionUploadRepository.prototype, 'softDeleteSubmissionUpload').resolves();
+
+      await service.softDeleteSubmissionUpload('artifact-1');
+
+      expect(remove).to.have.been.calledOnceWith('artifact-1');
+    });
+
+    it('locks and guards every upload before bulk soft deletion', async () => {
+      const lock = sinon.stub(SubmissionUploadRepository.prototype, 'lockSubmissionUploadsForSubmissionId').resolves();
+      const bulkGuard = sinon
+        .stub(SubmissionUploadReviewStatusService.prototype, 'assertSubmissionHasNoActivatedFeatures')
+        .resolves();
+      const remove = sinon
+        .stub(SubmissionUploadRepository.prototype, 'softDeleteSubmissionUploadsBySubmissionId')
+        .resolves(2);
+
+      expect(await service.softDeleteSubmissionUploadsBySubmissionId(1)).to.equal(2);
+      expect(lock).to.have.been.calledOnceWith(1);
+      expect(bulkGuard).to.have.been.calledOnceWith(1);
+      expect(remove).to.have.been.calledOnceWith(1);
+    });
+  });
+
+  describe('transitionSubmissionUploadStatus', () => {
+    it('updates status when current status is in the allowed set', async () => {
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
+      });
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
       });
 
@@ -400,7 +505,7 @@ describe('SubmissionUploadService', () => {
     });
 
     it('throws ApiConflictError when current status is not in the allowed set', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -420,7 +525,7 @@ describe('SubmissionUploadService', () => {
 
   describe('transitionSubmissionUploadToIngested', () => {
     it('updates status from ingesting to ingested', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -428,7 +533,7 @@ describe('SubmissionUploadService', () => {
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
       });
 
@@ -437,7 +542,7 @@ describe('SubmissionUploadService', () => {
     });
 
     it('throws ApiConflictError from invalid source state', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -456,16 +561,16 @@ describe('SubmissionUploadService', () => {
   });
 
   describe('transitionSubmissionUploadToIndexing', () => {
-    it('updates status from promoted to indexing', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+    it('updates status from reconciled to indexing', async () => {
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
-        status: 'promoted',
+        status: 'reconciled',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
       });
 
@@ -474,7 +579,7 @@ describe('SubmissionUploadService', () => {
     });
 
     it('does not update when already indexing', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -482,7 +587,7 @@ describe('SubmissionUploadService', () => {
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
       });
 
@@ -491,7 +596,7 @@ describe('SubmissionUploadService', () => {
     });
 
     it('throws ApiConflictError from invalid source state', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -511,7 +616,7 @@ describe('SubmissionUploadService', () => {
 
   describe('transitionSubmissionUploadToIndexed', () => {
     it('updates status from indexing to indexed', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -519,7 +624,7 @@ describe('SubmissionUploadService', () => {
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
       });
 
@@ -528,7 +633,7 @@ describe('SubmissionUploadService', () => {
     });
 
     it('does not update when already indexed', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
@@ -536,7 +641,7 @@ describe('SubmissionUploadService', () => {
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1'
       });
 
@@ -545,7 +650,7 @@ describe('SubmissionUploadService', () => {
     });
 
     it('throws ApiConflictError from invalid source state', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',

@@ -3,13 +3,13 @@ import { RECONCILE_START_STATUSES } from '../../constants/submission-upload';
 import { SubmissionUploadReconciliationService } from '../../services/reconciliation/submission-upload-reconciliation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-import { publishPromoteSubmissionFeaturesJob } from '../publisher';
+import { publishIndexSubmissionFeaturesJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 const defaultLog = getLogger('queue/jobs/reconcile-submission-features-job');
 
 export const reconcileSubmissionFeaturesJobDependencies = {
-  publishPromoteSubmissionFeaturesJob
+  publishIndexSubmissionFeaturesJob
 };
 
 export interface IReconcileSubmissionFeaturesJobData {
@@ -17,7 +17,7 @@ export interface IReconcileSubmissionFeaturesJobData {
 }
 
 /**
- * Reconcile durable staging for an upload.
+ * Reconcile upload-owned submission features before indexing.
  *
  * @param {PgBoss.Job<IReconcileSubmissionFeaturesJobData>[]} jobs Batched pg-boss jobs.
  * @returns {Promise<void>}
@@ -28,22 +28,24 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
   for (const job of jobs) {
     const { submissionUploadId } = job.data;
     await withConnection(async (connection) => {
-      const uploadService = new SubmissionUploadService(connection);
-      const upload = await uploadService.getSubmissionUploadWithLock(submissionUploadId);
+      const submissionUploadService = new SubmissionUploadService(connection);
+      const upload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
       if (!RECONCILE_START_STATUSES.includes(upload.status)) {
         return;
       }
 
-      await uploadService.transitionSubmissionUploadToReconciling(submissionUploadId);
-      const service = new SubmissionUploadReconciliationService(connection);
-      const counts = await service.reconcileSubmissionUploadFeatures(submissionUploadId);
-      if (counts.conflict > 0) {
-        await uploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
+      await submissionUploadService.transitionSubmissionUploadToReconciling(submissionUploadId);
+      const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(connection);
+      const invalidSourceIdentityFeatureCount =
+        await submissionUploadReconciliationService.validateSubmissionFeatureSourceIdentity(submissionUploadId);
+      if (invalidSourceIdentityFeatureCount > 0) {
+        await submissionUploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
         return;
       }
 
-      await uploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
-      await reconcileSubmissionFeaturesJobDependencies.publishPromoteSubmissionFeaturesJob(connection, {
+      await submissionUploadReconciliationService.reconcileSubmissionFeatures(submissionUploadId);
+      await submissionUploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
+      await reconcileSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
         submissionUploadId
       });
     });
@@ -61,8 +63,8 @@ export const reconcileSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IRecon
 ) => {
   for (const job of jobs) {
     await withConnection(async (connection) => {
-      const uploadService = new SubmissionUploadService(connection);
-      await uploadService.transitionSubmissionUploadStatus(job.data.submissionUploadId, 'failed', [
+      const submissionUploadService = new SubmissionUploadService(connection);
+      await submissionUploadService.transitionSubmissionUploadStatus(job.data.submissionUploadId, 'failed', [
         'ingested',
         'reconciling',
         'failed'

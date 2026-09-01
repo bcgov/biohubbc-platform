@@ -1,233 +1,194 @@
-// Integration tests for durable reconciliation, promotion, and activation.
-//
-// Covers immutable submission_feature version history, durable per-upload reconciliation
-// counts, idempotent re-approval, and atomic rejection when classification finds a conflict.
-// Each test seeds its own fixture and rolls back.
-//
-// Run: docker compose exec api npm run test:mocha -- --no-config --extension ts \
-//        'src/__integration__/db/submission-upload-reconciliation-service.integration.ts'
-// Requires: database container running with seed data.
+// Run with: npm run test:db -- --grep "single-table reconciliation"
 
 import { expect } from 'chai';
-import { describe } from 'mocha';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { HTTP409 } from '../../errors/http-error';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionUploadReconciliationService } from '../../services/reconciliation/submission-upload-reconciliation-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { createTestSubmission, createTestUploadWithFeatures } from '../helpers/test-submission-helpers';
 
-const FEATURE_TYPE_NAME = 'survey';
-const SOURCE_ID = 'reconciliation-source-1';
-const HASH_1 = 'a'.repeat(64);
-const HASH_2 = 'b'.repeat(64);
+const HASH_X = 'a'.repeat(64);
+const HASH_Y = 'b'.repeat(64);
 
-describe('SubmissionUploadReconciliationService — activation (integration)', function () {
+describe('single-table reconciliation (integration)', function () {
   this.timeout(30000);
 
   let connection: IDBConnection;
   let service: SubmissionUploadReconciliationService;
 
   before(() => initDBPool(defaultPoolConfig));
-
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
     service = new SubmissionUploadReconciliationService(connection);
   });
-
   afterEach(async () => {
     await connection.rollback();
     connection.release();
   });
 
-  async function createIndexedUpload(
-    submissionId: number,
-    features: Array<{ source_id: string | null; content_hash?: string | null }>
-  ): Promise<string> {
-    const submissionUploadId = await createTestUploadWithFeatures(
+  async function createUpload(submissionId: number, hash: string, sourceId = 'A') {
+    return createTestUploadWithFeatures(
       connection,
       submissionId,
-      FEATURE_TYPE_NAME,
-      [],
+      'survey',
+      [{ source_id: sourceId, content_hash: hash, data: { id: sourceId, type: 'survey', properties: {} } }],
       'indexed'
     );
-    const featureType = await connection.sql(SQL`
-      SELECT feature_type_id FROM feature_type WHERE name = ${FEATURE_TYPE_NAME} LIMIT 1;
-    `);
-    for (const feature of features) {
-      const data = JSON.stringify({ source_id: feature.source_id });
-      await connection.sql(SQL`
-        INSERT INTO submission_upload_feature (
-          submission_upload_id,
-          source_id,
-          feature_type_id,
-          data,
-          data_byte_size,
-          content_hash
-        ) VALUES (
-          ${submissionUploadId}::uuid,
-          ${feature.source_id},
-          ${featureType.rows[0].feature_type_id},
-          ${data}::jsonb,
-          octet_length(${data}::jsonb::text),
-          ${feature.content_hash ?? HASH_1}
-        );
-      `);
-    }
-    const counts = await service.reconcileSubmissionUploadFeatures(submissionUploadId);
-    if (counts.conflict === 0) {
-      await service.promoteSubmissionUploadFeatures(submissionUploadId);
-    }
-    return submissionUploadId;
   }
 
-  async function getFeatureIdsByUpload(submissionUploadId: string): Promise<number[]> {
-    const result = await connection.sql(SQL`
-      SELECT submission_feature_id
-      FROM submission_feature
-      WHERE submission_upload_id = ${submissionUploadId}::uuid
-      ORDER BY submission_feature_id;
-    `);
-    return result.rows.map((row) => row.submission_feature_id);
-  }
-
-  async function publishVersion(submissionId: number, contentHash: string) {
-    const submissionUploadId = await createIndexedUpload(submissionId, [
-      { source_id: SOURCE_ID, content_hash: contentHash }
-    ]);
-    const [submissionFeatureId] = await getFeatureIdsByUpload(submissionUploadId);
-    const counts = await service.activateSubmissionUploadReconciliation(submissionUploadId);
-    await connection.sql(SQL`
-      INSERT INTO submission_upload_status (submission_upload_id, status)
-      VALUES (${submissionUploadId}::uuid, 'approved');
-    `);
-    return { submissionUploadId, submissionFeatureId, counts };
-  }
-
-  async function getFeatureLifecycle(submissionFeatureId: number) {
+  async function featureForUpload(submissionUploadId: string) {
     const result = await connection.sql(SQL`
       SELECT
-        submission_upload_id,
-        source_id,
+        submission_feature_id,
+        reconciliation,
         content_hash,
+        successor_submission_feature_id,
         record_effective_date,
         record_end_date
       FROM submission_feature
-      WHERE submission_feature_id = ${submissionFeatureId};
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `);
     return result.rows[0];
   }
 
-  it('preserves immutable feature versions and durable per-upload counts', async () => {
+  it('creates a distinct unmodified occurrence and preserves a direct successor chain', async () => {
     const submissionId = await createTestSubmission(connection);
 
-    const versionA = await publishVersion(submissionId, HASH_1);
-    expect(versionA.counts).to.eql({ new: 1, unchanged: 0, superseded: 0, conflict: 0 });
+    const uploadA = await createUpload(submissionId, HASH_X);
+    await service.reconcileSubmissionFeatures(uploadA);
+    await service.activateSubmissionUploadReconciliation(uploadA);
 
-    const versionB = await publishVersion(submissionId, HASH_2);
-    expect(versionB.counts).to.eql({ new: 0, unchanged: 0, superseded: 1, conflict: 0 });
+    const uploadB = await createUpload(submissionId, HASH_X);
+    await service.reconcileSubmissionFeatures(uploadB);
+    await service.activateSubmissionUploadReconciliation(uploadB);
 
-    const lifecycleA = await getFeatureLifecycle(versionA.submissionFeatureId);
-    expect(lifecycleA).to.include({
-      submission_upload_id: versionA.submissionUploadId,
-      source_id: SOURCE_ID,
-      content_hash: HASH_1
-    });
-    expect(lifecycleA.record_effective_date).to.not.be.null;
-    expect(lifecycleA.record_end_date).to.not.be.null;
+    const uploadC = await createUpload(submissionId, HASH_Y);
+    await service.reconcileSubmissionFeatures(uploadC);
+    await service.activateSubmissionUploadReconciliation(uploadC);
 
-    const lifecycleB = await getFeatureLifecycle(versionB.submissionFeatureId);
-    expect(lifecycleB).to.include({
-      submission_upload_id: versionB.submissionUploadId,
-      source_id: SOURCE_ID,
-      content_hash: HASH_2
-    });
-    expect(lifecycleB.record_effective_date).to.not.be.null;
-    expect(lifecycleB.record_end_date).to.be.null;
-
-    const reapprovalCounts = await service.activateSubmissionUploadReconciliation(versionB.submissionUploadId);
-    expect(reapprovalCounts).to.eql(versionB.counts);
-
-    await service.revokeSubmissionUploadReconciliation(versionB.submissionUploadId);
-    expect((await getFeatureLifecycle(versionB.submissionFeatureId)).record_end_date).to.not.be.null;
-    expect((await getFeatureLifecycle(versionA.submissionFeatureId)).record_end_date).to.be.null;
-
-    const postRevocationReapprovalCounts = await service.activateSubmissionUploadReconciliation(
-      versionB.submissionUploadId
-    );
-    expect(postRevocationReapprovalCounts).to.eql(versionB.counts);
-    expect((await getFeatureLifecycle(versionB.submissionFeatureId)).record_end_date).to.be.null;
-
-    const summary = await connection.sql(SQL`
-      SELECT sur.reconciliation AS name, sur.count
-      FROM submission_upload_reconciliation sur
-      WHERE sur.submission_upload_id = ${versionB.submissionUploadId}::uuid
-      ORDER BY sur.reconciliation;
-    `);
-    expect(summary.rows).to.deep.equal([
-      { name: 'new', count: 0 },
-      { name: 'unchanged', count: 0 },
-      { name: 'superseded', count: 1 },
-      { name: 'conflict', count: 0 }
+    const [featureA, featureB, featureC] = await Promise.all([
+      featureForUpload(uploadA),
+      featureForUpload(uploadB),
+      featureForUpload(uploadC)
     ]);
 
-    const staging = await connection.sql(SQL`
-      SELECT COUNT(*)::integer AS count
-      FROM submission_upload_feature
-      WHERE submission_upload_id = ${versionB.submissionUploadId}::uuid;
-    `);
-    expect(staging.rows[0].count).to.equal(1);
+    expect(featureA.reconciliation).to.equal('new');
+    expect(featureA.successor_submission_feature_id).to.equal(featureB.submission_feature_id);
+    expect(featureA.record_end_date).to.not.be.null;
+    expect(featureB.reconciliation).to.equal('unmodified');
+    expect(featureB.successor_submission_feature_id).to.equal(featureC.submission_feature_id);
+    expect(featureB.record_end_date).to.not.be.null;
+    expect(featureC.reconciliation).to.equal('modified');
+    expect(featureC.successor_submission_feature_id).to.be.null;
+    expect(featureC.record_effective_date).to.not.be.null;
+    expect(featureC.record_end_date).to.be.null;
 
-    const versionC = await publishVersion(submissionId, HASH_2);
-    expect(versionC.counts).to.eql({ new: 0, unchanged: 1, superseded: 0, conflict: 0 });
-    expect((await getFeatureLifecycle(versionB.submissionFeatureId)).record_end_date).to.be.null;
-    expect(await getFeatureIdsByUpload(versionC.submissionUploadId)).to.deep.equal([]);
-  });
-
-  it('rejects approval when an unchanged reconciliation is stale', async () => {
-    const submissionId = await createTestSubmission(connection);
-    await publishVersion(submissionId, HASH_1);
-    const staleUploadId = await createIndexedUpload(submissionId, [{ source_id: SOURCE_ID, content_hash: HASH_1 }]);
-
-    await publishVersion(submissionId, HASH_2);
-
-    try {
-      await service.activateSubmissionUploadReconciliation(staleUploadId);
-      expect.fail('Expected stale reconciliation rejection');
-    } catch (error) {
-      expect(error).to.be.instanceOf(HTTP409);
-      expect((error as Error).message).to.include('stale');
-    }
-  });
-
-  it('does not partially activate valid features when any reconciliation key conflicts', async () => {
-    const submissionId = await createTestSubmission(connection);
-    const uploadId = await createIndexedUpload(submissionId, [
-      { source_id: `${SOURCE_ID}-valid`, content_hash: HASH_1 },
-      { source_id: null, content_hash: HASH_2 }
-    ]);
-    const featureIds = await getFeatureIdsByUpload(uploadId);
-
-    try {
-      await service.activateSubmissionUploadReconciliation(uploadId);
-      expect.fail('Expected reconciliation conflict');
-    } catch (error) {
-      expect(error).to.be.instanceOf(HTTP409);
-    }
-
-    const lifecycle = await connection.sql(SQL`
-      SELECT submission_feature_id, record_effective_date, record_end_date
+    const current = await connection.sql(SQL`
+      SELECT submission_feature_id
       FROM submission_feature
-      WHERE submission_feature_id = ANY(${featureIds}::integer[])
-      ORDER BY submission_feature_id;
+      WHERE submission_id = ${submissionId}
+        AND source_id = 'A'
+        AND record_effective_date <= now()
+        AND (record_end_date IS NULL OR now() < record_end_date)
+        AND successor_submission_feature_id IS NULL;
     `);
-    expect(lifecycle.rows).to.have.lengthOf(0);
+    expect(current.rows).to.deep.equal([{ submission_feature_id: featureC.submission_feature_id }]);
+  });
 
-    const summary = await connection.sql(SQL`
-      SELECT 1
-      FROM submission_upload_reconciliation
+  it('publishes the reconciliation stored during intake without reclassifying at approval', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const baselineUpload = await createUpload(submissionId, HASH_X);
+    await service.reconcileSubmissionFeatures(baselineUpload);
+    await service.activateSubmissionUploadReconciliation(baselineUpload);
+
+    const pendingUpload = await createUpload(submissionId, HASH_X);
+    await service.reconcileSubmissionFeatures(pendingUpload);
+
+    const approvalCounts = await service.activateSubmissionUploadReconciliation(pendingUpload);
+    expect(approvalCounts).to.eql({ new: 0, modified: 0, unmodified: 1 });
+    expect((await featureForUpload(pendingUpload)).reconciliation).to.equal('unmodified');
+  });
+
+  it('rejects duplicate source identity before reconciliation', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUploadWithFeatures(
+      connection,
+      submissionId,
+      'survey',
+      [
+        { source_id: 'duplicate', content_hash: HASH_X },
+        { source_id: 'duplicate', content_hash: HASH_Y }
+      ],
+      'indexed'
+    );
+
+    expect(await service.validateSubmissionFeatureSourceIdentity(uploadId)).to.equal(2);
+    const rows = await connection.sql(SQL`
+      SELECT reconciliation
+      FROM submission_feature
       WHERE submission_upload_id = ${uploadId}::uuid;
     `);
-    expect(summary.rowCount).to.equal(4);
+    expect(rows.rows).to.deep.equal([{ reconciliation: null }, { reconciliation: null }]);
+  });
+
+  it('replaces never-activated ingestion rows without deleting activated history', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const pendingUpload = await createUpload(submissionId, HASH_X, 'pending');
+    const activatedUpload = await createUpload(submissionId, HASH_Y, 'activated');
+    await service.reconcileSubmissionFeatures(activatedUpload);
+    await service.activateSubmissionUploadReconciliation(activatedUpload);
+
+    const repository = new FeatureIngestionRepository(connection);
+    await repository.deleteSubmissionFeaturesBySubmissionUploadId(pendingUpload);
+    await repository.deleteSubmissionFeaturesBySubmissionUploadId(activatedUpload);
+
+    const result = await connection.sql(SQL`
+      SELECT submission_upload_id, record_effective_date
+      FROM submission_feature
+      WHERE submission_upload_id IN (${pendingUpload}::uuid, ${activatedUpload}::uuid)
+      ORDER BY submission_upload_id;
+    `);
+
+    expect(result.rows).to.have.length(1);
+    expect(result.rows[0].submission_upload_id).to.equal(activatedUpload);
+    expect(result.rows[0].record_effective_date).to.not.be.null;
+  });
+
+  it('blocks mutation after activation while allowing pending uploads to be removed', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const approvedUpload = await createUpload(submissionId, HASH_X);
+    await service.reconcileSubmissionFeatures(approvedUpload);
+    await service.activateSubmissionUploadReconciliation(approvedUpload);
+
+    // Superseding every feature from the first upload must not restore its mutability.
+    const successorUpload = await createUpload(submissionId, HASH_Y);
+    await service.reconcileSubmissionFeatures(successorUpload);
+    await service.activateSubmissionUploadReconciliation(successorUpload);
+
+    const pendingUpload = await createUpload(submissionId, HASH_Y, 'B');
+    const submissionUploadService = new SubmissionUploadService(connection);
+
+    try {
+      await submissionUploadService.softDeleteSubmissionUpload(approvedUpload);
+      expect.fail('Expected activated upload mutation to be rejected');
+    } catch (error) {
+      expect(error).to.be.instanceOf(HTTP409);
+      expect((error as HTTP409).message).to.include('immutable');
+    }
+
+    await submissionUploadService.softDeleteSubmissionUpload(pendingUpload);
+
+    const result = await connection.sql(SQL`
+      SELECT submission_upload_id, record_end_date
+      FROM submission_upload
+      WHERE submission_upload_id IN (${approvedUpload}::uuid, ${pendingUpload}::uuid)
+      ORDER BY submission_upload_id;
+    `);
+    const rows = new Map(result.rows.map((row) => [row.submission_upload_id, row.record_end_date]));
+    expect(rows.get(approvedUpload)).to.be.null;
+    expect(rows.get(pendingUpload)).to.not.be.null;
   });
 });

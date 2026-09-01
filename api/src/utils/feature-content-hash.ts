@@ -7,7 +7,7 @@ import { IFlattenedBlock } from '../models/submission-feature';
  *
  * `String.prototype.localeCompare` is intentionally NOT used: its ordering is
  * locale/ICU-dependent, which would make the content hash differ across environments
- * (breaking the unchanged-vs-superseded classification the hash exists to drive) and
+ * (breaking the unmodified-vs-modified classification the hash exists to drive) and
  * change it versus the default `Array.prototype.sort` these calls previously relied on.
  * Code-unit order (the `<`/`>` operators) is stable everywhere and reproduces that prior
  * default ordering exactly, so stored hashes stay byte-identical.
@@ -34,8 +34,7 @@ function compareByCodeUnit(a: string, b: string): number {
  * The hash identifies whether the meaningful submitted content of a feature changed
  * between uploads: repeated uploads compare the incoming hash against the stored
  * `submission_feature.content_hash` of the published row with the same
- * (submission_id, feature_type_id, source_id) to classify the feature as unchanged
- * or superseded.
+ * (submission_id, source_id) to classify the feature as unmodified or modified.
  *
  * Normalized form:
  * - The hashed object is `{ type, parent, content, properties }` from the submitted
@@ -56,7 +55,7 @@ function compareByCodeUnit(a: string, b: string): number {
  *   entries with `undefined` values dropped and `undefined` array elements emitted
  *   as `null` (mirroring `JSON.stringify`).
  * - Geometry is not semantically normalized: differently-encoded but equivalent
- *   geometries hash differently and classify as superseded rather than unchanged —
+ *   geometries hash differently and classify as modified rather than unmodified —
  *   an extra version, never a missed update.
  *
  * @export
