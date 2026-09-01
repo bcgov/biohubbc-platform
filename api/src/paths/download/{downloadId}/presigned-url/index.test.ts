@@ -41,7 +41,7 @@ describe('paths/download/{downloadId}/presigned-url', () => {
   describe('getDownloadPresignedUrl', () => {
     it('returns 200 with parts for a READY download', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       sinon.stub(DownloadService.prototype, 'listDownloadParquetUrls').resolves(makeParts());
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(makeDownloadRecord());
@@ -63,7 +63,7 @@ describe('paths/download/{downloadId}/presigned-url', () => {
 
     it('returns 200 with parts for a DOWNLOADED download', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       sinon.stub(DownloadService.prototype, 'listDownloadParquetUrls').resolves(makeParts());
       sinon
@@ -82,7 +82,7 @@ describe('paths/download/{downloadId}/presigned-url', () => {
 
     it('throws HTTP409 when download status is PENDING', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       sinon
         .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.PENDING }));
@@ -103,7 +103,7 @@ describe('paths/download/{downloadId}/presigned-url', () => {
 
     it('throws HTTP409 when download status is PROCESSING', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       sinon
         .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
@@ -124,7 +124,7 @@ describe('paths/download/{downloadId}/presigned-url', () => {
 
     it('throws HTTP409 when download status is FAILED', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       sinon
         .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.FAILED }));

@@ -247,6 +247,9 @@ export class AuthorizationService extends DBService {
     }
 
     const user = await this.getCachedSystemUser();
+    if (!user && authorizeRule.entity !== 'download') {
+      return false;
+    }
 
     const teamAuthorizationService = new TeamAuthorizationService(this.connection);
     return teamAuthorizationService.isUserAuthorizedForTeamEntity(user?.system_user_id ?? null, authorizeRule);

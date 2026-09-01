@@ -1,11 +1,11 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
+import { IsAuthorized } from '../../models/download';
 import {
   DataRequestRecord,
   SubmissionRecord,
   SubmissionUploadRecord,
-  TeamAuthorizationResult,
   TicketRecord
 } from '../../models/team-authorization';
 import { BaseRepository } from '../base-repository';
@@ -210,7 +210,7 @@ export class TeamAuthorizationRepository extends BaseRepository {
       ) AS authorized;
     `;
 
-    const response = await this.connection.sql(sql, TeamAuthorizationResult);
+    const response = await this.connection.sql(sql, IsAuthorized);
 
     return response.rows[0]?.authorized ?? false;
   }

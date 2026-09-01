@@ -3,10 +3,9 @@ import { Request } from 'express';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection, getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
+import { getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../models/system-user';
-import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { AuthorizationService } from '../../services/authorization/authorization-service';
 import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
 import * as authorization from './authorization';
@@ -239,66 +238,5 @@ describe('authorizeRequest', function () {
     expect(isAuthorized).to.equal(true);
     expect(findContributorSystemUserStub).to.have.been.calledOnceWith(12);
     expect(mockReq.contributor_id).to.equal(77);
-  });
-});
-
-describe('AuthorizationService team download authorization', function () {
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('authorizes anonymous access to an unclaimed download', async function () {
-    const connection = getMockDBConnection();
-    const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
-    const teamAuthStub = sinon
-      .stub(TeamAuthorizationRepository.prototype, 'isUserAuthorizedForDownload')
-      .resolves(true);
-
-    const service = new AuthorizationService(connection);
-    const isAuthorized = await service.executeAuthorizationScheme({
-      and: [{ discriminator: 'Team', entity: 'download', downloadId }]
-    });
-
-    expect(isAuthorized).to.equal(true);
-    expect(teamAuthStub).to.have.been.calledOnceWith(null, downloadId);
-  });
-
-  it('authorizes authenticated access when the user belongs to a download team', async function () {
-    const connection = getMockDBConnection();
-    const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
-    const systemUser = {
-      system_user_id: 42,
-      role_names: [],
-      record_end_date: null
-    } as unknown as SystemUserExtended;
-    const teamAuthStub = sinon
-      .stub(TeamAuthorizationRepository.prototype, 'isUserAuthorizedForDownload')
-      .resolves(true);
-
-    const service = new AuthorizationService(connection, { systemUser });
-    const isAuthorized = await service.executeAuthorizationScheme({
-      and: [{ discriminator: 'Team', entity: 'download', downloadId }]
-    });
-
-    expect(isAuthorized).to.equal(true);
-    expect(teamAuthStub).to.have.been.calledOnceWith(42, downloadId);
-  });
-
-  it('rejects team-based download access when the user is not a team member', async function () {
-    const connection = getMockDBConnection();
-    const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
-    const systemUser = {
-      system_user_id: 42,
-      role_names: [],
-      record_end_date: null
-    } as unknown as SystemUserExtended;
-    sinon.stub(TeamAuthorizationRepository.prototype, 'isUserAuthorizedForDownload').resolves(false);
-
-    const service = new AuthorizationService(connection, { systemUser });
-    const isAuthorized = await service.executeAuthorizationScheme({
-      and: [{ discriminator: 'Team', entity: 'download', downloadId }]
-    });
-
-    expect(isAuthorized).to.equal(false);
   });
 });

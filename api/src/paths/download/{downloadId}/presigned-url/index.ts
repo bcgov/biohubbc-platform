@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection } from '../../../../database/db';
+import { getDBConnection } from '../../../../database/db';
 import { HTTP404, HTTP409 } from '../../../../errors/http-error';
 import { DownloadStatusEnum } from '../../../../models/download-status';
 import { DownloadPresignedUrlResponseSchema } from '../../../../openapi/schemas/download';
@@ -63,7 +63,7 @@ GET.apiDoc = {
  */
 export function getDownloadPresignedUrl(): RequestHandler {
   return async (req, res) => {
-    const connection = getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

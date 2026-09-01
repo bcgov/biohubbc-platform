@@ -625,6 +625,7 @@ describe('authorizeByTeam', function () {
   it('returns false if no system user is found', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const teamAuthorizationStub = sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity');
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
@@ -635,6 +636,27 @@ describe('authorizeByTeam', function () {
     });
 
     expect(result).to.be.false;
+    expect(teamAuthorizationStub).not.to.have.been.called;
+  });
+
+  it('delegates anonymous download authorization with a null system user ID', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const teamAuthorizationStub = sinon
+      .stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity')
+      .resolves(true);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+    const rule = {
+      discriminator: 'Team' as const,
+      entity: 'download' as const,
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+    };
+
+    const result = await authorizationService.authorizeByTeam(rule);
+
+    expect(result).to.be.true;
+    expect(teamAuthorizationStub).to.have.been.calledOnceWith(null, rule);
   });
 
   it('returns true when TeamAuthorizationService grants access', async function () {

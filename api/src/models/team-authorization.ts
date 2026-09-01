@@ -27,9 +27,3 @@ export const SubmissionRecord = z.object({
 });
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
-
-export const TeamAuthorizationResult = z.object({
-  authorized: z.boolean()
-});
-
-export type TeamAuthorizationResult = z.infer<typeof TeamAuthorizationResult>;
