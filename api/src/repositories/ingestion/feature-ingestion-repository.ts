@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { FeatureType, FeatureTypeWithProperties } from '../../models/feature-type';
 import { BaseRepository } from '../base-repository';
-import { isSubmissionFeatureActive } from '../sql-fragments';
+import { isSubmissionFeatureCurrent } from '../sql-fragments';
 
 type SubmissionFeatureIngestionRecord = {
   submissionId: number;
@@ -81,10 +81,10 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Bulk insert uploaded feature occurrences directly into submission_feature.
+   * Bulk insert uploaded feature rows directly into submission_feature.
    *
    * @param {SubmissionFeatureIngestionRecord[]} records Feature records prepared from the shallow-validated upload batch.
-   * @returns {Promise<number>} Number of feature occurrence rows inserted.
+   * @returns {Promise<number>} Number of feature rows inserted.
    * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatures(records: SubmissionFeatureIngestionRecord[]): Promise<number> {
@@ -150,10 +150,10 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Delete never-activated rows from an incomplete ingestion attempt.
+   * Delete never-published feature rows from an incomplete ingestion attempt.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
-   * @returns {Promise<void>} Resolves after all never-activated rows for the upload have been deleted.
+   * @returns {Promise<void>} Resolves after all never-published feature rows for the upload have been deleted.
    * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
@@ -199,7 +199,7 @@ export class FeatureIngestionRepository extends BaseRepository {
               AND parent.record_end_date IS NULL
             )
             OR (`;
-    sqlStatement.append(isSubmissionFeatureActive('parent'));
+    sqlStatement.append(isSubmissionFeatureCurrent('parent'));
     sqlStatement.append(SQL`)
         )
         ORDER BY

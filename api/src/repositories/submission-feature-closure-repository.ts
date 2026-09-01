@@ -13,7 +13,7 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * Delete the closure rows for a single submission.
    *
    * Scoped by source: every closure row has BOTH endpoints in one submission (the edge CTEs in
-   * {@link computeClosureForSubmission} joins both endpoints to the submission's active features), so
+   * {@link computeClosureForSubmission} joins both endpoints to the submission's current features), so
    * matching by source already identifies all of the submission's rows — and it matches on the primary
    * key, so no reverse index is needed. submission_feature is submission-wide (not non-ended-only), so an
    * ended feature's stale rows are swept too.
@@ -40,9 +40,10 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * Compute and insert the directed reachability closure for a single submission.
    *
    * Closure = reachability over the submission's parent and property (feature-reference) edges — the
-   * "evidence" reach used by search. The universe is the submission's current published rows across
-   * all uploads. Stored relationship targets remain immutable occurrence IDs; before graph recursion,
-   * distinct targets are resolved through direct successor links to their current terminal occurrence.
+   * "evidence" reach used by search. The universe is the submission's current features—published,
+   * not ended, and without successors—across
+   * all uploads. Stored relationship targets remain immutable feature IDs; before graph recursion,
+   * distinct targets are resolved through direct successor links to their terminal current feature.
    * Content edges (submission_feature_feature) are deliberately EXCLUDED: content is the parent tree
    * reversed, so closing over (parent + content) makes every tree edge bidirectional and the closure
    * becomes the complete digraph (O(N^2)). UNION (not UNION ALL) in the recursive CTEs terminates cycles
@@ -68,8 +69,8 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
     // the search reach and a superset. is_ancestor is true iff the edge is also in the ancestry closure.
     const sqlStatement = SQL`
       WITH RECURSIVE
-      -- Active features in the submission (the universe for self-loops and edge filtering).
-      active_features AS (
+      -- Current features in the submission (the universe for self-loops and edge filtering).
+      current_features AS (
         SELECT submission_feature_id
         FROM submission_feature
         WHERE submission_id = ${submissionId}
@@ -77,21 +78,27 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
           AND (record_end_date IS NULL OR now() < record_end_date)
           AND successor_submission_feature_id IS NULL
       ),
-      -- Resolve only occurrence IDs referenced by current sources. The path guard prevents malformed
+      -- Resolve only feature IDs referenced by current sources. The path guard prevents malformed
       -- successor cycles from hanging the rebuild; a cycle has no terminal and therefore yields no edge.
       stored_targets AS (
         SELECT DISTINCT child.parent_submission_feature_id AS original_id
         FROM submission_feature child
-        JOIN active_features active_source
-          ON active_source.submission_feature_id = child.submission_feature_id
+        JOIN current_features current_source
+          ON current_source.submission_feature_id = child.submission_feature_id
+        JOIN submission_feature stored_target
+          ON stored_target.submission_feature_id = child.parent_submission_feature_id
+         AND stored_target.submission_id = ${submissionId}
         WHERE child.parent_submission_feature_id IS NOT NULL
 
         UNION
 
         SELECT DISTINCT property.referenced_submission_feature_id AS original_id
         FROM submission_feature_property_feature property
-        JOIN active_features active_source
-          ON active_source.submission_feature_id = property.submission_feature_id
+        JOIN current_features current_source
+          ON current_source.submission_feature_id = property.submission_feature_id
+        JOIN submission_feature stored_target
+          ON stored_target.submission_feature_id = property.referenced_submission_feature_id
+         AND stored_target.submission_id = ${submissionId}
       ),
       successor_walk AS (
         SELECT original_id, original_id AS resolved_id, ARRAY[original_id]::integer[] AS path
@@ -105,26 +112,27 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
         FROM successor_walk walk
         JOIN submission_feature feature
           ON feature.submission_feature_id = walk.resolved_id
+         AND feature.submission_id = ${submissionId}
         WHERE feature.successor_submission_feature_id IS NOT NULL
           AND NOT feature.successor_submission_feature_id = ANY(walk.path)
       ),
       resolved_targets AS (
         SELECT walk.original_id, walk.resolved_id
         FROM successor_walk walk
-        JOIN active_features active_target
-          ON active_target.submission_feature_id = walk.resolved_id
+        JOIN current_features current_target
+          ON current_target.submission_feature_id = walk.resolved_id
       ),
-      -- Reflexive self-loops (every active feature reaches itself) seed the closure.
+      -- Reflexive self-loops (every current feature reaches itself) seed the closure.
       self_loops AS (
-        SELECT submission_feature_id AS source, submission_feature_id AS target FROM active_features
+        SELECT submission_feature_id AS source, submission_feature_id AS target FROM current_features
       ),
       -- Direct parent and property-reference edges. Sources are current; immutable stored targets are
-      -- normalized to current physical occurrences before entering either graph recursion.
+      -- normalized to current feature rows before entering either graph recursion.
       parent_edges AS (
         SELECT child.submission_feature_id AS source, resolved.resolved_id AS target
         FROM submission_feature child
-        JOIN active_features active_source
-          ON active_source.submission_feature_id = child.submission_feature_id
+        JOIN current_features current_source
+          ON current_source.submission_feature_id = child.submission_feature_id
         JOIN resolved_targets resolved
           ON resolved.original_id = child.parent_submission_feature_id
         WHERE child.parent_submission_feature_id IS NOT NULL
@@ -133,8 +141,8 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
         SELECT property.submission_feature_id AS source,
                resolved.resolved_id AS target
         FROM submission_feature_property_feature property
-        JOIN active_features active_source
-          ON active_source.submission_feature_id = property.submission_feature_id
+        JOIN current_features current_source
+          ON current_source.submission_feature_id = property.submission_feature_id
         JOIN resolved_targets resolved
           ON resolved.original_id = property.referenced_submission_feature_id
       ),

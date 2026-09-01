@@ -1,21 +1,54 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import {
+  buildSubmissionFeatureTerminalSubquery,
   codePropertyValueJson,
   featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
-  isSubmissionFeatureActive,
+  isSubmissionFeatureCurrent,
+  isSubmissionFeaturePublished,
   taxonPropertyValueJson
 } from './sql-fragments';
 
 describe('sql-fragments', () => {
-  describe('isSubmissionFeatureActive', () => {
-    it('requires an effective record that has not ended', () => {
-      const sql = isSubmissionFeatureActive('sf');
+  describe('isSubmissionFeaturePublished', () => {
+    it('requires only an effective record', () => {
+      const sql = isSubmissionFeaturePublished('sf');
+
+      expect(sql).to.equal('sf.record_effective_date <= now()');
+    });
+  });
+
+  describe('isSubmissionFeatureCurrent', () => {
+    it('requires a published terminal feature that has not ended', () => {
+      const sql = isSubmissionFeatureCurrent('sf');
 
       expect(sql).to.include('sf.record_effective_date <= now()');
       expect(sql).to.include('(sf.record_end_date IS NULL OR now() < sf.record_end_date)');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+    });
+  });
+
+  describe('buildSubmissionFeatureTerminalSubquery', () => {
+    it('follows same-submission successors and returns only a current terminal id', () => {
+      const sql = buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id').toLowerCase();
+
+      expect(sql).to.include('with recursive successor_chain');
+      expect(sql).to.match(/successor_chain[\s\S]*\bunion\b(?!\s+all)/);
+      expect(sql).to.include('successor.successor_submission_feature_id');
+      expect(sql).to.include('successor.submission_id = chain.submission_id');
+      expect(sql).to.include('union');
+      expect(sql).to.not.include('union all');
+      expect(sql).to.not.include('path');
+      expect(sql).to.include('chain.successor_submission_feature_id is null');
+      expect(sql).to.include('as terminal_submission_feature_id');
+    });
+
+    it('contains zero bound placeholders', () => {
+      const sql = buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id');
+
+      expect(sql.match(/\?/g) || []).to.be.empty;
     });
   });
 

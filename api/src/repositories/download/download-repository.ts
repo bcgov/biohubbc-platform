@@ -15,7 +15,7 @@ import {
 } from '../../models/download';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
-import { isSubmissionFeatureActive } from '../sql-fragments';
+import { isSubmissionFeatureCurrent } from '../sql-fragments';
 
 /**
  * Row shape for the typed-cursor base query.
@@ -566,7 +566,7 @@ export class DownloadRepository extends BaseRepository {
       INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
       INNER JOIN submission_feature sf
         ON sf.submission_feature_id = p.referenced_submission_feature_id
-        AND ${isSubmissionFeatureActive('sf')}
+        AND ${isSubmissionFeatureCurrent('sf')}
       WHERE p.submission_feature_id = ANY($1)
       GROUP BY p.submission_feature_id, fp.name`,
       artifact_key: `SELECT
@@ -599,7 +599,7 @@ export class DownloadRepository extends BaseRepository {
         ON ftp.feature_type_property_id = artifact_ftp.feature_type_property_id
       INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
       WHERE sfa.submission_feature_id = ANY($1)
-        AND ${isSubmissionFeatureActive('sf')}
+        AND ${isSubmissionFeatureCurrent('sf')}
       GROUP BY sfa.submission_feature_id, fp.name`
     };
 

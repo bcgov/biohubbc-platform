@@ -6,7 +6,7 @@ import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
-import { isEffectivelySecured, isSubmissionFeatureActive } from '../sql-fragments';
+import { isEffectivelySecured, isSubmissionFeatureCurrent } from '../sql-fragments';
 
 /**
  * Repository for security scope tables — the normalized access model that replaces
@@ -206,7 +206,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ps.effect = '${PolicyEffect.ALLOW}'
            AND p.record_end_date IS NULL
            AND p.status = 'approved'
-           AND ${isSubmissionFeatureActive('anchor_sf')}
+           AND ${isSubmissionFeatureCurrent('anchor_sf')}
            AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
            AND (ss.urn_feature_type = ft.name                       OR ss.urn_feature_type = '*')
            AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
@@ -349,7 +349,7 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT candidate.submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
-         WHERE ${isSubmissionFeatureActive('candidate')}
+         WHERE ${isSubmissionFeatureCurrent('candidate')}
            AND EXISTS (
              -- isEffectivelySecured deliberately fails closed when closure is missing; cache writers
              -- require positive evidence that the derived graph is available before creating anchors.
@@ -422,7 +422,7 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT candidate.submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
-         WHERE ${isSubmissionFeatureActive('candidate')}
+         WHERE ${isSubmissionFeatureCurrent('candidate')}
            AND EXISTS (
              SELECT 1
              FROM submission_feature_closure closure_ready

@@ -12,7 +12,7 @@ import {
   featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
-  isSubmissionFeatureActive,
+  isSubmissionFeatureCurrent,
   taxonPropertyValueJson
 } from './sql-fragments';
 
@@ -169,7 +169,7 @@ export class SearchFeatureRepository extends BaseRepository {
     const knex = getKnex();
 
     // Compile the normalized expression into an unexecuted feature-id subquery. When there is no
-    // expression, the matching-feature query below uses all active features of the anchor type.
+    // expression, the matching-feature query below uses all current features of the anchor type.
     const expressionFeatureIds = expressionTree
       ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
           anchorFeatureType,
@@ -270,7 +270,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .select('sf.submission_feature_id', 'sf.feature_type_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
-      .whereRaw(isSubmissionFeatureActive('sf'));
+      .whereRaw(isSubmissionFeatureCurrent('sf'));
 
     if (expressionFeatureIds) {
       query.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -328,7 +328,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .joinRaw(this.buildTypedPropertiesLateralJoinSql())
       .where('ft.name', anchorFeatureType)
-      .whereRaw(isSubmissionFeatureActive('sf'));
+      .whereRaw(isSubmissionFeatureCurrent('sf'));
 
     if (expressionFeatureIds) {
       expressionResults.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -552,7 +552,7 @@ export class SearchFeatureRepository extends BaseRepository {
              AND fp.record_end_date IS NULL
             JOIN submission_feature referenced_sf
               ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-             AND ${isSubmissionFeatureActive('referenced_sf')}
+             AND ${isSubmissionFeatureCurrent('referenced_sf')}
             WHERE p.submission_feature_id = sf.submission_feature_id
           ) AS property_values
           GROUP BY property_values.name

@@ -22,9 +22,10 @@ export class SubmissionFeatureClosureService extends DBService {
    * Recompute the directed reachability closure for a single submission.
    *
    * The closure is reachability over the union of parent and property (feature-reference) edges,
-   * recomputed wholesale for the submission so it always reflects the current live feature graph across
+   * recomputed wholesale for the submission so it always reflects the current feature graph—published,
+   * not ended, and without successors—across
    * all of the submission's uploads rather than an accumulation of prior states. Successive uploads
-   * create new physical occurrences, so cross-upload edges (a live feature parented by or referencing a
+   * create new feature rows, so cross-upload edges (a current feature parented by or referencing a
    * current feature from an earlier upload) are part of the graph. Content edges are intentionally
    * excluded (closing over parent + content is O(N^2)). Reachability is stored as directed
    * `(source, target)` rows probed in both directions: the composite `(source, target)` primary key
@@ -36,7 +37,7 @@ export class SubmissionFeatureClosureService extends DBService {
    *
    * Recomputed wholesale: the submission's prior closure rows are deleted, then the closure is
    * recomputed from the current feature graph. The caller runs both statements in one transaction (the
-   * job handler's `withConnection`, or the upload-activation transaction), so the recompute is atomic
+   * job handler's `withConnection`), so the recompute is atomic
    * and idempotent under retry — a deleted-but-not-yet-reinserted state is never visible to another
    * reader, and rerunning converges on the same rows rather than accumulating duplicates.
    *
@@ -58,9 +59,8 @@ export class SubmissionFeatureClosureService extends DBService {
   /**
    * Invalidate the derived graph for a submission.
    *
-   * Approval calls this after feature activation in the same transaction. Once committed, the
-   * absence of closure self-loops makes authorization fail closed until the asynchronous rebuild
-   * completes. Closure rows are derived state and are hard-deleted rather than temporally retired.
+   * This is the first half of an atomic closure recomputation. It is not part of feature publication:
+   * publication deliberately leaves the old snapshot readable until the asynchronous rebuild replaces it.
    *
    * @param {number} submissionId Submission identifier whose derived closure rows are removed.
    * @returns {Promise<void>} Resolves after the submission's closure rows have been deleted.

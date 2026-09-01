@@ -11,7 +11,7 @@ export interface ISubmissionFeature {
   feature_type_display_name: string;
   submission_name: string;
   source_id: string | null;
-  data: Record<string, any>;
+  data?: Record<string, any>;
   secured: boolean;
   security_reasons: string[];
 }

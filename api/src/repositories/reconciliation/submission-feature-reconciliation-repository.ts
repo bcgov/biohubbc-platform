@@ -31,36 +31,24 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
   }
 
   /**
-   * Delete existing source-identity errors for an upload before validation is rerun.
-   *
-   * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<void>} Resolves after the prior source-identity errors are deleted.
-   * @memberof SubmissionFeatureReconciliationRepository
-   */
-  async deleteSourceIdentityErrors(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_feature_error
-      WHERE submission_upload_id = ${submissionUploadId}::uuid
-        AND error_code IN ('MISSING_FEATURE_SOURCE_ID', 'DUPLICATE_FEATURE_SOURCE_ID');
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Identify and persist missing and duplicate source-identity errors for an upload.
+   * Replace missing and duplicate source-identity errors for an upload.
    *
    * Detection remains database-side so potentially large source-identifier collections are never
    * materialized in the application. The returned count represents invalid feature occurrences,
    * which can exceed the number of inserted error rows when a duplicate group contains many rows.
    *
    * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<number>} Number of feature occurrences with an invalid source identifier.
+   * @returns {Promise<number>} Number of features with an invalid source identifier.
    * @memberof SubmissionFeatureReconciliationRepository
    */
-  async insertSourceIdentityErrors(submissionUploadId: string): Promise<number> {
+  async replaceSourceIdentityErrors(submissionUploadId: string): Promise<number> {
     const sql = SQL`
-      WITH missing AS (
+      WITH deleted AS (
+        DELETE FROM submission_feature_error
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND error_code IN ('MISSING_FEATURE_SOURCE_ID', 'DUPLICATE_FEATURE_SOURCE_ID')
+      ),
+      missing AS (
         SELECT COUNT(*)::integer AS count
         FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}::uuid
@@ -231,6 +219,7 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
 
   /**
    * Link current predecessors to their direct successors and end the predecessors.
+   * A current predecessor is published, not ended, and has no successor feature.
    *
    * The caller must hold the submission feature-state lock and execute this method in the approval
    * transaction. Any currently published occurrence with the same source identifier is replaced.
@@ -269,8 +258,8 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
    * linking in the approval transaction.
    *
    * @param {string} submissionUploadId Submission upload identifier.
-   * @param {number} submissionId Submission identifier used to scope feature activation.
-   * @returns {Promise<number>} Number of reconciled feature rows activated.
+   * @param {number} submissionId Submission identifier used to scope feature publication.
+   * @returns {Promise<number>} Number of reconciled features published.
    * @memberof SubmissionFeatureReconciliationRepository
    */
   async activateReconciledSubmissionFeatures(submissionUploadId: string, submissionId: number): Promise<number> {

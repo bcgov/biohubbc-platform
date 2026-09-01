@@ -523,13 +523,16 @@ export class SecurityRepository extends BaseRepository {
   async getSecurityRulesForSubmissionFeatures(
     submissionFeatureIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    const queryBuilder = getKnex()
+    const knex = getKnex();
+    const queryBuilder = knex
       .queryBuilder()
       .select('*')
       .from('submission_feature_security')
       .whereIn('submission_feature_id', submissionFeatureIds)
       // Draft rows (automatic screening output pending review) are not applied security
-      .where('status', 'active');
+      .where('status', 'active')
+      .where('record_effective_date', '<=', knex.fn.now())
+      .where((lifecycle) => lifecycle.whereNull('record_end_date').orWhere('record_end_date', '>', knex.fn.now()));
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
@@ -561,6 +564,10 @@ export class SecurityRepository extends BaseRepository {
         qb.select('sfs.security_rule_id', knex.raw('COUNT(*)::int AS count'))
           .from('submission_feature_security as sfs')
           .where('sfs.status', 'active')
+          .where('sfs.record_effective_date', '<=', knex.fn.now())
+          .where((lifecycle) =>
+            lifecycle.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now())
+          )
           .whereIn('sfs.submission_feature_id', featureIdsSubQuery)
           .modify((qb) => {
             // Conditionally filter for specific features

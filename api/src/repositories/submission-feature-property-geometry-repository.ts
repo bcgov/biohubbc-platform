@@ -8,7 +8,7 @@ import {
   SubmissionFeaturePropertyGeometrySchema
 } from '../models/submission-feature-property-geometry';
 import { BaseRepository } from './base-repository';
-import { isSubmissionFeatureActive } from './sql-fragments';
+import { isSubmissionFeaturePublished } from './sql-fragments';
 
 export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository {
   /**
@@ -115,7 +115,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
   }
 
   /**
-   * Get the combined extent and count of a submission feature's active spatial properties.
+   * Get the combined extent and count of a submission feature's published spatial properties.
    *
    * The joins here must stay aligned with `biohub.martin_feature`
    * (`database/src/procedures/04_martin_feature.ts`): this decides whether a map is offered and where
@@ -152,7 +152,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     `;
 
     sqlStatement.append(`
-         AND ${isSubmissionFeatureActive('sf')}
+         AND ${isSubmissionFeaturePublished('sf')}
         JOIN feature_type_property ftp
           ON ftp.feature_type_property_id = g.feature_type_property_id
          AND ftp.feature_type_id = sf.feature_type_id
