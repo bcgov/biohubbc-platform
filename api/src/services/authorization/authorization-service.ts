@@ -58,10 +58,6 @@ export type TeamAuthorizationEntity =
   | {
       entity: 'submission';
       submissionUuid: string;
-    }
-  | {
-      entity: 'download';
-      downloadId: string;
     };
 
 export type AuthorizeByTeam = TeamAuthorizationEntity & {
@@ -71,9 +67,9 @@ export type AuthorizeByTeam = TeamAuthorizationEntity & {
 /**
  * Authorization rule that checks policy/security-scope access to a submission feature.
  *
- * Unlike `Team` entity checks, feature access is granted when the feature is open or when the user
- * has access through the feature's security policy. Anonymous requests are allowed to reach this
- * check (they can still read unsecured features).
+ * Unlike `Team` (a pure team-membership check), feature access is granted when the feature is open
+ * or when the user has access through the feature's security policy. Anonymous requests are allowed
+ * to reach this check (they can still read unsecured features).
  *
  * @export
  * @interface AuthorizeByPolicy
@@ -247,12 +243,12 @@ export class AuthorizationService extends DBService {
     }
 
     const user = await this.getCachedSystemUser();
-    if (!user && authorizeRule.entity !== 'download') {
+    if (!user) {
       return false;
     }
 
     const teamAuthorizationService = new TeamAuthorizationService(this.connection);
-    return teamAuthorizationService.isUserAuthorizedForTeamEntity(user?.system_user_id ?? null, authorizeRule);
+    return teamAuthorizationService.isUserAuthorizedForTeamEntity(user.system_user_id, authorizeRule);
   }
 
   /**

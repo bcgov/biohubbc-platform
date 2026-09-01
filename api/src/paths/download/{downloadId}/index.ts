@@ -9,12 +9,7 @@ import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler((req) => ({
-    and: [{ discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }]
-  })),
-  findDownloadById()
-];
+export const GET: Operation = [findDownloadById()];
 
 export const PUT: Operation = [
   authorizeRequestHandler(() => ({
@@ -124,8 +119,8 @@ GET.apiDoc = {
 /**
  * Get a download request by ID.
  *
- * Authorization is handled by download-scoped Team middleware. Use the authenticated
- * connection when a bearer token is present, otherwise fall back to the API user for anonymous links.
+ * Download-specific authorization middleware is introduced in SIMSBIOHUB-1074c. Use the
+ * authenticated connection when a bearer token is present, otherwise fall back to the API user.
  *
  * @returns {RequestHandler}
  */

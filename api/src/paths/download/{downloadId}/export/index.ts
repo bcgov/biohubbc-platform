@@ -21,12 +21,7 @@ export const POST: Operation = [
   createDownloadVersionExport()
 ];
 
-export const GET: Operation = [
-  authorizeRequestHandler((req) => ({
-    and: [{ discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }]
-  })),
-  listDownloadVersionExports()
-];
+export const GET: Operation = [listDownloadVersionExports()];
 
 POST.apiDoc = {
   description: 'Create a CSV export for a ready download',
@@ -142,7 +137,7 @@ export function createDownloadVersionExport(): RequestHandler {
 }
 
 /**
- * List all exports for a download. Authorization is handled by download-scoped Team middleware.
+ * List all exports for a download. Download-specific authorization is introduced in SIMSBIOHUB-1074c.
  * `part_count` is pre-joined at the repo layer so the UI can decide single-vs-multi-part presentation
  * without a per-row detail fetch.
  */

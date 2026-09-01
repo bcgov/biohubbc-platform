@@ -15,20 +15,6 @@ describe('TeamAuthorizationService', () => {
 
   describe('isUserAuthorizedForTeamEntity', () => {
     describe('entity: ticket', () => {
-      it('returns false when no system user is provided', async () => {
-        const mockConnection = getMockDBConnection();
-        const repositoryStub = sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByTicket');
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(null, {
-          entity: 'ticket',
-          ticketId: '11111111-1111-1111-1111-111111111111'
-        });
-
-        expect(result).to.be.false;
-        expect(repositoryStub).not.to.have.been.called;
-      });
-
       it('returns true when the user has active team access to the ticket', async () => {
         const mockConnection = getMockDBConnection();
         sinon
@@ -199,23 +185,6 @@ describe('TeamAuthorizationService', () => {
       });
     });
 
-    describe('entity: download', () => {
-      it('delegates to download team authorization with a nullable system user id', async () => {
-        const mockConnection = getMockDBConnection();
-        const repositoryStub = sinon
-          .stub(TeamAuthorizationRepository.prototype, 'isUserAuthorizedForDownload')
-          .resolves(true);
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(null, {
-          entity: 'download',
-          downloadId: 'aaaa0000-0000-0000-0000-000000000001'
-        });
-
-        expect(result).to.be.true;
-        expect(repositoryStub).to.have.been.calledOnceWith(null, 'aaaa0000-0000-0000-0000-000000000001');
-      });
-    });
   });
 
   describe('isSubmissionFeatureAccessibleToUser', () => {

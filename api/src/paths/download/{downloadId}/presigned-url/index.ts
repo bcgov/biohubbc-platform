@@ -12,12 +12,7 @@ import { getLogger } from '../../../../utils/logger';
 const defaultLog = getLogger('paths/download/{downloadId}/presigned-url');
 
 export const GET: Operation = [
-  authorizeRequestHandler((req) => ({
-    and: [
-      { discriminator: 'SystemUser' },
-      { discriminator: 'Team', entity: 'download', downloadId: req.params.downloadId }
-    ]
-  })),
+  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
   getDownloadPresignedUrl()
 ];
 
@@ -51,9 +46,8 @@ GET.apiDoc = {
 /**
  * Generate presigned S3 URLs for the Parquet artifacts of a download.
  *
- * Authorization is handled by one `authorizeRequestHandler` call combining `SystemUser`
- * and download-scoped `Team` discriminators. The API key authenticates the caller; the
- * team check still enforces the parent download's team-membership rule.
+ * The API key authenticates the caller. Download-specific authorization is added in
+ * SIMSBIOHUB-1074c alongside the dedicated authorization discriminator.
  *
  * Only `ready` and `downloaded` downloads may return URLs; any other status
  * produces a 409 Conflict so scripts can distinguish "not ready yet" from
