@@ -184,7 +184,6 @@ describe('TeamAuthorizationService', () => {
         expect(repositoryStub).to.have.been.calledOnceWith(1, submissionUuid);
       });
     });
-
   });
 
   describe('isSubmissionFeatureAccessibleToUser', () => {

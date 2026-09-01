@@ -262,5 +262,4 @@ describe('TeamAuthorizationRepository', () => {
       expect(result).to.be.true;
     });
   });
-
 });
