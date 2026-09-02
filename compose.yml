@@ -436,6 +436,8 @@ services:
       - CONTRIBUTOR_SYSTEM_USER_GUID=${CONTRIBUTOR_SYSTEM_USER_GUID}
       - ENABLE_MOCK_FEATURE_SEEDING=${ENABLE_MOCK_FEATURE_SEEDING}
       - NUM_MOCK_FEATURE_SUBMISSIONS=${NUM_MOCK_FEATURE_SUBMISSIONS}
+      - DB_USER_BCGW=${DB_USER_BCGW}
+      - DB_USER_BCGW_PASS=${DB_USER_BCGW_PASS}
     volumes:
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
     networks:
