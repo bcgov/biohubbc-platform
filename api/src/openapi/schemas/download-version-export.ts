@@ -122,6 +122,23 @@ export const CreateDownloadVersionExportRequestSchema: OpenAPIV3.SchemaObject = 
   }
 };
 
+const createDownloadVersionExportConfigRequestProperties = {
+  ...CreateDownloadVersionExportRequestSchema.properties
+};
+delete createDownloadVersionExportConfigRequestProperties.download_version_id;
+
+/**
+ * Body schema for `POST /api/download/:downloadId/version/:downloadVersionId/export`.
+ *
+ * The route path identifies the materialized download version. The body remains the export recipe
+ * plus the optional packaging knob.
+ */
+export const CreateDownloadVersionExportConfigRequestSchema: OpenAPIV3.SchemaObject = {
+  ...CreateDownloadVersionExportRequestSchema,
+  required: ['version', 'export_type', 'mode', 'feature_types'],
+  properties: createDownloadVersionExportConfigRequestProperties
+};
+
 /**
  * Response schema for a single download version export record (used by POST and
  * by list items). Detail endpoint extends this with `parts[]`.
@@ -187,6 +204,26 @@ export const DownloadVersionExportListResponseSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const DownloadVersionResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['download_version_id', 'download_id', 'status', 'feature_count', 'create_date'],
+  additionalProperties: false,
+  properties: {
+    download_version_id: { type: 'string', format: 'uuid' },
+    download_id: { type: 'string', format: 'uuid' },
+    status: {
+      type: 'string',
+      enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+    },
+    feature_count: { type: 'integer', nullable: true },
+    started_at: { type: 'string', nullable: true },
+    completed_at: { type: 'string', nullable: true },
+    materialized_at: { type: 'string', nullable: true },
+    error_message: { type: 'string', nullable: true },
+    create_date: { type: 'string' }
+  }
+};
+
 export const DownloadVersionListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: ['versions', 'pagination'],
@@ -194,25 +231,7 @@ export const DownloadVersionListResponseSchema: OpenAPIV3.SchemaObject = {
   properties: {
     versions: {
       type: 'array',
-      items: {
-        type: 'object',
-        required: ['download_version_id', 'download_id', 'status', 'feature_count', 'create_date'],
-        additionalProperties: false,
-        properties: {
-          download_version_id: { type: 'string', format: 'uuid' },
-          download_id: { type: 'string', format: 'uuid' },
-          status: {
-            type: 'string',
-            enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
-          },
-          feature_count: { type: 'integer', nullable: true },
-          started_at: { type: 'string', nullable: true },
-          completed_at: { type: 'string', nullable: true },
-          materialized_at: { type: 'string', nullable: true },
-          error_message: { type: 'string', nullable: true },
-          create_date: { type: 'string' }
-        }
-      }
+      items: DownloadVersionResponseSchema
     },
     pagination: paginationResponseSchema
   }

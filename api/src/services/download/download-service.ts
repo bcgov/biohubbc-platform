@@ -242,7 +242,11 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * List versions for a download.
+   * List versions belonging to a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting parameters.
+   * @return {Promise<DownloadVersionStatusRecord[]>} The matching download versions.
    */
   async listDownloadVersions(
     downloadId: string,
@@ -253,9 +257,33 @@ export class DownloadService extends DBService {
 
   /**
    * Count versions for a download.
+   *
+   * The count method follows its paired list method's name: `listDownloadVersionsCount`.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @return {Promise<number>} The number of matching download versions.
    */
   async listDownloadVersionsCount(downloadId: string): Promise<number> {
     return this.downloadVersionRepository.listDownloadVersionsCount(downloadId);
+  }
+
+  /**
+   * Get one version belonging to a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionStatusRecord>} The requested download version status record.
+   * @throws {ApiNotFoundError} When the download version does not exist.
+   * @throws {HTTP404} When the download version does not belong to the parent download.
+   */
+  async getDownloadVersion(downloadId: string, downloadVersionId: string): Promise<DownloadVersionStatusRecord> {
+    const version = await this.downloadVersionRepository.getDownloadVersion(downloadVersionId);
+
+    if (version.download_id !== downloadId) {
+      throw new HTTP404('Download version not found');
+    }
+
+    return version;
   }
 
   /**
@@ -378,9 +406,7 @@ export class DownloadService extends DBService {
    * @memberof DownloadService
    */
   async listDownloadParquetUrls(downloadId: string, downloadVersionId: string): Promise<DownloadParquetPart[]> {
-    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
-      downloadVersionId
-    );
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifacts(downloadVersionId);
     const objectStorageService = new ObjectStorageService();
 
     const parts: DownloadParquetPart[] = [];

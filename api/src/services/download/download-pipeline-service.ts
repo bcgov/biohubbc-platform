@@ -133,7 +133,7 @@ export class DownloadPipelineService extends DBService {
     allowedCurrentStatuses: DownloadStatusEnum[],
     metadata?: { error?: string; featureCount?: number }
   ): Promise<void> {
-    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(downloadVersionId);
+    const version = await this.downloadVersionRepository.getDownloadVersion(downloadVersionId);
 
     this.assertDownloadStatusTransition(
       downloadVersionId,

@@ -62,7 +62,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
 
       const transitionStub = sinon
@@ -133,7 +133,7 @@ describe('process-download-job', () => {
       // download_id (not the version id) into the parquet write so the S3 key/source resolve correctly.
       const versionDownloadId = 'bbbb0000-0000-0000-0000-000000000099';
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ download_id: versionDownloadId }));
 
       sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
@@ -162,7 +162,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
       sinon
@@ -201,7 +201,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       const transitionStub = sinon
         .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
@@ -231,7 +231,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
 
       const transitionStub = sinon
@@ -271,7 +271,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       const transitionStub = sinon
         .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
@@ -300,7 +300,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
       const transitionStub = sinon
@@ -326,7 +326,7 @@ describe('process-download-job', () => {
         setupMockConnection();
 
         sinon
-          .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+          .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
           .resolves(createMockDownloadVersionStatusRecord({ status: terminalStatus }));
 
         const transitionStub = sinon
@@ -349,7 +349,7 @@ describe('process-download-job', () => {
       // The handler has no null-guard of its own — the repository's get* throws on a miss,
       // and that error propagates so the job lands in the DLQ.
       const notFoundError = new Error('Download version not found');
-      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').rejects(notFoundError);
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').rejects(notFoundError);
 
       const transitionStub = sinon
         .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
@@ -371,7 +371,7 @@ describe('process-download-job', () => {
       setupMockConnection();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       const transitionStub = sinon
         .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
@@ -416,7 +416,7 @@ describe('process-download-job', () => {
       const sendStub = stubPgBoss();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
       sinon
@@ -438,7 +438,7 @@ describe('process-download-job', () => {
       const sendStub = stubPgBoss();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord());
       sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
       sinon
@@ -482,7 +482,7 @@ describe('process-download-job', () => {
       setupDLQMocks();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
       const transitionStub = sinon
@@ -507,7 +507,7 @@ describe('process-download-job', () => {
       setupDLQMocks();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
       const transitionStub = sinon
@@ -524,7 +524,7 @@ describe('process-download-job', () => {
         const { commitStub, rollbackStub } = setupDLQMocks();
 
         sinon
-          .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+          .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
           .resolves(createMockDownloadVersionStatusRecord({ status: terminalStatus }));
 
         const transitionStub = sinon
@@ -543,7 +543,7 @@ describe('process-download-job', () => {
       const { commitStub, rollbackStub } = setupDLQMocks();
 
       sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById')
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
 
       const testError = new Error('unexpected');

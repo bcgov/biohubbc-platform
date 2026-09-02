@@ -4,6 +4,7 @@ import {
   CreateDownloadResponse,
   DownloadDetail,
   DownloadListResponse,
+  DownloadVersion,
   DownloadVersionListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -66,5 +67,17 @@ export const useDownloadApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { getDownloads, createDownload, getDownload, listDownloadVersions };
+  /**
+   * Get a single version belonging to a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersion>} The requested download version.
+   */
+  const getDownloadVersion = async (downloadId: string, downloadVersionId: string): Promise<DownloadVersion> => {
+    const { data } = await axios.get<DownloadVersion>(`/api/download/${downloadId}/version/${downloadVersionId}`);
+    return data;
+  };
+
+  return { getDownloads, createDownload, getDownload, listDownloadVersions, getDownloadVersion };
 };

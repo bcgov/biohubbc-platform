@@ -419,6 +419,17 @@ describe('DownloadVersionExportRepository', () => {
       expect(knexStub).to.have.been.calledOnce;
       expect(result).to.eql([row]);
     });
+
+    it('filters the collection by download version when provided', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([]));
+      const repo = new DownloadVersionExportRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repo.listDownloadVersionExports(DOWNLOAD_ID, undefined, VERSION_ID);
+
+      const query = knexStub.firstCall.args[0].toSQL();
+      expect(query.bindings).to.include(DOWNLOAD_ID);
+      expect(query.bindings).to.include(VERSION_ID);
+    });
   });
 
   describe('listDownloadVersionExportsCount', () => {
@@ -431,6 +442,17 @@ describe('DownloadVersionExportRepository', () => {
 
       expect(knexStub).to.have.been.calledOnce;
       expect(result).to.equal(2);
+    });
+
+    it('filters the count by download version when provided', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 1 }]));
+      const repo = new DownloadVersionExportRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repo.listDownloadVersionExportsCount(DOWNLOAD_ID, VERSION_ID);
+
+      const query = knexStub.firstCall.args[0].toSQL();
+      expect(query.bindings).to.include(DOWNLOAD_ID);
+      expect(query.bindings).to.include(VERSION_ID);
     });
   });
 
@@ -550,7 +572,7 @@ describe('DownloadVersionExportRepository', () => {
     });
   });
 
-  describe('getDownloadVersionExportById', () => {
+  describe('getDownloadVersionExport', () => {
     it('the find SQL JOINs the group and the version→download chain', async () => {
       // Verifies: the full-record lookup reaches lifecycle fields via the group and download_id via the version chain
 
@@ -570,8 +592,8 @@ describe('DownloadVersionExportRepository', () => {
       // Step 2: Create repository with mocked connection
       const repo = new DownloadVersionExportRepository(mockDBConnection);
 
-      // Step 3: Call getDownloadVersionExportById
-      await repo.getDownloadVersionExportById(EXPORT_ID);
+      // Step 3: Call getDownloadVersionExport
+      await repo.getDownloadVersionExport(EXPORT_ID);
 
       // Step 4: Verify the joins to the group and to the version→download chain
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -592,7 +614,7 @@ describe('DownloadVersionExportRepository', () => {
 
       // Step 3 + 4: Call and assert it rejects with ApiNotFoundError
       try {
-        await repo.getDownloadVersionExportById(EXPORT_ID);
+        await repo.getDownloadVersionExport(EXPORT_ID);
         expect.fail('Expected error');
       } catch (err: any) {
         expect(err).to.be.instanceOf(ApiNotFoundError);

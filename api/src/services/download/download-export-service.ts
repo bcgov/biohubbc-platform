@@ -1,6 +1,6 @@
 import { DEFAULT_MAX_PART_SIZE_BYTES, EXPORTER_VERSION, SIGNED_URL_EXPIRY_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
 import {
@@ -125,14 +125,9 @@ export class DownloadExportService extends DBService {
     // lives in exactly one place (DownloadService.getAuthorizedDownload). Throws HTTP403 / HTTP404.
     await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
-    // The version is the explicit export target. getDownloadVersionStatusById throws HTTP404 when it
-    // does not exist; we then verify it belongs to the authorized download so a caller authorized on
-    // one download cannot export another download's materialized artifacts by naming its version id.
-    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(request.download_version_id);
-
-    if (version.download_id !== downloadId) {
-      throw new HTTP404('Download version not found');
-    }
+    // The version is the explicit export target. The parent-scoped service read returns 404 when the
+    // version is absent or belongs to another download.
+    const version = await this.downloadService.getDownloadVersion(downloadId, request.download_version_id);
 
     // An export is bound to one materialized snapshot — only a ready version can export. The named
     // version may legitimately be older than the download's most-recent version, so readiness is
@@ -286,7 +281,7 @@ export class DownloadExportService extends DBService {
    * that are not per-type Parquet sources (e.g. export part-zips) parse to null and drop out.
    */
   private async listMaterializedFeatureTypes(downloadId: string, versionId: string): Promise<Set<string>> {
-    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(versionId);
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifacts(versionId);
 
     return new Set(
       artifacts
@@ -297,19 +292,29 @@ export class DownloadExportService extends DBService {
 
   /**
    * List exports for a download, newest first, with `part_count` per row.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting parameters.
+   * @param {string} [downloadVersionId] - Optional version ID used to scope the collection.
+   * @return {Promise<DownloadVersionExportListRow[]>} The matching export rows.
    */
   async listDownloadVersionExports(
     downloadId: string,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    downloadVersionId?: string
   ): Promise<DownloadVersionExportListRow[]> {
-    return this.downloadVersionExportRepository.listDownloadVersionExports(downloadId, pagination);
+    return this.downloadVersionExportRepository.listDownloadVersionExports(downloadId, pagination, downloadVersionId);
   }
 
   /**
    * Count exports for a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} [downloadVersionId] - Optional version ID used to scope the count.
+   * @return {Promise<number>} The number of matching exports.
    */
-  async listDownloadVersionExportsCount(downloadId: string): Promise<number> {
-    return this.downloadVersionExportRepository.listDownloadVersionExportsCount(downloadId);
+  async listDownloadVersionExportsCount(downloadId: string, downloadVersionId?: string): Promise<number> {
+    return this.downloadVersionExportRepository.listDownloadVersionExportsCount(downloadId, downloadVersionId);
   }
 
   /**
@@ -321,26 +326,38 @@ export class DownloadExportService extends DBService {
    * picker can never offer a column the CSV won't produce — the same guarantee AC8 validation
    * enforces on the inbound recipe.
    *
-   * The version is the download's most-recent (`download.download_version_id`, resolved by the read
-   * query) — the same version the client sends back as `download_version_id` on the export request,
-   * so the columns shown and the version exported are guaranteed to be the same materialized snapshot.
+   * When `downloadVersionId` is omitted, the version defaults to the download's current
+   * `download_version_id`. A supplied version is verified to belong to the authorized download.
    *
    * Authorizes against the parent download (the team-membership rule lives in exactly one place —
-   * `DownloadService.getAuthorizedDownload`); only `ready` downloads with a materialized version
-   * have exportable data, so a `pending` / `processing` / `failed` parent surfaces 409.
+   * `DownloadService.getAuthorizedDownload`); only a `ready` selected version has exportable data,
+   * so a `pending` / `processing` / `failed` version surfaces 409.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {number | null} systemUserId - The requesting system user ID, or null when unauthenticated.
+   * @param {string} [downloadVersionId] - A specific version to inspect; defaults to the current version.
+   * @return {Promise<DownloadExportFeatureType[]>} The selected version's exportable types and columns.
+   * @throws {HTTP403} When the caller is not authorized to access the download.
+   * @throws {HTTP404} When the download or selected version is absent or mismatched.
+   * @throws {HTTP409} When the selected version is not ready.
    */
   async getDownloadVersionExportFeatureTypes(
     downloadId: string,
-    systemUserId: number | null
+    systemUserId: number | null,
+    downloadVersionId?: string
   ): Promise<DownloadExportFeatureType[]> {
     // Throws HTTP403 / HTTP404 as appropriate.
     const download = await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
+    const version = await this.downloadService.getDownloadVersion(
+      downloadId,
+      downloadVersionId ?? download.download_version_id
+    );
 
-    if (download.download_status !== DownloadStatusEnum.READY) {
-      throw new HTTP409('Download is not ready — cannot export');
+    if (version.status !== DownloadStatusEnum.READY) {
+      throw new HTTP409('Download version is not ready — cannot export');
     }
 
-    const availableColumnsByType = await this.buildAvailableColumnsByType(downloadId, download.download_version_id);
+    const availableColumnsByType = await this.buildAvailableColumnsByType(downloadId, version.download_version_id);
 
     return [...availableColumnsByType].map(([feature_type, columns]) => ({
       feature_type,
@@ -363,7 +380,7 @@ export class DownloadExportService extends DBService {
   ): Promise<DownloadVersionExportRecord> {
     await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
-    const exportRecord = await this.downloadVersionExportRepository.getDownloadVersionExportById(exportId);
+    const exportRecord = await this.downloadVersionExportRepository.getDownloadVersionExport(exportId);
 
     if (exportRecord.download_id !== downloadId) {
       throw new HTTP403('Access denied');
@@ -443,7 +460,7 @@ export class DownloadExportService extends DBService {
  *
  * Pure — no I/O. Lifecycle status/timing/error live on the group, never the per-user export, and
  * `download_id` is the parent already resolved by the caller — so the create path needs no
- * JOIN-on-RETURNING to build the same shape `getDownloadVersionExportById` returns.
+ * JOIN-on-RETURNING to build the same shape `getDownloadVersionExport` returns.
  *
  * Fields are picked explicitly rather than spread from `exportRow`: the thin row carries the
  * internal `download_version_id` and artifact-group FKs, which are not part of the client contract —

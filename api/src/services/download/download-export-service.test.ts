@@ -37,7 +37,7 @@ const SYSTEM_USER_ID = 42;
 /**
  * A READY download whose most-recent version resolves to VERSION_ID — the precondition the picker
  * reads (`download.download_version_id`). Export creation gates on the explicit request version, not
- * this field, so create tests additionally stub `getDownloadVersionStatusById` via `stubReadyVersion`.
+ * this field, so create tests additionally stub `getDownloadVersion` via `stubReadyVersion`.
  */
 const readyDownload = () =>
   createMockDownloadRecord({
@@ -47,13 +47,13 @@ const readyDownload = () =>
   });
 
 /**
- * Stub `DownloadVersionRepository.getDownloadVersionStatusById` to resolve a READY version owned by
+ * Stub `DownloadVersionRepository.getDownloadVersion` to resolve a READY version owned by
  * the parent download — the happy-path precondition export creation threads through after the auth
  * gate. Returns the stub so a test can override its resolution (e.g. a not-ready or wrong-owner
  * version) to exercise the version gates.
  */
 const stubReadyVersion = () =>
-  sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+  sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
     createMockDownloadVersionStatusRecord({
       download_version_id: VERSION_ID,
       download_id: DOWNLOAD_ID,
@@ -118,11 +118,11 @@ describe('DownloadExportService', () => {
      * `observation` carries a `count` (number) column; `sample` carries `site` (string).
      */
     const stubMaterializedData = () => {
-      // The create flow first gates on the explicit version (getDownloadVersionStatusById), then
+      // The create flow first gates on the explicit version (getDownloadVersion), then
       // builds the materialized column map from the version's artifacts + the schema codes.
       stubReadyVersion();
       sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts')
         .resolves([parquetArtifact('observation'), parquetArtifact('sample')]);
       sinon
         .stub(CodeService.prototype, 'getFeatureTypePropertyCodes')
@@ -613,7 +613,7 @@ describe('DownloadExportService', () => {
 
           // Step 1: Auth resolves; the named version exists and is owned by the download, but is not ready
           sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-          sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+          sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
             createMockDownloadVersionStatusRecord({
               download_version_id: VERSION_ID,
               download_id: DOWNLOAD_ID,
@@ -650,7 +650,7 @@ describe('DownloadExportService', () => {
 
         // Step 1: Auth resolves the parent download, but the named version is owned by a DIFFERENT download
         sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
-        sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersionStatusById').resolves(
+        sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
           createMockDownloadVersionStatusRecord({
             download_version_id: VERSION_ID,
             download_id: 'aaaa0000-0000-0000-0000-0000000000ff',
@@ -690,11 +690,12 @@ describe('DownloadExportService', () => {
 
       // Step 1: Auth resolves a READY download
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
+      const versionStub = stubReadyVersion();
 
       // Step 2: Only `observation` materialized a Parquet artifact; codes also carry an
       // unmaterialized `artifact` type that must be filtered out
       sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts')
         .resolves([parquetArtifact('observation')]);
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
         featureTypeCode('observation', [
@@ -706,7 +707,7 @@ describe('DownloadExportService', () => {
 
       // Step 3: Read the exportable feature types
       const service = new DownloadExportService(getMockDBConnection());
-      const result = await service.getDownloadVersionExportFeatureTypes(DOWNLOAD_ID, SYSTEM_USER_ID);
+      const result = await service.getDownloadVersionExportFeatureTypes(DOWNLOAD_ID, SYSTEM_USER_ID, VERSION_ID);
 
       // Step 4: Verify only the materialized type is offered, with the full column set in order
       expect(result).to.deep.equal([
@@ -715,6 +716,7 @@ describe('DownloadExportService', () => {
           columns: ['submission_feature_id', 'uuid', 'parent_uuid', 'count', 'comment']
         }
       ]);
+      expect(versionStub).to.have.been.calledOnceWith(VERSION_ID);
     });
 
     it('delegates authorization to getAuthorizedDownload and propagates its HTTP403', async () => {
@@ -723,10 +725,7 @@ describe('DownloadExportService', () => {
 
       // Step 1: Auth rejects with HTTP403
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-      const listArtifactsStub = sinon.stub(
-        DownloadVersionRepository.prototype,
-        'listDownloadVersionArtifactsByDownloadVersionId'
-      );
+      const listArtifactsStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts');
 
       // Step 2: Attempt the read
       const service = new DownloadExportService(getMockDBConnection());
@@ -759,7 +758,7 @@ describe('DownloadExportService', () => {
         error_message: null
       };
       const getStub = sinon
-        .stub(DownloadVersionExportRepository.prototype, 'getDownloadVersionExportById')
+        .stub(DownloadVersionExportRepository.prototype, 'getDownloadVersionExport')
         .resolves(exportRecord);
 
       // Step 2: Authorize the export
@@ -777,7 +776,7 @@ describe('DownloadExportService', () => {
 
       // Step 1: Auth rejects with HTTP403
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-      const getStub = sinon.stub(DownloadVersionExportRepository.prototype, 'getDownloadVersionExportById');
+      const getStub = sinon.stub(DownloadVersionExportRepository.prototype, 'getDownloadVersionExport');
 
       // Step 2: Attempt to authorize the export
       const service = new DownloadExportService(getMockDBConnection());

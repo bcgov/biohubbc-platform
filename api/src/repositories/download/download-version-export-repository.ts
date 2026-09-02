@@ -351,7 +351,7 @@ export class DownloadVersionExportRepository extends BaseRepository {
    * @throws {ApiNotFoundError} when no export matches the given ID.
    * @memberof DownloadVersionExportRepository
    */
-  async getDownloadVersionExportById(downloadVersionExportId: string): Promise<DownloadVersionExportRecord> {
+  async getDownloadVersionExport(downloadVersionExportId: string): Promise<DownloadVersionExportRecord> {
     const sql = SQL`
       SELECT
         de.download_version_export_id,
@@ -374,7 +374,7 @@ export class DownloadVersionExportRepository extends BaseRepository {
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Download version export not found', [
-        'DownloadVersionExportRepository->getDownloadVersionExportById',
+        'DownloadVersionExportRepository->getDownloadVersionExport',
         `no download_version_export with id ${downloadVersionExportId}`
       ]);
     }
@@ -392,12 +392,15 @@ export class DownloadVersionExportRepository extends BaseRepository {
    * groups with no parts yet resolve `part_count` to 0.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadVersionExportListRow[]>}
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting parameters.
+   * @param {string} [downloadVersionId] - Optional version ID used to scope the collection.
+   * @return {Promise<DownloadVersionExportListRow[]>} The matching export rows.
    * @memberof DownloadVersionExportRepository
    */
   async listDownloadVersionExports(
     downloadId: string,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    downloadVersionId?: string
   ): Promise<DownloadVersionExportListRow[]> {
     const knex = getKnex();
 
@@ -442,6 +445,10 @@ export class DownloadVersionExportRepository extends BaseRepository {
         'de.create_date'
       ]);
 
+    if (downloadVersionId) {
+      query.where('de.download_version_id', downloadVersionId);
+    }
+
     if (pagination) {
       this.applyPagination(query, pagination);
     }
@@ -459,10 +466,11 @@ export class DownloadVersionExportRepository extends BaseRepository {
    * Count exports for a download.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<number>}
+   * @param {string} [downloadVersionId] - Optional version ID used to scope the count.
+   * @return {Promise<number>} The number of matching exports.
    * @memberof DownloadVersionExportRepository
    */
-  async listDownloadVersionExportsCount(downloadId: string): Promise<number> {
+  async listDownloadVersionExportsCount(downloadId: string, downloadVersionId?: string): Promise<number> {
     const knex = getKnex();
 
     const query = knex
@@ -470,6 +478,10 @@ export class DownloadVersionExportRepository extends BaseRepository {
       .innerJoin('download_version as dv', 'dv.download_version_id', 'de.download_version_id')
       .where('dv.download_id', downloadId)
       .select(knex.raw('count(*)::integer as count'));
+
+    if (downloadVersionId) {
+      query.where('de.download_version_id', downloadVersionId);
+    }
 
     const response = await this.connection.knex(query);
 
