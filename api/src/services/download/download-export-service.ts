@@ -21,6 +21,7 @@ import {
   validateExportConfig
 } from '../../utils/export-config-utils';
 import { parseExportPartKey, parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
@@ -297,25 +298,18 @@ export class DownloadExportService extends DBService {
   /**
    * List exports for a download, newest first, with `part_count` per row.
    */
-  async listDownloadVersionExportsByDownloadId(downloadId: string): Promise<DownloadVersionExportListRow[]> {
-    return this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadId(downloadId);
+  async listDownloadVersionExports(
+    downloadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadVersionExportListRow[]> {
+    return this.downloadVersionExportRepository.listDownloadVersionExports(downloadId, pagination);
   }
 
   /**
-   * List exports for a download after authorizing the caller against the parent download.
-   *
-   * Authorizes against the parent download (the team-membership rule lives in exactly one place —
-   * `DownloadService.getAuthorizedDownload`), then returns the export list. The auth gate lives here,
-   * not in the route handler, so the list endpoint stays a thin one-service call and mirrors the
-   * detail endpoint's `getAuthorizedExportWithParts`.
+   * Count exports for a download.
    */
-  async listAuthorizedExportsByDownloadId(
-    downloadId: string,
-    systemUserId: number | null
-  ): Promise<DownloadVersionExportListRow[]> {
-    await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
-
-    return this.downloadVersionExportRepository.listDownloadVersionExportsByDownloadId(downloadId);
+  async listDownloadVersionExportsCount(downloadId: string): Promise<number> {
+    return this.downloadVersionExportRepository.listDownloadVersionExportsCount(downloadId);
   }
 
   /**

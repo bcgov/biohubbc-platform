@@ -1,8 +1,10 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -224,10 +226,12 @@ export class DownloadVersionRepository extends BaseRepository {
         download_version_id,
         download_id,
         status,
+        feature_count,
         started_at,
         completed_at,
         materialized_at,
-        error_message
+        error_message,
+        create_date
       FROM download_version
       WHERE download_version_id = ${downloadVersionId}
         AND record_end_date IS NULL;
@@ -245,5 +249,69 @@ export class DownloadVersionRepository extends BaseRepository {
     }
 
     return record;
+  }
+
+  /**
+   * List download versions for a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
+   * @return {Promise<DownloadVersionStatusRecord[]>}
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersions(
+    downloadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadVersionStatusRecord[]> {
+    const knex = getKnex();
+
+    const query = knex
+      .select([
+        'download_version_id',
+        'download_id',
+        'status',
+        'feature_count',
+        'started_at',
+        'completed_at',
+        'materialized_at',
+        'error_message',
+        'create_date'
+      ])
+      .from('download_version')
+      .where('download_id', downloadId)
+      .whereNull('record_end_date');
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    if (!pagination?.sort) {
+      query.orderBy('create_date', 'desc').orderBy('download_version_id', 'desc');
+    }
+
+    const response = await this.connection.knex(query, DownloadVersionStatusRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Count download versions for a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @return {Promise<number>}
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersionsCount(downloadId: string): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex
+      .table('download_version')
+      .where('download_id', downloadId)
+      .whereNull('record_end_date')
+      .select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
   }
 }

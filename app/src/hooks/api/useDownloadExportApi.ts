@@ -3,8 +3,10 @@ import {
   CreateExportPayload,
   DownloadExport,
   DownloadExportDetail,
+  DownloadExportListResponse,
   DownloadFeatureType
 } from 'interfaces/useDownloadExportApi.interface';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with CSV exports of downloads.
@@ -47,6 +49,23 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * List exports for a download.
+   *
+   * @param {string} downloadId
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @return {Promise<DownloadExportListResponse>}
+   */
+  const getExports = async (
+    downloadId: string,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<DownloadExportListResponse> => {
+    const { data } = await axios.get<DownloadExportListResponse>(`/api/download/${downloadId}/export`, {
+      params: pagination
+    });
+    return data;
+  };
+
+  /**
    * Lists the download's materialized feature types and their exportable columns,
    * which drive the export config picker.
    *
@@ -58,5 +77,5 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { createExport, getExport, getDownloadFeatureTypes };
+  return { createExport, getExport, getExports, getDownloadFeatureTypes };
 };

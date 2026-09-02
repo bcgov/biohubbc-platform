@@ -625,6 +625,7 @@ describe('authorizeByTeam', function () {
   it('returns false if no system user is found', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const teamAuthorizationStub = sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity');
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
@@ -635,6 +636,7 @@ describe('authorizeByTeam', function () {
     });
 
     expect(result).to.be.false;
+    expect(teamAuthorizationStub).not.to.have.been.called;
   });
 
   it('returns true when TeamAuthorizationService grants access', async function () {

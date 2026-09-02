@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getDownloadPresignedUrl } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
-import { HTTP403, HTTP404, HTTP409 } from '../../../../errors/http-error';
+import { HTTP409 } from '../../../../errors/http-error';
 import { DownloadRecord } from '../../../../models/download';
 import { DownloadStatusEnum } from '../../../../models/download-status';
 import { DownloadService } from '../../../../services/download/download-service';
@@ -43,8 +43,8 @@ describe('paths/download/{downloadId}/presigned-url', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(makeDownloadRecord());
       sinon.stub(DownloadService.prototype, 'listDownloadParquetUrls').resolves(makeParts());
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(makeDownloadRecord());
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
@@ -65,10 +65,10 @@ describe('paths/download/{downloadId}/presigned-url', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
-        .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.DOWNLOADED }));
       sinon.stub(DownloadService.prototype, 'listDownloadParquetUrls').resolves(makeParts());
+      sinon
+        .stub(DownloadService.prototype, 'findDownloadById')
+        .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.DOWNLOADED }));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
@@ -83,9 +83,8 @@ describe('paths/download/{downloadId}/presigned-url', () => {
     it('throws HTTP409 when download status is PENDING', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
       sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
+        .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.PENDING }));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -105,9 +104,8 @@ describe('paths/download/{downloadId}/presigned-url', () => {
     it('throws HTTP409 when download status is PROCESSING', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
       sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
+        .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -127,9 +125,8 @@ describe('paths/download/{downloadId}/presigned-url', () => {
     it('throws HTTP409 when download status is FAILED', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
       sinon
-        .stub(DownloadService.prototype, 'getAuthorizedDownload')
+        .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(makeDownloadRecord({ download_status: DownloadStatusEnum.FAILED }));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -143,46 +140,6 @@ describe('paths/download/{downloadId}/presigned-url', () => {
         expect.fail('Expected HTTP409 to be thrown');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
-      }
-    });
-
-    it('propagates HTTP403 from getAuthorizedDownload when user is not a team member', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const handler = getDownloadPresignedUrl();
-
-      try {
-        await handler(mockReq, mockRes, mockNext);
-        expect.fail('Expected HTTP403 to be thrown');
-      } catch (error) {
-        expect(error).to.be.instanceOf(HTTP403);
-      }
-    });
-
-    it('propagates HTTP404 from getAuthorizedDownload when download is missing', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP404('Download not found'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const handler = getDownloadPresignedUrl();
-
-      try {
-        await handler(mockReq, mockRes, mockNext);
-        expect.fail('Expected HTTP404 to be thrown');
-      } catch (error) {
-        expect(error).to.be.instanceOf(HTTP404);
       }
     });
   });

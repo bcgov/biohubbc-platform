@@ -22,9 +22,11 @@ export const DownloadVersionStatusRecord = z.object({
   download_version_id: z.string().uuid(),
   download_id: z.string().uuid(),
   status: DownloadStatusZod,
+  feature_count: z.number().nullable(),
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
   materialized_at: z.string().nullable(),
-  error_message: z.string().nullable()
+  error_message: z.string().nullable(),
+  create_date: z.string()
 });
 export type DownloadVersionStatusRecord = z.infer<typeof DownloadVersionStatusRecord>;

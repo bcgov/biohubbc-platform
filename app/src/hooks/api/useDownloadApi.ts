@@ -3,7 +3,8 @@ import {
   CreateDownloadRequest,
   CreateDownloadResponse,
   DownloadDetail,
-  DownloadListResponse
+  DownloadListResponse,
+  DownloadVersionListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -48,5 +49,22 @@ export const useDownloadApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { getDownloads, createDownload, getDownload };
+  /**
+   * Get paginated versions for a download.
+   *
+   * @param {string} downloadId
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @return {Promise<DownloadVersionListResponse>}
+   */
+  const listDownloadVersions = async (
+    downloadId: string,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<DownloadVersionListResponse> => {
+    const { data } = await axios.get<DownloadVersionListResponse>(`/api/download/${downloadId}/version`, {
+      params: pagination
+    });
+    return data;
+  };
+
+  return { getDownloads, createDownload, getDownload, listDownloadVersions };
 };

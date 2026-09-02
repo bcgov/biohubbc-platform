@@ -1,6 +1,5 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import useIsMounted from 'hooks/useIsMounted';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
@@ -39,7 +38,6 @@ export const useSearchResultDownload = ({
 }: UseSearchResultDownloadProps) => {
   const api = useApi();
   const navigate = useNavigate();
-  const { auth } = useAuthStateContext();
   const dialogContext = useDialogContext();
   const isMounted = useIsMounted();
   const { runSerialized } = useSerializedAsync();
@@ -77,11 +75,9 @@ export const useSearchResultDownload = ({
   /**
    * Submits the create-download form for the current expression search.
    * Serialized to prevent duplicate downloads. On success the dialog closes and
-   * the outcome branches on authentication: authenticated users switch to the
-   * Downloads sidebar with a success snackbar, while anonymous users are
-   * navigated to the public download page at `/download/:downloadId`, where they
-   * can monitor status and obtain their export. Failure keeps the dialog open
-   * and shows the API error. State updates are skipped after unmount.
+   * navigates to the download page at `/download/:downloadId`, where the user
+   * can monitor status and obtain exports. Failure keeps the dialog open and
+   * shows the API error. State updates are skipped after unmount.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name and description.
    * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
@@ -100,14 +96,7 @@ export const useSearchResultDownload = ({
             return;
           }
           setIsCreateDownloadDialogOpen(false);
-          if (auth.isAuthenticated) {
-            dialogContext.setSnackbar({
-              open: true,
-              snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
-            });
-          } else {
-            navigate(`/download/${response.download_id}`);
-          }
+          navigate(`/download/${response.download_id}`);
         } catch (error) {
           if (!isMounted()) {
             return;
@@ -122,7 +111,7 @@ export const useSearchResultDownload = ({
           }
         }
       }),
-    [api.download, auth.isAuthenticated, dialogContext, expressionTree, navigate, runSerialized, isMounted]
+    [api.download, dialogContext, expressionTree, navigate, runSerialized, isMounted]
   );
 
   /**
