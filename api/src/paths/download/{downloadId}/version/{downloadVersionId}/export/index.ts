@@ -22,7 +22,12 @@ export const POST: Operation = [
   createDownloadVersionExport()
 ];
 
-export const GET: Operation = [listDownloadVersionExports()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Download', downloadId: req.params.downloadId }]
+  })),
+  listDownloadVersionExports()
+];
 
 POST.apiDoc = {
   description: 'Create a CSV export for a ready download version',

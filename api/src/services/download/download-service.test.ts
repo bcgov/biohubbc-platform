@@ -633,6 +633,61 @@ describe('DownloadService', () => {
     });
   });
 
+  describe('isUserAuthorizedForDownload', () => {
+    it('returns false when the download does not exist', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
+      const claimedStub = sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam');
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload');
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', null);
+
+      expect(result).to.be.false;
+      expect(claimedStub).not.to.have.been.called;
+      expect(membershipStub).not.to.have.been.called;
+    });
+
+    it('returns true for an unclaimed download without checking team membership', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam').resolves(false);
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload');
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', null);
+
+      expect(result).to.be.true;
+      expect(membershipStub).not.to.have.been.called;
+    });
+
+    it('returns false for an anonymous request to a claimed download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam').resolves(true);
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload');
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', null);
+
+      expect(result).to.be.false;
+      expect(membershipStub).not.to.have.been.called;
+    });
+
+    it('returns the repository membership result for an authenticated request to a claimed download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam').resolves(true);
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload').resolves(true);
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', 42);
+
+      expect(result).to.be.true;
+      expect(membershipStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 42);
+    });
+  });
+
   describe('linkDownloadToNewTeam', () => {
     it('creates a team and links it to the download', async () => {
       const mockDBConnection = getMockDBConnection();

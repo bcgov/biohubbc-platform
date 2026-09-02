@@ -4,6 +4,7 @@ import { SystemUserExtended, isSystemUserInactive } from '../../models/system-us
 import { getUserGuid } from '../../utils/keycloak-utils';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
+import { DownloadService } from '../download/download-service';
 import { UserService } from '../user-service';
 import { TeamAuthorizationService } from './team-authorization-service';
 
@@ -31,6 +32,14 @@ export interface AuthorizeBySystemRoles {
  */
 export interface AuthorizeBySystemUser {
   discriminator: 'SystemUser';
+}
+
+/**
+ * Authorization rule that checks UUID access for an unclaimed download or linked-team access for a claimed download.
+ */
+export interface AuthorizeByDownload {
+  discriminator: 'Download';
+  downloadId: string;
 }
 
 /**
@@ -93,6 +102,7 @@ export interface AuthorizeByContributor {
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
+  | AuthorizeByDownload
   | AuthorizeByContributor
   | AuthorizeByTeam
   | AuthorizeByPolicy;
@@ -112,6 +122,7 @@ export type AuthorizationScheme = AuthorizeConfigAnd | AuthorizeConfigOr;
 export class AuthorizationService extends DBService {
   _userService = new UserService(this.connection);
   _contributorSystemUserService = new ContributorSystemUserService(this.connection);
+  _downloadService = new DownloadService(this.connection);
   _systemUser: SystemUserExtended | undefined = undefined;
   _keycloakToken: object | undefined = undefined;
   _contributorId: number | undefined = undefined;
@@ -161,6 +172,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'SystemUser':
           authorizeResults.push(await this.authorizeBySystemUser());
+          break;
+        case 'Download':
+          authorizeResults.push(await this.authorizeByDownload(authorizeRule));
           break;
         case 'Contributor':
           authorizeResults.push(await this.authorizeByContributor());
@@ -229,6 +243,25 @@ export class AuthorizationService extends DBService {
     const user = await this.getCachedSystemUser();
 
     return !!user; // true if user exists, false otherwise
+  }
+
+  /**
+   * Check whether the current request can access a download.
+   *
+   * Unclaimed downloads are accessible by UUID. Claimed downloads require the current user to
+   * belong to a linked team. Anonymous requests are allowed to reach this check.
+   *
+   * @param {AuthorizeByDownload} authorizeRule
+   * @returns {Promise<boolean>}
+   */
+  async authorizeByDownload(authorizeRule: AuthorizeByDownload): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
+    }
+
+    const user = await this.getCachedSystemUser();
+
+    return this._downloadService.isUserAuthorizedForDownload(authorizeRule.downloadId, user?.system_user_id ?? null);
   }
 
   /**

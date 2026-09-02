@@ -12,7 +12,9 @@ import { getLogger } from '../../../../utils/logger';
 const defaultLog = getLogger('paths/download/{downloadId}/presigned-url');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Download', downloadId: req.params.downloadId }]
+  })),
   getDownloadPresignedUrl()
 ];
 
@@ -46,8 +48,8 @@ GET.apiDoc = {
 /**
  * Generate presigned S3 URLs for the Parquet artifacts of a download.
  *
- * The API key authenticates the caller. Download-specific authorization is added in
- * SIMSBIOHUB-1074c alongside the dedicated authorization discriminator.
+ * The API key authenticates the caller. The Download authorization rule then grants UUID access
+ * to unclaimed downloads or linked-team access to claimed downloads.
  *
  * Only `ready` and `downloaded` downloads may return URLs; any other status
  * produces a 409 Conflict so scripts can distinguish "not ready yet" from

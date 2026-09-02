@@ -8,6 +8,7 @@ import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../models/system-user';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
+import { DownloadService } from '../download/download-service';
 import { UserService } from '../user-service';
 import {
   AuthorizationScheme,
@@ -92,6 +93,10 @@ describe('executeAuthorizeConfig', function () {
         discriminator: 'SystemUser'
       },
       {
+        discriminator: 'Download',
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      },
+      {
         discriminator: 'Contributor'
       },
       {
@@ -104,6 +109,7 @@ describe('executeAuthorizeConfig', function () {
 
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemRole').resolves(false);
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemUser').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'authorizeByDownload').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByContributor').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByPolicy').resolves(true);
 
@@ -111,7 +117,7 @@ describe('executeAuthorizeConfig', function () {
 
     const authorizeResults = await authorizationService.executeAuthorizeConfig(mockAuthorizeRules);
 
-    expect(authorizeResults).to.eql([false, true, true, true]);
+    expect(authorizeResults).to.eql([false, true, true, true, true]);
   });
 });
 
@@ -353,6 +359,55 @@ describe('authorizeBySystemUser', function () {
     const isAuthorizedBySystemUser = await authorizationService.authorizeBySystemUser();
 
     expect(isAuthorizedBySystemUser).to.be.false;
+  });
+});
+
+describe('authorizeByDownload', function () {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('delegates anonymous download authorization with a null system user ID', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const downloadAccessStub = sinon.stub(DownloadService.prototype, 'isUserAuthorizedForDownload').resolves(true);
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByDownload({
+      discriminator: 'Download',
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+    });
+
+    expect(result).to.be.true;
+    expect(downloadAccessStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', null);
+  });
+
+  it('delegates authenticated download authorization with the current system user ID', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const downloadAccessStub = sinon.stub(DownloadService.prototype, 'isUserAuthorizedForDownload').resolves(true);
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: { system_user_id: 42, record_end_date: null } as SystemUserExtended
+    });
+
+    const result = await authorizationService.authorizeByDownload({
+      discriminator: 'Download',
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+    });
+
+    expect(result).to.be.true;
+    expect(downloadAccessStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 42);
+  });
+
+  it('returns false when download authorization is denied', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(DownloadService.prototype, 'isUserAuthorizedForDownload').resolves(false);
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByDownload({
+      discriminator: 'Download',
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+    });
+
+    expect(result).to.be.false;
   });
 });
 
