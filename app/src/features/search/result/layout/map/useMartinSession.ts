@@ -8,6 +8,7 @@ import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { IMartinSession } from 'interfaces/useMartinApi.interface';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isAbortError } from 'utils/request';
 
 export type MartinSessionStatus = 'loading' | 'ready' | 'error';
 
@@ -33,17 +34,6 @@ export interface UseMartinSessionResult {
   /** Report that a tile request failed, triggering one bounded automatic recovery attempt. */
   onTileError: () => void;
 }
-
-/**
- * Whether an error is the cancellation of a request this hook aborted itself, rather than a failure
- * worth surfacing.
- *
- * @param {unknown} error
- * @return {*}  {boolean}
- */
-const isAbortError = (error: unknown) => {
-  return error instanceof Error && (error.name === 'CanceledError' || error.message === 'canceled');
-};
 
 /**
  * Owns the Martin session for the map view: creation, refresh before expiry, and recovery from a rejected tile request.

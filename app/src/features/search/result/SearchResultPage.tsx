@@ -43,10 +43,18 @@ export const SearchResultPage = () => {
     [codesDataLoader.data?.feature_type_with_properties]
   );
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, properties, hasMoreSecuredFeatures, isLoading, searchParams, setSearchParams, pagination } =
-    useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
+  const {
+    rows,
+    properties,
+    hasInaccessibleSecuredFeatures,
+    isLoading,
+    searchParams,
+    setSearchParams,
+    totalCount,
+    cursor
+  } = useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
-    useSearchResultPagingSort({ pagination, setSearchParams });
+    useSearchResultPagingSort({ cursor, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
     downloadView,
@@ -55,7 +63,7 @@ export const SearchResultPage = () => {
     handleOpenCreateDownload,
     handleCreateDownload,
     handleCancelCreateDownload
-  } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
+  } = useSearchResultDownload({ featureType, expressionTree, isLoading, totalCount });
   const {
     isCreateDataRequestDialogOpen,
     isSubmittingDataRequest,
@@ -67,7 +75,6 @@ export const SearchResultPage = () => {
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   // Show the "request access" banner when the search matched secured features hidden from the caller,
   // not merely because visible rows the caller can already see are secured.
-  const hasHiddenSecuredResults = hasMoreSecuredFeatures;
 
   if (routeConfig) {
     return (
@@ -82,18 +89,19 @@ export const SearchResultPage = () => {
             onFeatureTypeChange={handleFeatureTypeTabChange}
           />
 
-          {hasHiddenSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
+          {hasInaccessibleSecuredFeatures && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
 
           <SearchResultPanel
             rows={rows}
             featureTypeProperties={properties}
             isLoading={isLoading}
-            pagination={pagination}
+            cursor={cursor}
+            totalCount={totalCount}
             sortOptions={sortOptions}
             activeSort={activeSort}
             view={view}
             viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-            isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
+            isCreateDownloadDisabled={isSubmittingDownload || isLoading || totalCount === undefined}
             onCreateDownloadClick={handleOpenCreateDownload}
             onSortChange={handleSortChange}
             onViewChange={setView}

@@ -67,7 +67,7 @@ const buildSession = (overrides: Partial<IMartinSession> = {}): IMartinSession =
   source: 'search',
   martin_context_id: 'ctx-1',
   martin_url_template: '/martin/search/{z}/{x}/{y}',
-  has_more_secured_features: false,
+  has_inaccessible_secured_features: false,
   ...overrides
 });
 

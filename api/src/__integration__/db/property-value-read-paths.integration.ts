@@ -57,7 +57,6 @@ describe('Indexed property value read paths (integration)', function () {
    */
   async function findSearchRow(featureTypeName: string, submissionFeatureId: number) {
     const rows = await searchRepository.searchFeaturesByExpressionTree(featureTypeName, undefined, {
-      page: 1,
       limit: 25,
       sort: 'submission_feature_id',
       order: 'desc'

@@ -1,10 +1,12 @@
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
+import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import { FeatureTypeProperty } from '../models/feature-type-property';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { encodeSearchFeatureCursor, ensureCompleteCursorPaginationOptions } from '../utils/pagination';
+import { ApiCursorPaginationOptions, ApiCursorPaginationResults } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
@@ -33,79 +35,71 @@ export class SearchFeatureService extends DBService {
   /**
    * Search features that match an expression tree.
    *
+   * @param {string} anchorFeatureType - Target feature type returned by the search
    * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination settings
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<SearchFeatureResultWithRelevancy[]>}
+   * @return {Promise<SearchFeatureResultWithRelevancy[]>} Matching, accessible feature rows
    */
   async searchFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree: ExpressionTree | undefined,
-    pagination?: ApiPaginationOptions,
+    expressionTree?: ExpressionTree,
+    cursorPagination?: ApiCursorPaginationOptions,
     systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
-    defaultLog.debug({ label: 'searchFeaturesByExpressionTree', anchorFeatureType, expressionTree, pagination });
-    await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
-    const normalizedExpressionTree = expressionTree
-      ? await this.semanticValidator.validateExpressionTree(expressionTree)
-      : undefined;
+    defaultLog.debug({
+      label: 'searchFeaturesByExpressionTree',
+      anchorFeatureType,
+      expressionTree,
+      cursorPagination
+    });
+    const normalizedExpressionTree = await this.prepareExpressionTreeSearch(anchorFeatureType, expressionTree);
     return this.searchFeatureRepository.searchFeaturesByExpressionTree(
       anchorFeatureType,
       normalizedExpressionTree,
-      pagination,
+      cursorPagination,
       systemUserId
     );
   }
 
   /**
-   * Search features and count matching rows for a feature-type anchored expression search.
+   * Search features and load result property metadata for a feature-type anchored expression search.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
    * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination settings
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; count: number; has_more_secured_features: boolean }>}
+   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; has_inaccessible_secured_features: boolean; pagination: ApiCursorPaginationResults }>} Feature rows, metadata, security indicator, and adjacent-page cursors
    */
-  async searchFeaturesByExpressionTreeWithCount(
+  async searchFeaturesByExpressionTreeWithMetadata(
     anchorFeatureType: string,
-    expressionTree: ExpressionTree | undefined,
-    pagination?: ApiPaginationOptions,
+    expressionTree?: ExpressionTree,
+    cursorPagination?: ApiCursorPaginationOptions,
     systemUserId?: number | null
   ): Promise<{
     features: SearchFeatureResultWithRelevancy[];
     properties: FeatureTypeProperty[];
-    count: number;
-    has_more_secured_features: boolean;
+    has_inaccessible_secured_features: boolean;
+    pagination: ApiCursorPaginationResults;
   }> {
     defaultLog.debug({
-      label: 'searchFeaturesByExpressionTreeWithCount',
+      label: 'searchFeaturesByExpressionTreeWithMetadata',
       anchorFeatureType,
       expressionTree,
-      pagination
+      cursorPagination
     });
 
-    await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
-    const normalizedExpressionTree = expressionTree
-      ? await this.semanticValidator.validateExpressionTree(expressionTree)
-      : undefined;
+    const normalizedExpressionTree = await this.prepareExpressionTreeSearch(anchorFeatureType, expressionTree);
 
-    const [features, properties, count, has_more_secured_features] = await Promise.all([
+    const pagination = ensureCompleteCursorPaginationOptions(cursorPagination);
+    const [rows, properties, hasInaccessibleSecuredFeatures] = await Promise.all([
       this.searchFeatureRepository.searchFeaturesByExpressionTree(
         anchorFeatureType,
         normalizedExpressionTree,
-        pagination,
+        { ...pagination, limit: pagination.limit + 1 },
         systemUserId
       ),
-      this.searchFeatureRepository.searchFeaturesByExpressionTreeProperties(
-        anchorFeatureType,
-        normalizedExpressionTree,
-        systemUserId
-      ),
-      this.searchFeatureRepository.searchFeaturesByExpressionTreeCount(
-        anchorFeatureType,
-        normalizedExpressionTree,
-        systemUserId
-      ),
+      this.searchFeatureRepository.getFeatureTypeProperties(anchorFeatureType),
       this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         anchorFeatureType,
         normalizedExpressionTree,
@@ -113,27 +107,85 @@ export class SearchFeatureService extends DBService {
       )
     ]);
 
-    return { features, properties, count, has_more_secured_features };
+    const direction = pagination.boundary?.direction;
+    const isPrevious = direction === 'previous';
+    const hasLookahead = rows.length > pagination.limit;
+    // The repository restores display order, so backward lookahead is the first row.
+    const features = isPrevious ? rows.slice(-pagination.limit) : rows.slice(0, pagination.limit);
+    const hasNext = isPrevious || hasLookahead;
+    const hasPrevious = direction === 'next' || (isPrevious && hasLookahead);
+
+    return {
+      features,
+      properties,
+      has_inaccessible_secured_features: hasInaccessibleSecuredFeatures,
+      pagination: this.buildSearchFeatureCursorPagination(features, pagination, hasNext, hasPrevious)
+    };
   }
 
   /**
-   * Gets the total count of features matching an expression tree.
+   * Builds cursor-pagination metadata from the request and page boundary rows.
    *
-   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
-   * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<number>} Total count of matching features
+   * Every cursor contains the boundary feature's ID and creation date. ID sorting
+   * uses the ID directly; date sorting uses the date plus the ID as a stable
+   * tie-breaker. The first row anchors the previous cursor and the last row
+   * anchors the next cursor. Lookahead proves availability in the requested
+   * direction; the incoming cursor identifies the return direction.
+   * Return navigation may become stale if matching rows change between requests.
+   *
+   * @param {SearchFeatureResultWithRelevancy[]} features - Ordered feature rows for the current page
+   * @param {ApiCursorPaginationOptions} cursorPagination - Cursor-pagination request used to produce the page
+   * @param {boolean} hasNext - Whether accessible matches exist after the returned rows.
+   * @param {boolean} hasPrevious - Whether accessible matches exist before the returned rows.
+   * @return {ApiCursorPaginationResults} Effective limit/sort/order and encoded cursors for adjacent pages
    */
-  async getSearchFeaturesCountByExpressionTree(
+  private buildSearchFeatureCursorPagination(
+    features: SearchFeatureResultWithRelevancy[],
+    cursorPagination: ApiCursorPaginationOptions,
+    hasNext: boolean,
+    hasPrevious: boolean
+  ): ApiCursorPaginationResults {
+    const { limit, sort, order } = cursorPagination;
+    const metadata = { limit, sort, order };
+
+    if (features.length === 0) {
+      return { ...metadata, next_cursor: null, previous_cursor: null };
+    }
+
+    const firstFeature = features.at(0)!;
+    const lastFeature = features.at(-1)!;
+
+    const encode = (feature: SearchFeatureResultWithRelevancy, direction: 'next' | 'previous') =>
+      encodeSearchFeatureCursor({
+        direction,
+        submission_feature_id: feature.submission_feature_id,
+        create_date: feature.create_date
+      });
+
+    return {
+      ...metadata,
+      next_cursor: hasNext ? encode(lastFeature, 'next') : null,
+      previous_cursor: hasPrevious ? encode(firstFeature, 'previous') : null
+    };
+  }
+
+  /**
+   * Counts the number of features matching an expression tree.
+   *
+   * @param {string} anchorFeatureType - Target feature type returned by the search.
+   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria.
+   * @param {number | null} [systemUserId] - Security context.
+   * @return {Promise<number>} Matching feature count.
+   */
+  async countSearchFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree: ExpressionTree | undefined,
+    expressionTree?: ExpressionTree,
     systemUserId?: number | null
   ): Promise<number> {
-    defaultLog.debug({ label: 'getSearchFeaturesCountByExpressionTree', anchorFeatureType, expressionTree });
-    await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
-    const normalizedExpressionTree = expressionTree
-      ? await this.semanticValidator.validateExpressionTree(expressionTree)
-      : undefined;
-    return this.searchFeatureRepository.searchFeaturesByExpressionTreeCount(
+    defaultLog.debug({ label: 'countSearchFeaturesByExpressionTree', anchorFeatureType, expressionTree });
+    const normalizedExpressionTree = await this.prepareExpressionTreeSearch(anchorFeatureType, expressionTree);
+
+    return this.searchFeatureRepository.countFeaturesByExpressionTree(
       anchorFeatureType,
       normalizedExpressionTree,
       systemUserId
@@ -141,13 +193,19 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
-   * Validate that an expression-tree search target exists before delegating to the repository.
+   * Validates and normalizes the shared inputs for an expression-tree search.
    *
-   * @param {string} anchorFeatureType
-   * @return {Promise<void>}
+   * @param {string} anchorFeatureType - Target feature type to validate
+   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
+   * @return {Promise<NormalizedExpressionTreeExpression | undefined>} Normalized expression tree, when supplied
    */
-  private async validateExpressionTreeTargetFeatureType(anchorFeatureType: string): Promise<void> {
+  private async prepareExpressionTreeSearch(
+    anchorFeatureType: string,
+    expressionTree?: ExpressionTree
+  ): Promise<NormalizedExpressionTreeExpression | undefined> {
     const submissionRepository = new SubmissionRepository(this.connection);
     await submissionRepository.getFeatureTypeIdByName(anchorFeatureType);
+
+    return expressionTree ? this.semanticValidator.validateExpressionTree(expressionTree) : undefined;
   }
 }

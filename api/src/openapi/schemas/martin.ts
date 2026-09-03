@@ -41,7 +41,7 @@ export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
     'source',
     'martin_context_id',
     'martin_url_template',
-    'has_more_secured_features'
+    'has_inaccessible_secured_features'
   ],
   properties: {
     token: {
@@ -67,7 +67,7 @@ export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       description: 'Tile URL template for MapLibre, e.g. "/martin/search/{z}/{x}/{y}".'
     },
-    has_more_secured_features: {
+    has_inaccessible_secured_features: {
       type: 'boolean',
       description: 'True when the search matched secured features this caller cannot see.'
     }

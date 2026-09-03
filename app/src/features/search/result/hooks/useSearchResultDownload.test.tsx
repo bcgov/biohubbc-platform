@@ -3,7 +3,6 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { Mock, vi } from 'vitest';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 import { useSearchResultDownload } from './useSearchResultDownload';
@@ -33,12 +32,6 @@ const expressionTree: ExpressionTreeExpression = {
       value: 'salmon'
     }
   ]
-};
-
-const pagination: ApiPaginationResponseParams = {
-  total: 1,
-  current_page: 1,
-  last_page: 1
 };
 
 const formValues: ICreateDownloadFormValues = {
@@ -73,7 +66,7 @@ describe('useSearchResultDownload', () => {
 
   it('H1: success navigates to the download page without dialog or snackbar', async () => {
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     await act(async () => {
@@ -101,7 +94,7 @@ describe('useSearchResultDownload', () => {
     });
 
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     await act(async () => {
@@ -119,7 +112,7 @@ describe('useSearchResultDownload', () => {
     mockCreateDownload.mockRejectedValueOnce({ message: 'quota exceeded' } as APIError);
 
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     act(() => {
@@ -145,7 +138,7 @@ describe('useSearchResultDownload', () => {
     mockCreateDownload.mockRejectedValueOnce({ message: 'server unavailable' } as APIError);
 
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     act(() => {

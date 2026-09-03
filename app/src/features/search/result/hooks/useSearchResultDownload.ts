@@ -6,7 +6,6 @@ import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
@@ -16,8 +15,8 @@ interface UseSearchResultDownloadProps {
   expressionTree: ExpressionTreeExpression | null;
   /** Whether result data is currently loading. */
   isLoading: boolean;
-  /** Result pagination metadata; undefined while initial results are pending. */
-  pagination: ApiPaginationResponseParams | undefined;
+  /** Matching result count; undefined while the count request is pending. */
+  totalCount: number | undefined;
 }
 
 /**
@@ -27,14 +26,14 @@ interface UseSearchResultDownloadProps {
  * tab, create-download dialog state, checkout, and expression-backed download
  * creation. Guards against empty searches and stale in-flight result state.
  *
- * @param {UseSearchResultDownloadProps} props - Route, expression, loading, and pagination state needed by download actions.
+ * @param {UseSearchResultDownloadProps} props - Route, expression, loading, and count state needed by download actions.
  * @returns Download sidebar state, create-download dialog state, and handlers for opening, saving, canceling, and checkout.
  */
 export const useSearchResultDownload = ({
   featureType,
   expressionTree,
   isLoading,
-  pagination
+  totalCount
 }: UseSearchResultDownloadProps) => {
   const api = useApi();
   const navigate = useNavigate();
@@ -51,15 +50,15 @@ export const useSearchResultDownload = ({
 
   /**
    * Opens the create-download dialog for the currently applied search.
-   * Waits for pagination before deciding whether to open the form or show the
+   * Waits for the count before deciding whether to open the form or show the
    * zero-results dialog.
    */
   const handleOpenCreateDownload = useCallback(() => {
-    if (isLoading || pagination === undefined) {
+    if (isLoading || totalCount === undefined) {
       return;
     }
 
-    if (pagination.total === 0) {
+    if (totalCount === 0) {
       dialogContext.setOkDialog({
         open: true,
         dialogTitle: 'Create Download',
@@ -70,7 +69,7 @@ export const useSearchResultDownload = ({
     }
 
     setIsCreateDownloadDialogOpen(true);
-  }, [isLoading, pagination, dialogContext]);
+  }, [isLoading, totalCount, dialogContext]);
 
   /**
    * Submits the create-download form for the current expression search.

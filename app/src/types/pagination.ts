@@ -5,10 +5,18 @@ export interface ApiSearchParams {
   search?: string;
 }
 
+/** Sorting shared by offset- and cursor-paginated requests. */
+export interface PaginationSorting {
+  /** The field to sort by. */
+  sort?: string;
+  /** The direction to sort by. */
+  order?: 'asc' | 'desc';
+}
+
 /**
  * Defines the supported server-side pagination options.
  */
-export type ApiPaginationRequestOptions = {
+export interface ApiPaginationRequestOptions extends PaginationSorting {
   /**
    * The page number to retrieve. Starts at 1.
    *
@@ -21,31 +29,48 @@ export type ApiPaginationRequestOptions = {
    * @type {number}
    */
   limit: number;
-  /**
-   * The field to sort by.
-   *
-   * @type {string}
-   */
-  sort?: string;
-  /**
-   * The direction to sort by.
-   *
-   * @type {('asc' | 'desc')}
-   */
-  order?: 'asc' | 'desc';
-};
+}
+
+/**
+ * Defines the supported cursor-pagination options for API requests.
+ */
+export interface ApiCursorPaginationRequestOptions extends PaginationSorting {
+  /** The number of items to retrieve per page. */
+  limit: number;
+  /** Opaque cursor returned by an adjacent page. */
+  cursor?: string;
+}
 
 /**
  * Represents server-side pagination state given by the server
  */
-export type ApiPaginationResponseParams = {
+export interface ApiPaginationResponseParams extends PaginationSorting {
   total: number;
   current_page: number;
   last_page: number;
   per_page?: number;
-  sort?: string;
-  order?: 'asc' | 'desc';
-};
+}
+
+/**
+ * Represents cursor-pagination state returned by the server.
+ */
+export interface ApiCursorResponseParams extends PaginationSorting {
+  limit: number;
+  sort: string;
+  order: 'asc' | 'desc';
+  next_cursor: string | null;
+  previous_cursor: string | null;
+}
+
+/** URL and response state used to navigate a cursor-paginated result set. */
+export interface CursorPagination extends PaginationSorting {
+  /** Maximum number of rows requested for each page. */
+  limit: number;
+  /** Opaque cursor for the following page. */
+  next: string | null;
+  /** Opaque cursor for the preceding page. */
+  previous: string | null;
+}
 
 /**
  * Props for components using MUI DataGrid with server-side pagination.

@@ -105,7 +105,7 @@ export function createMartinSession(): RequestHandler {
         source: MARTIN_SOURCE.SEARCH,
         martin_context_id: context.martinContextId,
         martin_url_template: tokenService.getMartinUrlTemplate(MARTIN_SOURCE.SEARCH),
-        has_more_secured_features: context.hasMoreSecuredFeatures
+        has_inaccessible_secured_features: context.hasInaccessibleSecuredFeatures
       });
     } catch (error) {
       defaultLog.error({ label: 'createMartinSession', message: 'error', error });
