@@ -7,6 +7,7 @@ import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { SubmissionFeatureAbout } from 'components/feature/SubmissionFeatureAbout';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
@@ -113,6 +114,7 @@ export const PortalSubmissionFeaturePage = () => {
               />
             )}
           </PageSection>
+          {feature && <SubmissionFeatureAbout feature={feature} />}
         </Stack>
       </Container>
     </LoadingGuard>

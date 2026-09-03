@@ -50,12 +50,15 @@ describe('index', () => {
         submission_feature_id: 1,
         uuid: '123e4567-e89b-12d3-a456-426614174000',
         urn: 'urn:1:feature:1',
+        create_date: '2026-01-02T12:00:00.000Z',
         submission_id: 1,
         feature_type_id: 1,
         source_id: null,
+        successor_submission_feature_id: null,
         feature_type_name: 'sample_site',
         feature_type_display_name: 'Sample Site',
         submission_name: 'Test Submission',
+        contributor_name: 'SIMS',
         secured: true,
         security_reasons: ['Moose']
       };

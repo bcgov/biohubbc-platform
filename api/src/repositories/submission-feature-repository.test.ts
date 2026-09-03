@@ -35,12 +35,14 @@ describe('SubmissionFeatureRepository feature lookup', () => {
       submission_feature_id: 1,
       uuid: 'uuid',
       urn: 'urn',
+      create_date: '2026-01-02T12:00:00.000Z',
       submission_id: 2,
       feature_type_id: 3,
       source_id: 'A',
       feature_type_name: 'survey',
       feature_type_display_name: 'Survey',
       submission_name: 'Submission',
+      contributor_name: 'SIMS',
       secured: false,
       security_reasons: []
     };
@@ -53,6 +55,8 @@ describe('SubmissionFeatureRepository feature lookup', () => {
     expect(text).to.include('WITH RECURSIVE successor_chain');
     expect(text.match(/WITH RECURSIVE successor_chain/g) || []).to.have.lengthOf(1);
     expect(text).to.include('terminal.terminal_submission_feature_id');
+    expect(text).to.include('c.client_id as contributor_name');
+    expect(text).to.include('c.contributor_id = s.contributor_id');
     expect(text).to.include('successor.submission_id = chain.submission_id');
     expect(text).to.include('WITH RECURSIVE historical_ancestry');
     expect(text).to.include(`NOT (${isSubmissionFeatureCurrent('sf')})`);

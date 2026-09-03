@@ -15,12 +15,15 @@ const mockFeature = {
   submission_feature_id: 10,
   uuid: 'feat-uuid-1',
   urn: 'urn:test:1',
+  create_date: '2026-01-02T12:00:00.000Z',
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'observation',
   feature_type_display_name: 'Observation',
   submission_name: 'Test Submission',
+  contributor_name: 'SIMS',
   source_id: null,
+  successor_submission_feature_id: null,
   data: { species_name: 'Wolf', count: '5' },
   secured: false,
   security_reasons: []
@@ -74,6 +77,12 @@ describe('SubmissionFeaturePage', () => {
     expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object));
   });
 
+  it('renders Details as the selected tab', async () => {
+    const { findByRole } = renderPage();
+
+    expect(await findByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('links taxon property values to the taxon page under the submission', async () => {
     const { findByRole } = renderPage('/submission/1/feature/10?view=table');
 
@@ -88,6 +97,22 @@ describe('SubmissionFeaturePage', () => {
 
     expect(await findByText('Page Not Found')).toBeVisible();
     expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();
+  });
+
+  it('renders the no-data fallback when the API returns no feature', async () => {
+    mockGetSubmissionFeatureById.mockResolvedValueOnce({ feature: undefined });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('No data available')).toBeVisible();
+  });
+
+  it('renders the feature skeleton while the feature is loading', async () => {
+    mockGetSubmissionFeatureById.mockReturnValueOnce(new Promise(() => undefined));
+
+    const { findByTestId } = renderPage();
+
+    expect(await findByTestId('feature-skeleton')).toBeVisible();
   });
 
   it('renders Secured chip when feature is secured', async () => {

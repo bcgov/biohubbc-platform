@@ -80,12 +80,15 @@ export const SubmissionFeature = z.object({
   submission_feature_id: z.number(),
   uuid: z.string(),
   urn: z.string(),
+  create_date: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
+  successor_submission_feature_id: z.number().nullable(),
   feature_type_name: z.string(),
   feature_type_display_name: z.string(),
   submission_name: z.string(),
+  contributor_name: z.string(),
   secured: z.boolean(),
   security_reasons: z.array(z.string())
 });

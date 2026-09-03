@@ -636,6 +636,9 @@ const appTheme = createTheme({
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           },
+          '& .MuiChip-icon': {
+            marginRight: theme.spacing(0.2)
+          },
           '& .MuiChip-deleteIcon': {
             margin: '0 0 0 4px',
             color: alpha(theme.palette.text.secondary, 0.75),

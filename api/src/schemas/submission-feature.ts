@@ -12,12 +12,15 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         'submission_feature_id',
         'uuid',
         'urn',
+        'create_date',
         'submission_id',
         'feature_type_id',
         'source_id',
+        'successor_submission_feature_id',
         'feature_type_name',
         'feature_type_display_name',
         'submission_name',
+        'contributor_name',
         'secured',
         'security_reasons'
       ],
@@ -35,6 +38,11 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
           type: 'string',
           description: 'Uniform Resource Name of the feature'
         },
+        create_date: {
+          type: 'string',
+          format: 'date-time',
+          description: 'Date and time when the feature was created.'
+        },
         submission_id: {
           type: 'integer',
           description: 'Identifier of the submission that this feature belongs to.'
@@ -46,7 +54,13 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         source_id: {
           type: 'string',
           format: 'uuid',
+          nullable: true,
           description: 'UUID identifying the source of this feature.'
+        },
+        successor_submission_feature_id: {
+          type: 'integer',
+          nullable: true,
+          description: 'Identifier of the newer feature that supersedes this feature, when one exists.'
         },
         feature_type_name: {
           type: 'string',
@@ -59,6 +73,10 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         submission_name: {
           type: 'string',
           description: 'Name of the parent submission.'
+        },
+        contributor_name: {
+          type: 'string',
+          description: 'Name of the contributor associated with the parent submission.'
         },
         secured: {
           type: 'boolean',

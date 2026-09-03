@@ -23,12 +23,15 @@ const mockFeature = {
   submission_feature_id: 10,
   uuid: 'feat-uuid-1',
   urn: 'urn:test:1',
+  create_date: '2026-01-02T12:00:00.000Z',
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'observation',
   feature_type_display_name: 'Observation',
   submission_name: 'Test Submission',
+  contributor_name: 'SIMS',
   source_id: null,
+  successor_submission_feature_id: null,
   data: { species_name: 'Wolf' },
   secured: false
 };
@@ -111,13 +114,21 @@ describe('PortalSubmissionFeaturePage', () => {
     expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal/submission');
   });
 
-  it('places the map after Properties', async () => {
+  it('places Map and About after Properties', async () => {
     const { findByText, getAllByRole } = renderPage();
     await findByText('Properties');
 
     const sectionLabels = getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
 
-    expect(sectionLabels).toEqual(['Properties', 'Map']);
+    expect(sectionLabels).toEqual(['Properties', 'Map', 'About']);
+  });
+
+  it('renders feature metadata in the About section', async () => {
+    const { findByText } = renderPage();
+
+    expect(await findByText('January 2, 2026')).toBeVisible();
+    expect(await findByText('SIMS')).toBeVisible();
+    expect(await findByText('feat-uuid-1')).toBeVisible();
   });
 
   it('maps the feature being viewed', async () => {

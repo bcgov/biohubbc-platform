@@ -5,7 +5,13 @@ import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { buildBasemapLayer, buildBasemapSource, BASEMAP_SOURCE_ID } from 'components/map/basemap-layers';
 import { SlippyMap } from 'components/map/SlippyMap';
 import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
-import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SECTION_HEIGHT } from 'constants/spatial';
+import {
+  MAP_FIT_MAX_ZOOM,
+  MAP_FIT_PADDING,
+  MAP_MAX_ZOOM,
+  MAP_MIN_ZOOM,
+  SUBMISSION_FEATURE_MAP_SECTION_HEIGHT
+} from 'constants/spatial';
 import { useConfigContext } from 'hooks/useContext';
 import type { SourceSpecification } from 'maplibre-gl';
 import { PropsWithChildren, useCallback, useMemo } from 'react';
@@ -17,7 +23,6 @@ export interface ISubmissionFeatureMapProps {
   submissionFeatureId: number;
 }
 
-/** Height of the map section. Tall enough to give an extent context, short enough to leave the page scannable. */
 /**
  * Fixed frame every state of the map section renders inside.
  *
@@ -28,7 +33,9 @@ export interface ISubmissionFeatureMapProps {
  * @return {*}
  */
 const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
-  <Box data-testid={props.testId} sx={{ position: 'relative', display: 'flex', height: MAP_SECTION_HEIGHT }}>
+  <Box
+    data-testid={props.testId}
+    sx={{ position: 'relative', display: 'flex', height: SUBMISSION_FEATURE_MAP_SECTION_HEIGHT }}>
     {props.children}
   </Box>
 );
