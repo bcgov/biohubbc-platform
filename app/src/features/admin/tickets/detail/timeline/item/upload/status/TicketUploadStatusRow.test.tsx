@@ -1,3 +1,4 @@
+import { mdiCheck, mdiProgressClock } from '@mdi/js';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -155,6 +156,23 @@ describe('TicketUploadStatusRow', () => {
       `Ingesting${getFormattedDate(DATE_FORMAT.ShortMediumDateTimeFormat, '2026-09-03T18:31:00.000Z')}`
     ]);
     expect(items[0].textContent).toMatch(/Sep 3, 2026, \d{1,2}:45 [ap]m$/);
+  });
+
+  it('marks every stage before the current one as completed and keeps the current stage icon', async () => {
+    const user = userEvent.setup();
+    renderRow(makeUpload('reconciling'), {
+      status: 'loaded',
+      history: [
+        makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
+        makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
+        makeHistoryItem(3, 'reconciling', '2026-09-03T18:45:00.000Z')
+      ]
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Reconciling' }));
+
+    const iconPaths = screen.getAllByRole('listitem').map((item) => item.querySelector('svg path')?.getAttribute('d'));
+    expect(iconPaths).toEqual([mdiCheck, mdiCheck, mdiProgressClock]);
   });
 
   it('renders a safe fallback for a status the frontend does not know', async () => {

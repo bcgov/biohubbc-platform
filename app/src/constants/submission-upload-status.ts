@@ -52,6 +52,11 @@ export const SUBMISSION_UPLOAD_JOB_STATUS_ICONS: Record<SubmissionUploadJobStatu
   failed: mdiClose
 };
 
+/** Icon for a history row whose stage the upload has already moved past. */
+export const COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON = mdiCheck;
+
+export const COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON_COLOR = appTheme.palette.success.main;
+
 export const UNKNOWN_SUBMISSION_UPLOAD_JOB_STATUS_LABEL = 'Unknown status';
 
 export const UNKNOWN_SUBMISSION_UPLOAD_JOB_STATUS_ICON = mdiHelpCircleOutline;
