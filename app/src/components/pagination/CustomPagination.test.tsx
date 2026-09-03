@@ -1,13 +1,22 @@
 import { cleanup, fireEvent } from '@testing-library/react';
 import { render } from 'test-helpers/test-utils';
+import { CursorPagination } from 'types/pagination';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CustomPagination } from './CustomPagination';
 
+const defaultCursor: CursorPagination = {
+  limit: 10,
+  sort: 'relevancy_score',
+  order: 'desc',
+  next: 'next-token',
+  previous: null
+};
+
 const defaultProps = {
+  cursor: defaultCursor,
   currentPage: 1,
-  pageSize: 10,
+  rowCount: 10,
   totalCount: 100,
-  lastPage: 10,
   onPageChange: vi.fn(),
   onPageSizeChange: vi.fn()
 };
@@ -24,57 +33,52 @@ describe('CustomPagination', () => {
   it('renders the total count label', () => {
     const { getByText } = render(<CustomPagination {...defaultProps} />);
 
-    expect(getByText('1–10 of 100')).toBeInTheDocument();
+    expect(getByText('Showing 10 of 100 rows')).toBeInTheDocument();
   });
 
-  it('renders correct range label for a middle page', () => {
-    const { getByText } = render(
-      <CustomPagination {...defaultProps} currentPage={3} pageSize={10} totalCount={100} lastPage={10} />
+  it('renders the page size and total for a middle page', () => {
+    const { getByText } = render(<CustomPagination {...defaultProps} currentPage={3} totalCount={100} />);
+
+    expect(getByText('Showing 10 of 100 rows')).toBeInTheDocument();
+  });
+
+  it('renders "Showing 0 of 0 rows" when there are no results', () => {
+    const { getByText } = render(<CustomPagination {...defaultProps} currentPage={1} rowCount={0} totalCount={0} />);
+
+    expect(getByText('Showing 0 of 0 rows')).toBeInTheDocument();
+  });
+
+  it('renders an unknown-total state with only previous and next navigation', () => {
+    const { getByRole, getByText, queryByRole } = render(
+      <CustomPagination
+        cursor={defaultCursor}
+        currentPage={1}
+        rowCount={10}
+        onPageChange={vi.fn()}
+        onPageSizeChange={vi.fn()}
+      />
     );
 
-    expect(getByText('21–30 of 100')).toBeInTheDocument();
+    expect(getByText('Showing 10 rows')).toBeInTheDocument();
+    expect(getByRole('button', { name: /go to previous page/i })).toBeDisabled();
+    expect(getByRole('button', { name: /go to next page/i })).toBeEnabled();
+    expect(queryByRole('button', { name: /^page \d+$/i })).not.toBeInTheDocument();
   });
 
-  it('renders "0–0 of 0" when there are no results', () => {
-    const { getByText } = render(
-      <CustomPagination {...defaultProps} currentPage={1} pageSize={10} totalCount={0} lastPage={1} />
-    );
-
-    expect(getByText('0–0 of 0')).toBeInTheDocument();
-  });
-
-  it('calls onPageChange when a page button is clicked', () => {
+  it('calls onPageChange when the next button is clicked', () => {
     const onPageChange = vi.fn();
-    const { getByRole } = render(<CustomPagination {...defaultProps} lastPage={5} onPageChange={onPageChange} />);
+    const { getByRole } = render(<CustomPagination {...defaultProps} totalCount={50} onPageChange={onPageChange} />);
 
-    fireEvent.click(getByRole('button', { name: /page 2/i }));
+    fireEvent.click(getByRole('button', { name: /go to next page/i }));
 
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
-  it('shows a four-page window around the current page when available', () => {
-    const { getByRole, queryByRole } = render(<CustomPagination {...defaultProps} currentPage={5} lastPage={10} />);
+  it('shows page position without rendering arbitrary page buttons', () => {
+    const { getByText, queryByRole } = render(<CustomPagination {...defaultProps} currentPage={5} />);
 
-    [3, 4, 5, 6].forEach((page) => {
-      expect(getByRole('button', { name: new RegExp(`page ${page}`, 'i') })).toBeInTheDocument();
-    });
-    expect(queryByRole('button', { name: /page 7/i })).not.toBeInTheDocument();
-  });
-
-  it('always shows the final page instead of ending with an ellipsis', () => {
-    const { getByRole } = render(<CustomPagination {...defaultProps} currentPage={1} lastPage={99} />);
-
-    expect(getByRole('button', { name: /page 99/i })).toBeInTheDocument();
-  });
-
-  it('caps the leading page run before the ellipsis at four pages', () => {
-    const { getByRole, queryByRole } = render(<CustomPagination {...defaultProps} currentPage={1} lastPage={99} />);
-
-    [1, 2, 3, 4].forEach((page) => {
-      expect(getByRole('button', { name: new RegExp(`page ${page}`, 'i') })).toBeInTheDocument();
-    });
-    expect(queryByRole('button', { name: /page 5/i })).not.toBeInTheDocument();
-    expect(getByRole('button', { name: /page 99/i })).toBeInTheDocument();
+    expect(getByText('Page 5 of 10')).toBeInTheDocument();
+    expect(queryByRole('button', { name: /^page \d+$/i })).not.toBeInTheDocument();
   });
 
   it('calls onPageSizeChange when the page size select changes', () => {
@@ -88,13 +92,15 @@ describe('CustomPagination', () => {
   });
 
   it('renders the page size select with the current pageSize selected', () => {
-    const { getByRole } = render(<CustomPagination {...defaultProps} pageSize={25} />);
+    const { getByRole } = render(<CustomPagination {...defaultProps} cursor={{ ...defaultCursor, limit: 25 }} />);
 
     expect(getByRole('combobox', { name: /rows per page/i })).toHaveTextContent('25');
   });
 
   it('disables previous/next navigation when on the only page', () => {
-    const { getByRole } = render(<CustomPagination {...defaultProps} currentPage={1} lastPage={1} totalCount={5} />);
+    const { getByRole } = render(
+      <CustomPagination {...defaultProps} cursor={{ ...defaultCursor, next: null }} currentPage={1} totalCount={5} />
+    );
 
     expect(getByRole('button', { name: /go to previous page/i })).toBeDisabled();
     expect(getByRole('button', { name: /go to next page/i })).toBeDisabled();

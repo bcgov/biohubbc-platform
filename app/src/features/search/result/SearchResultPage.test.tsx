@@ -89,6 +89,13 @@ const mockGetAvailableUsers = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
 const mockSetResultSearchParams = vi.fn();
+const defaultCursor = {
+  limit: 10,
+  sort: 'relevancy_score',
+  order: 'desc' as const,
+  next: null,
+  previous: null
+};
 
 const codesPayload = {
   feature_type_with_properties: [
@@ -138,7 +145,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: mockSetResultSearchParams,
-      pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 5,
+      currentPage: 1,
+      cursor: defaultCursor
     });
   });
 
@@ -158,6 +167,25 @@ describe('SearchResultPage', () => {
     expect(mockSetResultSearchParams).toHaveBeenCalledWith({ limit: '25' });
   });
 
+  it('uses URL pagination while count metadata is unavailable', () => {
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ uuid: 'result-1', submission_feature_id: 1 }],
+      properties: [],
+      isLoading: false,
+      searchParams: new URLSearchParams('page=3&limit=25'),
+      setSearchParams: mockSetResultSearchParams,
+      totalCount: undefined,
+      currentPage: 3,
+      cursor: { ...defaultCursor, limit: 25, previous: 'previous-token' }
+    });
+
+    const { getByRole, getByText } = renderPage();
+
+    expect(getByText('Showing 1 row')).toBeInTheDocument();
+    fireEvent.click(getByRole('button', { name: /go to previous page/i }));
+    expect(mockSetResultSearchParams).toHaveBeenCalledWith({ page: '2', cursor: 'previous-token' });
+  });
+
   it('opens an OkDialog when Create Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
@@ -165,7 +193,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 0,
+      currentPage: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole, queryByRole } = renderPage();
@@ -262,7 +292,9 @@ describe('SearchResultPage', () => {
       isLoading: true,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: undefined
+      totalCount: undefined,
+      currentPage: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole } = renderPage();
@@ -365,7 +397,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 1,
+      currentPage: 1,
+      cursor: defaultCursor
     });
 
     const { queryByRole } = renderPage();
@@ -381,7 +415,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 2, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 2,
+      currentPage: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole, findByRole } = renderPage();
@@ -403,7 +439,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 1,
+      currentPage: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole, findByLabelText, getByTestId, findByRole } = renderPage();
@@ -431,7 +469,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 1,
+      currentPage: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole, findByLabelText, getByTestId, findByRole } = renderPage();

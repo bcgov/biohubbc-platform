@@ -6,8 +6,10 @@ import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { ApiCursorPaginationRequestOptions, CursorPagination } from 'types/pagination';
+import { toApiCursorPagination } from 'utils/pagination';
 import { normalizeQueryParam } from 'utils/query-param';
+import { isAbortError } from 'utils/request';
 
 /**
  * Custom hook for managing expression search results with URL-driven state, sorting, and pagination.
@@ -19,38 +21,23 @@ import { normalizeQueryParam } from 'utils/query-param';
  * - Automatically debounces API requests when params change.
  */
 interface SearchResultsLoaderInput {
-  params: URLSearchParams;
+  cursorPagination: ApiCursorPaginationRequestOptions;
   expressionTree: ExpressionTreeExpression | null;
   featureTypeName: string;
   signal: AbortSignal;
 }
 
-type SearchResultsPagination = ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' };
+interface SearchResultData {
+  featureTypeName: string;
+  response: SearchFeatureResponse;
+}
 
-const buildPagination = (params: URLSearchParams): SearchResultsPagination => ({
-  page: Number(params.get(URL_PARAMS.PAGE.toLowerCase()) ?? 1),
-  limit: Number(params.get(URL_PARAMS.LIMIT.toLowerCase()) ?? 10),
-  sort: params.get(URL_PARAMS.SORT.toLowerCase()) ?? undefined,
-  order: (params.get(URL_PARAMS.ORDER.toLowerCase()) as 'asc' | 'desc') ?? undefined
-});
-
-const buildEmptyResponse = (pagination: SearchResultsPagination): SearchFeatureResponse => ({
-  features: [],
-  properties: [],
-  pagination: {
-    total: 0,
-    per_page: pagination.limit,
-    current_page: pagination.page,
-    last_page: 1,
-    sort: pagination.sort,
-    order: pagination.order
-  },
-  has_more_secured_features: false
-});
-
-const isAbortError = (error: unknown) => {
-  return error instanceof Error && (error.name === 'CanceledError' || error.message === 'canceled');
-};
+interface SearchResultCount {
+  featureTypeName: string;
+  expressionTree: ExpressionTreeExpression | null;
+  refreshKey: number;
+  total: number;
+}
 
 /**
  * Loads feature-search results from URL pagination/sort params and an expression tree.
@@ -75,21 +62,35 @@ export const useSearchResults = (
   const api = useApi();
   const dialogContext = useDialogContext();
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
-  const [data, setData] = useState<SearchFeatureResponse>();
+  const [data, setData] = useState<SearchResultData>();
+  const [count, setCount] = useState<SearchResultCount>();
   const [isLoading, setIsLoading] = useState(false);
   const [hasSettled, setHasSettled] = useState(false);
   const searchApiRef = useRef(api.search);
   const dialogContextRef = useRef(dialogContext);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const requestIdRef = useRef(0);
+  const setRawSearchParamsRef = useRef(setRawSearchParams);
+  const resultsAbortControllerRef = useRef<AbortController | null>(null);
+  const resultsRequestIdRef = useRef(0);
   const previousRefreshKeyRef = useRef(refreshKey);
   const previousExpressionTreeRef = useRef(expressionTree);
-  const previousSortRef = useRef<Pick<SearchResultsPagination, 'sort' | 'order'> | null>(null);
+  const previousSortRef = useRef<Pick<ApiCursorPaginationRequestOptions, 'sort' | 'order'> | null>(null);
+  const cursorPagination = useMemo(() => toApiCursorPagination(searchParams), [searchParams]);
+  const currentPage = Number(searchParams.get(URL_PARAMS.PAGE) ?? 1);
 
   useEffect(() => {
     searchApiRef.current = api.search;
     dialogContextRef.current = dialogContext;
-  }, [api.search, dialogContext]);
+    setRawSearchParamsRef.current = setRawSearchParams;
+  }, [api.search, dialogContext, setRawSearchParams]);
+
+  const reportRequestError = useCallback((error: unknown) => {
+    if (!isAbortError(error)) {
+      dialogContextRef.current.setSnackbar({
+        open: true,
+        snackbarMessage: (error as Error).message
+      });
+    }
+  }, []);
 
   /**
    * Loads search results for a single prepared request.
@@ -100,24 +101,15 @@ export const useSearchResults = (
    * @returns Search response for the request, or `undefined` when the request was aborted or failed.
    */
   const loadSearchResults = useCallback(
-    async ({ params, expressionTree, featureTypeName, signal }: SearchResultsLoaderInput) => {
-      const pagination = buildPagination(params);
-
+    async ({ cursorPagination, expressionTree, featureTypeName, signal }: SearchResultsLoaderInput) => {
       try {
-        return await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, pagination, { signal });
+        return await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, cursorPagination, { signal });
       } catch (error) {
-        if (isAbortError(error)) {
-          return undefined;
-        }
-
-        dialogContextRef.current.setSnackbar({
-          open: true,
-          snackbarMessage: (error as Error).message
-        });
+        reportRequestError(error);
         return undefined;
       }
     },
-    []
+    [reportRequestError]
   );
 
   /**
@@ -128,12 +120,12 @@ export const useSearchResults = (
    */
   const startSearch = useCallback(
     async (input: Omit<SearchResultsLoaderInput, 'signal'>) => {
-      abortControllerRef.current?.abort();
+      resultsAbortControllerRef.current?.abort();
 
       const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-      const requestId = requestIdRef.current + 1;
-      requestIdRef.current = requestId;
+      resultsAbortControllerRef.current = abortController;
+      const requestId = resultsRequestIdRef.current + 1;
+      resultsRequestIdRef.current = requestId;
       setIsLoading(true);
 
       const nextData = await loadSearchResults({
@@ -141,16 +133,18 @@ export const useSearchResults = (
         signal: abortController.signal
       });
 
-      if (requestIdRef.current !== requestId) {
+      if (resultsRequestIdRef.current !== requestId) {
         return;
       }
 
-      if (nextData) {
-        setData(nextData);
-        setHasSettled(true);
+      setIsLoading(false);
+
+      if (!nextData) {
+        return;
       }
 
-      setIsLoading(false);
+      setData({ featureTypeName: input.featureTypeName, response: nextData });
+      setHasSettled(true);
     },
     [loadSearchResults]
   );
@@ -171,20 +165,6 @@ export const useSearchResults = (
   }, [startSearch]);
 
   /**
-   * Writes normalized result query params to the router.
-   * `setSearchParams` owns normalization, deletion, replacement, and pagination
-   * reset rules.
-   *
-   * @param {TypedURLSearchParams} newParams - Complete next query param state for the result route.
-   */
-  const updateParams = useCallback(
-    (newParams: TypedURLSearchParams) => {
-      setRawSearchParams(newParams);
-    },
-    [setRawSearchParams]
-  );
-
-  /**
    * Unified setter for URL params.
    *
    * @param updates key-value pairs to set (keys and values will be normalized to lowercase)
@@ -196,30 +176,49 @@ export const useSearchResults = (
 
       Object.entries(updates).forEach(([key, value]) => {
         const typedKey = key.toLowerCase() as UrlParamKey;
-        const normalizedValue = normalizeQueryParam(value);
 
-        if (normalizedValue === undefined || normalizedValue === '') {
+        if (value === undefined || value === '') {
           newParams.delete(typedKey);
-        } else if (replace) {
-          newParams.delete(typedKey);
-          newParams.append(typedKey, normalizedValue);
+          return;
+        }
+
+        const normalizedValue = typedKey === URL_PARAMS.CURSOR ? value : normalizeQueryParam(value);
+        if (replace) {
+          newParams.set(typedKey, normalizedValue);
         } else {
           newParams.append(typedKey, normalizedValue);
         }
       });
 
-      // Reset page unless the only param being changed is PAGE itself
+      const navigationParams = new Set<UrlParamKey>([URL_PARAMS.PAGE, URL_PARAMS.CURSOR]);
       const shouldResetPage = Object.keys(updates).some(
-        (key) => key.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
+        (key) => !navigationParams.has(key.toLowerCase() as UrlParamKey)
       );
       if (shouldResetPage) {
         newParams.set(URL_PARAMS.PAGE, '1');
+        newParams.delete(URL_PARAMS.CURSOR);
       }
 
-      updateParams(newParams);
+      setRawSearchParams(newParams);
     },
-    [searchParams, updateParams]
+    [searchParams, setRawSearchParams]
   );
+
+  // Counts depend on the search itself, not the current cursor page or sort.
+  useEffect(() => {
+    if (!enabled || !featureTypeName) {
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    void searchApiRef.current
+      .countFeatures(featureTypeName, expressionTree, { signal: abortController.signal })
+      .then(({ total }) => setCount({ featureTypeName, expressionTree, refreshKey, total }))
+      .catch(reportRequestError);
+
+    return () => abortController.abort();
+  }, [enabled, expressionTree, featureTypeName, refreshKey, reportRequestError]);
 
   // Refresh when the route, URL params, applied expression, or explicit refresh key changes.
   useEffect(() => {
@@ -227,26 +226,32 @@ export const useSearchResults = (
       return;
     }
 
-    const pagination = buildPagination(searchParams);
-
     if (!featureTypeName) {
       debouncedRefresh.cancel();
-      abortControllerRef.current?.abort();
-      setData(buildEmptyResponse(pagination));
+      resultsAbortControllerRef.current?.abort();
+      setData(undefined);
       setHasSettled(true);
       setIsLoading(false);
       return;
     }
 
-    const input = { params: searchParams, expressionTree, featureTypeName };
+    if (currentPage > 1 && !cursorPagination.cursor) {
+      const firstPageParams = new TypedURLSearchParams(searchParams.toString());
+      firstPageParams.set(URL_PARAMS.PAGE, '1');
+      setRawSearchParamsRef.current(firstPageParams);
+      return;
+    }
+
+    const input = { cursorPagination, expressionTree, featureTypeName };
     const isExplicitExpressionApply = previousRefreshKeyRef.current !== refreshKey;
     const isExpressionTreeChange = previousExpressionTreeRef.current !== expressionTree;
     const previousSort = previousSortRef.current;
     const isSortChange =
-      previousSort !== null && (previousSort.sort !== pagination.sort || previousSort.order !== pagination.order);
+      previousSort !== null &&
+      (previousSort.sort !== cursorPagination.sort || previousSort.order !== cursorPagination.order);
     previousRefreshKeyRef.current = refreshKey;
     previousExpressionTreeRef.current = expressionTree;
-    previousSortRef.current = { sort: pagination.sort, order: pagination.order };
+    previousSortRef.current = { sort: cursorPagination.sort, order: cursorPagination.order };
 
     // Applying filters or sort changes should feel immediate. A changed expression
     // comes from the URL update; an unchanged re-apply comes from refreshKey.
@@ -263,26 +268,55 @@ export const useSearchResults = (
     // advancing requestId first, that stale completion can set isLoading=false
     // while the new debounced search is still pending, causing an empty-state flash
     // when switching tabs.
-    requestIdRef.current += 1;
-    abortControllerRef.current?.abort();
+    resultsRequestIdRef.current += 1;
+    resultsAbortControllerRef.current?.abort();
     debouncedRefresh(input);
-  }, [searchParams, expressionTree, featureTypeName, enabled, refreshKey, debouncedRefresh, startSearch]);
+  }, [
+    searchParams,
+    expressionTree,
+    featureTypeName,
+    enabled,
+    refreshKey,
+    cursorPagination,
+    currentPage,
+    debouncedRefresh,
+    startSearch
+  ]);
 
   useEffect(
     () => () => {
       debouncedRefresh.cancel();
-      abortControllerRef.current?.abort();
+      resultsAbortControllerRef.current?.abort();
     },
     [debouncedRefresh]
   );
 
+  const currentData = data && data.featureTypeName === featureTypeName ? data.response : undefined;
+  const totalCount =
+    count &&
+    count.featureTypeName === featureTypeName &&
+    count.expressionTree === expressionTree &&
+    count.refreshKey === refreshKey
+      ? count.total
+      : undefined;
+  const responsePagination = currentData?.pagination;
+  const cursor: CursorPagination = {
+    limit: responsePagination?.limit ?? cursorPagination.limit,
+    sort: responsePagination?.sort ?? cursorPagination.sort,
+    order: responsePagination?.order ?? cursorPagination.order,
+    next: responsePagination?.next_cursor ?? null,
+    previous: responsePagination?.previous_cursor ?? null
+  };
+
   return {
-    rows: data?.features ?? [],
-    properties: data?.properties ?? [],
-    hasMoreSecuredFeatures: data?.has_more_secured_features ?? false,
+    rows: currentData?.features ?? [],
+    properties: currentData?.properties ?? [],
+    hasMoreSecuredFeatures: currentData?.has_more_secured_features ?? false,
     isLoading: isLoading || !hasSettled,
     searchParams,
     setSearchParams,
-    pagination: data?.pagination
+    totalCount,
+    currentPage,
+    cursor
   };
 };

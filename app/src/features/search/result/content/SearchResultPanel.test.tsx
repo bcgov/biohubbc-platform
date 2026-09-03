@@ -11,7 +11,9 @@ const panel = (view: SEARCH_RESULT_VIEW) => (
     rows={[]}
     featureTypeProperties={[]}
     isLoading={false}
-    pagination={{ current_page: 1, per_page: 10, total: 42, last_page: 5, sort: undefined, order: undefined }}
+    cursor={{ limit: 10, sort: 'relevancy_score', order: 'desc', next: 'next-token', previous: null }}
+    currentPage={1}
+    totalCount={42}
     sortOptions={[]}
     activeSort=""
     view={view}
@@ -90,6 +92,34 @@ describe('SearchResultPanel', () => {
       expect(screen.getByTestId('search-result-options')).toBeInTheDocument();
       expect(screen.queryByTestId('map-content')).not.toBeInTheDocument();
       expect(screen.getByRole('navigation')).toBeInTheDocument();
+    });
+
+    it('renders arrow-only pagination while total metadata is unavailable', () => {
+      render(
+        <SearchResultPanel
+          rows={[]}
+          featureTypeProperties={[]}
+          isLoading={false}
+          cursor={{ limit: 10, sort: 'relevancy_score', order: 'desc', next: 'next-token', previous: null }}
+          currentPage={1}
+          sortOptions={[]}
+          activeSort=""
+          view={SEARCH_RESULT_VIEW.TABLE}
+          viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
+          isCreateDownloadDisabled={false}
+          onCreateDownloadClick={vi.fn()}
+          onSortChange={vi.fn()}
+          onViewChange={vi.fn()}
+          onResultClick={vi.fn()}
+          onPageChange={vi.fn()}
+          onPageSizeChange={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Showing 0 rows')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /go to previous page/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /go to next page/i })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: /^page \d+$/i })).not.toBeInTheDocument();
     });
   });
 });

@@ -1,8 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
-import { ExpressionTree } from '../../../../models/expression-tree';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   featureSearchRequestBodySchema,
@@ -10,7 +8,8 @@ import {
 } from '../../../../openapi/schemas/search/search-feature';
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { getLogger } from '../../../../utils/logger';
-import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../../utils/pagination';
+import { makeCursorPaginationOptionsFromBody } from '../../../../utils/pagination';
+import { getSearchExpressionTree, getSearchFeatureType } from '../../../../utils/search-feature-request';
 import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/search/feature/{feature_type}');
@@ -61,32 +60,30 @@ export function searchFeatures(): RequestHandler {
       await connection.open();
 
       const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
-      const featureType = req.params.feature_type?.trim().toLowerCase();
-      const pagination = makePaginationOptionsFromBody(req);
+      const featureType = getSearchFeatureType(req);
+      const cursorPagination = makeCursorPaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);
+      const expressionTree = getSearchExpressionTree(req);
 
-      if (!featureType) {
-        throw new HTTP400('Feature type path parameter is required');
-      }
-
-      const expressionTreeParseResult = req.body.expression ? ExpressionTree.safeParse(req.body.expression) : null;
-
-      if (expressionTreeParseResult?.success === false) {
-        throw new HTTP400('Invalid expression tree', expressionTreeParseResult.error.issues);
-      }
-
-      const expressionTree = expressionTreeParseResult?.data;
-
-      const { features, properties, count, has_more_secured_features } =
-        await service.searchFeaturesByExpressionTreeWithCount(featureType, expressionTree, pagination, systemUserId);
+      const {
+        features,
+        properties,
+        has_more_secured_features,
+        pagination: paginationCursors
+      } = await service.searchFeaturesByExpressionTreeWithMetadata(
+        featureType,
+        expressionTree,
+        cursorPagination,
+        systemUserId
+      );
 
       await connection.commit();
 
       return res.status(200).json({
         features,
         properties,
-        pagination: makePaginationResponse(count, pagination),
-        has_more_secured_features
+        has_more_secured_features,
+        pagination: paginationCursors
       });
     } catch (error) {
       defaultLog.error({ label: 'searchFeatures', message: 'error', error });

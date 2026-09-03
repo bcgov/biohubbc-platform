@@ -4,6 +4,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { Mock, vi } from 'vitest';
 import { useSearchResults } from './useSearchResults';
 
@@ -15,20 +16,21 @@ vi.mock('hooks/useSearchQuery', () => ({
 }));
 
 const mockSearchFeatures = vi.fn();
+const mockCountFeatures = vi.fn();
 
 describe('useSearchResults', () => {
   const expectAbortOptions = expect.objectContaining({ signal: expect.any(Object) });
-  const defaultSearchFeatureResponse = {
+  const defaultSearchFeatureResponse: SearchFeatureResponse = {
     features: [],
+    properties: [],
+    has_more_secured_features: false,
     pagination: {
-      total: 0,
-      per_page: 25,
-      current_page: 2,
-      last_page: 1,
-      sort: 'create_date',
-      order: 'asc'
-    },
-    has_more_secured_features: false
+      limit: 25,
+      sort: 'relevancy_score',
+      order: 'desc',
+      next_cursor: null,
+      previous_cursor: null
+    }
   };
   const expressionTree: ExpressionTreeExpression = {
     type: 'expression',
@@ -46,10 +48,12 @@ describe('useSearchResults', () => {
 
   beforeEach(() => {
     mockSearchFeatures.mockResolvedValue(defaultSearchFeatureResponse);
+    mockCountFeatures.mockResolvedValue({ total: 0 });
 
     (useApi as Mock).mockReturnValue({
       search: {
-        searchFeatures: mockSearchFeatures
+        searchFeatures: mockSearchFeatures,
+        countFeatures: mockCountFeatures
       }
     });
 
@@ -58,7 +62,7 @@ describe('useSearchResults', () => {
     });
 
     (useSearchQueryParams as Mock).mockReturnValue({
-      searchParams: new URLSearchParams('page=2&limit=25&sort=create_date&order=asc'),
+      searchParams: new URLSearchParams('page=1&limit=25&sort=create_date&order=asc'),
       setSearchParams: vi.fn()
     });
   });
@@ -76,7 +80,6 @@ describe('useSearchResults', () => {
         'species_observation',
         expressionTree,
         {
-          page: 2,
           limit: 25,
           sort: 'create_date',
           order: 'asc'
@@ -84,6 +87,83 @@ describe('useSearchResults', () => {
         expectAbortOptions
       );
     });
+
+    expect(mockCountFeatures).toHaveBeenCalledWith('species_observation', expressionTree, expectAbortOptions);
+    expect(mockCountFeatures.mock.calls[0][2].signal).not.toBe(mockSearchFeatures.mock.calls[0][3].signal);
+  });
+
+  it('keeps the independently loaded count when the current result page is empty', async () => {
+    (useSearchQueryParams as Mock).mockReturnValue({
+      searchParams: new URLSearchParams('page=1&limit=25'),
+      setSearchParams: vi.fn()
+    });
+
+    let resolveResults: (response: SearchFeatureResponse) => void;
+    let resolveCount: (response: { total: number }) => void;
+    mockSearchFeatures.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveResults = resolve;
+        })
+    );
+    mockCountFeatures.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCount = resolve;
+        })
+    );
+
+    const { result } = renderHook(() => useSearchResults('species_observation', true, expressionTree));
+
+    await waitFor(() => {
+      expect(mockSearchFeatures).toHaveBeenCalledOnce();
+      expect(mockCountFeatures).toHaveBeenCalledOnce();
+    });
+
+    await act(async () => {
+      resolveCount!({ total: 50_000_000 });
+      await Promise.resolve();
+    });
+
+    expect(result.current.totalCount).toBe(50_000_000);
+
+    await act(async () => {
+      resolveResults!(defaultSearchFeatureResponse);
+      await Promise.resolve();
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.totalCount).toBe(50_000_000);
+  });
+
+  it('clears pagination state immediately when the feature type changes', async () => {
+    vi.useFakeTimers();
+
+    mockSearchFeatures.mockResolvedValue({
+      ...defaultSearchFeatureResponse,
+      pagination: { next_cursor: 'next-species', previous_cursor: 'previous-species' }
+    });
+    mockCountFeatures.mockResolvedValue({ total: 50_000_000 });
+
+    const { result, rerender } = renderHook(({ featureTypeName }) => useSearchResults(featureTypeName, true, null), {
+      initialProps: { featureTypeName: 'species_observation' }
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.totalCount).toBe(50_000_000);
+    expect(result.current.cursor.next).toBe('next-species');
+    expect(result.current.cursor.previous).toBe('previous-species');
+
+    rerender({ featureTypeName: 'habitat_feature' });
+
+    expect(result.current.totalCount).toBeUndefined();
+    expect(result.current.cursor.next).toBeNull();
+    expect(result.current.cursor.previous).toBeNull();
   });
 
   it('sends null expression with pagination when filters are cleared', async () => {
@@ -94,7 +174,6 @@ describe('useSearchResults', () => {
         'species_observation',
         null,
         {
-          page: 2,
           limit: 25,
           sort: 'create_date',
           order: 'asc'
@@ -106,7 +185,7 @@ describe('useSearchResults', () => {
 
   it('uses pagination without explicit sort when no expression filters are applied', async () => {
     (useSearchQueryParams as Mock).mockReturnValue({
-      searchParams: new URLSearchParams('page=3&limit=25'),
+      searchParams: new URLSearchParams('page=1&limit=25'),
       setSearchParams: vi.fn()
     });
 
@@ -117,7 +196,6 @@ describe('useSearchResults', () => {
         'species_observation',
         null,
         {
-          page: 3,
           limit: 25,
           sort: undefined,
           order: undefined
@@ -130,7 +208,7 @@ describe('useSearchResults', () => {
   it('does not issue a redundant immediate refresh after setter-driven URL updates', async () => {
     vi.useFakeTimers();
 
-    let currentSearchParams = new URLSearchParams('page=2&limit=25');
+    let currentSearchParams = new URLSearchParams('page=1&limit=25');
     const setSearchParams = vi.fn((nextSearchParams: URLSearchParams) => {
       currentSearchParams = nextSearchParams;
     });
@@ -152,7 +230,7 @@ describe('useSearchResults', () => {
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
 
     act(() => {
-      result.current.setSearchParams({ [URL_PARAMS.PAGE]: '3' });
+      result.current.setSearchParams({ [URL_PARAMS.PAGE]: '2', [URL_PARAMS.CURSOR]: 'next-token' });
     });
     rerender();
 
@@ -164,14 +242,15 @@ describe('useSearchResults', () => {
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockCountFeatures).toHaveBeenCalledTimes(1);
     expect(mockSearchFeatures).toHaveBeenLastCalledWith(
       'species_observation',
       null,
       {
-        page: 3,
         limit: 25,
         sort: undefined,
-        order: undefined
+        order: undefined,
+        cursor: 'next-token'
       },
       expectAbortOptions
     );
@@ -180,7 +259,7 @@ describe('useSearchResults', () => {
   it('uses updated limit in the next request after page size changes', async () => {
     vi.useFakeTimers();
 
-    let currentSearchParams = new URLSearchParams('page=2&limit=10');
+    let currentSearchParams = new URLSearchParams('page=1&limit=10');
     const setSearchParams = vi.fn((nextSearchParams: URLSearchParams) => {
       currentSearchParams = nextSearchParams;
     });
@@ -206,7 +285,7 @@ describe('useSearchResults', () => {
     });
     rerender();
 
-    expect(setSearchParams).toHaveBeenCalledWith(new URLSearchParams('limit=50&page=1'));
+    expect(setSearchParams.mock.calls[0][0].toString()).toBe('page=1&limit=50');
 
     await act(async () => {
       vi.advanceTimersByTime(300);
@@ -218,7 +297,6 @@ describe('useSearchResults', () => {
       'species_observation',
       null,
       {
-        page: 1,
         limit: 50,
         sort: undefined,
         order: undefined
@@ -230,7 +308,7 @@ describe('useSearchResults', () => {
   it('sets loading immediately while a debounced URL-param search is pending', async () => {
     vi.useFakeTimers();
 
-    let currentSearchParams = new URLSearchParams('page=2&limit=25');
+    let currentSearchParams = new URLSearchParams('page=1&limit=25');
     const setSearchParams = vi.fn((nextSearchParams: URLSearchParams) => {
       currentSearchParams = nextSearchParams;
     });
@@ -254,7 +332,7 @@ describe('useSearchResults', () => {
     mockSearchFeatures.mockClear();
 
     act(() => {
-      result.current.setSearchParams({ [URL_PARAMS.PAGE]: '3' });
+      result.current.setSearchParams({ [URL_PARAMS.PAGE]: '2', [URL_PARAMS.CURSOR]: 'next-token' });
     });
     rerender();
 
@@ -291,7 +369,7 @@ describe('useSearchResults', () => {
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
     expect(result.current.isLoading).toBe(true);
-    expect(result.current.pagination).toBeUndefined();
+    expect(result.current.totalCount).toBe(0);
 
     await act(async () => {
       rerender({ refreshKey: 1 });
@@ -302,13 +380,13 @@ describe('useSearchResults', () => {
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
     expect(result.current.isLoading).toBe(false);
-    expect(result.current.pagination).toEqual(defaultSearchFeatureResponse.pagination);
+    expect(result.current.totalCount).toBe(0);
   });
 
   it('starts one immediate request when the applied expression changes', async () => {
     vi.useFakeTimers();
 
-    const nextExpressionTree: ExpressionTreeExpression = {
+    const updatedExpressionTree: ExpressionTreeExpression = {
       type: 'expression',
       operator: 'AND',
       clauses: [
@@ -339,16 +417,15 @@ describe('useSearchResults', () => {
     mockSearchFeatures.mockClear();
 
     await act(async () => {
-      rerender({ appliedExpression: nextExpressionTree });
+      rerender({ appliedExpression: updatedExpressionTree });
       await Promise.resolve();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
     expect(mockSearchFeatures).toHaveBeenLastCalledWith(
       'species_observation',
-      nextExpressionTree,
+      updatedExpressionTree,
       {
-        page: 2,
         limit: 25,
         sort: 'create_date',
         order: 'asc'
@@ -402,7 +479,6 @@ describe('useSearchResults', () => {
       'telemetry',
       null,
       {
-        page: 2,
         limit: 25,
         sort: 'create_date',
         order: 'asc'
@@ -438,7 +514,6 @@ describe('useSearchResults', () => {
       'species_observation',
       null,
       {
-        page: 2,
         limit: 25,
         sort: 'create_date',
         order: 'asc'
@@ -488,7 +563,7 @@ describe('useSearchResults', () => {
     vi.useFakeTimers();
 
     const setSearchParams = vi.fn();
-    const initialSearchParams = new URLSearchParams('page=2&limit=25&sort=create_date&order=asc');
+    const initialSearchParams = new URLSearchParams('page=1&limit=25&sort=create_date&order=asc');
     const sortedSearchParams = new URLSearchParams('page=1&limit=25&sort=relevancy_score&order=desc');
 
     (useSearchQueryParams as Mock).mockReturnValue({
@@ -529,7 +604,6 @@ describe('useSearchResults', () => {
       'species_observation',
       expressionTree,
       {
-        page: 1,
         limit: 25,
         sort: 'relevancy_score',
         order: 'desc'

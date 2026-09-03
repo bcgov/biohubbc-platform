@@ -1,9 +1,8 @@
-import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
+import { URL_PARAMS } from 'constants/query-params';
 import { useDialogContext } from 'hooks/useContext';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { normalizeQueryParam } from 'utils/query-param';
 import { decodeExpressionFromUrl, encodeExpressionToUrl } from 'utils/expression-url';
 
 /**
@@ -65,7 +64,7 @@ export const useSearchResultExpression = () => {
   /**
    * Applies a new expression tree to the search result page.
    *
-   * When `nextExpressionTree` is non-null the encoded expression is written to
+   * When `expression` is non-null the encoded expression is written to
    * the `expr` URL param and the page resets to page 1. When `null` the `expr`
    * param is removed and sort/order are cleared so results revert to their
    * default ordering.
@@ -74,39 +73,20 @@ export const useSearchResultExpression = () => {
    * re-applying the same expression still refreshes without double-firing normal
    * applies, where the URL change itself triggers the search.
    *
-   * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression to apply, or `null` to clear filters.
+   * @param {ExpressionTreeExpression | null} expression - Expression to apply, or `null` to clear filters.
    */
   const handleExpressionApply = useCallback(
-    (nextExpressionTree: ExpressionTreeExpression | null) => {
-      const nextParams: Partial<Record<UrlParamKey, string>> = {
-        [URL_PARAMS.PAGE]: '1'
-      };
-
-      if (nextExpressionTree === null) {
-        nextParams[URL_PARAMS.SORT] = '';
-        nextParams[URL_PARAMS.ORDER] = '';
-      }
-
+    (expression: ExpressionTreeExpression | null) => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
+      newParams.set(URL_PARAMS.PAGE, '1');
+      newParams.delete(URL_PARAMS.CURSOR);
 
-      Object.entries(nextParams).forEach(([key, value]) => {
-        const typedKey = key.toLowerCase() as UrlParamKey;
-        const normalizedValue = normalizeQueryParam(value);
-
-        if (normalizedValue === undefined || normalizedValue === '') {
-          newParams.delete(typedKey);
-        } else {
-          newParams.delete(typedKey);
-          newParams.append(typedKey, normalizedValue);
-        }
-      });
-
-      if (nextExpressionTree === null) {
+      if (expression === null) {
         newParams.delete(URL_PARAMS.EXPR);
+        newParams.delete(URL_PARAMS.SORT);
+        newParams.delete(URL_PARAMS.ORDER);
       } else {
-        // Use super.set directly on the underlying URLSearchParams to store the
-        // base64url value as-is (TypedURLSearchParams.set lowercases values).
-        URLSearchParams.prototype.set.call(newParams, URL_PARAMS.EXPR, encodeExpressionToUrl(nextExpressionTree));
+        newParams.set(URL_PARAMS.EXPR, encodeExpressionToUrl(expression));
       }
 
       // Most applies change the URL; the search hook observes that URL/expression change

@@ -2,7 +2,7 @@ import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { JsonValue } from 'types/json';
-import { ApiPaginationResponseParams } from 'types/pagination';
+import { ApiCursorResponseParams, ApiPaginationResponseParams } from 'types/pagination';
 
 /** Generic paginated result */
 interface PaginatedResult<T> {
@@ -27,9 +27,14 @@ export interface SearchFeatureResult {
 export interface SearchFeatureResponse {
   features: SearchFeatureResultWithRelevancy[];
   properties: FeatureTypeProperty[];
-  pagination: ApiPaginationResponseParams;
   /** True when the search matched secured features hidden from the caller by access filtering. */
   has_more_secured_features: boolean;
+  pagination: ApiCursorResponseParams;
+}
+
+/** Total for a feature expression search. */
+export interface SearchFeatureCountResponse {
+  total: number;
 }
 
 /** Search result representing a matched feature with relevancy */

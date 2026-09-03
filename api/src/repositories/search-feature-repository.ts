@@ -1,9 +1,12 @@
 import { Knex } from 'knex';
 import { getKnex } from '../database/db';
+import { ApiValidationError } from '../errors/api-error';
+import { CountResult } from '../models/count';
 import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
 import { FeatureTypeProperty } from '../models/feature-type-property';
+import { SearchFeatureSort } from '../models/search-feature-pagination';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
@@ -20,68 +23,55 @@ import {
  * Repository for searching submission features by expression-tree criteria.
  */
 export class SearchFeatureRepository extends BaseRepository {
-  private readonly typedPropertyTableNames = [
-    'submission_feature_property_string',
-    'submission_feature_property_number',
-    'submission_feature_property_boolean',
-    'submission_feature_property_timestamp',
-    'submission_feature_property_geometry',
-    'submission_feature_property_code',
-    'submission_feature_property_taxon',
-    'submission_feature_property_feature'
-  ];
-
   /**
    * Searches for submission features matching the provided expression tree.
    *
-   * @param {ExpressionTree} expressionTree - Expression tree criteria
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @param {NormalizedExpressionTreeExpression} [expressionTree] - Optional normalized expression tree criteria
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination options
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<SearchFeatureResultWithRelevancy[]>}
+   * @return {Promise<SearchFeatureResultWithRelevancy[]>} Ordered, accessible feature rows
    */
   async searchFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
-    pagination?: ApiPaginationOptions,
+    expressionTree?: NormalizedExpressionTreeExpression,
+    cursorPagination?: ApiCursorPaginationOptions,
     systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
-    const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
-      : null;
+    const expressionFeatureIds = this.buildExpressionFeatureIdsSubquery(
+      anchorFeatureType,
+      expressionTree,
+      systemUserId
+    );
 
     let query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
-    query = this.applyExpressionSearchPagination(query, pagination);
+    query = this.applyExpressionSearchCursorPagination(query, cursorPagination);
 
     const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
 
-    return response.rows;
+    return cursorPagination?.boundary?.direction === 'previous' ? response.rows.reverse() : response.rows;
   }
 
   /**
    * Gets the count of features matching the provided expression tree.
    *
-   * @param {ExpressionTree} expressionTree - Expression tree criteria
+   * @param {string} anchorFeatureType - Target feature type included in the count
+   * @param {NormalizedExpressionTreeExpression} [expressionTree] - Optional normalized expression tree criteria
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<number>} Promise resolving to the count of matching features
+   * @return {Promise<number>} Count of matching, accessible features
    */
-  async searchFeaturesByExpressionTreeCount(
+  async countFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
+    expressionTree?: NormalizedExpressionTreeExpression,
     systemUserId?: number | null
   ): Promise<number> {
     const knex = getKnex();
-    const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
-      : null;
+    const expressionFeatureIds = this.buildExpressionFeatureIdsSubquery(
+      anchorFeatureType,
+      expressionTree,
+      systemUserId
+    );
 
     const query = this.buildExpressionTreeMatchingFeaturesQuery(
       knex,
@@ -90,8 +80,44 @@ export class SearchFeatureRepository extends BaseRepository {
       systemUserId
     );
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
-    const response = await this.connection.knex(countQuery);
+    const response = await this.connection.knex(countQuery, CountResult);
     return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Gets active property metadata for the requested feature type.
+   *
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @return {Promise<FeatureTypeProperty[]>} Active feature type property metadata
+   */
+  async getFeatureTypeProperties(anchorFeatureType: string): Promise<FeatureTypeProperty[]> {
+    const knex = getKnex();
+    const query = knex('feature_type_property as ftp')
+      .select(
+        'ftp.feature_type_property_id',
+        'fp.feature_property_id',
+        'fpt.feature_property_type_id',
+        'fp.name',
+        'fp.display_name',
+        'fp.description',
+        'fpt.name as type_name',
+        'ftp.required_value',
+        'fp.calculated_value',
+        'ftp.allow_multiple'
+      )
+      .join('feature_type as ft', 'ftp.feature_type_id', 'ft.feature_type_id')
+      .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
+      .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
+      .where('ft.name', anchorFeatureType)
+      .whereNull('ft.record_end_date')
+      .whereNull('ftp.record_end_date')
+      .whereNull('fp.record_end_date')
+      .whereNull('fpt.record_end_date')
+      .orderByRaw('ftp.sort ASC NULLS LAST')
+      .orderBy('fp.display_name', 'asc');
+
+    const response = await this.connection.knex(query, FeatureTypeProperty);
+    return response.rows;
   }
 
   /**
@@ -152,107 +178,34 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Gets metadata for properties with at least one non-null typed value on the full filtered result set.
-   * Pagination is intentionally irrelevant. A typed row counts only when its property belongs to the
-   * matched feature's feature type, mirroring row-level property hydration.
+   * Builds the optional feature-ID subquery shared by result and count searches.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
+   * @param {NormalizedExpressionTreeExpression} [expressionTree] - Optional normalized expression criteria
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<FeatureTypeProperty[]>} Active metadata for properties with at least one non-null value.
+   * @return {Knex.QueryBuilder | null} Matching feature-ID subquery, or null when no expression was supplied
    */
-  async searchFeaturesByExpressionTreeProperties(
+  private buildExpressionFeatureIdsSubquery(
     anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
+    expressionTree?: NormalizedExpressionTreeExpression,
     systemUserId?: number | null
-  ): Promise<FeatureTypeProperty[]> {
-    const knex = getKnex();
+  ): Knex.QueryBuilder | null {
+    if (!expressionTree) {
+      return null;
+    }
 
-    // Compile the normalized expression into an unexecuted feature-id subquery. When there is no
-    // expression, the matching-feature query below uses all current features of the anchor type.
-    const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
-      : null;
-
-    // Build the full, security-filtered result set as (submission_feature_id, feature_type_id).
-    // This intentionally has no LIMIT/OFFSET: top-level property metadata describes every feature
-    // matched by the expression, independently of the page returned in `features`.
-    const matchingFeaturesQuery = this.buildExpressionTreeMatchingFeaturesQuery(
-      knex,
+    return expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
       anchorFeatureType,
-      expressionFeatureIds,
-      systemUserId
+      expressionTree,
+      systemUserId ?? null
     );
-
-    // Normalize all indexed typed-property tables to the two columns needed for presence checks.
-    // Typed rows represent non-null values. Keeping the matching-feature join outside this
-    // UNION means PostgreSQL consumes `matching_features` once instead of once per property table.
-    const typedPropertyRowsQuery = knex.unionAll(
-      this.typedPropertyTableNames.map((tableName) =>
-        knex(`${tableName} as p`).select('p.submission_feature_id', 'p.feature_type_property_id')
-      ),
-      true
-    );
-
-    // Retain property ids that occur on at least one matched feature. The feature-type join mirrors
-    // row hydration and rejects stale or unrelated property rows attached to a feature id. Grouping
-    // here reduces an arbitrarily large value set to the small set of distinct property ids before
-    // descriptive metadata is joined.
-    const presentPropertyIdsQuery = knex('typed_property_rows as tpr')
-      .select('tpr.feature_type_property_id')
-      .join('matching_features as mf', 'tpr.submission_feature_id', 'mf.submission_feature_id')
-      .join('feature_type_property as matching_ftp', (join) => {
-        join
-          .on('tpr.feature_type_property_id', '=', 'matching_ftp.feature_type_property_id')
-          .andOn('mf.feature_type_id', '=', 'matching_ftp.feature_type_id');
-      })
-      .whereNull('matching_ftp.record_end_date')
-      .groupBy('tpr.feature_type_property_id');
-
-    // Assemble the three stages as single-use CTEs, then hydrate only the active metadata records
-    // for property ids proven to have a non-null value in the full expression result.
-    const query = knex
-      .with('matching_features', matchingFeaturesQuery)
-      .with('typed_property_rows', typedPropertyRowsQuery)
-      .with('present_property_ids', presentPropertyIdsQuery)
-      .from('present_property_ids as ppi')
-      .select(
-        'ftp.feature_type_property_id',
-        'fp.feature_property_id',
-        'fpt.feature_property_type_id',
-        'fp.name',
-        'fp.display_name',
-        'fp.description',
-        'fpt.name as type_name',
-        'ftp.required_value',
-        'fp.calculated_value',
-        'ftp.allow_multiple'
-      )
-      .join('feature_type_property as ftp', 'ppi.feature_type_property_id', 'ftp.feature_type_property_id')
-      .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
-      .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
-      .whereNull('ftp.record_end_date')
-      .whereNull('fp.record_end_date')
-      .whereNull('fpt.record_end_date')
-      .orderByRaw('ftp.sort ASC NULLS LAST')
-      .orderBy('fp.display_name', 'asc');
-
-    // Only the compact metadata result crosses the database/application boundary; matching feature
-    // ids and typed value rows remain inside PostgreSQL.
-    const response = await this.connection.knex(query, FeatureTypeProperty);
-
-    return response.rows;
   }
 
   /**
    * Builds the filtered set of matching submission features without result hydration.
    *
-   * Used by count and property-metadata queries so they do not pay the cost of building
-   * row-level properties JSON that they never read.
+   * Used by count and security-probe queries so they do not pay the cost of
+   * building row-level properties JSON that they never read.
    *
    * @param {Knex} knex - Knex instance
    * @param {string} anchorFeatureType - Route anchor/result feature type
@@ -296,8 +249,7 @@ export class SearchFeatureRepository extends BaseRepository {
    * `submission_feature.data`, which remains ingestion source JSON only.
    * Adds the `is_secured` projection and applies the security WHERE filter.
    *
-   * Pagination is applied separately by `applyExpressionSearchPagination` so the count wrapper
-   * can wrap this query in `count(*)` without inheriting LIMIT/OFFSET.
+   * Cursor pagination is applied separately by `applyExpressionSearchCursorPagination`.
    *
    * @param {Knex} knex - Knex instance
    * @param {string} anchorFeatureType - Route anchor/result feature type
@@ -564,33 +516,77 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Applies SQL-side pagination for expression search results.
    *
-   * The current public pagination model is page/limit based, so deep pages still use OFFSET. Keep ordering stable by
-   * always adding submission_feature_id as the deterministic order key/tie-breaker. A future cursor API can replace
-   * this with `submission_feature_id > :cursor ORDER BY submission_feature_id LIMIT :limit` without changing the
-   * expression evaluator boundary.
+   * Cursor values identify the first row outside the requested page. The unique
+   * submission_feature_id is the complete position for ID sorting and the stable
+   * tie-breaker for non-unique create_date sorting.
    *
    * @param {Knex.QueryBuilder} query - Final expression search query
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination options
    * @return {Knex.QueryBuilder} Query with stable SQL-side pagination applied
    */
-  private applyExpressionSearchPagination(
+  private applyExpressionSearchCursorPagination(
     query: Knex.QueryBuilder,
-    pagination?: ApiPaginationOptions
+    cursorPagination?: ApiCursorPaginationOptions
   ): Knex.QueryBuilder {
-    if (pagination?.sort && pagination.order) {
-      query.orderBy(pagination.sort, pagination.order);
+    const sort = this.getExpressionSearchSort(cursorPagination);
+    const cursorBoundary = cursorPagination?.boundary;
+    const reverseSortOrder = sort.order === 'asc' ? 'desc' : 'asc';
+    const queryOrder = cursorBoundary?.direction === 'previous' ? reverseSortOrder : sort.order;
+
+    if (cursorBoundary) {
+      const comparison = (cursorBoundary.direction === 'next') === (sort.order === 'asc') ? '>' : '<';
+
+      if (sort.sort === 'create_date') {
+        // create_date is not unique, so compare it together with the stable ID
+        // tie-breaker to resume from one exact position without gaps or duplicates.
+        query.whereRaw(`(create_date, submission_feature_id) ${comparison} (?, ?)`, [
+          cursorBoundary.create_date,
+          cursorBoundary.submission_feature_id
+        ]);
+      } else {
+        // The unique ID is both the active sort value and the complete cursor position.
+        query.where('submission_feature_id', comparison, cursorBoundary.submission_feature_id);
+      }
     }
 
-    query.orderBy('submission_feature_id', 'asc');
+    query.orderBy(sort.sort, queryOrder);
 
-    if (pagination?.limit) {
-      query.limit(pagination.limit);
+    if (sort.sort !== 'submission_feature_id') {
+      query.orderBy('submission_feature_id', queryOrder);
     }
 
-    if (pagination?.page && pagination.limit) {
-      query.offset((pagination.page - 1) * pagination.limit);
+    if (cursorPagination?.limit) {
+      query.limit(cursorPagination.limit);
     }
 
     return query;
+  }
+
+  /**
+   * Resolves the supported database sort and order for a feature search.
+   *
+   * Relevance currently has no variable score, so it uses stable feature-ID
+   * ordering. Explicit ID and creation-date sorts retain their requested order.
+   *
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Requested cursor pagination and sorting
+   * @return {{ sort: SearchFeatureSort; order: 'asc' | 'desc' }} Validated database sort definition
+   */
+  private getExpressionSearchSort(cursorPagination?: ApiCursorPaginationOptions): {
+    sort: SearchFeatureSort;
+    order: 'asc' | 'desc';
+  } {
+    if (!cursorPagination?.sort || cursorPagination.sort === 'relevancy_score') {
+      return { sort: 'submission_feature_id', order: 'asc' };
+    }
+
+    const sort = SearchFeatureSort.safeParse(cursorPagination.sort);
+    if (!sort.success) {
+      throw new ApiValidationError('Unsupported search result sort field');
+    }
+
+    return {
+      sort: sort.data,
+      order: cursorPagination.order ?? 'asc'
+    };
   }
 }

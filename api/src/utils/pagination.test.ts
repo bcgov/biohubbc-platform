@@ -1,15 +1,37 @@
 import { expect } from 'chai';
 import { Request } from 'express';
 import { describe, it } from 'mocha';
+import { ZodError } from 'zod';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import {
+  decodeSearchFeatureCursor,
+  encodeSearchFeatureCursor,
   ensureCompletePaginationOptions,
+  makeCursorPaginationOptionsFromBody,
   makePaginationOptionsFromBody,
   makePaginationOptionsFromRequest,
   makePaginationResponse
 } from './pagination';
 
 describe('pagination', () => {
+  describe('search feature cursors', () => {
+    it('should encode and decode a valid cursor', () => {
+      const cursor = {
+        direction: 'next' as const,
+        submission_feature_id: 123,
+        create_date: '2026-05-11T00:00:00.000Z'
+      };
+
+      expect(decodeSearchFeatureCursor(encodeSearchFeatureCursor(cursor))).to.eql(cursor);
+    });
+
+    it('should reject a decoded cursor that does not match the cursor schema', () => {
+      const cursor = Buffer.from(JSON.stringify({ direction: 'unsupported' })).toString('base64url');
+
+      expect(() => decodeSearchFeatureCursor(cursor)).to.throw(ZodError);
+    });
+  });
+
   describe('makePaginationOptionsFromRequest', () => {
     it('should return default options if query params are missing', () => {
       const mockRequest = { query: {} } as unknown as Request;
@@ -75,6 +97,53 @@ describe('pagination', () => {
         sort: 'name',
         order: 'asc'
       });
+    });
+  });
+
+  describe('makeCursorPaginationOptionsFromBody', () => {
+    it('should apply cursor-pagination defaults', () => {
+      const mockRequest = { body: {} } as unknown as Request;
+
+      expect(makeCursorPaginationOptionsFromBody(mockRequest)).to.eql({
+        limit: 25,
+        boundary: undefined,
+        sort: 'relevancy_score',
+        order: 'desc'
+      });
+    });
+
+    it('should return cursor options without offset pagination fields', () => {
+      const boundary = {
+        direction: 'next' as const,
+        submission_feature_id: 123,
+        create_date: '2026-05-11T00:00:00.000Z'
+      };
+      const mockRequest = {
+        body: {
+          pagination: {
+            page: 20,
+            limit: '10',
+            cursor: encodeSearchFeatureCursor(boundary),
+            sort: 'create_date',
+            order: 'DESC'
+          }
+        }
+      } as unknown as Request;
+
+      expect(makeCursorPaginationOptionsFromBody(mockRequest)).to.eql({
+        limit: 10,
+        boundary,
+        sort: 'create_date',
+        order: 'desc'
+      });
+    });
+
+    it('should reject an invalid cursor', () => {
+      const mockRequest = {
+        body: { pagination: { cursor: 'invalid-cursor' } }
+      } as unknown as Request;
+
+      expect(() => makeCursorPaginationOptionsFromBody(mockRequest)).to.throw('Invalid search result cursor');
     });
   });
 

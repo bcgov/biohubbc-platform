@@ -1,20 +1,23 @@
 import { act, renderHook } from 'test-helpers/test-utils';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { useSearchResultPagingSort } from './useSearchResultPagingSort';
-
-const pagination: ApiPaginationResponseParams = {
-  total: 10,
-  current_page: 1,
-  last_page: 1,
-  sort: 'relevancy_score',
-  order: 'desc'
-};
 
 describe('useSearchResultPagingSort', () => {
   it('optimistically updates the active sort before pagination refreshes', () => {
     const setSearchParams = vi.fn();
 
-    const { result } = renderHook(() => useSearchResultPagingSort({ pagination, setSearchParams }));
+    const { result } = renderHook(() =>
+      useSearchResultPagingSort({
+        cursor: {
+          limit: 10,
+          sort: 'relevancy_score',
+          order: 'desc',
+          next: 'next-token',
+          previous: null
+        },
+        currentPage: 1,
+        setSearchParams
+      })
+    );
 
     act(() => {
       result.current.handleSortChange('create_date', 'desc');
@@ -27,5 +30,26 @@ describe('useSearchResultPagingSort', () => {
       direction: 'desc'
     });
     expect(setSearchParams).toHaveBeenCalledWith({ sort: 'create_date', order: 'desc' }, true);
+  });
+
+  it('uses the returned keyset cursor for the next page', () => {
+    const setSearchParams = vi.fn();
+    const { result } = renderHook(() =>
+      useSearchResultPagingSort({
+        cursor: {
+          limit: 10,
+          sort: 'relevancy_score',
+          order: 'desc',
+          next: 'next-token',
+          previous: null
+        },
+        currentPage: 1,
+        setSearchParams
+      })
+    );
+
+    act(() => result.current.handlePageChange(2));
+
+    expect(setSearchParams).toHaveBeenCalledWith({ page: '2', cursor: 'next-token' });
   });
 });

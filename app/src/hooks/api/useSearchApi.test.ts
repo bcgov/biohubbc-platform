@@ -56,15 +56,14 @@ describe('useSearchApi', () => {
       const mockResponse: SearchFeatureResponse = {
         features: mockResults,
         properties: [],
+        has_more_secured_features: false,
         pagination: {
-          total: 1,
-          per_page: 10,
-          current_page: 1,
-          last_page: 1,
-          sort: 'relevance',
-          order: 'desc'
-        },
-        has_more_secured_features: false
+          limit: 25,
+          sort: 'relevancy_score',
+          order: 'desc',
+          next_cursor: null,
+          previous_cursor: null
+        }
       };
 
       mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
@@ -99,26 +98,25 @@ describe('useSearchApi', () => {
       const mockResponse: SearchFeatureResponse = {
         features: mockResults,
         properties: [],
+        has_more_secured_features: false,
         pagination: {
-          total: 5,
-          per_page: 10,
-          current_page: 1,
-          last_page: 1,
-          sort: undefined,
-          order: undefined
-        },
-        has_more_secured_features: false
+          limit: 25,
+          sort: 'relevancy_score',
+          order: 'desc',
+          next_cursor: null,
+          previous_cursor: null
+        }
       };
 
       mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures('survey', expressionTree, { page: 1, limit: 10 });
+      const result = await useSearchApi(axios).searchFeatures('survey', expressionTree, { limit: 10 });
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].data).toEqual(
         JSON.stringify({
           expression: expressionTree,
-          pagination: { page: 1, limit: 10 }
+          pagination: { limit: 10 }
         })
       );
     });
@@ -127,25 +125,24 @@ describe('useSearchApi', () => {
       const mockResponse: SearchFeatureResponse = {
         features: [],
         properties: [],
+        has_more_secured_features: false,
         pagination: {
-          total: 0,
-          per_page: 25,
-          current_page: 1,
-          last_page: 1,
-          sort: undefined,
-          order: undefined
-        },
-        has_more_secured_features: false
+          limit: 25,
+          sort: 'relevancy_score',
+          order: 'desc',
+          next_cursor: null,
+          previous_cursor: null
+        }
       };
 
       mock.onPost('/api/search/feature/telemetry').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchFeatures('telemetry', null, { page: 1, limit: 25 });
+      const result = await useSearchApi(axios).searchFeatures('telemetry', null, { limit: 25 });
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.post[0].data).toEqual(
         JSON.stringify({
-          pagination: { page: 1, limit: 25 }
+          pagination: { limit: 25 }
         })
       );
     });
@@ -154,15 +151,14 @@ describe('useSearchApi', () => {
       const mockResponse: SearchFeatureResponse = {
         features: [],
         properties: [],
+        has_more_secured_features: false,
         pagination: {
-          total: 0,
-          per_page: 10,
-          current_page: 1,
-          last_page: 1,
-          sort: undefined,
-          order: undefined
-        },
-        has_more_secured_features: false
+          limit: 25,
+          sort: 'relevancy_score',
+          order: 'desc',
+          next_cursor: null,
+          previous_cursor: null
+        }
       };
 
       mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
@@ -170,7 +166,31 @@ describe('useSearchApi', () => {
       const result = await useSearchApi(axios).searchFeatures('survey', expressionTree);
 
       expect(result.features).toEqual([]);
-      expect(result.pagination.total).toEqual(0);
+    });
+  });
+
+  describe('countFeatures', () => {
+    it('should make a POST request to the feature count endpoint with the expression and abort signal', async () => {
+      const controller = new AbortController();
+      mock.onPost('/api/search/feature/survey/count').reply(200, { total: 50_000_000 });
+
+      const result = await useSearchApi(axios).countFeatures('survey', expressionTree, {
+        signal: controller.signal
+      });
+
+      expect(result).toEqual({ total: 50_000_000 });
+      expect(mock.history.post[0].data).toEqual(JSON.stringify({ expression: expressionTree }));
+      expect(mock.history.post[0].signal).toBe(controller.signal);
+    });
+
+    it('should omit the expression when counting a broad feature search', async () => {
+      const controller = new AbortController();
+      mock.onPost('/api/search/feature/telemetry/count').reply(200, { total: 5_000_000 });
+
+      const result = await useSearchApi(axios).countFeatures('telemetry', null, { signal: controller.signal });
+
+      expect(result).toEqual({ total: 5_000_000 });
+      expect(mock.history.post[0].data).toEqual(JSON.stringify({}));
     });
   });
 

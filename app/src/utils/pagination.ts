@@ -1,8 +1,6 @@
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
-import { PAGE_WINDOW_SIZE } from 'constants/pagination';
-import { ApiPaginationRequestOptions } from 'types/pagination';
-
-export type PaginationPageItem = number | 'start-ellipsis' | 'end-ellipsis';
+import { URL_PARAMS } from 'constants/query-params';
+import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Converts DataGrid-style pagination/sort state into API pagination options.
@@ -26,53 +24,22 @@ export const toApiPagination = (
 };
 
 /**
- * Builds an inclusive number range.
+ * Converts URL search parameters into cursor-pagination API options.
  *
- * @param {number} start - First value in the range.
- * @param {number} end - Last value in the range.
- * @returns {number[]} Ordered list of numbers from `start` through `end`.
+ * The cursor is read with the native `URLSearchParams` implementation so its
+ * opaque, case-sensitive value is preserved even when a normalized parameter
+ * wrapper is supplied.
+ *
+ * @param {URLSearchParams} params - URL parameters containing cursor-pagination state.
+ * @returns {ApiCursorPaginationRequestOptions} API options for the current cursor page.
  */
-export const range = (start: number, end: number): number[] => {
-  return Array.from({ length: end - start + 1 }, (_value, index) => start + index);
-};
+export const toApiCursorPagination = (params: URLSearchParams): ApiCursorPaginationRequestOptions => {
+  const cursor = URLSearchParams.prototype.get.call(params, URL_PARAMS.CURSOR) as string | null;
 
-/**
- * Builds the compact pagination item sequence.
- *
- * The sequence keeps a fixed-size page window near the current page, includes
- * the first page when the window is not already at the start, and always includes
- * the final page so the control never ends with an ellipsis.
- *
- * @param {number} currentPage - One-based active page number.
- * @param {number} lastPage - One-based final page number.
- * @returns {PaginationPageItem[]} Page numbers and ellipsis markers to render.
- */
-export const getPaginationItems = (currentPage: number, lastPage: number): PaginationPageItem[] => {
-  if (lastPage <= PAGE_WINDOW_SIZE + 1) {
-    return range(1, lastPage);
-  }
-
-  const windowStart = Math.min(Math.max(currentPage - 2, 1), lastPage - PAGE_WINDOW_SIZE + 1);
-  const windowEnd = windowStart + PAGE_WINDOW_SIZE - 1;
-  const items: PaginationPageItem[] = [];
-
-  if (windowStart > 1) {
-    items.push(1);
-
-    if (windowStart > 2) {
-      items.push('start-ellipsis');
-    }
-  }
-
-  items.push(...range(windowStart, windowEnd));
-
-  if (windowEnd < lastPage) {
-    if (windowEnd < lastPage - 1) {
-      items.push('end-ellipsis');
-    }
-
-    items.push(lastPage);
-  }
-
-  return items;
+  return {
+    limit: Number(params.get(URL_PARAMS.LIMIT) ?? 10),
+    sort: params.get(URL_PARAMS.SORT) ?? undefined,
+    order: (params.get(URL_PARAMS.ORDER) as 'asc' | 'desc') ?? undefined,
+    cursor: cursor ?? undefined
+  };
 };

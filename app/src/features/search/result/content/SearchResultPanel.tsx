@@ -9,7 +9,7 @@ import { SEARCH_RESULT_VIEW } from 'constants/search';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useState } from 'react';
-import { ApiPaginationResponseParams } from 'types/pagination';
+import { CursorPagination } from 'types/pagination';
 import { SearchResultOptions } from './option/SearchResultOptions';
 import { SearchResultSortOption, SearchResultToolbar } from './toolbar/SearchResultToolbar';
 
@@ -20,8 +20,12 @@ interface SearchResultPanelProps {
   featureTypeProperties: FeatureTypeProperty[];
   /** Whether the result request is currently loading. */
   isLoading: boolean;
-  /** Pagination metadata returned by the result request. Undefined while the first request is pending. */
-  pagination: ApiPaginationResponseParams | undefined;
+  /** Cursor pagination state for the current result page. */
+  cursor: CursorPagination;
+  /** One-based page displayed in the pagination controls. */
+  currentPage: number;
+  /** Total matching rows from the separate count request, when resolved. */
+  totalCount?: number;
   /** Available sort buttons and their current directions. */
   sortOptions: SearchResultSortOption[];
   /** Field name for the currently active sort. */
@@ -70,7 +74,9 @@ export const SearchResultPanel = ({
   rows,
   featureTypeProperties,
   isLoading,
-  pagination,
+  cursor,
+  currentPage,
+  totalCount,
   sortOptions,
   activeSort,
   view,
@@ -173,10 +179,10 @@ export const SearchResultPanel = ({
 
             <Box sx={{ px: 2, py: 1 }}>
               <CustomPagination
-                currentPage={pagination?.current_page ?? 1}
-                pageSize={pagination?.per_page ?? 10}
-                totalCount={pagination?.total ?? 0}
-                lastPage={pagination?.last_page ?? 1}
+                cursor={cursor}
+                currentPage={currentPage}
+                rowCount={rows.length}
+                totalCount={totalCount}
                 onPageChange={onPageChange}
                 onPageSizeChange={onPageSizeChange}
               />

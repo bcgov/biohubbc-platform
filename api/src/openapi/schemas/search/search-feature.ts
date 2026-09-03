@@ -1,7 +1,7 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { PredicateOperator } from '../../../models/expression-predicate';
 import { GeoJSON } from '../geoJson';
-import { paginationRequestBodySchema, paginationResponseSchema } from '../pagination';
+import { cursorPaginationRequestBodySchema, cursorPaginationResponseSchema } from '../pagination';
 
 /**
  * Recursive expression tree for feature search.
@@ -122,9 +122,27 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
         additionalProperties: false,
         properties: {
           expression: featureSearchExpressionTreeSchema,
-          pagination: paginationRequestBodySchema
+          pagination: cursorPaginationRequestBodySchema
         },
         description: 'Optional expression tree and pagination. Omit expression to list target features.'
+      }
+    }
+  }
+};
+
+/**
+ * Feature count request body.
+ */
+export const featureSearchCountRequestBodySchema: OpenAPIV3.RequestBodyObject = {
+  required: true,
+  content: {
+    'application/json': {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          expression: featureSearchExpressionTreeSchema
+        }
       }
     }
   }
@@ -135,7 +153,7 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
  */
 export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['features', 'properties', 'pagination', 'has_more_secured_features'],
+  required: ['features', 'properties', 'has_more_secured_features', 'pagination'],
   properties: {
     features: {
       type: 'array',
@@ -143,15 +161,27 @@ export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
     },
     properties: {
       type: 'array',
-      description:
-        'Metadata for properties with a non-null indexed value on at least one feature in the full filtered expression result. Independent of pagination.',
+      description: 'Active property definitions for the selected feature type. Independent of pagination and filters.',
       items: featureSearchPropertySchema
     },
-    pagination: paginationResponseSchema,
     has_more_secured_features: {
       type: 'boolean',
       description:
         'True when the search matched secured features that were excluded from the results because the caller cannot access them.'
+    },
+    pagination: cursorPaginationResponseSchema
+  }
+};
+
+/** Count response for feature searches. */
+export const featureSearchCountResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['total'],
+  properties: {
+    total: {
+      type: 'integer',
+      minimum: 0,
+      description: 'Number of matching features.'
     }
   }
 };
