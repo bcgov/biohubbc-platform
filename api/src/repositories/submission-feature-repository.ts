@@ -121,12 +121,15 @@ export class SubmissionFeatureRepository extends BaseRepository {
         sf.submission_feature_id,
         sf.uuid,
         sf.urn,
+        sf.create_date,
         sf.submission_id,
         sf.feature_type_id,
         sf.source_id,
+        sf.successor_submission_feature_id,
         ft.name as feature_type_name,
         ft.display_name as feature_type_display_name,
         s.name as submission_name,
+        c.client_id as contributor_name,
     `;
     // The security fragments are raw, zero-placeholder SQL and must be appended as text: interpolating
     // them into a SQL`` tag would bind them as parameter values rather than splice them as SQL.
@@ -155,6 +158,8 @@ export class SubmissionFeatureRepository extends BaseRepository {
         feature_type ft ON ft.feature_type_id = sf.feature_type_id
       JOIN
         submission s ON s.submission_id = sf.submission_id
+      JOIN
+        contributor c ON c.contributor_id = s.contributor_id
       JOIN LATERAL
         ${buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id')} terminal ON true
       JOIN LATERAL (

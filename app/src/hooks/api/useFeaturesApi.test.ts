@@ -22,6 +22,7 @@ describe('useFeaturesApi', () => {
           submission_id: 1,
           feature_type_id: 2,
           source_id: 'SIMS',
+          successor_submission_feature_id: null,
           data: {
             timestamp: '2020-01-01'
           },
