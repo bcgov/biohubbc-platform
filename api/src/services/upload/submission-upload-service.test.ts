@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatus } from '../../models/submission-upload-processing-status';
@@ -501,6 +501,50 @@ describe('SubmissionUploadService', () => {
       expect(lock).to.have.been.calledOnceWith(1);
       expect(bulkGuard).to.have.been.calledOnceWith(1);
       expect(remove).to.have.been.calledOnceWith(1);
+    });
+  });
+
+  describe('findSubmissionUploadProcessingStatusHistory', () => {
+    it('validates the upload belongs to the submission and returns the history items', async () => {
+      const ownershipStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
+        .resolves(buildUpload('ingested'));
+      const row = buildProcessingStatus('artifact-1', 'ingesting');
+      const findStub = sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findActiveSubmissionUploadProcessingStatuses')
+        .resolves([row]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+
+      expect(ownershipStub).to.have.been.calledOnceWith('submission-uuid', 'artifact-1');
+      expect(findStub).to.have.been.calledOnceWith('artifact-1');
+      expect(result).to.eql([
+        {
+          submission_upload_status_id: row.submission_upload_status_id,
+          submission_upload_id: row.submission_upload_id,
+          status: row.status,
+          create_date: row.create_date
+        }
+      ]);
+    });
+
+    it('does not read history when the upload is not in the submission', async () => {
+      sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
+        .rejects(new ApiNotFoundError('Submission upload not found'));
+      const findStub = sinon.stub(
+        SubmissionUploadProcessingStatusRepository.prototype,
+        'findActiveSubmissionUploadProcessingStatuses'
+      );
+
+      try {
+        await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+        expect.fail('Expected ApiNotFoundError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+      }
+
+      expect(findStub).not.to.have.been.called;
     });
   });
 

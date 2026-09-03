@@ -17,3 +17,14 @@ export const SubmissionUploadProcessingStatus = z.object({
   create_user: z.number()
 });
 export type SubmissionUploadProcessingStatus = z.infer<typeof SubmissionUploadProcessingStatus>;
+
+/**
+ * One entry of an upload's processing status history as returned by the administrative history endpoint.
+ */
+export const SubmissionUploadProcessingStatusHistoryItem = SubmissionUploadProcessingStatus.pick({
+  submission_upload_status_id: true,
+  submission_upload_id: true,
+  status: true,
+  create_date: true
+});
+export type SubmissionUploadProcessingStatusHistoryItem = z.infer<typeof SubmissionUploadProcessingStatusHistoryItem>;
