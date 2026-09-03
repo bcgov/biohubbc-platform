@@ -6,9 +6,11 @@ import {
   CreateSubmissionUploadWithTeam,
   SubmissionUpload,
   SubmissionUploadFilters,
+  SubmissionUploadJobStatus,
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
+import { SubmissionUploadStatusTypeEnum } from '../../models/submission-upload-review-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -266,6 +268,7 @@ export class SubmissionUploadRepository extends BaseRepository {
           submission_upload_status sus
         WHERE
           sus.submission_upload_id = su.submission_upload_id
+          AND sus.status = ANY(${SubmissionUploadStatusTypeEnum.options}::submission_upload_status_type[])
         ORDER BY
           sus.create_date DESC,
           sus.submission_upload_status_id DESC
@@ -432,7 +435,6 @@ export class SubmissionUploadRepository extends BaseRepository {
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
-        status = COALESCE(${submissionUpload.status}, status),
         ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
@@ -444,6 +446,44 @@ export class SubmissionUploadRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update submission_upload record', [
         'SubmissionUploadRepository->updateSubmissionUpload',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Set the processing status of an active submission_upload record.
+   *
+   * Only `SubmissionUploadService.transitionSubmissionUploadStatus` should call this: it holds the
+   * row lock, validates the transition and records the history row around this write.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to update.
+   * @param {SubmissionUploadJobStatus} status - The processing status to persist.
+   * @returns {Promise<{ submission_upload_id: string }>} - The ID of the updated submission_upload.
+   * @throws {ApiExecuteSQLError} - If no active record was updated.
+   * @memberof SubmissionUploadRepository
+   */
+  async updateSubmissionUploadStatus(
+    submissionUploadId: string,
+    status: SubmissionUploadJobStatus
+  ): Promise<{ submission_upload_id: string }> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET
+        status = ${status}
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission_upload status', [
+        'SubmissionUploadRepository->updateSubmissionUploadStatus',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }

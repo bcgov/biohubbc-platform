@@ -3,13 +3,16 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUploadReviewStatus,
   SubmissionUploadReviewStatus,
-  SubmissionUploadReviewStatusHistoryRow
+  SubmissionUploadReviewStatusHistoryRow,
+  SubmissionUploadStatusTypeEnum
 } from '../../models/submission-upload-review-status';
 import { BaseRepository } from '../base-repository';
 
 /**
- * Repository for managing submission_upload_status records.
- * Tracks immutable admin review status decisions for each submission upload.
+ * Repository for the review decision rows in `submission_upload_status`.
+ *
+ * The table also holds processing status rows, so every read filters to the review decision
+ * subset (`SubmissionUploadStatusTypeEnum`). Review decisions are append-only; the latest row wins.
  */
 export class SubmissionUploadReviewStatusRepository extends BaseRepository {
   /**
@@ -63,6 +66,7 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
         submission_upload_status
       WHERE
         submission_upload_id = ${submissionUploadId}
+        AND status = ANY(${SubmissionUploadStatusTypeEnum.options}::submission_upload_status_type[])
       ORDER BY
         create_date DESC,
         submission_upload_status_id DESC
@@ -88,7 +92,7 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
   }
 
   /**
-   * Get all submission_upload_status records for a submission (publish history), newest first.
+   * Get all review decision records for a submission (publish history), newest first.
    *
    * @param {string} submissionUuid - The submission UUID to look up.
    * @returns {Promise<SubmissionUploadReviewStatusHistoryRow[]>} - All status records for the submission.
@@ -106,6 +110,7 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
       INNER JOIN submission s ON s.submission_id = su.submission_id
       WHERE
         s.uuid = ${submissionUuid}
+        AND sus.status = ANY(${SubmissionUploadStatusTypeEnum.options}::submission_upload_status_type[])
       ORDER BY
         sus.create_date DESC,
         sus.submission_upload_status_id DESC;

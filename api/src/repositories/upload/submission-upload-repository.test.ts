@@ -364,6 +364,35 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('updateSubmissionUploadStatus', () => {
+    it('throws an error if no active record was updated', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.updateSubmissionUploadStatus('id-1', 'ingesting');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update submission_upload status');
+      }
+    });
+
+    it('returns the updated record ID and binds the status', async () => {
+      const mockRow = { submission_upload_id: 'id-1' };
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.updateSubmissionUploadStatus('id-1', 'ingesting');
+
+      expect(result).to.eql(mockRow);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date IS NULL');
+      expect(sqlStub.firstCall.args[0].values).to.eql(['ingesting', 'id-1']);
+    });
+  });
+
   describe('deleteSubmissionUpload', () => {
     it('throws an error if soft delete fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
