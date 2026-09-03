@@ -1,4 +1,4 @@
-import { mdiCheck, mdiClose } from '@mdi/js';
+import { mdiCheck, mdiClose, mdiCloudUploadOutline, mdiHelpCircleOutline, mdiProgressClock } from '@mdi/js';
 import { SubmissionUploadDecision, SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 
@@ -22,11 +22,23 @@ export const SUBMISSION_UPLOAD_JOB_STATUS_COLORS: Partial<Record<SubmissionUploa
   failed: 'error.main'
 };
 
-export const SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICONS: Partial<Record<SubmissionUploadJobStatus, string>> = {
+export const SUBMISSION_UPLOAD_JOB_STATUS_ICONS: Record<SubmissionUploadJobStatus, string> = {
+  uploaded: mdiCloudUploadOutline,
+  ingesting: mdiProgressClock,
+  ingested: mdiCheck,
+  reconciling: mdiProgressClock,
+  reconciled: mdiCheck,
+  promoting: mdiProgressClock,
+  promoted: mdiCheck,
+  indexing: mdiProgressClock,
   indexed: mdiCheck,
   invalid: mdiClose,
   failed: mdiClose
 };
+
+export const UNKNOWN_SUBMISSION_UPLOAD_JOB_STATUS_LABEL = 'Unknown status';
+
+export const UNKNOWN_SUBMISSION_UPLOAD_JOB_STATUS_ICON = mdiHelpCircleOutline;
 
 export const SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICON_COLORS: Partial<Record<SubmissionUploadJobStatus, string>> = {
   indexed: appTheme.palette.success.main,

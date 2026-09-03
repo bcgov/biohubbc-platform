@@ -17,7 +17,17 @@ import { ITicketUploadTimelineItemProps } from './upload/TicketUploadTimelineIte
  * @returns {JSX.Element} Ticket timeline item for a submission upload.
  */
 export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) => {
-  const { upload, dateLabel, onCreateReview, onOpenReview, onAccept, onReject, onResetDecision } = props;
+  const {
+    upload,
+    dateLabel,
+    statusHistory,
+    onLoadStatusHistory,
+    onCreateReview,
+    onOpenReview,
+    onAccept,
+    onReject,
+    onResetDecision
+  } = props;
   const bodyText =
     upload.submission_comment ||
     upload.submission_description ||
@@ -43,7 +53,11 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
             <Typography variant="body2">{bodyText}</Typography>
           </Box>
 
-          <TicketUploadStatusRow upload={upload} />
+          <TicketUploadStatusRow
+            upload={upload}
+            statusHistory={statusHistory}
+            onLoadStatusHistory={onLoadStatusHistory}
+          />
 
           <TicketUploadReviewRow
             label="Validation"

@@ -4,10 +4,13 @@ import {
   TicketSubmissionUploadResponse,
   TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
+import { SubmissionUploadStatusHistoryState } from '../../hooks/upload/useSubmissionUploadStatusHistory';
 
 export interface ITicketUploadTimelineItemProps {
   upload: TicketSubmissionUploadResponse;
   dateLabel: string;
+  statusHistory: SubmissionUploadStatusHistoryState | undefined;
+  onLoadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
   onCreateReview: (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
@@ -29,6 +32,13 @@ export interface ITicketUploadReviewRowProps {
 
 export interface ITicketUploadStatusRowProps {
   upload: TicketSubmissionUploadResponse;
+  /** Cached history state for this upload; undefined until it has been requested. */
+  statusHistory: SubmissionUploadStatusHistoryState | undefined;
+  onLoadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
+}
+
+export interface ITicketUploadStatusHistoryProps {
+  statusHistory: SubmissionUploadStatusHistoryState | undefined;
 }
 
 export interface ITicketUploadDecisionRowProps {
