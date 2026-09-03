@@ -313,7 +313,6 @@ export class SubmissionService extends DBService {
    * @returns {Promise<
    *     {
    *       feature_type_name: string;
-   *       feature_type_display_name: string;
    *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
    *     }[]
    *   >}
@@ -322,7 +321,6 @@ export class SubmissionService extends DBService {
   async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
     {
       feature_type_name: string;
-      feature_type_display_name: string;
       features: SubmissionFeatureRecordWithTypeAndSecurity[];
     }[]
   > {
@@ -344,7 +342,6 @@ export class SubmissionService extends DBService {
 
     const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
       feature_type_name: featureType,
-      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
       features: submissionFeatures
     }));
 

@@ -570,7 +570,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'survey',
-          feature_type_display_name: 'Survey',
           submission_feature_security_ids: []
         },
         {
@@ -590,7 +589,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'observation',
-          feature_type_display_name: 'Observation',
           submission_feature_security_ids: []
         },
         {
@@ -610,7 +608,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'observation',
-          feature_type_display_name: 'Observation',
           submission_feature_security_ids: []
         },
         {
@@ -630,7 +627,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'artifact',
-          feature_type_display_name: 'Artifact',
           submission_feature_security_ids: []
         }
       ];
@@ -647,17 +643,14 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql([
         {
           feature_type_name: 'survey',
-          feature_type_display_name: 'Survey',
           features: [{ ...mockSubmissionRecords[0] }]
         },
         {
           feature_type_name: 'observation',
-          feature_type_display_name: 'Observation',
           features: [{ ...mockSubmissionRecords[1] }, { ...mockSubmissionRecords[2] }]
         },
         {
           feature_type_name: 'artifact',
-          feature_type_display_name: 'Artifact',
           features: [{ ...mockSubmissionRecords[3] }]
         }
       ]);

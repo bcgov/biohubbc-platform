@@ -40,7 +40,6 @@ export const AdminSubmissionPage = () => {
       featureDataLoader.data?.features.map((feature) => ({
         id: feature.submission_feature_id,
         submission_feature_id: feature.submission_feature_id,
-        feature_type_display_name: feature.feature_type_name,
         feature_type_name: feature.feature_type_name,
         secured: feature.secured
       })) ?? []
