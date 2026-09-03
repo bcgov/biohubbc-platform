@@ -538,4 +538,44 @@ describe('searchFeatures', () => {
     expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[3]).to.equal(null);
   });
+
+  it('should cancel database work when the HTTP client disconnects', async () => {
+    let rejectSearch!: (error: Error) => void;
+    const cancelStub = sinon.stub().callsFake(async () => rejectSearch(new Error('Query cancelled')));
+    const dbConnectionObj = getMockDBConnection({
+      cancel: cancelStub,
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake((options) => {
+      options?.signal?.addEventListener('abort', () => void dbConnectionObj.cancel(), { once: true });
+      return dbConnectionObj;
+    });
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { feature_type: 'survey' };
+    mockReq.body = {};
+    const searchStub = sinon
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata')
+      .returns(new Promise((_, reject) => (rejectSearch = reject)));
+
+    const handlerPromise = search.searchFeatures()(mockReq, mockRes, mockNext);
+    await Promise.resolve();
+    mockRes.emit('close');
+    try {
+      await handlerPromise;
+      expect.fail('Expected searchFeatures to reject');
+    } catch (error) {
+      expect((error as Error).message).to.equal('Query cancelled');
+    }
+
+    expect(searchStub).to.have.been.calledOnce;
+    expect(cancelStub).to.have.been.calledOnce;
+    expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+    expect(dbConnectionObj.release).to.have.been.calledOnce;
+    expect(dbConnectionObj.commit).not.to.have.been.called;
+    expect(mockRes.status).not.to.have.been.called;
+  });
 });
