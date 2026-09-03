@@ -544,6 +544,50 @@ describe('SubmissionUploadService', () => {
     });
   });
 
+  describe('findSubmissionUploadProcessingStatusHistory', () => {
+    it('validates the upload belongs to the submission and returns the history items', async () => {
+      const ownershipStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
+        .resolves(buildUpload('ingested'));
+      const row = buildProcessingStatus('artifact-1', 'ingesting');
+      const findStub = sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findActiveSubmissionUploadProcessingStatuses')
+        .resolves([row]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+
+      expect(ownershipStub).to.have.been.calledOnceWith('submission-uuid', 'artifact-1');
+      expect(findStub).to.have.been.calledOnceWith('artifact-1');
+      expect(result).to.eql([
+        {
+          submission_upload_status_id: row.submission_upload_status_id,
+          submission_upload_id: row.submission_upload_id,
+          status: row.status,
+          create_date: row.create_date
+        }
+      ]);
+    });
+
+    it('does not read history when the upload is not in the submission', async () => {
+      sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
+        .rejects(new ApiNotFoundError('Submission upload not found'));
+      const findStub = sinon.stub(
+        SubmissionUploadProcessingStatusRepository.prototype,
+        'findActiveSubmissionUploadProcessingStatuses'
+      );
+
+      try {
+        await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+        expect.fail('Expected ApiNotFoundError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+      }
+
+      expect(findStub).not.to.have.been.called;
+    });
+  });
+
   describe('transitionSubmissionUploadStatus', () => {
     it('ends superseded rows, updates the current status and inserts the history row in that order', async () => {
       sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('reconciled'));
