@@ -1,4 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { DataRequestResponseSchema } from './data-request';
 import { paginationResponseSchema } from './pagination';
 import { TicketSystemUserWithUserSchema } from './ticket-system-user';
@@ -6,17 +7,7 @@ import { SubmissionUploadReviewResponseSchema } from './upload';
 
 const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
 const TicketStatusEnum = ['open', 'closed'];
-const SubmissionUploadJobStatusEnum = [
-  'uploaded',
-  'ingesting',
-  'ingested',
-  'reconciling',
-  'reconciled',
-  'indexing',
-  'indexed',
-  'invalid',
-  'failed'
-];
+const SubmissionUploadJobStatusEnum = SubmissionUploadJobStatus.options;
 const SubmissionUploadReviewStatusEnum = ['submitted', 'approved', 'denied', 'deleted'];
 const SubmissionValidationStatusEnum = ['pending', 'started', 'completed', 'invalid', 'failed'];
 

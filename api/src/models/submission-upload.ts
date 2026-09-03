@@ -10,6 +10,8 @@ export const SubmissionUploadJobStatus = z.enum([
   'ingested',
   'reconciling',
   'reconciled',
+  'promoting',
+  'promoted',
   'indexing',
   'indexed',
   // Terminal failure states
@@ -57,12 +59,14 @@ export const CreateSubmissionUploadWithTeam = CreateSubmissionUpload.extend({
 export type CreateSubmissionUploadWithTeam = z.infer<typeof CreateSubmissionUploadWithTeam>;
 
 /**
- * Payload for updating an existing SubmissionUpload
+ * Payload for updating an existing SubmissionUpload.
+ *
+ * `status` is not updatable here: processing status changes go through
+ * `SubmissionUploadService.transitionSubmissionUploadStatus`, which also records the history row.
  */
 export const UpdateSubmissionUpload = z.object({
   submission_id: z.number().optional(),
   upload_id: z.string().uuid().optional(),
-  status: SubmissionUploadJobStatus.optional(),
   ticket_id: z.string().uuid().optional()
 });
 export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
