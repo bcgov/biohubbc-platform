@@ -731,27 +731,19 @@ describe('ArtifactSecurityService', () => {
       sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(mockUploadArchive);
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves(mockSubmissionUpload);
       const transitionStub = sinon
-        .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+        .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed')
         .resolves();
 
       await service.failSubmissionUploadByArtifactSecurityId('uuid-1');
 
-      expect(transitionStub).to.have.been.calledOnceWith('su-1', 'failed', [
-        'uploaded',
-        'ingesting',
-        'ingested',
-        'reconciling',
-        'reconciled',
-        'indexing',
-        'failed'
-      ]);
+      expect(transitionStub).to.have.been.calledOnceWith('su-1');
     });
 
     it('is a no-op when the artifact has no upload_archive', async () => {
       sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
       sinon.stub(UploadArchiveService.prototype, 'findUploadArchiveByArtifactId').resolves(null);
       const getSubmissionUploadStub = sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId');
-      const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus');
+      const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed');
 
       await service.failSubmissionUploadByArtifactSecurityId('uuid-1');
 
@@ -765,7 +757,7 @@ describe('ArtifactSecurityService', () => {
       sinon
         .stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId')
         .resolves({ ...mockSubmissionUpload, status: 'indexed' });
-      const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus');
+      const transitionStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed');
 
       await service.failSubmissionUploadByArtifactSecurityId('uuid-1');
 

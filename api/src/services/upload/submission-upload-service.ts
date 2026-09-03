@@ -1,3 +1,4 @@
+import { ACTIVE_UPLOAD_PROCESSING_STAGES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
@@ -14,7 +15,9 @@ import {
 } from '../../models/submission-upload-review-status';
 import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
+import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
+import { getSupersededProcessingStatuses } from '../../utils/submission-upload-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
@@ -26,6 +29,7 @@ import { SubmissionUploadReviewStatusService } from './submission-upload-review-
 
 export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
+  submissionUploadProcessingStatusRepository: SubmissionUploadProcessingStatusRepository;
   blueprintRepository: BlueprintRepository;
   submissionUploadReviewStatusService: SubmissionUploadReviewStatusService;
   teamService: TeamService;
@@ -46,6 +50,7 @@ export class SubmissionUploadService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
+    this.submissionUploadProcessingStatusRepository = new SubmissionUploadProcessingStatusRepository(connection);
     this.blueprintRepository = new BlueprintRepository(connection);
     this.submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(connection);
     this.teamService = new TeamService(connection);
@@ -186,7 +191,8 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Create a dedicated access team and insert a new submission_upload record.
+   * Create a dedicated access team, insert a new submission_upload record and record its initial
+   * processing status so the status history starts at the upload's first status.
    *
    * @param {CreateSubmissionUpload} submissionUpload The artifact data to insert
    * @param {number} requestorSystemUserId Authenticated user who initiated the upload
@@ -210,10 +216,17 @@ export class SubmissionUploadService extends DBService {
     await this.submissionUploadRepository.lockSubmissionUploadsForSubmissionId(submissionUpload.submission_id);
     await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionUpload.submission_id);
 
-    return this.submissionUploadRepository.insertSubmissionUpload({
+    const inserted = await this.submissionUploadRepository.insertSubmissionUpload({
       ...submissionUpload,
       team_id: team.team_id
     });
+
+    await this.submissionUploadProcessingStatusRepository.insertSubmissionUploadProcessingStatus(
+      inserted.submission_upload_id,
+      submissionUpload.status
+    );
+
+    return inserted;
   }
 
   /**
@@ -258,10 +271,16 @@ export class SubmissionUploadService extends DBService {
   /**
    * Transition submission upload status after asserting the current status is allowed.
    *
+   * This is the only path that writes `submission_upload.status`. On one connection it locks the
+   * active upload row, validates the transition, end-dates the history rows the new status
+   * supersedes, updates the current status and inserts the new history row. The caller owns the
+   * transaction, so a failure at any step rolls back every write together. A transition to the
+   * status the upload already holds is a no-op that writes nothing.
+   *
    * @param {string} submissionUploadId Submission upload identifier.
    * @param {SubmissionUpload['status']} nextStatus Status to persist after validation.
    * @param {SubmissionUpload['status'][]} allowedCurrentStatuses Current statuses permitted to make the transition.
-   * @returns {Promise<void>} Resolves after the validated status transition is persisted.
+   * @returns {Promise<void>} Resolves after the validated status transition and its history row are persisted.
    * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadStatus(
@@ -277,7 +296,29 @@ export class SubmissionUploadService extends DBService {
 
     this.assertStatusCanChange(submissionUploadId, current.status, allowedCurrentStatuses);
 
-    await this.submissionUploadRepository.updateSubmissionUpload(submissionUploadId, { status: nextStatus });
+    await this.submissionUploadProcessingStatusRepository.endActiveSubmissionUploadProcessingStatuses(
+      submissionUploadId,
+      getSupersededProcessingStatuses(nextStatus)
+    );
+    await this.submissionUploadRepository.updateSubmissionUploadStatus(submissionUploadId, nextStatus);
+    await this.submissionUploadProcessingStatusRepository.insertSubmissionUploadProcessingStatus(
+      submissionUploadId,
+      nextStatus
+    );
+  }
+
+  /**
+   * Transition to ingesting when the process stage starts.
+   * - uploaded -> ingesting
+   * - ingesting -> ingesting (no-op, idempotent retry)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>} Resolves after transition to `ingesting`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
+   */
+  async transitionSubmissionUploadToIngesting(submissionUploadId: string): Promise<void> {
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'ingesting', ['uploaded']);
   }
 
   /**
@@ -305,14 +346,21 @@ export class SubmissionUploadService extends DBService {
    * @memberof SubmissionUploadService
    */
   async transitionSubmissionUploadToInvalid(submissionUploadId: string): Promise<void> {
-    await this.transitionSubmissionUploadStatus(submissionUploadId, 'invalid', [
-      'uploaded',
-      'ingesting',
-      'ingested',
-      'reconciling',
-      'reconciled',
-      'indexing'
-    ]);
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'invalid', ACTIVE_UPLOAD_PROCESSING_STAGES);
+  }
+
+  /**
+   * Transition to failed when a processing job exhausts its retries or its artifact fails scanning.
+   * - any non-terminal processing stage -> failed
+   * - failed -> failed (no-op)
+   * - indexed / invalid -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>} Resolves after transition to `failed`, including an idempotent no-op.
+   * @memberof SubmissionUploadService
+   */
+  async transitionSubmissionUploadToFailed(submissionUploadId: string): Promise<void> {
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'failed', ACTIVE_UPLOAD_PROCESSING_STAGES);
   }
 
   /**

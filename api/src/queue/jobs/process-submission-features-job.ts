@@ -118,7 +118,7 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
     }
 
     // Locked row + in-transaction write prevents duplicate concurrent starts.
-    await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'ingesting' });
+    await submissionUploadService.transitionSubmissionUploadToIngesting(submissionUploadId);
 
     await submissionValidationService.updateSubmissionValidationStatus(
       jobId,
@@ -497,13 +497,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
 
       await withConnection(async (connection) => {
         const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
-          'uploaded',
-          'ingesting',
-          'ingested',
-          'indexing',
-          'failed'
-        ]);
+        await submissionUploadService.transitionSubmissionUploadToFailed(submissionUploadId);
       });
 
       defaultLog.info({

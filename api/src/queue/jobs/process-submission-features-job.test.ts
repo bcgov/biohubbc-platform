@@ -56,12 +56,10 @@ describe('process-submission-features-job', () => {
         ...defaultSubmissionUpload,
         status: 'uploaded'
       });
-      sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload').resolves({
-        submission_upload_id: defaultSubmissionUpload.submission_upload_id
-      });
+      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIngesting').resolves();
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIngested').resolves();
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
-      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
+      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
       sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
@@ -79,9 +77,11 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
+      const toIngestingStub = SubmissionUploadService.prototype
+        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
       const toIngestedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIngested as sinon.SinonStub;
-      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
+      expect(toIngestingStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(toIngestingStub.calledBefore(toIngestedStub)).to.be.true;
       expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(publishStub.calledOnce).to.be.true;
       expect(toIngestedStub.calledBefore(publishStub)).to.be.true;
@@ -155,7 +155,7 @@ describe('process-submission-features-job', () => {
         expect(error).to.equal(testError);
       }
 
-      const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
+      const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToFailed as sinon.SinonStub;
       const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
         .deleteSubmissionFeaturesBySubmissionUploadId as sinon.SinonStub;
       expect(toFailedStub.called).to.be.false;
@@ -203,8 +203,9 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
-      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
+      const toIngestingStub = SubmissionUploadService.prototype
+        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
+      expect(toIngestingStub.calledWith('test-sub-upload-id')).to.be.true;
     });
 
     it('skips processing when current status is failed', async () => {
@@ -227,8 +228,8 @@ describe('process-submission-features-job', () => {
     it('updates submission upload and validation to failed', async () => {
       stubConnections();
 
-      const updateUploadStub = sinon
-        .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+      const toFailedStub = sinon
+        .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed')
         .resolves();
       const updateValidationStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionUploadId')
@@ -243,15 +244,7 @@ describe('process-submission-features-job', () => {
       await processSubmissionFeaturesFailedHandler([job]);
 
       expect(updateValidationStub.calledOnce).to.be.true;
-      expect(
-        updateUploadStub.calledWith('test-sub-upload-id', 'failed', [
-          'uploaded',
-          'ingesting',
-          'ingested',
-          'indexing',
-          'failed'
-        ])
-      ).to.be.true;
+      expect(toFailedStub).to.have.been.calledOnceWith('test-sub-upload-id');
     });
   });
 });

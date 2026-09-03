@@ -88,7 +88,8 @@ describe('SubmissionUploadReviewStatusRepository', () => {
 
       expect(result).to.eql([]);
       expect(sqlStub.firstCall.args[0].text).to.contain('s.uuid =');
-      expect(sqlStub.firstCall.args[0].values).to.eql([submissionUuid]);
+      expect(sqlStub.firstCall.args[0].text).to.contain('sus.status = ANY(');
+      expect(sqlStub.firstCall.args[0].values).to.eql([submissionUuid, ['submitted', 'approved', 'denied', 'deleted']]);
     });
   });
 });
