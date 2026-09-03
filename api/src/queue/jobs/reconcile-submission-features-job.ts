@@ -72,11 +72,7 @@ export const reconcileSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IRecon
   for (const job of jobs) {
     await withConnection(async (connection) => {
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.transitionSubmissionUploadStatus(job.data.submissionUploadId, 'failed', [
-        'ingested',
-        'reconciling',
-        'failed'
-      ]);
+      await submissionUploadService.transitionSubmissionUploadToFailed(job.data.submissionUploadId);
     });
     defaultLog.warn({
       label: 'reconcileSubmissionFeaturesFailedHandler',

@@ -8,6 +8,7 @@ import { SecurityService } from '../../services/security-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
   IReconcileSubmissionFeaturesJobData,
+  reconcileSubmissionFeaturesFailedHandler,
   reconcileSubmissionFeaturesJobDependencies,
   reconcileSubmissionFeaturesJobHandler
 } from './reconcile-submission-features-job';
@@ -90,5 +91,14 @@ describe('reconcile-submission-features-job', () => {
     expect(invalid).to.have.been.calledWith('upload-1');
     expect(reconcile).not.to.have.been.called;
     expect(publish).not.to.have.been.called;
+  });
+
+  it('marks the upload failed through the common transition flow once retries are exhausted', async () => {
+    stubUpload();
+    const toFailed = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
+
+    await reconcileSubmissionFeaturesFailedHandler([job]);
+
+    expect(toFailed).to.have.been.calledOnceWith('upload-1');
   });
 });

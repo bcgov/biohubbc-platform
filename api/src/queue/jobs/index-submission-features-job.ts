@@ -257,11 +257,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
 
     await withConnection(async (connection) => {
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
-        'reconciled',
-        'indexing',
-        'failed'
-      ]);
+      await submissionUploadService.transitionSubmissionUploadToFailed(submissionUploadId);
     });
 
     defaultLog.warn({
