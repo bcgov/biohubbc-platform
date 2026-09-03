@@ -5,6 +5,7 @@ import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditFo
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
+import { useSubmissionUploadStatusHistory } from './hooks/upload/useSubmissionUploadStatusHistory';
 import { useTicketTimelineUploadActions } from './hooks/upload/useTicketTimelineUploadActions';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
@@ -48,6 +49,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleConfirmSubmissionUploadReviewStatusUpdate,
     handleConfirmSubmissionUploadReviewStatusReset
   } = useTicketTimelineUploadActions();
+  const { statusHistoryByUploadId, loadStatusHistory } = useSubmissionUploadStatusHistory();
 
   return (
     <>
@@ -62,6 +64,8 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onViewFinalizedPolicy={handleOpenPolicyDetailPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
+        submissionUploadStatusHistoryByUploadId={statusHistoryByUploadId}
+        onLoadSubmissionUploadStatusHistory={loadStatusHistory}
         onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
         onUpdateSubmissionUploadReview={handleUpdateSubmissionUploadReview}
         onConfirmSubmissionUploadReviewStatusUpdate={handleConfirmSubmissionUploadReviewStatusUpdate}
