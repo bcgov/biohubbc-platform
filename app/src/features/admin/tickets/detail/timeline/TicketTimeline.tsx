@@ -43,8 +43,9 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleSavePolicy
   } = useTicketTimelineDataRequestActions();
   const {
-    handleRequestSubmissionUploadReview,
-    handleUpdateSubmissionUploadReview,
+    creatingReviewKeys,
+    handleCreateSubmissionUploadReview,
+    handleOpenSubmissionUploadReview,
     handleConfirmSubmissionUploadReviewStatusUpdate,
     handleConfirmSubmissionUploadReviewStatusReset
   } = useTicketTimelineUploadActions();
@@ -55,6 +56,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         ticket={ticket}
         isLoading={isLoading}
         updatingDataRequestId={updatingDataRequestId}
+        creatingReviewKeys={creatingReviewKeys}
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}
         onDeleteComment={handleConfirmDeleteComment}
@@ -62,8 +64,8 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onViewFinalizedPolicy={handleOpenPolicyDetailPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
-        onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
-        onUpdateSubmissionUploadReview={handleUpdateSubmissionUploadReview}
+        onCreateSubmissionUploadReview={handleCreateSubmissionUploadReview}
+        onOpenSubmissionUploadReview={handleOpenSubmissionUploadReview}
         onConfirmSubmissionUploadReviewStatusUpdate={handleConfirmSubmissionUploadReviewStatusUpdate}
         onConfirmSubmissionUploadReviewStatusReset={handleConfirmSubmissionUploadReviewStatusReset}
       />

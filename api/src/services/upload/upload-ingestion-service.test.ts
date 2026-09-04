@@ -20,7 +20,6 @@ import { TicketService } from '../ticket-service';
 import { UserService } from '../user-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
-import { SubmissionUploadReviewService } from './submission-upload-review-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
@@ -49,7 +48,6 @@ describe('UploadIngestionService', () => {
   beforeEach(() => {
     mockConnection = getMockDBConnection({ systemUserId: () => 1 });
     service = new UploadIngestionService(mockConnection);
-    sinon.stub(SubmissionUploadReviewService.prototype, 'createDefaultReviewsForUpload').resolves([]);
     sinon.stub(SubmissionUploadService.prototype, 'resolveBlueprintIdForUpload').resolves(mockBlueprintId);
     sinon.stub(SubmissionService.prototype, 'addSubmissionTeamMembers').resolves();
     sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity').resolves(true);
@@ -86,8 +84,6 @@ describe('UploadIngestionService', () => {
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      const createDefaultReviewsStub = SubmissionUploadReviewService.prototype
-        .createDefaultReviewsForUpload as sinon.SinonStub;
       sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
         submission_upload_status_id: 1,
         submission_upload_id: 'submission-upload-id-1',
@@ -132,7 +128,6 @@ describe('UploadIngestionService', () => {
         mockSubmission.system_user_id,
         [mockHumanSubmitterSystemUserId, 43]
       );
-      expect(createDefaultReviewsStub).to.have.been.calledOnceWith(mockSubmissionId, 'submission-upload-id-1', 1);
       expect(result.submissionUuid).to.equal(mockSubmission.uuid);
       expect(result.uploadId).to.equal(mockUploadId);
       expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);

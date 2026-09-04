@@ -77,7 +77,7 @@ export const PolicyHeader = ({
         <DropdownButton
           value={policy.status}
           itemGroups={[{ groupId: 'policy-status', items: policyStatusOptions }]}
-          valueColorMap={policyStatusColorMap}
+          color={policyStatusColorMap[policy.status]}
           size="small"
           disabled={isSavingPolicyStatus || isSavingPolicyDetails}
           data-testid="policy-status-dropdown"

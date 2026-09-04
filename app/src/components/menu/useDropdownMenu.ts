@@ -5,13 +5,13 @@ import type { IDropdownMenuItemGroup } from './DropdownMenu.interface';
  * Shared state and derived values for controls that open a `DropdownMenu`.
  * Use this from trigger components that need selected labels, enabled-state checks, and menu anchor handlers.
  *
- * @param {string} value Currently selected item value.
+ * @param {string | null} value Currently selected item value, or `null` when no item is selected.
  * @param {IDropdownMenuItemGroup[]} itemGroups Grouped menu items.
  * @param {(value: string) => void} onSelect Selection callback called after the menu closes.
  * @return {*}
  */
 export const useDropdownMenu = (
-  value: string,
+  value: string | null,
   itemGroups: IDropdownMenuItemGroup[],
   onSelect: (value: string) => void
 ) => {
