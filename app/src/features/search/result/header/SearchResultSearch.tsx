@@ -42,11 +42,11 @@ export const SearchResultSearch = (props: SearchResultSearchProps) => {
    * Applies the expression builder value and closes the filter popover.
    * The parent result page owns expression state and search refresh.
    *
-   * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression selected by the user, or `null` when filters are cleared.
+   * @param {ExpressionTreeExpression | null} expression - Expression selected by the user, or `null` when filters are cleared.
    */
-  const handleExpressionApply = (nextExpressionTree: ExpressionTreeExpression | null) => {
+  const handleExpressionApply = (expression: ExpressionTreeExpression | null) => {
     setIsFilterPanelOpen(false);
-    onExpressionApply(nextExpressionTree);
+    onExpressionApply(expression);
   };
 
   return (

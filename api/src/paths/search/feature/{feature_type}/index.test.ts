@@ -41,7 +41,7 @@ describe('searchFeatures', () => {
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: 'survey' };
+    mockReq.params = { feature_type: '  SURVEY  ' };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
@@ -61,14 +61,18 @@ describe('searchFeatures', () => {
     mockReq.body = {
       expression: expressionTree,
       pagination: {
-        page: '1',
         limit: '10'
       }
     };
 
     const searchStub = sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata')
+      .resolves({
+        features: mockResults,
+        properties: [],
+        has_more_secured_features: false,
+        pagination: { next_cursor: null, previous_cursor: null }
+      });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -76,49 +80,18 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[1]).to.eql(expressionTree);
+    expect(searchStub.firstCall.args[2]).to.eql({
+      limit: 10,
+      boundary: undefined,
+      sort: 'relevancy_score',
+      order: 'desc'
+    });
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
       properties: [],
-      pagination: {
-        total: 1,
-        per_page: 10,
-        current_page: 1,
-        last_page: 1,
-        sort: undefined,
-        order: undefined
-      },
-      has_more_secured_features: false
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
     });
-  });
-
-  it('should normalize the requested feature type before searching', async () => {
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub().resolves(),
-      rollback: sinon.stub().resolves(),
-      release: sinon.stub().resolves(),
-      open: sinon.stub().resolves()
-    });
-    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { feature_type: '  SURVEY  ' };
-    mockReq.body = {
-      expression: expressionTree,
-      pagination: {
-        page: '1',
-        limit: '10'
-      }
-    };
-
-    const searchStub = sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
-
-    const requestHandler = search.searchFeatures();
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(searchStub.firstCall.args[0]).to.equal('survey');
-    expect(mockRes.statusValue).to.equal(200);
   });
 
   it('should return expression search results for secured features visible to the caller', async () => {
@@ -151,14 +124,16 @@ describe('searchFeatures', () => {
     mockReq.body = {
       expression: expressionTree,
       pagination: {
-        page: '1',
         limit: '10'
       }
     };
 
-    sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
+    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata').resolves({
+      features: mockResults,
+      properties: [],
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
+    });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -168,15 +143,8 @@ describe('searchFeatures', () => {
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
       properties: [],
-      pagination: {
-        total: 1,
-        per_page: 10,
-        current_page: 1,
-        last_page: 1,
-        sort: undefined,
-        order: undefined
-      },
-      has_more_secured_features: false
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
     });
   });
 
@@ -193,12 +161,15 @@ describe('searchFeatures', () => {
     mockReq.params = { feature_type: 'dataset' };
     mockReq.body = {
       expression: expressionTree,
-      pagination: { page: '1', limit: '10' }
+      pagination: { limit: '10' }
     };
 
-    sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: true });
+    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata').resolves({
+      features: [],
+      properties: [],
+      has_more_secured_features: true,
+      pagination: { next_cursor: null, previous_cursor: null }
+    });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -239,16 +210,18 @@ describe('searchFeatures', () => {
     mockReq.body = {
       expression: expressionTree,
       pagination: {
-        page: '2',
         limit: '5',
         sort: 'feature_type_name',
         order: 'asc'
       }
     };
 
-    sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: 25, has_more_secured_features: false });
+    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata').resolves({
+      features: mockResults,
+      properties: [],
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
+    });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -257,15 +230,8 @@ describe('searchFeatures', () => {
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
       properties: [],
-      pagination: {
-        total: 25,
-        per_page: 5,
-        current_page: 2,
-        last_page: 5,
-        sort: 'feature_type_name',
-        order: 'asc'
-      },
-      has_more_secured_features: false
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
     });
   });
 
@@ -284,14 +250,16 @@ describe('searchFeatures', () => {
     mockReq.body = {
       expression: expressionTree,
       pagination: {
-        page: '1',
         limit: '10'
       }
     };
 
-    sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
+    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata').resolves({
+      features: [],
+      properties: [],
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
+    });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -300,15 +268,8 @@ describe('searchFeatures', () => {
     expect(mockRes.jsonValue).to.eql({
       features: [],
       properties: [],
-      pagination: {
-        total: 0,
-        per_page: 10,
-        current_page: 1,
-        last_page: 1,
-        sort: undefined,
-        order: undefined
-      },
-      has_more_secured_features: false
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
     });
   });
 
@@ -327,13 +288,12 @@ describe('searchFeatures', () => {
     mockReq.body = {
       expression: expressionTree,
       pagination: {
-        page: '1',
         limit: '10'
       }
     };
 
     const testError = new Error('Test error');
-    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount').rejects(testError);
+    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata').rejects(testError);
 
     const requestHandler = search.searchFeatures();
 
@@ -388,7 +348,7 @@ describe('searchFeatures', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { feature_type: 'telemetry' };
     mockReq.body = {
-      pagination: { page: '1', limit: '25' }
+      pagination: { limit: '25' }
     };
 
     const mockResults: SearchFeatureResultWithRelevancy[] = [
@@ -407,8 +367,13 @@ describe('searchFeatures', () => {
     ];
 
     const searchStub = sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: 37, has_more_secured_features: false });
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata')
+      .resolves({
+        features: mockResults,
+        properties: [],
+        has_more_secured_features: false,
+        pagination: { next_cursor: null, previous_cursor: null }
+      });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -416,14 +381,7 @@ describe('searchFeatures', () => {
     expect(searchStub.firstCall.args[0]).to.equal('telemetry');
     expect(searchStub.firstCall.args[1]).to.equal(undefined);
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue.pagination).to.eql({
-      total: 37,
-      per_page: 25,
-      current_page: 1,
-      last_page: 2,
-      sort: undefined,
-      order: undefined
-    });
+    expect(mockRes.jsonValue.pagination).to.eql({ next_cursor: null, previous_cursor: null });
   });
 
   it('should handle missing pagination gracefully', async () => {
@@ -457,9 +415,12 @@ describe('searchFeatures', () => {
       expression: expressionTree
     };
 
-    sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: mockResults, properties: [], count: mockResults.length, has_more_secured_features: false });
+    sinon.stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata').resolves({
+      features: mockResults,
+      properties: [],
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
+    });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -468,15 +429,8 @@ describe('searchFeatures', () => {
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
       properties: [],
-      pagination: {
-        total: 1,
-        per_page: 25,
-        current_page: 1,
-        last_page: 1,
-        sort: undefined,
-        order: undefined
-      },
-      has_more_secured_features: false
+      has_more_secured_features: false,
+      pagination: { next_cursor: null, previous_cursor: null }
     });
   });
 
@@ -494,12 +448,17 @@ describe('searchFeatures', () => {
 
     mockReq.body = {
       expression: expressionTree,
-      pagination: { page: '1', limit: '10' }
+      pagination: { limit: '10' }
     };
 
     const searchStub = sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata')
+      .resolves({
+        features: [],
+        properties: [],
+        has_more_secured_features: false,
+        pagination: { next_cursor: null, previous_cursor: null }
+      });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -525,12 +484,17 @@ describe('searchFeatures', () => {
     mockReq.params = { feature_type: 'survey' };
     mockReq.body = {
       expression: expressionTree,
-      pagination: { page: '1', limit: '10' }
+      pagination: { limit: '10' }
     };
 
     const searchStub = sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata')
+      .resolves({
+        features: [],
+        properties: [],
+        has_more_secured_features: false,
+        pagination: { next_cursor: null, previous_cursor: null }
+      });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -556,12 +520,17 @@ describe('searchFeatures', () => {
     mockReq.params = { feature_type: 'survey' };
     mockReq.body = {
       expression: expressionTree,
-      pagination: { page: '1', limit: '10' }
+      pagination: { limit: '10' }
     };
 
     const searchStub = sinon
-      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithCount')
-      .resolves({ features: [], properties: [], count: 0, has_more_secured_features: false });
+      .stub(SearchFeatureService.prototype, 'searchFeaturesByExpressionTreeWithMetadata')
+      .resolves({
+        features: [],
+        properties: [],
+        has_more_secured_features: false,
+        pagination: { next_cursor: null, previous_cursor: null }
+      });
 
     const requestHandler = search.searchFeatures();
     await requestHandler(mockReq, mockRes, mockNext);

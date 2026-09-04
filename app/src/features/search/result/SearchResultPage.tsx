@@ -43,10 +43,19 @@ export const SearchResultPage = () => {
     [codesDataLoader.data?.feature_type_with_properties]
   );
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, properties, hasMoreSecuredFeatures, isLoading, searchParams, setSearchParams, pagination } =
-    useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
+  const {
+    rows,
+    properties,
+    hasMoreSecuredFeatures,
+    isLoading,
+    searchParams,
+    setSearchParams,
+    totalCount,
+    currentPage,
+    cursor
+  } = useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
-    useSearchResultPagingSort({ pagination, setSearchParams });
+    useSearchResultPagingSort({ cursor, currentPage, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
     downloadView,
@@ -55,7 +64,7 @@ export const SearchResultPage = () => {
     handleOpenCreateDownload,
     handleCreateDownload,
     handleCancelCreateDownload
-  } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
+  } = useSearchResultDownload({ featureType, expressionTree, isLoading, totalCount });
   const {
     isCreateDataRequestDialogOpen,
     isSubmittingDataRequest,
@@ -88,12 +97,14 @@ export const SearchResultPage = () => {
             rows={rows}
             featureTypeProperties={properties}
             isLoading={isLoading}
-            pagination={pagination}
+            cursor={cursor}
+            currentPage={currentPage}
+            totalCount={totalCount}
             sortOptions={sortOptions}
             activeSort={activeSort}
             view={view}
             viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-            isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
+            isCreateDownloadDisabled={isSubmittingDownload || isLoading || totalCount === undefined}
             onCreateDownloadClick={handleOpenCreateDownload}
             onSortChange={handleSortChange}
             onViewChange={setView}

@@ -2,6 +2,8 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { OpenAPIV3 } from 'openapi-types';
 import {
+  featureSearchCountRequestBodySchema,
+  featureSearchCountResponseSchema,
   featureSearchPropertySchema,
   featureSearchRequestBodySchema,
   featureSearchResponseSchema,
@@ -19,6 +21,9 @@ describe('featureSearchRequestBodySchema', () => {
     });
     expect(schema).to.not.have.property('required');
     expect(schemaProperties).to.have.property('pagination');
+    const paginationSchema = schemaProperties.pagination;
+    expect(paginationSchema.properties).to.include.keys(['limit', 'cursor', 'sort', 'order']);
+    expect(paginationSchema.properties).to.not.have.property('page');
   });
 
   it('accepts an expression tree feature search body', () => {
@@ -49,7 +54,26 @@ describe('featureSearchRequestBodySchema', () => {
   it('documents response-level property metadata used for table columns', () => {
     const responseProperties = featureSearchResponseSchema.properties as Record<string, OpenAPIV3.SchemaObject>;
 
-    expect(featureSearchResponseSchema.required).to.include.members(['features', 'properties', 'pagination']);
+    expect(featureSearchResponseSchema.required).to.include.members([
+      'features',
+      'properties',
+      'has_more_secured_features',
+      'pagination'
+    ]);
+    expect(responseProperties.pagination).to.deep.include({ type: 'object', additionalProperties: false });
+    expect(responseProperties.pagination.properties).to.include.keys([
+      'limit',
+      'sort',
+      'order',
+      'next_cursor',
+      'previous_cursor'
+    ]);
+    expect(responseProperties.pagination.properties).to.not.include.keys([
+      'total',
+      'current_page',
+      'last_page',
+      'per_page'
+    ]);
     expect(responseProperties.properties).to.deep.include({
       type: 'array',
       items: featureSearchPropertySchema
@@ -65,5 +89,21 @@ describe('featureSearchRequestBodySchema', () => {
       type: 'boolean',
       description: 'Whether this property can be returned as an array of values.'
     });
+  });
+
+  it('documents the count response', () => {
+    expect(featureSearchCountResponseSchema.required).to.deep.equal(['total']);
+    expect(featureSearchCountResponseSchema.properties?.total).to.deep.include({
+      type: 'integer',
+      minimum: 0
+    });
+  });
+
+  it('documents count requests without pagination', () => {
+    const schema = featureSearchCountRequestBodySchema.content['application/json']?.schema as OpenAPIV3.SchemaObject;
+
+    expect(schema.additionalProperties).to.equal(false);
+    expect(schema.properties).to.have.property('expression');
+    expect(schema.properties).to.not.have.property('pagination');
   });
 });

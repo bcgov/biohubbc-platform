@@ -4,6 +4,7 @@ import {
   ISearchAllFilters,
   ISearchPropertyFilters,
   ISearchTaxonFilters,
+  SearchFeatureCountResponse,
   SearchFeatureResponse,
   SearchPropertyResponse,
   SearchResponse,
@@ -11,7 +12,7 @@ import {
   SearchTaxonResponse
 } from 'interfaces/useSearchApi.interface';
 import qs from 'qs';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns API methods for searching features.
@@ -24,19 +25,40 @@ export const useSearchApi = (axios: AxiosInstance) => {
    * Search for features of a feature type by expression tree.
    *
    * @param {ExpressionTreeExpression} expressionTree - Optional expression tree search parameters
-   * @param {ApiPaginationRequestOptions} pagination
+   * @param {ApiCursorPaginationRequestOptions} pagination
    * @param {Pick<AxiosRequestConfig, 'signal'>} options - Optional request controls, including an abort signal for canceling stale searches.
    * @return {Promise<SearchFeatureResponse >} Array of matching features sorted by relevancy
    */
   const searchFeatures = async (
     featureType: string,
     expressionTree?: ExpressionTreeExpression | null,
-    pagination?: ApiPaginationRequestOptions,
+    pagination?: ApiCursorPaginationRequestOptions,
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchFeatureResponse> => {
     const body = expressionTree ? { expression: expressionTree, pagination } : { pagination };
     const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body, {
       signal: options?.signal
+    });
+
+    return data;
+  };
+
+  /**
+   * Count the features matching an optional expression tree.
+   *
+   * @param {string} featureType - Feature type route segment.
+   * @param {ExpressionTreeExpression | null} expressionTree - Expression tree search parameters, or null for all features.
+   * @param {{ signal: AbortSignal }} options - Request cancellation signal.
+   * @returns {Promise<SearchFeatureCountResponse>} Matching feature count.
+   */
+  const countFeatures = async (
+    featureType: string,
+    expressionTree: ExpressionTreeExpression | null,
+    options: { signal: AbortSignal }
+  ): Promise<SearchFeatureCountResponse> => {
+    const body = expressionTree ? { expression: expressionTree } : {};
+    const { data } = await axios.post<SearchFeatureCountResponse>(`/api/search/feature/${featureType}/count`, body, {
+      signal: options.signal
     });
 
     return data;
@@ -114,6 +136,7 @@ export const useSearchApi = (axios: AxiosInstance) => {
 
   return {
     searchFeatures,
+    countFeatures,
     searchAll,
     searchProperties,
     searchTaxon,

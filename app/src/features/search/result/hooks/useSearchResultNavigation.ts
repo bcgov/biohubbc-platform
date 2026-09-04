@@ -48,6 +48,7 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
         const nextSearchParams = new URLSearchParams(location.search);
         nextSearchParams.delete(URL_PARAMS.FEATURE_TYPE);
         nextSearchParams.delete(URL_PARAMS.PAGE);
+        nextSearchParams.delete(URL_PARAMS.CURSOR);
         const nextSearch = nextSearchParams.toString();
         navigate(nextSearch ? `${nextLink.to}?${nextSearch}` : nextLink.to);
       }

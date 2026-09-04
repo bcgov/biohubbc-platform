@@ -6,6 +6,7 @@ import {
 import { useApi } from 'hooks/useApi';
 import { ISubmissionFeatureTileSession } from 'interfaces/useMartinApi.interface';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isAbortError } from 'utils/request';
 
 export type SubmissionFeatureTileSessionStatus = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -31,17 +32,6 @@ export interface UseSubmissionFeatureTileSessionResult {
   /** Report that a tile request failed, triggering one bounded automatic recovery attempt. */
   onTileError: () => void;
 }
-
-/**
- * Whether an error is the cancellation of a request this hook aborted itself, rather than a failure
- * worth surfacing.
- *
- * @param {unknown} error
- * @return {*}  {boolean}
- */
-const isAbortError = (error: unknown) => {
-  return error instanceof Error && (error.name === 'CanceledError' || error.message === 'canceled');
-};
 
 /**
  * Owns the tile session for one submission feature's map: creation, refresh before expiry, and recovery from a

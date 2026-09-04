@@ -1,11 +1,13 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ApiPaginationResponseParams } from 'types/pagination';
+import { CursorPagination } from 'types/pagination';
 import { type SearchResultSortOption } from '../content/toolbar/SearchResultToolbar';
 
 interface UseSearchResultPagingSortProps {
-  /** Pagination metadata returned by the current result request. */
-  pagination: ApiPaginationResponseParams | undefined;
+  /** Cursor pagination state for the current result page. */
+  cursor: CursorPagination;
+  /** One-based page stored in the URL for display and browser history. */
+  currentPage: number;
   /** URL-aware search parameter setter from `useSearchResults`. */
   setSearchParams: (params: Partial<Record<UrlParamKey, string>>, replace?: boolean) => void;
 }
@@ -19,9 +21,9 @@ interface UseSearchResultPagingSortProps {
  * @param {UseSearchResultPagingSortProps} props - Current pagination metadata and URL-aware search-param setter.
  * @returns Active sort field, toolbar sort options, and handlers for sort, page, and page-size changes.
  */
-export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSearchResultPagingSortProps) => {
-  const serverSort = pagination?.sort ?? 'relevancy_score';
-  const serverOrder = pagination?.order ?? 'desc';
+export const useSearchResultPagingSort = ({ cursor, currentPage, setSearchParams }: UseSearchResultPagingSortProps) => {
+  const serverSort = cursor.sort ?? 'relevancy_score';
+  const serverOrder = cursor.order ?? 'desc';
   const [optimisticSort, setOptimisticSort] = useState({ sort: serverSort, order: serverOrder });
 
   useEffect(() => {
@@ -66,9 +68,13 @@ export const useSearchResultPagingSort = ({ pagination, setSearchParams }: UseSe
    */
   const handlePageChange = useCallback(
     (page: number) => {
-      setSearchParams({ [URL_PARAMS.PAGE]: String(page) });
+      const pageCursor = page > currentPage ? cursor.next : cursor.previous;
+
+      if (pageCursor) {
+        setSearchParams({ [URL_PARAMS.PAGE]: String(page), [URL_PARAMS.CURSOR]: pageCursor });
+      }
     },
-    [setSearchParams]
+    [currentPage, cursor.next, cursor.previous, setSearchParams]
   );
 
   /**
