@@ -18,9 +18,10 @@ import {
 import { useConfigContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import type { SourceSpecification } from 'maplibre-gl';
-import { PropsWithChildren, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { buildSearchResultLayers, buildSearchResultsSource, SEARCH_RESULTS_SOURCE_ID } from './map-layers';
 import { resolveMapSelection } from './map-selection';
+import { SearchResultMapFrame } from './SearchResultMapFrame';
 import { SearchResultMapPopper } from './SearchResultMapPopper';
 import { useMartinSession } from './useMartinSession';
 
@@ -37,25 +38,9 @@ export interface ISearchResultMapContainerProps {
    * has and stops talking to the server, and re-mints on the way back.
    */
   isActive: boolean;
+  /** Optional submission scope. Memoize derived arrays at the caller to preserve the map session. */
+  submissionIds?: number[];
 }
-
-/**
- * Fixed frame every state of the map view renders inside.
- *
- * The panel slot this view fills is a row flex container, so an unsized child collapses to its content — swapping the
- * map for a loading or error state would then change the panel's height and make the surrounding search UI jump. One
- * shared frame keeps the footprint identical across states; only the content inside it swaps.
- *
- * @param {PropsWithChildren<{ testId: string }>} props
- * @return {*}
- */
-const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
-  <Box
-    data-testid={props.testId}
-    sx={{ position: 'relative', display: 'flex', flex: '1 1 auto', width: '100%', minHeight: MAP_VIEW_MIN_HEIGHT }}>
-    {props.children}
-  </Box>
-);
 
 /**
  * Map view of the search results.
@@ -63,18 +48,19 @@ const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
  * Owns everything search-specific: creating the Martin session, attaching the tile token, replacing the tile source
  * when the search changes, and interpreting cluster selections. `SlippyMap` receives only generic map configuration.
  *
- * @param {ISearchResultMapContainerProps} props
- * @return {*}
+ * @param {ISearchResultMapContainerProps} props - Search state, visibility, and optional submission scope.
+ * @returns {JSX.Element} The search results map or its current loading or error state.
  */
 export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) => {
-  const { featureTypeName, expressionTree, isActive } = props;
+  const { featureTypeName, expressionTree, isActive, submissionIds } = props;
 
   const config = useConfigContext();
 
   const { status, session, tokenRef, reloadNonce, retry, onTileError } = useMartinSession(
     featureTypeName,
     expressionTree,
-    isActive
+    isActive,
+    submissionIds
   );
 
   const bcBasemap = useBcBasemap(config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION);
@@ -149,15 +135,15 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
 
   if (status === 'loading' && !session) {
     return (
-      <MapFrame testId="search-result-map-loading">
+      <SearchResultMapFrame testId="search-result-map-loading">
         <SkeletonMap />
-      </MapFrame>
+      </SearchResultMapFrame>
     );
   }
 
   if (status === 'error' || !session) {
     return (
-      <MapFrame testId="search-result-map-error">
+      <SearchResultMapFrame testId="search-result-map-error">
         <Box
           sx={{
             flex: '1 1 auto',
@@ -173,12 +159,12 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
           </Typography>
           <Button onClick={retry}>Try again</Button>
         </Box>
-      </MapFrame>
+      </SearchResultMapFrame>
     );
   }
 
   return (
-    <MapFrame testId="search-result-map">
+    <SearchResultMapFrame testId="search-result-map">
       <SlippyMap
         // A new context means a different session, so the map is rebuilt for it. A recovery or manual retry bumps
         // reloadNonce to force a remount that re-requests the tiles; a token-only refresh before expiry changes
@@ -208,6 +194,6 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
         onViewportChange={bcBasemap.onViewportChange}
         sx={{ flex: '1 1 auto', minHeight: MAP_VIEW_MIN_HEIGHT }}
       />
-    </MapFrame>
+    </SearchResultMapFrame>
   );
 };

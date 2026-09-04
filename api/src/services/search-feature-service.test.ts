@@ -99,7 +99,7 @@ describe('SearchFeatureService', () => {
       const result = await service.searchFeaturesByExpressionTree('survey', undefined, undefined, 42);
 
       expect(repoStub).to.have.been.calledOnce;
-      expect(repoStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, 42]);
+      expect(repoStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, 42, undefined]);
       expect(result).to.equal(mockFeatures);
     });
   });
@@ -130,6 +130,7 @@ describe('SearchFeatureService', () => {
         'survey',
         normalizedExpression,
         { limit: 26, sort: 'relevancy_score', order: 'desc', boundary: undefined },
+        undefined,
         undefined
       ]);
       expect(propertiesStub).to.have.been.calledOnceWith('survey');
@@ -262,7 +263,7 @@ describe('SearchFeatureService', () => {
     await service.searchFeaturesByExpressionTree('survey', expressionTree);
 
     expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
-    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, undefined, undefined]);
+    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, undefined, undefined, undefined]);
   });
 
   it('passes the same deduplicated range expression to result and count queries', async () => {
@@ -323,7 +324,7 @@ describe('SearchFeatureService', () => {
       const result = await service.countSearchFeaturesByExpressionTree('survey', expressionTree, 91);
 
       expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
-      expect(countStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, 91]);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, 91, undefined]);
       expect(result).to.equal(42_000);
     });
 
@@ -339,7 +340,7 @@ describe('SearchFeatureService', () => {
       const result = await service.countSearchFeaturesByExpressionTree('survey', undefined, null);
 
       expect(normalizeStub).to.not.have.been.called;
-      expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, null]);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, null, undefined]);
       expect(result).to.equal(5_000_000);
     });
   });

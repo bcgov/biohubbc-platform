@@ -1,6 +1,7 @@
 import { BC_BASEMAP_LAYER_ID, BC_BASEMAP_SOURCE_ID } from 'components/map/bc-basemap-layers';
 import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import type { IMartinSession } from 'interfaces/useMartinApi.interface';
+import { useMemo } from 'react';
 import { act, cleanup, render, screen, waitFor } from 'test-helpers/test-utils';
 import { SearchResultMapContainer } from './SearchResultMapContainer';
 import { SEARCH_RESULTS_SOURCE_ID } from './map-layers';
@@ -137,6 +138,49 @@ describe('SearchResultMapContainer', () => {
         'species_observation',
         expressionTree,
         expect.objectContaining({ signal: expect.anything() })
+      );
+    });
+
+    it('passes the submission scope when requesting a Martin session', async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+
+      renderContainer({ submissionIds: [42] });
+
+      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalled());
+      expect(mocks.createMartinSession).toHaveBeenCalledWith(
+        'species_observation',
+        null,
+        expect.objectContaining({ submissionIds: [42], signal: expect.anything() })
+      );
+    });
+
+    it('keeps a memoized submission session across renders and replaces it when its ID changes', async () => {
+      const ScopedMap = ({ submissionId }: { submissionId: number }) => {
+        const submissionIds = useMemo(() => [submissionId], [submissionId]);
+        return (
+          <SearchResultMapContainer
+            featureTypeName="species_observation"
+            expressionTree={null}
+            isActive
+            submissionIds={submissionIds}
+          />
+        );
+      };
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+      const { rerender } = render(<ScopedMap submissionId={42} />);
+      await screen.findByTestId('slippy-map-stub');
+
+      rerender(<ScopedMap submissionId={42} />);
+      await act(async () => {});
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
+      expect(mocks.slippyMapMounts.count).toBe(1);
+
+      rerender(<ScopedMap submissionId={44} />);
+      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalledTimes(2));
+      expect(mocks.createMartinSession).toHaveBeenLastCalledWith(
+        'species_observation',
+        null,
+        expect.objectContaining({ submissionIds: [44] })
       );
     });
 

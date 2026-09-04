@@ -79,7 +79,8 @@ export function searchFeatures(): RequestHandler {
         featureType,
         expressionTree,
         cursorPagination,
-        systemUserId
+        systemUserId,
+        req.body.submissionIds
       );
 
       await connection.commit();

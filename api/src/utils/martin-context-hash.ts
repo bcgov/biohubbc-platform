@@ -6,12 +6,14 @@ export interface MartinContextHashInput {
   featureTypeId: number;
   /** Caller whose live authorization applies, or null for anonymous. */
   systemUserId: number | null;
+  /** Sorted submission scope, or null for all submissions. */
+  submissionIds?: number[] | null;
 }
 
 /**
  * Compute the dedup key for a tile context.
  *
- * Two requests share a context, and therefore share cached tiles, only when all three inputs match.
+ * Two requests share a context, and therefore share cached tiles, only when all identity inputs match.
  * The expression id is already deduplicated by the expression persistence layer (identical
  * normalized searches resolve to one id), so it is a stable identity for the search. Including the
  * user id is what keeps sharing safe: authorization is evaluated live per user at serve time, so two
@@ -25,7 +27,8 @@ export const computeMartinContextHash = (input: MartinContextHashInput): string 
   const identity = JSON.stringify({
     expression_id: input.expressionId,
     feature_type_id: input.featureTypeId,
-    system_user_id: input.systemUserId
+    system_user_id: input.systemUserId,
+    submission_ids: input.submissionIds ?? null
   });
 
   return createHash('sha256').update(identity).digest('hex');

@@ -46,7 +46,8 @@ export class SearchFeatureService extends DBService {
     anchorFeatureType: string,
     expressionTree?: ExpressionTree,
     cursorPagination?: ApiCursorPaginationOptions,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({
       label: 'searchFeaturesByExpressionTree',
@@ -59,7 +60,8 @@ export class SearchFeatureService extends DBService {
       anchorFeatureType,
       expression,
       cursorPagination,
-      systemUserId
+      systemUserId,
+      submissionIds
     );
   }
 
@@ -76,7 +78,8 @@ export class SearchFeatureService extends DBService {
     anchorFeatureType: string,
     expressionTree?: ExpressionTree,
     cursorPagination?: ApiCursorPaginationOptions,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<{
     features: SearchFeatureResultWithRelevancy[];
     properties: FeatureTypeProperty[];
@@ -98,13 +101,15 @@ export class SearchFeatureService extends DBService {
         anchorFeatureType,
         expression,
         { ...pagination, limit: pagination.limit + 1 },
-        systemUserId
+        systemUserId,
+        submissionIds
       ),
       this.searchFeatureRepository.getFeatureTypeProperties(anchorFeatureType),
       this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         anchorFeatureType,
         expression,
-        systemUserId
+        systemUserId,
+        submissionIds
       )
     ]);
 
@@ -181,12 +186,18 @@ export class SearchFeatureService extends DBService {
   async countSearchFeaturesByExpressionTree(
     anchorFeatureType: string,
     expressionTree?: ExpressionTree,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<number> {
     defaultLog.debug({ label: 'countSearchFeaturesByExpressionTree', anchorFeatureType, expressionTree });
     const expression = await this.prepareSearchExpression(anchorFeatureType, expressionTree);
 
-    return this.searchFeatureRepository.countFeaturesByExpressionTree(anchorFeatureType, expression, systemUserId);
+    return this.searchFeatureRepository.countFeaturesByExpressionTree(
+      anchorFeatureType,
+      expression,
+      systemUserId,
+      submissionIds
+    );
   }
 
   /**

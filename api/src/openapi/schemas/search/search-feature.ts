@@ -110,6 +110,14 @@ export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+/** Optional submission scope shared by feature searches and their counts. */
+const submissionIdsSchema: OpenAPIV3.SchemaObject = {
+  type: 'array',
+  minItems: 1,
+  uniqueItems: true,
+  items: { type: 'integer', minimum: 1 }
+};
+
 /**
  * Feature search request body
  */
@@ -122,6 +130,7 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
         additionalProperties: false,
         properties: {
           expression: featureSearchExpressionTreeSchema,
+          submissionIds: submissionIdsSchema,
           pagination: cursorPaginationRequestBodySchema
         },
         description: 'Optional expression tree and pagination. Omit expression to list target features.'
@@ -141,7 +150,8 @@ export const featureSearchCountRequestBodySchema: OpenAPIV3.RequestBodyObject = 
         type: 'object',
         additionalProperties: false,
         properties: {
-          expression: featureSearchExpressionTreeSchema
+          expression: featureSearchExpressionTreeSchema,
+          submissionIds: submissionIdsSchema
         }
       }
     }

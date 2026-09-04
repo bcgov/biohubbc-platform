@@ -9,11 +9,13 @@ import { useSearchPagination } from './useSearchPagination';
 
 interface SearchResultData {
   featureTypeName: string;
+  submissionIds?: number[];
   response: SearchFeatureResponse;
 }
 
 interface SearchResultCount {
   featureTypeName: string;
+  submissionIds?: number[];
   expressionTree: ExpressionTreeExpression | null;
   refreshKey: number;
   total: number;
@@ -31,13 +33,15 @@ interface SearchResultCount {
  * @param {boolean} enabled - Whether the route has enough context to issue requests.
  * @param {ExpressionTreeExpression | null} expressionTree - Applied expression tree, or null to list target features.
  * @param {number} refreshKey - Explicit apply counter; changes abort the active request and start the next one immediately.
+ * @param {number[]} submissionIds - Optional scope. Memoize derived arrays at the caller to avoid redundant requests.
  * @returns Search rows, pagination, loading state, current URL params, and URL-aware setter.
  */
 export const useSearchResults = (
   featureTypeName: string | undefined,
   enabled = true,
   expressionTree: ExpressionTreeExpression | null = null,
-  refreshKey = 0
+  refreshKey = 0,
+  submissionIds?: number[]
 ) => {
   const { searchFeatures, countFeatures } = useApi().search;
   const { setSnackbar } = useDialogContext();
@@ -48,7 +52,8 @@ export const useSearchResults = (
     count &&
     count.featureTypeName === featureTypeName &&
     count.expressionTree === expressionTree &&
-    count.refreshKey === refreshKey
+    count.refreshKey === refreshKey &&
+    count.submissionIds === submissionIds
       ? count.total
       : undefined;
   const { searchParams, setSearchParams, cursorPagination } = useSearchPagination();
@@ -70,9 +75,12 @@ export const useSearchResults = (
     const controller = new AbortController();
     const loadCount = async () => {
       try {
-        const { total } = await countFeatures(featureTypeName, expressionTree, { signal: controller.signal });
+        const { total } = await countFeatures(featureTypeName, expressionTree, {
+          signal: controller.signal,
+          submissionIds
+        });
         if (!controller.signal.aborted) {
-          setCount({ featureTypeName, expressionTree, refreshKey, total });
+          setCount({ featureTypeName, expressionTree, refreshKey, total, submissionIds });
         }
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -82,7 +90,7 @@ export const useSearchResults = (
     };
     void loadCount();
     return () => controller.abort();
-  }, [countFeatures, enabled, expressionTree, featureTypeName, refreshKey, reportRequestError]);
+  }, [countFeatures, enabled, expressionTree, featureTypeName, refreshKey, reportRequestError, submissionIds]);
 
   useEffect(() => {
     if (!enabled) {
@@ -98,10 +106,11 @@ export const useSearchResults = (
       try {
         setIsLoading(true);
         const response = await searchFeatures(featureTypeName, expressionTree, cursorPagination, {
-          signal: controller.signal
+          signal: controller.signal,
+          submissionIds
         });
         if (!controller.signal.aborted) {
-          setData({ featureTypeName, response });
+          setData({ featureTypeName, response, submissionIds });
         }
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -115,9 +124,21 @@ export const useSearchResults = (
     };
     void loadResults();
     return () => controller.abort();
-  }, [searchFeatures, enabled, featureTypeName, expressionTree, cursorPagination, refreshKey, reportRequestError]);
+  }, [
+    searchFeatures,
+    enabled,
+    featureTypeName,
+    expressionTree,
+    cursorPagination,
+    refreshKey,
+    reportRequestError,
+    submissionIds
+  ]);
 
-  const currentData = data && data.featureTypeName === featureTypeName ? data.response : undefined;
+  const currentData =
+    data && data.featureTypeName === featureTypeName && data.submissionIds === submissionIds
+      ? data.response
+      : undefined;
   const responsePagination = currentData?.pagination;
   const cursor: CursorPagination = {
     limit: cursorPagination.limit,

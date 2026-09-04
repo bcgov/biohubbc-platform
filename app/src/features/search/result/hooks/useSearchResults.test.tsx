@@ -5,6 +5,7 @@ import { useDialogContext } from 'hooks/useContext';
 import { useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
+import { useMemo } from 'react';
 import { Mock, vi } from 'vitest';
 import { useSearchResults } from './useSearchResults';
 
@@ -511,6 +512,46 @@ describe('useSearchResults', () => {
         order: 'asc'
       },
       expectAbortOptions
+    );
+  });
+
+  it('reuses a memoized submission scope across renders and refreshes when its ID changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ submissionId }) => {
+        const submissionIds = useMemo(() => [submissionId], [submissionId]);
+        return useSearchResults('species_observation', true, null, 0, submissionIds);
+      },
+      { initialProps: { submissionId: 42 } }
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    rerender({ submissionId: 42 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(result.current.isLoading).toBe(false);
+    expect(mockCountFeatures).toHaveBeenCalledTimes(1);
+
+    rerender({ submissionId: 43 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockCountFeatures).toHaveBeenCalledTimes(2);
+    expect(mockCountFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      expect.objectContaining({ submissionIds: [43] })
+    );
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      expect.any(Object),
+      expect.objectContaining({ submissionIds: [43] })
     );
   });
 

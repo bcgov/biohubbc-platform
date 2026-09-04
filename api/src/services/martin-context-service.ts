@@ -61,7 +61,8 @@ export class MartinContextService extends DBService {
   async createOrReuseMartinContext(
     featureTypeName: string,
     expressionTree: ExpressionTree | undefined,
-    systemUserId: number | null
+    systemUserId: number | null,
+    submissionIds?: number[]
   ): Promise<MartinContextResult> {
     const { contextTtlSeconds, tokenTtlSeconds, maxLiveContexts } = getMartinConfig();
 
@@ -82,10 +83,12 @@ export class MartinContextService extends DBService {
       : null;
     const optimizedExpression = normalizedExpression ? optimizeExpression(normalizedExpression) : undefined;
 
+    const normalizedSubmissionIds = submissionIds ? [...new Set(submissionIds)].sort((a, b) => a - b) : null;
     const contextHash = computeMartinContextHash({
       expressionId,
       featureTypeId: feature_type_id,
-      systemUserId: systemUserId ?? null
+      systemUserId: systemUserId ?? null,
+      submissionIds: normalizedSubmissionIds
     });
 
     await this.martinContextRepository.deleteExpiredContextsByHash(contextHash);
@@ -96,7 +99,8 @@ export class MartinContextService extends DBService {
       await this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         featureTypeName,
         optimizedExpression,
-        systemUserId
+        systemUserId,
+        normalizedSubmissionIds ?? undefined
       );
 
     // Reuse and creation are one statement, serialized per context hash: two identical mints racing
@@ -107,7 +111,8 @@ export class MartinContextService extends DBService {
         context_hash: contextHash,
         expression_id: expressionId,
         feature_type_id,
-        system_user_id: systemUserId ?? null
+        system_user_id: systemUserId ?? null,
+        submission_ids: normalizedSubmissionIds
       },
       tokenTtlSeconds,
       contextTtlSeconds
