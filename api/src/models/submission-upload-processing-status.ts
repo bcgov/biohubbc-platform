@@ -12,8 +12,8 @@ export const SubmissionUploadProcessingStatus = z.object({
   submission_upload_status_id: z.number(),
   submission_upload_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
-  record_end_date: z.coerce.date().nullable(),
-  create_date: z.coerce.date(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
   create_user: z.number()
 });
 export type SubmissionUploadProcessingStatus = z.infer<typeof SubmissionUploadProcessingStatus>;

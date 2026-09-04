@@ -823,7 +823,7 @@ const buildProcessingStatus = (
   submission_upload_id: submissionUploadId,
   status,
   record_end_date: null,
-  create_date: new Date('2026-09-03T00:00:00.000Z'),
+  create_date: '2026-09-03T00:00:00.000Z',
   create_user: 1
 });
 
@@ -835,7 +835,7 @@ const buildProcessingStatus = (
 const stubTransitionWrites = () => ({
   endStub: sinon
     .stub(SubmissionUploadProcessingStatusRepository.prototype, 'endActiveSubmissionUploadProcessingStatuses')
-    .resolves([]),
+    .resolves(0),
   updateStub: sinon
     .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadStatus')
     .resolves({ submission_upload_id: 'artifact-1' }),

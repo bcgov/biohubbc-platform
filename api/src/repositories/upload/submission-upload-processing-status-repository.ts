@@ -3,6 +3,7 @@ import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatus } from '../../models/submission-upload-processing-status';
 import { BaseRepository } from '../base-repository';
+import { processingStatusPredicate } from './submission-upload-status-predicates';
 
 /**
  * Repository for the processing status rows in `submission_upload_status`.
@@ -63,13 +64,13 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId - Submission upload whose rows are superseded.
    * @param {SubmissionUploadJobStatus[]} statuses - Statuses whose active rows should be ended.
-   * @returns {Promise<{ submission_upload_status_id: number }[]>} - Identifiers of the rows ended.
+   * @returns {Promise<number>} - Number of rows ended.
    * @memberof SubmissionUploadProcessingStatusRepository
    */
   async endActiveSubmissionUploadProcessingStatuses(
     submissionUploadId: string,
     statuses: SubmissionUploadJobStatus[]
-  ): Promise<{ submission_upload_status_id: number }[]> {
+  ): Promise<number> {
     const sqlStatement = SQL`
       UPDATE submission_upload_status
       SET
@@ -77,13 +78,12 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
       WHERE
         submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL
-        AND status = ANY(${statuses}::submission_upload_status_type[])
-      RETURNING submission_upload_status_id;
+        AND status = ANY(${statuses}::submission_upload_status_type[]);
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
-    return response.rows;
+    return response.rowCount ?? 0;
   }
 
   /**
@@ -109,11 +109,15 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
       WHERE
         submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL
-        AND status = ANY(${SubmissionUploadJobStatus.options}::submission_upload_status_type[])
+        AND `
+      .append(processingStatusPredicate('status'))
+      .append(
+        SQL`
       ORDER BY
         create_date ASC,
         submission_upload_status_id ASC;
-    `;
+    `
+      );
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadProcessingStatus);
 

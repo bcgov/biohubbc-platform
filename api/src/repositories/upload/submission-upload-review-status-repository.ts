@@ -3,16 +3,16 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUploadReviewStatus,
   SubmissionUploadReviewStatus,
-  SubmissionUploadReviewStatusHistoryRow,
-  SubmissionUploadStatusTypeEnum
+  SubmissionUploadReviewStatusHistoryRow
 } from '../../models/submission-upload-review-status';
 import { BaseRepository } from '../base-repository';
+import { reviewStatusPredicate } from './submission-upload-status-predicates';
 
 /**
  * Repository for the review decision rows in `submission_upload_status`.
  *
- * The table also holds processing status rows, so every read filters to the review decision
- * subset (`SubmissionUploadStatusTypeEnum`). Review decisions are append-only; the latest row wins.
+ * The table also holds processing status rows, so every read filters with `reviewStatusPredicate`.
+ * Review decisions are append-only; the latest row wins.
  */
 export class SubmissionUploadReviewStatusRepository extends BaseRepository {
   /**
@@ -66,12 +66,16 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
         submission_upload_status
       WHERE
         submission_upload_id = ${submissionUploadId}
-        AND status = ANY(${SubmissionUploadStatusTypeEnum.options}::submission_upload_status_type[])
+        AND `
+      .append(reviewStatusPredicate('status'))
+      .append(
+        SQL`
       ORDER BY
         create_date DESC,
         submission_upload_status_id DESC
       LIMIT 1;
-    `;
+    `
+      );
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatus);
 
@@ -110,11 +114,15 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
       INNER JOIN submission s ON s.submission_id = su.submission_id
       WHERE
         s.uuid = ${submissionUuid}
-        AND sus.status = ANY(${SubmissionUploadStatusTypeEnum.options}::submission_upload_status_type[])
+        AND `
+      .append(reviewStatusPredicate('sus.status'))
+      .append(
+        SQL`
       ORDER BY
         sus.create_date DESC,
         sus.submission_upload_status_id DESC;
-    `;
+    `
+      );
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatusHistoryRow);
 

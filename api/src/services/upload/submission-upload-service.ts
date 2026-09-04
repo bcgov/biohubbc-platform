@@ -17,6 +17,7 @@ import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
+import { getLogger } from '../../utils/logger';
 import { getSupersededProcessingStatuses } from '../../utils/submission-upload-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
@@ -26,6 +27,8 @@ import { SubmissionFeatureClosureService } from '../submission-feature-closure-s
 import { SubmissionService } from '../submission-service';
 import { SubmissionValidationService } from '../submission-validation-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
+
+const defaultLog = getLogger('services/upload/submission-upload-service');
 
 export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
@@ -296,10 +299,23 @@ export class SubmissionUploadService extends DBService {
 
     this.assertStatusCanChange(submissionUploadId, current.status, allowedCurrentStatuses);
 
-    await this.submissionUploadProcessingStatusRepository.endActiveSubmissionUploadProcessingStatuses(
-      submissionUploadId,
-      getSupersededProcessingStatuses(nextStatus)
-    );
+    const supersededCount =
+      await this.submissionUploadProcessingStatusRepository.endActiveSubmissionUploadProcessingStatuses(
+        submissionUploadId,
+        getSupersededProcessingStatuses(nextStatus)
+      );
+
+    if (supersededCount > 0) {
+      defaultLog.info({
+        label: 'transitionSubmissionUploadStatus',
+        message: 'Superseded processing status history rows',
+        submissionUploadId,
+        currentStatus: current.status,
+        nextStatus,
+        supersededCount
+      });
+    }
+
     await this.submissionUploadRepository.updateSubmissionUploadStatus(submissionUploadId, nextStatus);
     await this.submissionUploadProcessingStatusRepository.insertSubmissionUploadProcessingStatus(
       submissionUploadId,

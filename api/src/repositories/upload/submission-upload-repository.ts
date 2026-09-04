@@ -10,9 +10,9 @@ import {
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
-import { SubmissionUploadStatusTypeEnum } from '../../models/submission-upload-review-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
+import { reviewStatusPredicate } from './submission-upload-status-predicates';
 
 export class SubmissionUploadRepository extends BaseRepository {
   /**
@@ -268,7 +268,10 @@ export class SubmissionUploadRepository extends BaseRepository {
           submission_upload_status sus
         WHERE
           sus.submission_upload_id = su.submission_upload_id
-          AND sus.status = ANY(${SubmissionUploadStatusTypeEnum.options}::submission_upload_status_type[])
+          AND `
+      .append(reviewStatusPredicate('sus.status'))
+      .append(
+        SQL`
         ORDER BY
           sus.create_date DESC,
           sus.submission_upload_status_id DESC
@@ -311,7 +314,8 @@ export class SubmissionUploadRepository extends BaseRepository {
         AND s.record_end_date IS NULL
       ORDER BY
         su.create_date ASC;
-    `;
+    `
+      );
 
     const response = await this.connection.sql(sqlStatement, TicketSubmissionUpload);
     return response.rows;
