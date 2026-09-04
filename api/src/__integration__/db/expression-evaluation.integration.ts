@@ -428,7 +428,7 @@ describe('expression-evaluation (integration)', function () {
     return new Set(result.rows.map((r) => r.taxon_id));
   }
 
-  // === broad feature-type projection (no closure needed) ===================
+  // === broad feature-type projection (closure self-loop required) ===================
 
   describe('buildBroadFeatureTypeSubquery', () => {
     it('returns every active submission_feature of the given type for an authenticated user', async () => {
@@ -503,8 +503,8 @@ describe('expression-evaluation (integration)', function () {
 
   describe('buildExpressionTreeFeatureIdsSubquery — same-type self-match', () => {
     it('AND tree returns only features matching every predicate', async () => {
-      // Self-match: anchor type == evidence type, so the result is the evidence itself with no closure or
-      // content edges needed. Isolated submissions keep the target and decoy from sharing any reach.
+      // Self-match: anchor type == evidence type, so the result is the evidence itself once the closure
+      // self-loop marks it as search-eligible. Isolated submissions keep the target and decoy from sharing any reach.
       const submissionTarget = await createTestSubmission(connection);
       const target = await createTestFeature(connection, submissionTarget, 'sample_site', { name: 'AND-target' });
       await indexNameProperty(target, 'AND-target');
@@ -785,10 +785,10 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * Reflexive reach. A single feature E(sample_site) returns itself because same-type evidence directly
-     * matches the anchor row.
+     * Reflexive reach. A single feature E(sample_site) returns itself because the closure self-loop makes
+     * same-type evidence search-eligible and the anchor row is the evidence row.
      */
-    it('5: reflexive — evidence returns itself with empty closure and no edges', async () => {
+    it('5: reflexive — evidence returns itself through its closure self-loop', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
 
@@ -908,8 +908,8 @@ describe('expression-evaluation (integration)', function () {
     /**
      * Empty-closure behaviour, two halves, evaluated on the authenticated path.
      * (a) uploadA gets NO closure: A(sample_site) <- E(sample_site), evidence=E, anchor=sample_site -> A
-     *     ABSENT. With no ancestry rows the parent A is unreachable from E, and (post fail-closed) E itself
-     *     reads as secured and is stripped — either way A does not appear.
+     *     ABSENT. With no self-loop, E is not closure-eligible evidence; with no ancestry rows, A is
+     *     also unreachable from E.
      * (b) submission B's closure is rebuilt to self-loops only (no e2→m ancestor edge). M is reachable
      *     from E2 only through the content edge, and expression evaluation no longer walks content
      *     reachability (SIMSBIOHUB-1085), so M stays ABSENT: E2(sample_site) ─content→ M(animal),
@@ -917,7 +917,7 @@ describe('expression-evaluation (integration)', function () {
      *     recompute is submission-scoped, so rebuilding B's closure must not create rows for A's features.
      */
     it('9: empty closure — closure ancestor reach absent, content reach absent', async () => {
-      // (a) closure ancestor reach needs the closure — do NOT rebuild it.
+      // (a) closure eligibility and ancestor reach both need the closure — do NOT rebuild it.
       const submissionA = await createTestSubmission(connection);
       const uploadA = await createTestUpload(connection, submissionA);
       const ancestorSite = await insertFeatureRow({
