@@ -21,6 +21,9 @@ export type SubmissionRecord = {
 
 export type SubmissionRecordWithSecurity = SubmissionRecord & {
   security: SECURITY_APPLIED_STATUS;
+  contributor_name: string;
+  last_approved_upload_date: string | null;
+  feature_types: string[];
 };
 
 export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {

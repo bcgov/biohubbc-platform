@@ -242,7 +242,10 @@ export const SubmissionRecord = z.object({
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
 export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
-  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  contributor_name: z.string(),
+  last_approved_upload_date: z.string().nullable(),
+  feature_types: z.array(z.string()).min(1)
 });
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
@@ -1294,6 +1297,9 @@ export class SubmissionRepository extends BaseRepository {
         submission.update_date,
         submission.update_user,
         submission.revision_count,
+        contributor.client_id as contributor_name,
+        latest_approved_upload.create_date as last_approved_upload_date,
+        submission_feature_types.feature_types,
         CASE
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
@@ -1302,9 +1308,78 @@ export class SubmissionRepository extends BaseRepository {
       FROM
         submission
       INNER JOIN
+        contributor
+      ON
+        contributor.contributor_id = submission.contributor_id
+      LEFT JOIN LATERAL (
+        SELECT
+          submission_upload.create_date
+        FROM
+          submission_upload
+        WHERE
+          submission_upload.submission_id = submission.submission_id
+        AND
+          (
+            SELECT submission_upload_status.status
+            FROM submission_upload_status
+            WHERE submission_upload_status.submission_upload_id = submission_upload.submission_upload_id
+            ORDER BY
+              submission_upload_status.create_date DESC,
+              submission_upload_status.submission_upload_status_id DESC
+            LIMIT 1
+          ) = 'approved'
+        ORDER BY
+          submission_upload.create_date DESC,
+          submission_upload.submission_upload_id DESC
+        LIMIT 1
+      ) latest_approved_upload ON TRUE
+      INNER JOIN LATERAL (
+        SELECT
+          jsonb_agg(feature_types.name ORDER BY feature_types.is_root DESC, feature_types.name) as feature_types
+        FROM (
+          SELECT
+            feature_type.name,
+            bool_or(tab_submission_feature.parent_submission_feature_id IS NULL) as is_root
+          FROM
+            submission_feature tab_submission_feature
+          INNER JOIN
+            feature_type
+          ON
+            feature_type.feature_type_id = tab_submission_feature.feature_type_id
+          INNER JOIN
+            submission_feature_closure searchable_tab_feature
+          ON
+            searchable_tab_feature.source_submission_feature_id = tab_submission_feature.submission_feature_id
+          AND
+            searchable_tab_feature.target_submission_feature_id = tab_submission_feature.submission_feature_id
+          WHERE
+            tab_submission_feature.submission_id = submission.submission_id
+          AND
+            tab_submission_feature.record_effective_date <= now()
+          AND
+            (tab_submission_feature.record_end_date IS NULL OR now() < tab_submission_feature.record_end_date)
+          AND
+            tab_submission_feature.successor_submission_feature_id IS NULL
+          GROUP BY
+            feature_type.name
+        ) feature_types
+      ) submission_feature_types ON TRUE
+      INNER JOIN
         submission_feature
       ON
         submission_feature.submission_id = submission.submission_id
+      AND
+        submission_feature.record_effective_date <= now()
+      AND
+        (submission_feature.record_end_date IS NULL OR now() < submission_feature.record_end_date)
+      AND
+        submission_feature.successor_submission_feature_id IS NULL
+      INNER JOIN
+        submission_feature_closure searchable_submission_feature
+      ON
+        searchable_submission_feature.source_submission_feature_id = submission_feature.submission_feature_id
+      AND
+        searchable_submission_feature.target_submission_feature_id = submission_feature.submission_feature_id
       LEFT JOIN
         submission_feature_security
       ON
@@ -1318,7 +1393,10 @@ export class SubmissionRepository extends BaseRepository {
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
-        submission.submission_id;
+        submission.submission_id,
+        contributor.client_id,
+        latest_approved_upload.create_date,
+        submission_feature_types.feature_types;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);

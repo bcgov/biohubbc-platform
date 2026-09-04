@@ -53,7 +53,10 @@ GET.apiDoc = {
               'update_date',
               'update_user',
               'revision_count',
-              'security'
+              'security',
+              'contributor_name',
+              'last_approved_upload_date',
+              'feature_types'
             ],
             properties: {
               submission_id: {
@@ -127,6 +130,19 @@ GET.apiDoc = {
                   SECURITY_APPLIED_STATUS.SECURED,
                   SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
                 ]
+              },
+              contributor_name: {
+                type: 'string'
+              },
+              last_approved_upload_date: {
+                type: 'string',
+                format: 'date-time',
+                nullable: true
+              },
+              feature_types: {
+                type: 'array',
+                minItems: 1,
+                items: { type: 'string' }
               }
             },
             additionalProperties: false
