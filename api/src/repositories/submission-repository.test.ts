@@ -1046,18 +1046,29 @@ describe('SubmissionRepository', () => {
     it('should succeed with valid data', async () => {
       const mockResponse = {
         feature_type_name: 'name',
+        last_approved_upload_date: '2026-02-03T12:00:00.000Z',
         submission_feature_security_ids: [1]
       };
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const sqlSpy = sinon.stub().returns(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1);
 
       expect(response).to.eql(mockResponse);
+      const sql = sqlSpy.firstCall.args[0].text;
+      expect(sql).to.include('latest_approved_upload.create_date as last_approved_upload_date');
+      expect(sql).to.include("submission_upload.decision = 'approved'");
+      expect(sql).to.include('submission_upload.record_end_date IS NULL OR now() < submission_upload.record_end_date');
+      expect(sql).to.include('submission_upload.create_date DESC');
+      expect(sql).to.include('submission_feature_types.feature_types');
+      expect(sql).to.include('ORDER BY feature_types.is_root DESC, feature_types.name');
+      expect(sql).to.not.include("'display_name', feature_types.display_name");
+      expect(sql).to.include('tab_submission_feature.submission_id = submission.submission_id');
     });
   });
 

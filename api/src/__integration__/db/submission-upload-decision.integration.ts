@@ -100,11 +100,17 @@ describe('submission upload decision (integration)', function () {
     const before = await readUpload(submissionUploadId);
     expect(before.decision).to.equal('pending');
 
+    // The status route checks upload ownership through this schema-validated lookup before recording a decision.
+    const upload = await service.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
+    expect(upload.decision).to.equal('pending');
+
     const result = await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
 
     expect(result).to.eql({ submission_upload_id: submissionUploadId, decision: 'approved' });
     const after = await readUpload(submissionUploadId);
     expect(after.decision).to.equal('approved');
+    const approvedUpload = await service.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
+    expect(approvedUpload.decision).to.equal('approved');
     expect(after.revision_count).to.be.greaterThan(before.revision_count);
     expect(publishClosureStub).to.have.been.calledOnce;
     expect(publishClosureStub.firstCall.args[1]).to.eql({ submissionUploadId });

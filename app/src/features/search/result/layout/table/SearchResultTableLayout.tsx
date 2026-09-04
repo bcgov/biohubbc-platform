@@ -35,27 +35,31 @@ export const SearchResultTableLayout = ({
   onClick
 }: SearchResultTableLayoutProps) => {
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
-    const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map((property) => ({
-      field: String(property.feature_type_property_id),
-      headerName: property.display_name,
-      minWidth: 160,
-      flex: 1,
-      sortable: false,
-      valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
-      renderCell: (params) => (
-        <Typography
-          variant="body2"
-          noWrap
-          title={typeof params.value === 'string' ? params.value : ''}
-          sx={{ width: '100%' }}>
-          <PropertyValueDisplay
-            value={params.row.properties?.[property.name]}
-            submissionId={params.row.submission_id}
-            pathResolvers={pathResolvers}
-          />
-        </Typography>
-      )
-    }));
+    const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map(
+      (property, index) => ({
+        field: String(property.feature_type_property_id),
+        headerName: property.display_name,
+        minWidth: 160,
+        flex: 1,
+        sortable: false,
+        cellClassName: index === featureTypeProperties.length - 1 ? 'last-column-cell' : undefined,
+        headerClassName: index === featureTypeProperties.length - 1 ? 'last-column-header' : undefined,
+        valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
+        renderCell: (params) => (
+          <Typography
+            variant="body2"
+            noWrap
+            title={typeof params.value === 'string' ? params.value : ''}
+            sx={{ width: '100%' }}>
+            <PropertyValueDisplay
+              value={params.row.properties?.[property.name]}
+              submissionId={params.row.submission_id}
+              pathResolvers={pathResolvers}
+            />
+          </Typography>
+        )
+      })
+    );
 
     return [
       {
@@ -101,7 +105,8 @@ export const SearchResultTableLayout = ({
         '& .MuiDataGrid-root': {
           border: 'none'
         },
-        '& .secured-column-cell, & .secured-column-header': { pl: '30px', justifyContent: 'center' }
+        '& .secured-column-cell, & .secured-column-header': { pl: 1, justifyContent: 'center' },
+        '& .last-column-cell, & .last-column-header': { pr: 1 }
       }}
     />
   );

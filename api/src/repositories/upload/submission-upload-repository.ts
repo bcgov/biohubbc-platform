@@ -187,6 +187,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.upload_id,
         su.team_id,
         su.status,
+        su.decision,
         su.ticket_id,
         su.blueprint_id,
         su.comment,
