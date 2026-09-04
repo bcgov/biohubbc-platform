@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+/**
+ * Review decision subset of the `submission_upload_status_type` database enum.
+ *
+ * The database enum also carries the processing status values stored in the same table; readers of
+ * review decisions filter to this subset.
+ */
 export const SubmissionUploadStatusTypeEnum = z.enum(['submitted', 'approved', 'denied', 'deleted']);
 export type SubmissionUploadStatusTypeEnum = z.infer<typeof SubmissionUploadStatusTypeEnum>;
 

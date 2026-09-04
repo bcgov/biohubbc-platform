@@ -188,11 +188,7 @@ export class ArtifactSecurityService extends DBService {
       return;
     }
 
-    await this.submissionUploadService.transitionSubmissionUploadStatus(
-      submissionUpload.submission_upload_id,
-      'failed',
-      ['uploaded', 'ingesting', 'ingested', 'reconciling', 'reconciled', 'indexing', 'failed']
-    );
+    await this.submissionUploadService.transitionSubmissionUploadToFailed(submissionUpload.submission_upload_id);
   }
 
   /**

@@ -57,7 +57,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexing').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
-    sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
+    sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
     sinon
       .stub(indexSubmissionFeaturesJobDependencies, 'publishComputeSubmissionFeatureClosureJob')
       .resolves({ status: 'published', jobId: 'job-xyz' });
@@ -162,8 +162,8 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       expect(error).to.equal(testError);
     }
 
-    const transitionStatusStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
-    expect(transitionStatusStub.called).to.be.false;
+    const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToFailed as sinon.SinonStub;
+    expect(toFailedStub.called).to.be.false;
   });
 
   it('allows retry/resume when status is already indexing', async () => {
@@ -266,9 +266,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
 
   it('marks upload failed and logs failure with error output without throwing', async () => {
     stubConnections();
-    const transitionStatusStub = sinon
-      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
-      .resolves();
+    const toFailedStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
 
     const job = {
       id: 'job-1',
@@ -285,15 +283,12 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('submission-upload-1', 'failed', ['reconciled', 'indexing', 'failed'])).to.be
-      .true;
+    expect(toFailedStub).to.have.been.calledOnceWith('submission-upload-1');
   });
 
   it('should mark upload failed and log default message when output is null', async () => {
     stubConnections();
-    const transitionStatusStub = sinon
-      .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
-      .resolves();
+    const toFailedStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
 
     const job = {
       id: 'job-2',
@@ -310,7 +305,6 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(transitionStatusStub.calledWith('submission-upload-2', 'failed', ['reconciled', 'indexing', 'failed'])).to.be
-      .true;
+    expect(toFailedStub).to.have.been.calledOnceWith('submission-upload-2');
   });
 });
