@@ -24,11 +24,13 @@ export const useMartinApi = (axios: AxiosInstance) => {
   const createMartinSession = async (
     featureType: string,
     expressionTree?: ExpressionTreeExpression | null,
-    options?: Pick<AxiosRequestConfig, 'signal'>
+    options?: Pick<AxiosRequestConfig, 'signal'> & { submissionIds?: number[] }
   ): Promise<IMartinSession> => {
-    const body = expressionTree
-      ? { feature_type: featureType, expression: expressionTree }
-      : { feature_type: featureType };
+    const body = {
+      feature_type: featureType,
+      ...(options?.submissionIds?.length ? { submissionIds: options.submissionIds } : {}),
+      ...(expressionTree ? { expression: expressionTree } : {})
+    };
 
     const { data } = await axios.post<IMartinSession>('/api/martin/token', body, {
       signal: options?.signal

@@ -68,7 +68,8 @@ const isAbortError = (error: unknown) => {
 export const useMartinSession = (
   featureTypeName: string,
   expressionTree: ExpressionTreeExpression | null,
-  enabled: boolean
+  enabled: boolean,
+  submissionIds?: number[]
 ): UseMartinSessionResult => {
   const api = useApi();
   const dialogContext = useDialogContext();
@@ -177,7 +178,7 @@ export const useMartinSession = (
     tokenRef.current = null;
     setSession(null);
     setStatus('loading');
-  }, [featureTypeName, expressionTree, clearRecoveryTimer]);
+  }, [featureTypeName, expressionTree, submissionIds, clearRecoveryTimer]);
 
   useEffect(() => {
     if (!enabled) {
@@ -206,7 +207,8 @@ export const useMartinSession = (
     const createSession = async () => {
       try {
         const response = await apiRef.current.martin.createMartinSession(featureTypeName, expressionTree, {
-          signal: abortController.signal
+          signal: abortController.signal,
+          submissionIds
         });
 
         if (!isCurrent) {
@@ -255,7 +257,7 @@ export const useMartinSession = (
       isCurrent = false;
       abortController.abort();
     };
-  }, [featureTypeName, expressionTree, enabled, mintCount]);
+  }, [featureTypeName, expressionTree, enabled, mintCount, submissionIds]);
 
   // Refresh shortly before the token expires. The API reuses the underlying authorization context where it can, so a
   // refresh usually rotates only the token and leaves the rendered tiles untouched.

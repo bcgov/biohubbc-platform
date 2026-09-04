@@ -36,6 +36,8 @@ export interface ISearchResultMapContainerProps {
    * has and stops talking to the server, and re-mints on the way back.
    */
   isActive: boolean;
+  /** Optional submission scope applied to the mapped search. */
+  submissionIds?: number[];
 }
 
 /**
@@ -45,8 +47,8 @@ export interface ISearchResultMapContainerProps {
  * map for a loading or error state would then change the panel's height and make the surrounding search UI jump. One
  * shared frame keeps the footprint identical across states; only the content inside it swaps.
  *
- * @param {PropsWithChildren<{ testId: string }>} props
- * @return {*}
+ * @param {PropsWithChildren<{ testId: string }>} props - Frame content and test selector.
+ * @returns {JSX.Element} A consistently sized frame for a map, loading state, or error state.
  */
 const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
   <Box
@@ -62,18 +64,19 @@ const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
  * Owns everything search-specific: creating the Martin session, attaching the tile token, replacing the tile source
  * when the search changes, and interpreting cluster selections. `SlippyMap` receives only generic map configuration.
  *
- * @param {ISearchResultMapContainerProps} props
- * @return {*}
+ * @param {ISearchResultMapContainerProps} props - Search state, visibility, and optional submission scope.
+ * @returns {JSX.Element} The search results map or its current loading or error state.
  */
 export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) => {
-  const { featureTypeName, expressionTree, isActive } = props;
+  const { featureTypeName, expressionTree, isActive, submissionIds } = props;
 
   const config = useConfigContext();
 
   const { status, session, tokenRef, reloadNonce, retry, onTileError } = useMartinSession(
     featureTypeName,
     expressionTree,
-    isActive
+    isActive,
+    submissionIds
   );
 
   const tileSources = useMemo((): Record<string, SourceSpecification> => {

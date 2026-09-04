@@ -78,7 +78,13 @@ export function searchFeatures(): RequestHandler {
       const expressionTree = expressionTreeParseResult?.data;
 
       const { features, properties, count, has_more_secured_features } =
-        await service.searchFeaturesByExpressionTreeWithCount(featureType, expressionTree, pagination, systemUserId);
+        await service.searchFeaturesByExpressionTreeWithCount(
+          featureType,
+          expressionTree,
+          pagination,
+          systemUserId,
+          req.body.submissionIds
+        );
 
       await connection.commit();
 

@@ -43,7 +43,8 @@ export class SearchFeatureRepository extends BaseRepository {
     anchorFeatureType: string,
     expressionTree: NormalizedExpressionTreeExpression | undefined,
     pagination?: ApiPaginationOptions,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
     const expressionFeatureIds = expressionTree
@@ -54,7 +55,13 @@ export class SearchFeatureRepository extends BaseRepository {
         )
       : null;
 
-    let query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
+    let query = this.buildExpressionTreeSearchQuery(
+      knex,
+      anchorFeatureType,
+      expressionFeatureIds,
+      systemUserId,
+      submissionIds
+    );
     query = this.applyExpressionSearchPagination(query, pagination);
 
     const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
@@ -72,7 +79,8 @@ export class SearchFeatureRepository extends BaseRepository {
   async searchFeaturesByExpressionTreeCount(
     anchorFeatureType: string,
     expressionTree: NormalizedExpressionTreeExpression | undefined,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<number> {
     const knex = getKnex();
     const expressionFeatureIds = expressionTree
@@ -87,7 +95,8 @@ export class SearchFeatureRepository extends BaseRepository {
       knex,
       anchorFeatureType,
       expressionFeatureIds,
-      systemUserId
+      systemUserId,
+      submissionIds
     );
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
@@ -120,16 +129,24 @@ export class SearchFeatureRepository extends BaseRepository {
   async hasInaccessibleSecuredFeaturesByExpressionTree(
     anchorFeatureType: string,
     expressionTree: NormalizedExpressionTreeExpression | undefined,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<boolean> {
     const knex = getKnex();
 
     // Candidate anchor features matched by the expression, WITHOUT the caller access filter. The
     // expression subquery already restricts to active anchor-type features, so it is used directly;
     // only the no-expression case needs the feature-type filter from buildExpressionTreeMatchingFeaturesQuery.
-    const matchingFeatures = expressionTree
+    const expressionFeatureIds = expressionTree
       ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
-      : this.buildExpressionTreeMatchingFeaturesQuery(knex, anchorFeatureType, null);
+      : null;
+    const matchingFeatures = this.buildExpressionTreeMatchingFeaturesQuery(
+      knex,
+      anchorFeatureType,
+      expressionFeatureIds,
+      undefined,
+      submissionIds
+    );
 
     const existsQuery = knex
       .select(knex.raw('1'))
@@ -164,7 +181,8 @@ export class SearchFeatureRepository extends BaseRepository {
   async searchFeaturesByExpressionTreeProperties(
     anchorFeatureType: string,
     expressionTree: NormalizedExpressionTreeExpression | undefined,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<FeatureTypeProperty[]> {
     const knex = getKnex();
 
@@ -185,7 +203,8 @@ export class SearchFeatureRepository extends BaseRepository {
       knex,
       anchorFeatureType,
       expressionFeatureIds,
-      systemUserId
+      systemUserId,
+      submissionIds
     );
 
     // Normalize all indexed typed-property tables to the two columns needed for presence checks.
@@ -264,13 +283,16 @@ export class SearchFeatureRepository extends BaseRepository {
     knex: Knex,
     anchorFeatureType: string,
     expressionFeatureIds: Knex.QueryBuilder | null,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Knex.QueryBuilder {
     const query = knex('submission_feature as sf')
       .select('sf.submission_feature_id', 'sf.feature_type_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
       .whereRaw(isSubmissionFeatureCurrent('sf'));
+
+    this.applySubmissionScope(query, submissionIds, 'sf');
 
     if (expressionFeatureIds) {
       query.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -310,7 +332,8 @@ export class SearchFeatureRepository extends BaseRepository {
     knex: Knex,
     anchorFeatureType: string,
     expressionFeatureIds: Knex.QueryBuilder | null,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Knex.QueryBuilder {
     const expressionResults = knex('submission_feature as sf')
       .select(
@@ -329,6 +352,8 @@ export class SearchFeatureRepository extends BaseRepository {
       .joinRaw(this.buildTypedPropertiesLateralJoinSql())
       .where('ft.name', anchorFeatureType)
       .whereRaw(isSubmissionFeatureCurrent('sf'));
+
+    this.applySubmissionScope(expressionResults, submissionIds, 'sf');
 
     if (expressionFeatureIds) {
       expressionResults.whereIn('sf.submission_feature_id', expressionFeatureIds);
@@ -358,6 +383,27 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     return finalQuery;
+  }
+
+  /**
+   * Restrict candidates to submissions whose active graph snapshot contains the feature.
+   *
+   * Every feature in a successfully-built closure has a reflexive self-loop. Requiring that row,
+   * rather than filtering on `submission_feature.submission_id` alone, ensures submission-scoped
+   * reads expose only the active/published feature set represented by the closure snapshot.
+   */
+  private applySubmissionScope(query: Knex.QueryBuilder, submissionIds?: number[], featureAlias = 'sf'): void {
+    if (!submissionIds?.length) {
+      return;
+    }
+
+    query.whereIn(`${featureAlias}.submission_id`, submissionIds).whereExists((builder) => {
+      builder
+        .select(1)
+        .from('submission_feature_closure as submission_scope_closure')
+        .whereRaw(`submission_scope_closure.source_submission_feature_id = ${featureAlias}.submission_feature_id`)
+        .whereRaw(`submission_scope_closure.target_submission_feature_id = ${featureAlias}.submission_feature_id`);
+    });
   }
 
   /**

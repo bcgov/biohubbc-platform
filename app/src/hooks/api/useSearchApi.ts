@@ -32,9 +32,13 @@ export const useSearchApi = (axios: AxiosInstance) => {
     featureType: string,
     expressionTree?: ExpressionTreeExpression | null,
     pagination?: ApiPaginationRequestOptions,
-    options?: Pick<AxiosRequestConfig, 'signal'>
+    options?: Pick<AxiosRequestConfig, 'signal'> & { submissionIds?: number[] }
   ): Promise<SearchFeatureResponse> => {
-    const body = expressionTree ? { expression: expressionTree, pagination } : { pagination };
+    const body = {
+      ...(expressionTree ? { expression: expressionTree } : {}),
+      pagination,
+      ...(options?.submissionIds?.length ? { submissionIds: options.submissionIds } : {})
+    };
     const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body, {
       signal: options?.signal
     });

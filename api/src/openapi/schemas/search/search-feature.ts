@@ -122,9 +122,18 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
         additionalProperties: false,
         properties: {
           expression: featureSearchExpressionTreeSchema,
+          submissionIds: {
+            type: 'array',
+            minItems: 1,
+            uniqueItems: true,
+            items: { type: 'integer', minimum: 1 },
+            description:
+              'Submission identifiers used to restrict results to features present in each submission closure.'
+          },
           pagination: paginationRequestBodySchema
         },
-        description: 'Optional expression tree and pagination. Omit expression to list target features.'
+        description:
+          'Optional expression tree, submission scope, and pagination. Omit expression to list target features.'
       }
     }
   }

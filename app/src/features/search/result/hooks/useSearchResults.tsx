@@ -23,6 +23,7 @@ interface SearchResultsLoaderInput {
   expressionTree: ExpressionTreeExpression | null;
   featureTypeName: string;
   signal: AbortSignal;
+  submissionIds?: number[];
 }
 
 type SearchResultsPagination = ApiPaginationRequestOptions & { sort?: string; order?: 'asc' | 'desc' };
@@ -70,7 +71,8 @@ export const useSearchResults = (
   featureTypeName: string | undefined,
   enabled = true,
   expressionTree: ExpressionTreeExpression | null = null,
-  refreshKey = 0
+  refreshKey = 0,
+  submissionIds?: number[]
 ) => {
   const api = useApi();
   const dialogContext = useDialogContext();
@@ -100,11 +102,14 @@ export const useSearchResults = (
    * @returns Search response for the request, or `undefined` when the request was aborted or failed.
    */
   const loadSearchResults = useCallback(
-    async ({ params, expressionTree, featureTypeName, signal }: SearchResultsLoaderInput) => {
+    async ({ params, expressionTree, featureTypeName, signal, submissionIds }: SearchResultsLoaderInput) => {
       const pagination = buildPagination(params);
 
       try {
-        return await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, pagination, { signal });
+        return await searchApiRef.current.searchFeatures(featureTypeName, expressionTree, pagination, {
+          signal,
+          submissionIds
+        });
       } catch (error) {
         if (isAbortError(error)) {
           return undefined;
@@ -238,7 +243,7 @@ export const useSearchResults = (
       return;
     }
 
-    const input = { params: searchParams, expressionTree, featureTypeName };
+    const input = { params: searchParams, expressionTree, featureTypeName, submissionIds };
     const isExplicitExpressionApply = previousRefreshKeyRef.current !== refreshKey;
     const isExpressionTreeChange = previousExpressionTreeRef.current !== expressionTree;
     const previousSort = previousSortRef.current;
@@ -266,7 +271,16 @@ export const useSearchResults = (
     requestIdRef.current += 1;
     abortControllerRef.current?.abort();
     debouncedRefresh(input);
-  }, [searchParams, expressionTree, featureTypeName, enabled, refreshKey, debouncedRefresh, startSearch]);
+  }, [
+    searchParams,
+    expressionTree,
+    featureTypeName,
+    enabled,
+    refreshKey,
+    submissionIds,
+    debouncedRefresh,
+    startSearch
+  ]);
 
   useEffect(
     () => () => {
