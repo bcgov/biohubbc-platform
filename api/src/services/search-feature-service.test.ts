@@ -4,10 +4,12 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import type { ExpressionTree } from '../models/expression-tree';
+import type { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { decodeSearchFeatureCursor } from '../utils/pagination';
-import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureService } from './search-feature-service';
 
 chai.use(sinonChai);
@@ -45,6 +47,29 @@ describe('SearchFeatureService', () => {
       allow_multiple: false
     }
   ];
+  const expressionTree: ExpressionTree = {
+    type: 'expression',
+    operator: 'AND',
+    clauses: [
+      {
+        type: 'predicate',
+        feature_property_id: 14,
+        feature_type_property_id: null,
+        operator: 'Exists'
+      }
+    ]
+  };
+  const normalizedExpression: NormalizedExpressionTree = {
+    ...expressionTree,
+    clauses: [
+      {
+        ...expressionTree.clauses[0],
+        feature_property_type_id: 5,
+        feature_property_type_name: 'number',
+        internal_predicate: { type: 'number', operator: 'Exists' }
+      }
+    ]
+  };
 
   describe('searchFeaturesByExpressionTree', () => {
     it('propagates the repository error when the anchor feature type does not exist', async () => {
@@ -80,18 +105,13 @@ describe('SearchFeatureService', () => {
   });
 
   describe('searchFeaturesByExpressionTreeWithMetadata', () => {
-    it('returns features and metadata without executing a count, normalizing the expression tree first', async () => {
+    it('returns features and metadata without executing a count, normalizing the expression first', async () => {
       const service = new SearchFeatureService(getMockDBConnection());
 
-      const tree = { type: 'leaf' } as unknown as Parameters<
-        SearchFeatureService['searchFeaturesByExpressionTreeWithMetadata']
-      >[1];
-      const normalized = { normalized: true };
-
       sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
-      const validateStub = sinon
-        .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
-        .resolves(normalized as never);
+      const normalizeStub = sinon
+        .stub(ExpressionTreeNormalizationService.prototype, 'normalize')
+        .resolves(normalizedExpression);
       const searchStub = sinon
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree')
         .resolves(mockFeatures);
@@ -102,13 +122,13 @@ describe('SearchFeatureService', () => {
         .stub(SearchFeatureRepository.prototype, 'hasInaccessibleSecuredFeaturesByExpressionTree')
         .resolves(true);
 
-      const result = await service.searchFeaturesByExpressionTreeWithMetadata('survey', tree);
+      const result = await service.searchFeaturesByExpressionTreeWithMetadata('survey', expressionTree);
 
-      expect(validateStub).to.have.been.calledOnceWith(tree);
+      expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
       expect(searchStub).to.have.been.calledOnce;
-      expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
+      expect(searchStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, undefined, undefined]);
       expect(propertiesStub).to.have.been.calledOnceWith('survey');
-      expect(hiddenSecuredStub).to.have.been.calledOnceWith('survey', normalized, undefined);
+      expect(hiddenSecuredStub).to.have.been.calledOnceWith('survey', normalizedExpression, undefined);
       expect(result).to.deep.equal({
         features: mockFeatures,
         properties: mockProperties,
@@ -178,56 +198,95 @@ describe('SearchFeatureService', () => {
     });
   });
 
-  it('normalizes expression-tree searches through the semantic validator', async () => {
+  it('normalizes expression-tree searches before repository evaluation', async () => {
     const service = new SearchFeatureService(getMockDBConnection());
-    const tree = { type: 'leaf' } as unknown as Parameters<SearchFeatureService['searchFeaturesByExpressionTree']>[1];
-    const normalized = { normalized: true };
 
     sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
-    const validateStub = sinon
-      .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
-      .resolves(normalized as never);
+    const normalizeStub = sinon
+      .stub(ExpressionTreeNormalizationService.prototype, 'normalize')
+      .resolves(normalizedExpression);
     const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree').resolves([]);
 
-    await service.searchFeaturesByExpressionTree('survey', tree);
+    await service.searchFeaturesByExpressionTree('survey', expressionTree);
 
-    expect(validateStub).to.have.been.calledOnceWith(tree);
-    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
+    expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
+    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, undefined, undefined]);
+  });
+
+  it('passes the same deduplicated range expression to result and count queries', async () => {
+    const service = new SearchFeatureService(getMockDBConnection());
+    const lowerBound = {
+      type: 'predicate',
+      feature_property_id: 14,
+      feature_type_property_id: null,
+      feature_property_type_id: 5,
+      feature_property_type_name: 'number',
+      operator: 'GreaterThan',
+      value: 7,
+      internal_predicate: { type: 'number', operator: 'GreaterThan', value: 7 }
+    } as const;
+    const upperBound = {
+      type: 'predicate',
+      feature_property_id: 14,
+      feature_type_property_id: null,
+      feature_property_type_id: 5,
+      feature_property_type_name: 'number',
+      operator: 'LessThan',
+      value: 9,
+      internal_predicate: { type: 'number', operator: 'LessThan', value: 9 }
+    } as const;
+    const normalizedRange: NormalizedExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [upperBound, lowerBound, lowerBound]
+    };
+    const optimizedRange: NormalizedExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [lowerBound, upperBound]
+    };
+
+    sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
+    sinon.stub(ExpressionTreeNormalizationService.prototype, 'normalize').resolves(normalizedRange);
+    const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree').resolves([]);
+    const countStub = sinon.stub(SearchFeatureRepository.prototype, 'countFeaturesByExpressionTree').resolves(0);
+
+    await service.searchFeaturesByExpressionTree('survey', expressionTree);
+    await service.countSearchFeaturesByExpressionTree('survey', expressionTree);
+
+    expect(searchStub.firstCall.args[1]).to.deep.equal(optimizedRange);
+    expect(countStub.firstCall.args[1]).to.deep.equal(optimizedRange);
   });
 
   describe('countSearchFeaturesByExpressionTree', () => {
-    it('validates and normalizes the expression before requesting the count', async () => {
+    it('normalizes the expression before requesting the count', async () => {
       const service = new SearchFeatureService(getMockDBConnection());
-      const tree = { type: 'leaf' } as unknown as Parameters<
-        SearchFeatureService['countSearchFeaturesByExpressionTree']
-      >[1];
-      const normalized = { normalized: true };
 
       sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
-      const validateStub = sinon
-        .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
-        .resolves(normalized as never);
+      const normalizeStub = sinon
+        .stub(ExpressionTreeNormalizationService.prototype, 'normalize')
+        .resolves(normalizedExpression);
       const countStub = sinon.stub(SearchFeatureRepository.prototype, 'countFeaturesByExpressionTree').resolves(42_000);
 
-      const result = await service.countSearchFeaturesByExpressionTree('survey', tree, 91);
+      const result = await service.countSearchFeaturesByExpressionTree('survey', expressionTree, 91);
 
-      expect(validateStub).to.have.been.calledOnceWith(tree);
-      expect(countStub.firstCall.args).to.deep.equal(['survey', normalized, 91]);
+      expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, 91]);
       expect(result).to.equal(42_000);
     });
 
-    it('does not run semantic validation when the expression is omitted', async () => {
+    it('does not normalize when the expression is omitted', async () => {
       const service = new SearchFeatureService(getMockDBConnection());
 
       sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
-      const validateStub = sinon.stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree');
+      const normalizeStub = sinon.stub(ExpressionTreeNormalizationService.prototype, 'normalize');
       const countStub = sinon
         .stub(SearchFeatureRepository.prototype, 'countFeaturesByExpressionTree')
         .resolves(5_000_000);
 
       const result = await service.countSearchFeaturesByExpressionTree('survey', undefined, null);
 
-      expect(validateStub).to.not.have.been.called;
+      expect(normalizeStub).to.not.have.been.called;
       expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, null]);
       expect(result).to.equal(5_000_000);
     });

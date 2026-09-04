@@ -1,6 +1,5 @@
-import type { PredicatePropertyTypeName } from '../constants/expression';
-import type { InternalTypedPredicate } from './expression-predicate';
-import type { ExpressionTreeExpression, ExpressionTreePredicate } from './expression-tree';
+import type { InternalTypedPredicate, PredicatePropertyTypeName } from './expression-predicate';
+import type { ExpressionTree, ExpressionTreePredicate } from './expression-tree';
 
 export type NormalizedExpressionTreePredicate = ExpressionTreePredicate & {
   feature_property_type_id: number;
@@ -8,8 +7,8 @@ export type NormalizedExpressionTreePredicate = ExpressionTreePredicate & {
   internal_predicate: InternalTypedPredicate;
 };
 
-export type NormalizedExpressionTreeExpression = Omit<ExpressionTreeExpression, 'clauses'> & {
+export type NormalizedExpressionTree = Omit<ExpressionTree, 'clauses'> & {
   clauses: NormalizedExpressionTreeClause[];
 };
 
-export type NormalizedExpressionTreeClause = NormalizedExpressionTreePredicate | NormalizedExpressionTreeExpression;
+export type NormalizedExpressionTreeClause = NormalizedExpressionTreePredicate | NormalizedExpressionTree;

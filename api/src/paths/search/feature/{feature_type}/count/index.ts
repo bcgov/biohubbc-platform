@@ -9,7 +9,10 @@ import {
 import { SearchFeatureService } from '../../../../../services/search-feature-service';
 import { getLogger } from '../../../../../utils/logger';
 import { registerRequestCancellation } from '../../../../../utils/request-cancellation';
-import { getSearchExpressionTree, getSearchFeatureType } from '../../../../../utils/search-feature-request';
+import {
+  validateSearchExpressionTree,
+  validateSearchFeatureType
+} from '../../../../../utils/search-feature-validation';
 import { getActiveSystemUserId } from '../../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/search/feature/{feature_type}/count');
@@ -56,8 +59,8 @@ export function countFeatures(): RequestHandler {
       await connection.open();
 
       const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
-      const featureType = getSearchFeatureType(req);
-      const expressionTree = getSearchExpressionTree(req);
+      const featureType = validateSearchFeatureType(req.params.feature_type);
+      const expressionTree = validateSearchExpressionTree(req.body.expression);
       const total = await new SearchFeatureService(connection).countSearchFeaturesByExpressionTree(
         featureType,
         expressionTree,

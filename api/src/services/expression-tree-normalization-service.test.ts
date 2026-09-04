@@ -7,7 +7,7 @@ import { PredicateOperator } from '../models/expression-predicate';
 import { ExpressionPredicatePropertyMetadata } from '../models/feature-type-property';
 import { TaxonRecord } from '../models/taxon';
 import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
-import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { TaxonomyService } from './taxonomy-service';
 
 const metadata = (
@@ -35,12 +35,13 @@ const taxonRecord = (taxon_id: number): TaxonRecord => ({
   itis_update_date: '2020-01-01'
 });
 
-describe('ExpressionPredicateSemanticValidator', () => {
+describe('ExpressionTreeNormalizationService', () => {
   let currentMetadata: ExpressionPredicatePropertyMetadata;
+  let getPropertyMetadata: sinon.SinonStub;
 
   beforeEach(() => {
     currentMetadata = metadata('string');
-    sinon
+    getPropertyMetadata = sinon
       .stub(FeatureTypePropertyRepository.prototype, 'getExpressionPredicatePropertyMetadata')
       .callsFake(async () => currentMetadata);
   });
@@ -49,14 +50,14 @@ describe('ExpressionPredicateSemanticValidator', () => {
     sinon.restore();
   });
 
-  const validateOne = async (
+  const normalizeOne = async (
     propertyType: ExpressionPredicatePropertyMetadata['feature_property_type_name'],
     operator: PredicateOperator,
     value?: unknown
   ) => {
     currentMetadata = metadata(propertyType);
 
-    const validator = new ExpressionPredicateSemanticValidator(getMockDBConnection());
+    const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
     const tree = {
       type: 'expression',
       operator: 'AND',
@@ -71,13 +72,105 @@ describe('ExpressionPredicateSemanticValidator', () => {
       ]
     } as const;
 
-    return validator.validateExpressionTree(tree);
+    return expressionTreeNormalizationService.normalize(tree);
   };
+
+  it('flattens and orders associative expressions without removing duplicates', async () => {
+    const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
+    const result = await expressionTreeNormalizationService.normalize({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 15,
+          feature_type_property_id: null,
+          operator: 'Equals',
+          value: 'second'
+        },
+        {
+          type: 'expression',
+          operator: 'AND',
+          clauses: [
+            {
+              type: 'predicate',
+              feature_property_id: 14,
+              feature_type_property_id: null,
+              operator: 'Equals',
+              value: 'first'
+            },
+            {
+              type: 'predicate',
+              feature_property_id: 14,
+              feature_type_property_id: null,
+              operator: 'Equals',
+              value: 'first'
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(result.clauses.map((clause) => clause.type === 'predicate' && clause.feature_property_id)).to.eql([
+      14, 14, 15
+    ]);
+  });
+
+  it('preserves expressions separated by a different logical operator', async () => {
+    const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
+    const result = await expressionTreeNormalizationService.normalize({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'expression',
+          operator: 'OR',
+          clauses: [
+            {
+              type: 'predicate',
+              feature_property_id: 14,
+              feature_type_property_id: null,
+              operator: 'Equals',
+              value: 'first'
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(result.clauses[0]).to.include({ type: 'expression', operator: 'OR' });
+  });
+
+  it('resolves repeated property metadata once per normalization call', async () => {
+    const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
+    await expressionTreeNormalizationService.normalize({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 10,
+          feature_type_property_id: 20,
+          operator: 'Equals',
+          value: 'first'
+        },
+        {
+          type: 'predicate',
+          feature_property_id: 10,
+          feature_type_property_id: 20,
+          operator: 'Equals',
+          value: 'second'
+        }
+      ]
+    });
+
+    expect(getPropertyMetadata).to.have.been.calledOnceWithExactly(10, 20);
+  });
 
   it('normalizes a taxon DescendsFrom predicate', async () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
 
-    const result = await validateOne('taxon', 'DescendsFrom', 180703);
+    const result = await normalizeOne('taxon', 'DescendsFrom', 180703);
     const predicate = result.clauses[0];
 
     expect(predicate).to.include({
@@ -95,7 +188,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
   it('resolves a numeric taxon TSN to an internal taxon_id', async () => {
     const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
 
-    const result = await validateOne('taxon', 'Equals', 180703);
+    const result = await normalizeOne('taxon', 'Equals', 180703);
     const predicate = result.clauses[0];
 
     // The client value is an ITIS TSN; findTaxon resolves it to the internal taxon_id.
@@ -110,7 +203,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
   it('resolves a taxon scientific-name string to a taxon_id', async () => {
     const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7)]);
 
-    const result = await validateOne('taxon', 'DescendsFrom', 'Cervidae');
+    const result = await normalizeOne('taxon', 'DescendsFrom', 'Cervidae');
     const predicate = result.clauses[0];
 
     expect(taxonStub).to.have.been.calledOnceWith({ itis_scientific_name: 'Cervidae' });
@@ -124,7 +217,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
   it('resolves a numeric-string taxon TSN to an internal taxon_id', async () => {
     const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
 
-    const result = await validateOne('taxon', 'Equals', '180703');
+    const result = await normalizeOne('taxon', 'Equals', '180703');
     const predicate = result.clauses[0];
 
     expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 180703 });
@@ -139,7 +232,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([]);
 
     try {
-      await validateOne('taxon', 'Equals', '2147483648');
+      await normalizeOne('taxon', 'Equals', '2147483648');
       expect.fail();
     } catch (error) {
       expect(error).to.be.instanceOf(ApiValidationError);
@@ -151,7 +244,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7), taxonRecord(8)]);
 
     try {
-      await validateOne('taxon', 'DescendsFrom', 'Cervidae');
+      await normalizeOne('taxon', 'DescendsFrom', 'Cervidae');
       expect.fail();
     } catch (error) {
       expect(error).to.be.instanceOf(ApiValidationError);
@@ -163,7 +256,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7)]);
 
     for (const operator of ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom'] as const) {
-      const result = await validateOne('taxon', operator, 180703);
+      const result = await normalizeOne('taxon', operator, 180703);
       const predicate = result.clauses[0];
 
       expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
@@ -179,7 +272,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
     const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
 
     try {
-      await validateOne('taxon', 'Equals', 999999);
+      await normalizeOne('taxon', 'Equals', 999999);
       expect.fail();
     } catch (error) {
       expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 999999 });
@@ -194,7 +287,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
     const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
 
     try {
-      await validateOne('taxon', 'Equals', 'Notarealtaxon');
+      await normalizeOne('taxon', 'Equals', 'Notarealtaxon');
       expect.fail();
     } catch (error) {
       expect(taxonStub).to.have.been.calledOnceWith({ itis_scientific_name: 'Notarealtaxon' });
@@ -206,7 +299,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
 
   it('rejects an operator that is invalid for the property type', async () => {
     try {
-      await validateOne('taxon', 'After', 123);
+      await normalizeOne('taxon', 'After', 123);
       expect.fail();
     } catch (error) {
       expect(error).to.be.instanceOf(ApiValidationError);
@@ -214,9 +307,9 @@ describe('ExpressionPredicateSemanticValidator', () => {
   });
 
   it('normalizes datetime date, time, and datetime scalar literals', async () => {
-    const date = await validateOne('datetime', 'After', '2020-01-01');
-    const time = await validateOne('datetime', 'After', '14:30:00-07:00');
-    const dateTime = await validateOne('datetime', 'After', '2020-01-01T14:30:00-07:00');
+    const date = await normalizeOne('datetime', 'After', '2020-01-01');
+    const time = await normalizeOne('datetime', 'After', '14:30:00-07:00');
+    const dateTime = await normalizeOne('datetime', 'After', '2020-01-01T14:30:00-07:00');
 
     expect(date.clauses[0].type === 'predicate' && date.clauses[0].internal_predicate).to.deep.include({
       type: 'timestamp',
@@ -236,15 +329,15 @@ describe('ExpressionPredicateSemanticValidator', () => {
   });
 
   it('enforces OnDate and OnTime literal kind rules', async () => {
-    await validateOne('datetime', 'OnDate', '2020-01-01');
-    await validateOne('datetime', 'OnTime', '14:30:00-07:00');
+    await normalizeOne('datetime', 'OnDate', '2020-01-01');
+    await normalizeOne('datetime', 'OnTime', '14:30:00-07:00');
 
     for (const [operator, value] of [
       ['OnDate', '2020-01-01T14:30:00-07:00'],
       ['OnTime', '2020-01-01']
     ]) {
       try {
-        await validateOne('datetime', operator, value);
+        await normalizeOne('datetime', operator, value);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiValidationError);
@@ -253,11 +346,11 @@ describe('ExpressionPredicateSemanticValidator', () => {
   });
 
   it('validates value shape and Exists semantics', async () => {
-    await validateOne('string', 'Contains', 'wolf');
-    await validateOne('boolean', 'Equals', true);
-    await validateOne('code', 'Equals', 42);
-    await validateOne('spatial', 'Within', { type: 'Point', coordinates: [0, 0] });
-    await validateOne('number', 'Exists');
+    await normalizeOne('string', 'Contains', 'wolf');
+    await normalizeOne('boolean', 'Equals', true);
+    await normalizeOne('code', 'Equals', 42);
+    await normalizeOne('spatial', 'Within', { type: 'Point', coordinates: [0, 0] });
+    await normalizeOne('number', 'Exists');
 
     for (const [type, operator, value] of [
       ['string', 'Contains', 42],
@@ -266,7 +359,7 @@ describe('ExpressionPredicateSemanticValidator', () => {
       ['number', 'Exists', 1]
     ] as const) {
       try {
-        await validateOne(type, operator, value);
+        await normalizeOne(type, operator, value);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiValidationError);
@@ -275,9 +368,9 @@ describe('ExpressionPredicateSemanticValidator', () => {
   });
 
   it('preserves nullable feature_type_property_id and resolves property metadata', async () => {
-    const validator = new ExpressionPredicateSemanticValidator(getMockDBConnection());
+    const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
 
-    const result = await validator.validateExpressionTree({
+    const result = await expressionTreeNormalizationService.normalize({
       type: 'expression',
       operator: 'AND',
       clauses: [

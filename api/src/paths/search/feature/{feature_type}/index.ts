@@ -10,7 +10,7 @@ import { SearchFeatureService } from '../../../../services/search-feature-servic
 import { getLogger } from '../../../../utils/logger';
 import { makeCursorPaginationOptionsFromBody } from '../../../../utils/pagination';
 import { registerRequestCancellation } from '../../../../utils/request-cancellation';
-import { getSearchExpressionTree, getSearchFeatureType } from '../../../../utils/search-feature-request';
+import { validateSearchExpressionTree, validateSearchFeatureType } from '../../../../utils/search-feature-validation';
 import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/search/feature/{feature_type}');
@@ -65,10 +65,10 @@ export function searchFeatures(): RequestHandler {
       await connection.open();
 
       const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
-      const featureType = getSearchFeatureType(req);
+      const featureType = validateSearchFeatureType(req.params.feature_type);
       const cursorPagination = makeCursorPaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);
-      const expressionTree = getSearchExpressionTree(req);
+      const expressionTree = validateSearchExpressionTree(req.body.expression);
 
       const {
         features,

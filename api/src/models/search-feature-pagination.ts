@@ -9,3 +9,13 @@ export const SearchFeatureCursor = z.object({
   create_date: z.string()
 });
 export type SearchFeatureCursor = z.infer<typeof SearchFeatureCursor>;
+
+/**
+ * Validated sorting and cursor values used to build a feature search query.
+ */
+export interface SearchFeatureQueryOptions {
+  sort: SearchFeatureSort;
+  order: 'asc' | 'desc';
+  boundary?: SearchFeatureCursor;
+  limit?: number;
+}

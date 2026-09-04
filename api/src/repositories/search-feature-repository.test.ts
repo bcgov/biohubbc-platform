@@ -4,7 +4,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { getKnex } from '../database/db';
 import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { SearchFeatureRepository } from './search-feature-repository';
 import { codePropertyValueJson, featureReferencePropertyValueJson, taxonPropertyValueJson } from './sql-fragments';
@@ -39,7 +39,7 @@ describe('SearchFeatureRepository', () => {
         getKnex()('any_table').select('submission_feature_id')
       );
 
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -79,7 +79,7 @@ describe('SearchFeatureRepository', () => {
         getKnex()('any_table').select('submission_feature_id')
       );
 
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -148,7 +148,7 @@ describe('SearchFeatureRepository', () => {
     it('should push expression date sorting and pagination into the anchor query', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const repository = new SearchFeatureRepository(getMockDBConnection({ knex: knexSpy }));
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [normalizedPredicate(46, null, { type: 'string', operator: 'Equals', value: 'moose' })]
@@ -177,7 +177,7 @@ describe('SearchFeatureRepository', () => {
         sort: 'create_date',
         order: 'desc',
         limit: 25,
-        cursor: {
+        boundary: {
           direction: 'next',
           submission_feature_id: 50,
           create_date: '2026-09-01T12:00:00Z'
@@ -319,7 +319,7 @@ describe('SearchFeatureRepository', () => {
         rows: [{ count: 42_000 }]
       });
       const repository = new SearchFeatureRepository(getMockDBConnection({ knex: knexSpy }));
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -369,7 +369,7 @@ describe('SearchFeatureRepository', () => {
   });
 
   describe('hasInaccessibleSecuredFeaturesByExpressionTree', () => {
-    const expressionTree: NormalizedExpressionTreeExpression = {
+    const expressionTree: NormalizedExpressionTree = {
       type: 'expression',
       operator: 'AND',
       clauses: [

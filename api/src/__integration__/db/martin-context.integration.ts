@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ExpressionTree } from '../../models/expression-tree';
 import { MartinContextRepository } from '../../repositories/martin-context-repository';
-import { ExpressionPredicateSemanticValidator } from '../../services/expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from '../../services/expression-tree-normalization-service';
 import { MartinContextService } from '../../services/martin-context-service';
 
 const FEATURE_TYPE = 'species_observation';
@@ -175,7 +175,7 @@ describe('Tile context (integration)', function () {
       // Validation resolves property metadata from the database. The probe for secured results and
       // the write path both need the normalized tree, so validating per consumer would repeat those
       // reads on every mint.
-      const validate = sinon.spy(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree');
+      const validate = sinon.spy(ExpressionTreeNormalizationService.prototype, 'normalize');
 
       await service.createOrReuseMartinContext(FEATURE_TYPE, filteredSearch(900103), null);
 

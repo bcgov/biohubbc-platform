@@ -1,7 +1,8 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
 import { getKnex } from '../database/db';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
+import { optimizeExpression } from '../utils/expression-optimization';
 import { parseTimestamp } from '../utils/timestamp';
 import {
   applyTaxonExpressionOperator,
@@ -29,7 +30,7 @@ const normalizedPredicate = (
 
 const timestampPredicateSql = (operator: string, value?: string): string => {
   const parsedTimestamp = value === undefined ? undefined : parseTimestamp(value) ?? undefined;
-  const expressionTree: NormalizedExpressionTreeExpression = {
+  const expressionTree: NormalizedExpressionTree = {
     type: 'expression',
     operator: 'AND',
     clauses: [
@@ -53,7 +54,7 @@ describe('expression-evaluation', () => {
 
   describe('buildExpressionTreeFeatureIdsSubquery', () => {
     it('should build typed property SQL that matches shared properties through feature_type_property', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -88,7 +89,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should check uncorrelated typed evidence availability before scanning anchors', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
@@ -105,7 +106,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should apply indexed ordering and pagination to the anchor scan', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
@@ -115,7 +116,7 @@ describe('expression-evaluation', () => {
         sort: 'create_date',
         order: 'desc',
         limit: 10,
-        cursor: {
+        boundary: {
           direction: 'next',
           submission_feature_id: 20,
           create_date: '2026-09-01T12:00:00Z'
@@ -130,7 +131,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should reverse the indexed traversal for a previous-page date cursor', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
@@ -140,7 +141,7 @@ describe('expression-evaluation', () => {
         sort: 'create_date',
         order: 'desc',
         limit: 10,
-        cursor: {
+        boundary: {
           direction: 'previous',
           submission_feature_id: 20,
           create_date: '2026-09-01T12:00:00Z'
@@ -155,7 +156,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should apply anonymous security filtering to predicate evidence', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -175,7 +176,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should apply authenticated security filtering to predicate evidence', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -197,7 +198,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should also apply security filtering to projected target features (defense in depth)', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -218,7 +219,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should narrow predicate evidence by feature_type_property_id when provided', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -239,7 +240,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should project related predicate evidence to anchor feature ids through closure probes', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -273,8 +274,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.not.include('root_feature_id');
     });
 
-    it('should compose OR expressions as boolean predicate groups', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+    it('should compose nested OR expressions', () => {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'OR',
         clauses: [
@@ -304,7 +305,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should recursively compose nested expression target sets', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -348,7 +349,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should use feature-level NotEquals evidence semantics for multi-value properties', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -369,6 +370,79 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('p_not_equals.submission_feature_id = p.submission_feature_id');
       expect(sql).to.include('"ftp_not_equals"."feature_property_id" = 48');
       expect(sql).to.include('"p_not_equals"."value" = \'red\'');
+    });
+
+    it('should apply numeric range bounds to the same property row', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              normalizedPredicate(14, null, { type: 'number', operator: 'GreaterThan', value: 7 }),
+              normalizedPredicate(14, null, { type: 'number', operator: 'LessThan', value: 9 })
+            ]
+          },
+          {
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              normalizedPredicate(14, null, { type: 'number', operator: 'GreaterThan', value: 3 }),
+              normalizedPredicate(14, null, { type: 'number', operator: 'LessThan', value: 5 })
+            ]
+          }
+        ]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('p.value > 7');
+      expect(sql).to.include('p.value < 9');
+      expect(sql).to.include('p.value > 3');
+      expect(sql).to.include('p.value < 5');
+    });
+
+    it('should coalesce same-property equality predicates after mapping evidence to the anchor', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 77 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 100 })
+        ]
+      };
+
+      const optimizedExpression = optimizeExpression(expressionTree);
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', optimizedExpression, null).toString();
+
+      expect(optimizedExpression).to.deep.include({ type: 'expression', operator: 'AND' });
+      expect(sql).to.include('in (100, 77)');
+      expect(sql).to.include('count(DISTINCT grouped_search_evidence.matched_value) = 2');
+    });
+
+    it('should compile same-property OR equalities to one IN evidence filter', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'OR',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 77 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 100 })
+        ]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('"p"."value" in (100, 77)');
     });
 
     it('should compile timestamp date predicates against date_value instead of the removed value column', () => {
@@ -418,7 +492,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should project predicate evidence to species_observation targets through same-type matching and closure probes', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -508,7 +582,7 @@ describe('expression-evaluation', () => {
   });
 
   describe('buildUnfilteredExpressionTreeFeatureIdsSubquery', () => {
-    const expressionTree: NormalizedExpressionTreeExpression = {
+    const expressionTree: NormalizedExpressionTree = {
       type: 'expression',
       operator: 'AND',
       clauses: [
@@ -539,8 +613,47 @@ describe('expression-evaluation', () => {
   });
 
   describe('buildExpressionTreeCountFeatureIdsSubquery', () => {
+    it('should aggregate coalesced AND equalities after mapping evidence to anchor IDs', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 77 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 100 })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('in (100, 77)');
+      expect(sql).to.include('count(DISTINCT grouped_evidence.matched_value) = 2');
+    });
+
+    it('should apply numeric range bounds to the same property row', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'GreaterThan', value: 7 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'LessThan', value: 9 })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('p.value > 7 and p.value < 9');
+    });
+
     it('checks evidence availability before evaluating matching anchor sets', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
@@ -555,7 +668,7 @@ describe('expression-evaluation', () => {
     });
 
     it('maps typed evidence to the requested anchor type before combining clauses', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -580,7 +693,7 @@ describe('expression-evaluation', () => {
     });
 
     it('wraps complete child sets before combining a nested expression', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -604,7 +717,7 @@ describe('expression-evaluation', () => {
     });
 
     it('unions OR anchor sets and removes denied anchors and related evidence as sets', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'OR',
         clauses: [
@@ -630,7 +743,7 @@ describe('expression-evaluation', () => {
     });
 
     it('requires closure eligibility for both anchors and related evidence', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
