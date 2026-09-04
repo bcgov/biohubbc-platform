@@ -29,7 +29,7 @@ export interface SubmissionUploadJobStatusPresentation {
  * @return {boolean} Whether `status` is a known `SubmissionUploadJobStatus`.
  */
 export const isSubmissionUploadJobStatus = (status: string): status is SubmissionUploadJobStatus =>
-  Object.prototype.hasOwnProperty.call(SUBMISSION_UPLOAD_JOB_STATUS_LABELS, status);
+  Object.hasOwn(SUBMISSION_UPLOAD_JOB_STATUS_LABELS, status);
 
 /**
  * Resolve the shared label and icon for a processing status, falling back to a neutral
