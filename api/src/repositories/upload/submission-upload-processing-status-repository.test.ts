@@ -41,10 +41,8 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
   });
 
   describe('endActiveSubmissionUploadProcessingStatuses', () => {
-    it('end-dates only active rows in the given statuses and returns their ids', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves({ rowCount: 2, rows: [{ submission_upload_status_id: 3 }, { submission_upload_status_id: 4 }] });
+    it('end-dates only active rows in the given statuses and returns how many were ended', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.endActiveSubmissionUploadProcessingStatuses(SUBMISSION_UPLOAD_ID, [
@@ -52,19 +50,19 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
         'indexed'
       ]);
 
-      expect(result).to.eql([{ submission_upload_status_id: 3 }, { submission_upload_status_id: 4 }]);
+      expect(result).to.equal(2);
       expect(sqlStub.firstCall.args[0].text).to.contain('SET\n        record_end_date = now()');
       expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date IS NULL');
       expect(sqlStub.firstCall.args[0].values).to.eql([SUBMISSION_UPLOAD_ID, ['indexing', 'indexed']]);
     });
 
-    it('returns an empty array when nothing was active', async () => {
+    it('returns zero when nothing was active', async () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.endActiveSubmissionUploadProcessingStatuses(SUBMISSION_UPLOAD_ID, ['failed']);
 
-      expect(result).to.be.empty;
+      expect(result).to.equal(0);
     });
   });
 
@@ -98,6 +96,6 @@ const buildRow = (params: {
   submission_upload_id: SUBMISSION_UPLOAD_ID,
   status: params.status,
   record_end_date: null,
-  create_date: new Date('2026-09-03T00:00:00.000Z'),
+  create_date: '2026-09-03T00:00:00.000Z',
   create_user: 1
 });
