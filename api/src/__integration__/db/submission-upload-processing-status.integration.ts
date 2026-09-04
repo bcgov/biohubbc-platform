@@ -3,6 +3,7 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
@@ -55,6 +56,28 @@ describe('submission upload processing status (integration)', function () {
     `);
     return result.rows[0].status;
   }
+
+  it('accepts every processing status value in submission_upload_status.status', async () => {
+    const result = await connection.sql(SQL`
+      SELECT
+        array_agg(job.enumlabel::text ORDER BY job.enumsortorder) AS job_statuses,
+        array_agg(job.enumlabel::text ORDER BY job.enumsortorder) FILTER (
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM pg_enum status
+            INNER JOIN pg_type status_type ON status_type.oid = status.enumtypid
+            WHERE status_type.typname = 'submission_upload_status_type'
+              AND status.enumlabel = job.enumlabel
+          )
+        ) AS missing_statuses
+      FROM pg_enum job
+      INNER JOIN pg_type job_type ON job_type.oid = job.enumtypid
+      WHERE job_type.typname = 'submission_upload_job_status';
+    `);
+
+    expect(result.rows[0].job_statuses).to.have.members([...SubmissionUploadJobStatus.options]);
+    expect(result.rows[0].missing_statuses).to.be.null;
+  });
 
   it('records each transition as an active row in order and keeps submission_upload.status current', async () => {
     const submissionUploadId = await createUploadedUpload();
