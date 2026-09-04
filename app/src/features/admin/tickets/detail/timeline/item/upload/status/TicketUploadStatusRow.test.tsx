@@ -56,7 +56,9 @@ describe('TicketUploadStatusRow', () => {
 
     const toggle = screen.getByRole('button', { name: 'Ingested' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(document.getElementById(toggle.getAttribute('aria-controls') ?? '')).not.toBeVisible();
+    const region = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+    expect(region).not.toBeVisible();
+    expect(region).toBeEmptyDOMElement();
     expect(onLoadStatusHistory).not.toHaveBeenCalled();
   });
 
@@ -129,7 +131,7 @@ describe('TicketUploadStatusRow', () => {
 
   it('shows the empty state when the upload has no history', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('uploaded'), { status: 'loaded', history: [] });
+    renderRow(makeUpload('uploaded'), { status: 'loaded', uploadStatus: 'uploaded', history: [] });
 
     await user.click(screen.getByRole('button', { name: 'Uploaded' }));
 
@@ -140,6 +142,7 @@ describe('TicketUploadStatusRow', () => {
     const user = userEvent.setup();
     renderRow(makeUpload('ingested'), {
       status: 'loaded',
+      uploadStatus: 'ingested',
       history: [
         makeHistoryItem(3, 'ingested', '2026-09-03T18:45:00.000Z'),
         makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
@@ -162,6 +165,7 @@ describe('TicketUploadStatusRow', () => {
     const user = userEvent.setup();
     renderRow(makeUpload('reconciling'), {
       status: 'loaded',
+      uploadStatus: 'ingested',
       history: [
         makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
         makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
@@ -179,6 +183,7 @@ describe('TicketUploadStatusRow', () => {
     const user = userEvent.setup();
     renderRow(makeUpload('archiving' as SubmissionUploadJobStatus), {
       status: 'loaded',
+      uploadStatus: 'ingested',
       history: [makeHistoryItem(1, 'archiving' as SubmissionUploadJobStatus, '2026-09-03T18:30:00.000Z')]
     });
 

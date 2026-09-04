@@ -32,12 +32,6 @@ export const SUBMISSION_UPLOAD_JOB_STATUS_LABELS: Record<SubmissionUploadJobStat
 
 export const TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES: SubmissionUploadJobStatus[] = ['indexed', 'invalid', 'failed'];
 
-export const SUBMISSION_UPLOAD_JOB_STATUS_COLORS: Partial<Record<SubmissionUploadJobStatus, string>> = {
-  indexed: 'success.main',
-  invalid: 'error.main',
-  failed: 'error.main'
-};
-
 export const SUBMISSION_UPLOAD_JOB_STATUS_ICONS: Record<SubmissionUploadJobStatus, string> = {
   uploaded: mdiCloudUploadOutline,
   ingesting: mdiProgressClock,
