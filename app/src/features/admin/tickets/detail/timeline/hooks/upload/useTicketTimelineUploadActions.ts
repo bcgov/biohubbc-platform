@@ -2,12 +2,12 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import {
+  ICreateSubmissionUploadReviewRequest,
   IUpdateSubmissionUploadReviewStatusRequest,
   SubmissionUploadReviewScope,
-  SubmissionUploadReviewTaskStatus,
-  TicketSubmissionUploadResponse,
-  TicketSubmissionUploadReviewResponse
+  TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
+import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
 
 type SubmissionUploadReviewStatusUpdate = IUpdateSubmissionUploadReviewStatusRequest['status'];
@@ -22,6 +22,7 @@ export const useTicketTimelineUploadActions = () => {
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
+  const navigate = useNavigate();
 
   const updateCachedSubmissionUpload = (
     submissionUploadId: string,
@@ -57,23 +58,6 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Replaces one scoped upload review in the cached ticket after an update response.
-   * The backend response is treated as the source of truth, so this does not derive fields from stale row state.
-   *
-   * @param {TicketSubmissionUploadReviewResponse} review Backend-confirmed scoped review record.
-   * @returns {void}
-   */
-  const setCachedUploadReview = (review: TicketSubmissionUploadReviewResponse): void => {
-    updateCachedSubmissionUpload(review.submission_upload_id, (upload) => ({
-      ...upload,
-      reviews: {
-        ...upload.reviews,
-        [review.scope]: review
-      }
-    }));
-  };
-
-  /**
    * Shows the API error from a failed upload action in the shared ticket snackbar.
    * All upload handlers use the same failure path so the UI reports backend validation and permission errors consistently.
    *
@@ -102,7 +86,7 @@ export const useTicketTimelineUploadActions = () => {
   ): Promise<void> => {
     try {
       const updatedReviewStatus = await api.tickets.updateSubmissionUploadReviewStatus(
-        upload.submission_uuid,
+        upload.submission_id,
         upload.submission_upload_id,
         {
           status: nextStatus
@@ -116,59 +100,52 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Updates the status of an existing scoped upload review task.
-   * Use this from review rows that already have a backend review record and therefore know the review id to patch.
+   * Creates an in-progress scoped review and opens its review workflow.
    *
-   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
-   * @param {TicketSubmissionUploadReviewResponse} review Existing review task being updated.
-   * @param {SubmissionUploadReviewTaskStatus} nextStatus Status selected by the reviewer.
-   * @returns {Promise<void>} Resolves after the backend response has replaced the cached review.
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the new review.
+   * @param {SubmissionUploadReviewScope} scope Scope selected by the administrator.
+   * @returns {Promise<void>} Resolves after navigation or after a failed request is reported.
    */
-  const handleUpdateSubmissionUploadReview = async (
+  const handleCreateSubmissionUploadReview = async (
     upload: TicketSubmissionUploadResponse,
-    review: TicketSubmissionUploadReviewResponse,
-    nextStatus: SubmissionUploadReviewTaskStatus
+    scope: SubmissionUploadReviewScope,
+    review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
   ): Promise<void> => {
     try {
-      const updatedReview = await api.tickets.updateSubmissionUploadReview(
-        upload.submission_uuid,
+      const insertedReview = await api.tickets.insertSubmissionUploadReview(
+        upload.submission_id,
         upload.submission_upload_id,
-        review.submission_upload_review_id,
-        { status: nextStatus }
+        {
+          ...review,
+          scope,
+          status: 'in_progress'
+        }
       );
 
-      setCachedUploadReview(updatedReview);
+      navigate(
+        `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${scope}/${insertedReview.submission_upload_review_id}`
+      );
     } catch (error) {
       showUploadActionError(error);
     }
   };
 
   /**
-   * Requests a replacement review for one scoped upload task and caches the backend-created row.
-   * Use this from missing review rows only; existing rows should either navigate to the review page or patch status.
+   * Opens an existing scoped review workflow.
    *
-   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
-   * @param {SubmissionUploadReviewScope} scope Review scope being requested.
-   * @returns {Promise<void>} Resolves after the backend-created review is reflected in local ticket state.
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the existing review.
+   * @param {SubmissionUploadReviewScope} scope Existing review scope.
+   * @param {string} submissionUploadReviewId Existing review identifier.
+   * @returns {void}
    */
-  const handleRequestSubmissionUploadReview = async (
+  const handleOpenSubmissionUploadReview = (
     upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope
-  ): Promise<void> => {
-    try {
-      const insertedReview = await api.tickets.insertSubmissionUploadReview(
-        upload.submission_uuid,
-        upload.submission_upload_id,
-        {
-          scope,
-          status: 'requested'
-        }
-      );
-
-      setCachedUploadReview(insertedReview);
-    } catch (error) {
-      showUploadActionError(error);
-    }
+    scope: SubmissionUploadReviewScope,
+    submissionUploadReviewId: string
+  ): void => {
+    navigate(
+      `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${scope}/${submissionUploadReviewId}`
+    );
   };
 
   /**
@@ -216,8 +193,8 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   return {
-    handleRequestSubmissionUploadReview,
-    handleUpdateSubmissionUploadReview,
+    handleCreateSubmissionUploadReview,
+    handleOpenSubmissionUploadReview,
     handleConfirmSubmissionUploadReviewStatusUpdate,
     handleConfirmSubmissionUploadReviewStatusReset
   };

@@ -21,6 +21,8 @@ const SubmissionUploadReviewStatusSchema = z.nativeEnum(SubmissionUploadReviewSt
 export const SubmissionUploadReview = z.object({
   submission_upload_review_id: z.string().uuid(),
   submission_upload_id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).nullable(),
   scope: SubmissionUploadReviewScopeSchema,
   status: SubmissionUploadReviewStatusSchema,
   requested_by: z.number().int().positive().nullable()
@@ -29,6 +31,8 @@ export type SubmissionUploadReview = z.infer<typeof SubmissionUploadReview>;
 
 export const CreateSubmissionUploadReview = z.object({
   submission_upload_id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).nullable(),
   scope: SubmissionUploadReviewScopeSchema,
   status: SubmissionUploadReviewStatusSchema,
   requested_by: z.number().int().positive().nullable()
