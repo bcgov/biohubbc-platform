@@ -2,14 +2,13 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { MARTIN_SOURCE } from '../../../constants/martin';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { HTTP400 } from '../../../errors/http-error';
-import { ExpressionTree } from '../../../models/expression-tree';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { martinSessionRequestBodySchema, martinSessionResponseSchema } from '../../../openapi/schemas/martin';
 import { martinTokenRateLimiter } from '../../../request-handlers/rate-limit';
 import { MartinContextService } from '../../../services/martin-context-service';
 import { MartinTokenService } from '../../../services/martin-token-service';
 import { getLogger } from '../../../utils/logger';
+import { validateSearchExpressionTree, validateSearchFeatureType } from '../../../utils/search-feature-validation';
 import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/martin/token');
@@ -63,36 +62,21 @@ export function createMartinSession(): RequestHandler {
       await connection.open();
 
       const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
-      const featureType = req.body.feature_type?.trim().toLowerCase();
+      const featureType = validateSearchFeatureType(req.body.feature_type);
+      const expressionTree = validateSearchExpressionTree(req.body.expression);
 
-      if (!featureType) {
-        throw new HTTP400('Feature type is required');
-      }
+      const martinContextService = new MartinContextService(connection);
 
-      // Validated the way the search endpoint validates it, so an expression the table view accepts
-      // is never rejected here, or the reverse.
-      const expressionTreeParseResult = req.body.expression ? ExpressionTree.safeParse(req.body.expression) : null;
-
-      if (expressionTreeParseResult?.success === false) {
-        throw new HTTP400('Invalid expression tree', expressionTreeParseResult.error.issues);
-      }
-
-      const service = new MartinContextService(connection);
-
-      const context = await service.createOrReuseMartinContext(
-        featureType,
-        expressionTreeParseResult?.data,
-        systemUserId
-      );
+      const context = await martinContextService.createOrReuseMartinContext(featureType, expressionTree, systemUserId);
 
       await connection.commit();
 
       // The token is short lived and caller specific, so it must never be cached.
       res.setHeader('Cache-Control', 'no-store');
 
-      const tokenService = new MartinTokenService();
+      const martinTokenService = new MartinTokenService();
 
-      const { token, expiresIn } = tokenService.mintToken({
+      const { token, expiresIn } = martinTokenService.mintToken({
         source: MARTIN_SOURCE.SEARCH,
         ctx: context.martinContextId
       });
@@ -104,7 +88,7 @@ export function createMartinSession(): RequestHandler {
         context_expires_in: context.expiresInSeconds,
         source: MARTIN_SOURCE.SEARCH,
         martin_context_id: context.martinContextId,
-        martin_url_template: tokenService.getMartinUrlTemplate(MARTIN_SOURCE.SEARCH),
+        martin_url_template: martinTokenService.getMartinUrlTemplate(MARTIN_SOURCE.SEARCH),
         has_more_secured_features: context.hasMoreSecuredFeatures
       });
     } catch (error) {

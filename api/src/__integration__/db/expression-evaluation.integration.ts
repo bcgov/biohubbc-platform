@@ -38,19 +38,20 @@
 // Requires: database container running with seed data.
 
 import { expect } from 'chai';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
-import {
-  NormalizedExpressionTreeExpression,
-  NormalizedExpressionTreePredicate
-} from '../../models/expression-tree-internal';
+import { NormalizedExpressionTree, NormalizedExpressionTreePredicate } from '../../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import {
   applyTaxonExpressionOperator,
   buildBroadFeatureTypeSubquery,
+  buildExpressionTreeCountFeatureIdsSubquery,
   buildExpressionTreeFeatureIdsSubquery
 } from '../../repositories/expression-evaluation';
 import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { optimizeExpression } from '../../utils/expression-optimization';
 import { createFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -84,6 +85,32 @@ function namePredicate(
     feature_property_type_name: 'string',
     internal_predicate: { type: 'string', operator: 'Equals', value }
   } as unknown as NormalizedExpressionTreePredicate;
+}
+
+/**
+ * Builds a normalized numeric predicate for an isolated integration-test property.
+ *
+ * @param {{ featurePropertyId: number; featureTypePropertyId: number; featurePropertyTypeId: number }} property -
+ * Resolved property identifiers.
+ * @param {'Equals' | 'GreaterThan' | 'LessThan'} operator - Numeric predicate operator.
+ * @param {number} value - Comparison boundary.
+ * @return {NormalizedExpressionTreePredicate} Normalized predicate accepted by SQL generation.
+ */
+function numberPredicate(
+  property: { featurePropertyId: number; featureTypePropertyId: number; featurePropertyTypeId: number },
+  operator: 'Equals' | 'GreaterThan' | 'LessThan',
+  value: number
+): NormalizedExpressionTreePredicate {
+  return {
+    type: 'predicate',
+    feature_property_id: property.featurePropertyId,
+    feature_type_property_id: property.featureTypePropertyId,
+    feature_property_type_id: property.featurePropertyTypeId,
+    feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
+    operator,
+    value,
+    internal_predicate: { type: 'number', operator, value }
+  };
 }
 
 describe('expression-evaluation (integration)', function () {
@@ -199,6 +226,132 @@ describe('expression-evaluation (integration)', function () {
         bftp.blueprint_feature_type_property_id,
         ${value},
         ${systemUserId}
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+       AND bftp.feature_type_property_id = ${featureTypePropertyId}
+       AND bftp.record_end_date IS NULL
+      WHERE sf.submission_feature_id = ${submissionFeatureId};
+    `);
+  }
+
+  /**
+   * Creates an isolated multi-valued number property assignment for one feature type.
+   *
+   * A unique property prevents pre-existing seed rows from influencing exact result-set assertions. The assignment is
+   * also added to the active default blueprint so typed property rows satisfy their blueprint foreign-key contract.
+   *
+   * @param {string} featureTypeName - Feature type that will carry the number property.
+   * @return {Promise<{ featurePropertyId: number; featureTypePropertyId: number; featurePropertyTypeId: number }>}
+   * Identifiers required to build normalized predicates and insert typed values.
+   */
+  async function createNumberProperty(featureTypeName: string): Promise<{
+    featurePropertyId: number;
+    featureTypePropertyId: number;
+    featurePropertyTypeId: number;
+  }> {
+    const propertyName = `test_range_${randomUUID().replaceAll('-', '')}`;
+    const result = await connection.sql(SQL`
+      WITH inserted_property AS (
+        INSERT INTO feature_property (
+          feature_property_type_id,
+          name,
+          display_name,
+          record_effective_date,
+          create_user
+        )
+        SELECT
+          fpt.feature_property_type_id,
+          ${propertyName},
+          ${propertyName},
+          now(),
+          ${connection.systemUserId()}
+        FROM feature_property_type fpt
+        WHERE fpt.name = 'number'
+        RETURNING feature_property_id, feature_property_type_id
+      )
+      INSERT INTO feature_type_property (
+        feature_type_id,
+        feature_property_id,
+        allow_multiple,
+        record_effective_date,
+        create_user
+      )
+      SELECT
+        ft.feature_type_id,
+        inserted_property.feature_property_id,
+        true,
+        now(),
+        ${connection.systemUserId()}
+      FROM inserted_property
+      JOIN feature_type ft ON ft.name = ${featureTypeName}
+      RETURNING
+        feature_property_id,
+        feature_type_property_id AS assignment_id,
+        (SELECT feature_property_type_id FROM inserted_property) AS property_type_id;
+    `);
+    const property = {
+      featurePropertyId: result.rows[0].feature_property_id,
+      featureTypePropertyId: result.rows[0].assignment_id,
+      featurePropertyTypeId: result.rows[0].property_type_id
+    };
+
+    await connection.sql(SQL`
+      INSERT INTO blueprint_feature_type_property (
+        blueprint_feature_type_id,
+        feature_type_property_id,
+        required_value,
+        allow_multiple,
+        create_user
+      )
+      SELECT
+        bft.blueprint_feature_type_id,
+        ${property.featureTypePropertyId},
+        false,
+        true,
+        ${connection.systemUserId()}
+      FROM blueprint_feature_type bft
+      JOIN blueprint b USING (blueprint_id)
+      JOIN feature_type ft USING (feature_type_id)
+      WHERE b.is_default = true
+        AND b.record_end_date IS NULL
+        AND bft.record_end_date IS NULL
+        AND ft.name = ${featureTypeName};
+    `);
+
+    return property;
+  }
+
+  /**
+   * Inserts one value for a typed number property on a feature.
+   *
+   * @param {number} submissionFeatureId - Feature receiving the value.
+   * @param {number} featureTypePropertyId - Concrete number-property assignment.
+   * @param {number} value - Numeric value to store.
+   * @return {Promise<void>} Resolves after the typed property row is inserted.
+   */
+  async function indexNumberProperty(
+    submissionFeatureId: number,
+    featureTypePropertyId: number,
+    value: number
+  ): Promise<void> {
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_number (
+        submission_feature_id,
+        feature_type_property_id,
+        blueprint_feature_type_property_id,
+        value,
+        create_user
+      )
+      SELECT
+        ${submissionFeatureId},
+        ${featureTypePropertyId},
+        bftp.blueprint_feature_type_property_id,
+        ${value},
+        ${connection.systemUserId()}
       FROM submission_feature sf
       JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
       JOIN blueprint_feature_type bft
@@ -517,13 +670,17 @@ describe('expression-evaluation (integration)', function () {
       await rebuildClosureForSubmission(submissionTarget);
       await rebuildClosureForSubmission(submissionOther);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('AND-target')]
       };
 
-      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId());
+      const subquery = buildExpressionTreeFeatureIdsSubquery(
+        'sample_site',
+        optimizeExpression(tree),
+        connection.systemUserId()
+      );
       const ids = await runSubquery(subquery);
 
       expect(ids.has(target)).to.equal(true);
@@ -550,13 +707,17 @@ describe('expression-evaluation (integration)', function () {
       await rebuildClosureForSubmission(submissionB);
       await rebuildClosureForSubmission(submissionDecoy);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'OR',
         clauses: [namePredicate('OR-A'), namePredicate('OR-B')]
       };
 
-      const subquery = buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId());
+      const subquery = buildExpressionTreeFeatureIdsSubquery(
+        'sample_site',
+        optimizeExpression(tree),
+        connection.systemUserId()
+      );
       const ids = await runSubquery(subquery);
 
       expect(ids.has(a)).to.equal(true);
@@ -595,7 +756,7 @@ describe('expression-evaluation (integration)', function () {
       await closure.computeClosureForUpload(uploadOpen);
       await closure.computeClosureForUpload(uploadSecured);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'OR',
         clauses: [namePredicate('Open-secfilter'), namePredicate('Secured-secfilter')]
@@ -632,7 +793,7 @@ describe('expression-evaluation (integration)', function () {
       await indexNameProperty(matchingObservation, 'high-elevation-observation', SAMPLE_SITE_NAME_FTP_ID);
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('high-elevation-observation', SAMPLE_SITE_NAME_FTP_ID)]
@@ -658,7 +819,7 @@ describe('expression-evaluation (integration)', function () {
     it('1: descendant reach — anchor below evidence is recovered via closureReverse', async () => {
       const { c } = await seedSurveyAnimalCaptureChain('Caribou Study');
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('Caribou Study', SURVEY_NAME_FTP_ID)]
@@ -687,7 +848,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('leaf', SAMPLE_SITE_NAME_FTP_ID)]
@@ -718,7 +879,7 @@ describe('expression-evaluation (integration)', function () {
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
       // (a) forward: filter F (referencing) -> anchor animal returns G (referenced).
-      const forwardTree: NormalizedExpressionTreeExpression = {
+      const forwardTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('ref', SAMPLE_SITE_NAME_FTP_ID)]
@@ -729,7 +890,7 @@ describe('expression-evaluation (integration)', function () {
       expect(forwardIds.has(g)).to.equal(true);
 
       // (b) reverse: filter G (referenced) -> anchor sample_site returns F (referencing).
-      const reverseTree: NormalizedExpressionTreeExpression = {
+      const reverseTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('ref-reverse', SAMPLE_SITE_NAME_FTP_ID)]
@@ -766,7 +927,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('evidence-row', SAMPLE_SITE_NAME_FTP_ID)]
@@ -797,7 +958,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('self', SAMPLE_SITE_NAME_FTP_ID)]
@@ -832,7 +993,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('dedup', SAMPLE_SITE_NAME_FTP_ID)]
@@ -859,7 +1020,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('c', SAMPLE_SITE_NAME_FTP_ID)]
@@ -894,7 +1055,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('ds', SURVEY_NAME_FTP_ID)]
@@ -933,7 +1094,7 @@ describe('expression-evaluation (integration)', function () {
       });
       await indexNameProperty(e, 'no-closure-ancestor', SAMPLE_SITE_NAME_FTP_ID);
 
-      const ancestorTree: NormalizedExpressionTreeExpression = {
+      const ancestorTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('no-closure-ancestor', SAMPLE_SITE_NAME_FTP_ID)]
@@ -963,7 +1124,7 @@ describe('expression-evaluation (integration)', function () {
       await indexNameProperty(e2, 'no-closure-content', SAMPLE_SITE_NAME_FTP_ID);
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadB);
 
-      const contentTree: NormalizedExpressionTreeExpression = {
+      const contentTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('no-closure-content', SAMPLE_SITE_NAME_FTP_ID)]
@@ -1016,28 +1177,161 @@ describe('expression-evaluation (integration)', function () {
       await closure.computeClosureForUpload(uploadOne);
       await closure.computeClosureForUpload(uploadTwo);
 
-      const orTree: NormalizedExpressionTreeExpression = {
+      const orTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'OR',
         clauses: [namePredicate('compose-d1', SURVEY_NAME_FTP_ID), namePredicate('compose-d2', SURVEY_NAME_FTP_ID)]
       };
       const orIds = await runSubquery(
-        buildExpressionTreeFeatureIdsSubquery('sample_site', orTree, connection.systemUserId())
+        buildExpressionTreeFeatureIdsSubquery('sample_site', optimizeExpression(orTree), connection.systemUserId())
       );
       expect(orIds.has(s1)).to.equal(true);
       expect(orIds.has(s2)).to.equal(true);
 
-      const andTree: NormalizedExpressionTreeExpression = {
+      const andTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('compose-d1', SURVEY_NAME_FTP_ID), namePredicate('compose-d2', SURVEY_NAME_FTP_ID)]
       };
       const andIds = await runSubquery(
-        buildExpressionTreeFeatureIdsSubquery('sample_site', andTree, connection.systemUserId())
+        buildExpressionTreeFeatureIdsSubquery('sample_site', optimizeExpression(andTree), connection.systemUserId())
       );
       // No sample_site descends from BOTH surveys, so the intersection of the two reaches is empty.
       expect(andIds.has(s1)).to.equal(false);
       expect(andIds.has(s2)).to.equal(false);
+    });
+
+    it('10b: coalesced AND equalities can be satisfied by separate related evidence features', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const survey = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'survey'
+      });
+      const firstSite = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: survey
+      });
+      const secondSite = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: survey
+      });
+      await indexNameProperty(firstSite, 'joint-value-a');
+      await indexNameProperty(secondSite, 'joint-value-b');
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree = optimizeExpression({
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          { ...namePredicate('joint-value-a'), feature_type_property_id: null },
+          { ...namePredicate('joint-value-b'), feature_type_property_id: null }
+        ]
+      });
+      const ids = await runSubquery(buildExpressionTreeFeatureIdsSubquery('survey', tree, connection.systemUserId()));
+      const countIds = await runSubquery(
+        buildExpressionTreeCountFeatureIdsSubquery('survey', tree, connection.systemUserId())
+      );
+
+      expect(ids.has(survey)).to.equal(true);
+      expect(countIds.has(survey)).to.equal(true);
+    });
+
+    it('10c: duplicate range predicates require one property value to satisfy every bound', async () => {
+      const featureTypeName = 'species_observation';
+      const property = await createNumberProperty(featureTypeName);
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const match = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const splitValues = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const belowRange = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const aboveRange = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const boundaryValues = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+
+      await indexNumberProperty(match, property.featureTypePropertyId, 8);
+      await indexNumberProperty(splitValues, property.featureTypePropertyId, 4);
+      await indexNumberProperty(splitValues, property.featureTypePropertyId, 12);
+      await indexNumberProperty(belowRange, property.featureTypePropertyId, 0);
+      await indexNumberProperty(aboveRange, property.featureTypePropertyId, 66);
+      await indexNumberProperty(aboveRange, property.featureTypePropertyId, 90);
+      await indexNumberProperty(aboveRange, property.featureTypePropertyId, 17);
+      await indexNumberProperty(boundaryValues, property.featureTypePropertyId, 7);
+      await indexNumberProperty(boundaryValues, property.featureTypePropertyId, 9);
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const lowerBound = numberPredicate(property, 'GreaterThan', 7);
+      const tree = optimizeExpression({
+        type: 'expression',
+        operator: 'AND',
+        clauses: [numberPredicate(property, 'LessThan', 9), lowerBound, lowerBound]
+      });
+      const resultIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery(featureTypeName, tree, connection.systemUserId())
+      );
+      const countIds = await runSubquery(
+        buildExpressionTreeCountFeatureIdsSubquery(featureTypeName, tree, connection.systemUserId())
+      );
+
+      expect([...resultIds]).to.deep.equal([match]);
+      expect([...countIds]).to.deep.equal([match]);
+      expect(resultIds.has(splitValues)).to.equal(false);
+      expect(resultIds.has(belowRange)).to.equal(false);
+      expect(resultIds.has(aboveRange)).to.equal(false);
+      expect(resultIds.has(boundaryValues)).to.equal(false);
+    });
+
+    it('10d: duplicate AND and OR equalities preserve multi-valued property semantics', async () => {
+      const featureTypeName = 'species_observation';
+      const property = await createNumberProperty(featureTypeName);
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const bothValues = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const firstValue = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const secondValue = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const otherValue = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+
+      await indexNumberProperty(bothValues, property.featureTypePropertyId, 77);
+      await indexNumberProperty(bothValues, property.featureTypePropertyId, 100);
+      await indexNumberProperty(firstValue, property.featureTypePropertyId, 77);
+      await indexNumberProperty(secondValue, property.featureTypePropertyId, 100);
+      await indexNumberProperty(otherValue, property.featureTypePropertyId, 50);
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const equals77 = numberPredicate(property, 'Equals', 77);
+      const equals100 = numberPredicate(property, 'Equals', 100);
+      const andExpression = optimizeExpression({
+        type: 'expression',
+        operator: 'AND',
+        clauses: [equals100, equals77, equals77]
+      });
+      const orExpression = optimizeExpression({
+        type: 'expression',
+        operator: 'OR',
+        clauses: [equals100, equals77, equals77]
+      });
+      const andResultIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery(featureTypeName, andExpression, connection.systemUserId())
+      );
+      const andCountIds = await runSubquery(
+        buildExpressionTreeCountFeatureIdsSubquery(featureTypeName, andExpression, connection.systemUserId())
+      );
+      const orResultIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery(featureTypeName, orExpression, connection.systemUserId())
+      );
+      const orCountIds = await runSubquery(
+        buildExpressionTreeCountFeatureIdsSubquery(featureTypeName, orExpression, connection.systemUserId())
+      );
+
+      expect([...andResultIds]).to.deep.equal([bothValues]);
+      expect([...andCountIds]).to.deep.equal([bothValues]);
+      expect(orResultIds).to.deep.equal(new Set([bothValues, firstValue, secondValue]));
+      expect(orCountIds).to.deep.equal(new Set([bothValues, firstValue, secondValue]));
+      expect(orResultIds.has(otherValue)).to.equal(false);
     });
 
     /**
@@ -1048,7 +1342,7 @@ describe('expression-evaluation (integration)', function () {
     it('11: anchor type filters the reachable set to one type', async () => {
       const { d, a, c } = await seedSurveyAnimalCaptureChain('cross-type');
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('cross-type', SURVEY_NAME_FTP_ID)]
@@ -1082,7 +1376,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('chain', SAMPLE_SITE_NAME_FTP_ID)]
@@ -1122,7 +1416,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('cc', SAMPLE_SITE_NAME_FTP_ID)]
@@ -1155,7 +1449,7 @@ describe('expression-evaluation (integration)', function () {
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      const tree: NormalizedExpressionTreeExpression = {
+      const tree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('gap', SAMPLE_SITE_NAME_FTP_ID)]

@@ -1,14 +1,15 @@
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { FeatureTypeProperty } from '../models/feature-type-property';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
+import { optimizeExpression } from '../utils/expression-optimization';
 import { getLogger } from '../utils/logger';
 import { encodeSearchFeatureCursor, ensureCompleteCursorPaginationOptions } from '../utils/pagination';
 import { ApiCursorPaginationOptions, ApiCursorPaginationResults } from '../zod-schema/pagination';
 import { DBService } from './db-service';
-import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 
 const defaultLog = getLogger('services/search-feature-service');
@@ -19,7 +20,7 @@ const defaultLog = getLogger('services/search-feature-service');
  */
 export class SearchFeatureService extends DBService {
   searchFeatureRepository: SearchFeatureRepository;
-  semanticValidator: ExpressionPredicateSemanticValidator;
+  expressionTreeNormalizationService: ExpressionTreeNormalizationService;
 
   /**
    * Initializes the SearchFeatureService with a database connection.
@@ -29,7 +30,7 @@ export class SearchFeatureService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.searchFeatureRepository = new SearchFeatureRepository(connection);
-    this.semanticValidator = new ExpressionPredicateSemanticValidator(connection);
+    this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
   }
 
   /**
@@ -53,10 +54,10 @@ export class SearchFeatureService extends DBService {
       expressionTree,
       cursorPagination
     });
-    const normalizedExpressionTree = await this.prepareExpressionTreeSearch(anchorFeatureType, expressionTree);
+    const expression = await this.prepareSearchExpression(anchorFeatureType, expressionTree);
     return this.searchFeatureRepository.searchFeaturesByExpressionTree(
       anchorFeatureType,
-      normalizedExpressionTree,
+      expression,
       cursorPagination,
       systemUserId
     );
@@ -89,19 +90,19 @@ export class SearchFeatureService extends DBService {
       cursorPagination
     });
 
-    const normalizedExpressionTree = await this.prepareExpressionTreeSearch(anchorFeatureType, expressionTree);
+    const expression = await this.prepareSearchExpression(anchorFeatureType, expressionTree);
 
     const [features, properties, has_more_secured_features] = await Promise.all([
       this.searchFeatureRepository.searchFeaturesByExpressionTree(
         anchorFeatureType,
-        normalizedExpressionTree,
+        expression,
         cursorPagination,
         systemUserId
       ),
       this.searchFeatureRepository.getFeatureTypeProperties(anchorFeatureType),
       this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         anchorFeatureType,
-        normalizedExpressionTree,
+        expression,
         systemUserId
       )
     ]);
@@ -121,6 +122,11 @@ export class SearchFeatureService extends DBService {
    * uses the ID directly; date sorting uses the date plus the ID as a stable
    * tie-breaker. The first row anchors the previous cursor and the last row
    * anchors the next cursor.
+   *
+   * @example
+   * A full 25-row first page returns a next cursor built from row 25 and no previous cursor. A request containing a
+   * boundary returns a previous cursor built from row 1. A short or empty page returns no next cursor because there is
+   * no evidence that another page exists.
    *
    * @param {SearchFeatureResultWithRelevancy[]} features - Ordered feature rows for the current page
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Cursor-pagination request used to produce the page
@@ -168,29 +174,35 @@ export class SearchFeatureService extends DBService {
     systemUserId?: number | null
   ): Promise<number> {
     defaultLog.debug({ label: 'countSearchFeaturesByExpressionTree', anchorFeatureType, expressionTree });
-    const normalizedExpressionTree = await this.prepareExpressionTreeSearch(anchorFeatureType, expressionTree);
+    const expression = await this.prepareSearchExpression(anchorFeatureType, expressionTree);
 
-    return this.searchFeatureRepository.countFeaturesByExpressionTree(
-      anchorFeatureType,
-      normalizedExpressionTree,
-      systemUserId
-    );
+    return this.searchFeatureRepository.countFeaturesByExpressionTree(anchorFeatureType, expression, systemUserId);
   }
 
   /**
    * Validates and normalizes the shared inputs for an expression-tree search.
    *
+   * @example
+   * `Count > 7 AND Count < 9 AND Count > 7` first resolves Count as a numeric property, then returns the optimized
+   * `AND(Count > 7, Count < 9)` representation consumed by both result and count repositories. An omitted expression
+   * returns undefined after feature-type validation.
+   *
    * @param {string} anchorFeatureType - Target feature type to validate
    * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
-   * @return {Promise<NormalizedExpressionTreeExpression | undefined>} Normalized expression tree, when supplied
+   * @return {Promise<NormalizedExpressionTree | undefined>} Validated and optimized expression tree, when supplied
    */
-  private async prepareExpressionTreeSearch(
+  private async prepareSearchExpression(
     anchorFeatureType: string,
     expressionTree?: ExpressionTree
-  ): Promise<NormalizedExpressionTreeExpression | undefined> {
+  ): Promise<NormalizedExpressionTree | undefined> {
     const submissionRepository = new SubmissionRepository(this.connection);
     await submissionRepository.getFeatureTypeIdByName(anchorFeatureType);
 
-    return expressionTree ? this.semanticValidator.validateExpressionTree(expressionTree) : undefined;
+    if (!expressionTree) {
+      return undefined;
+    }
+
+    const normalizedExpression = await this.expressionTreeNormalizationService.normalize(expressionTree);
+    return optimizeExpression(normalizedExpression);
   }
 }

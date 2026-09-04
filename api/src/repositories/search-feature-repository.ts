@@ -2,13 +2,13 @@ import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { FeatureTypeProperty } from '../models/feature-type-property';
-import { SearchFeatureSort } from '../models/search-feature-pagination';
+import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
 import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { dependencies as expressionEvaluation, ExpressionTreeFeatureIdsQueryOptions } from './expression-evaluation';
+import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
   codePropertyValueJson,
   featureReferencePropertyValueJson,
@@ -26,23 +26,23 @@ export class SearchFeatureRepository extends BaseRepository {
    * Searches for submission features matching the provided expression tree.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTreeExpression} [expressionTree] - Optional normalized expression tree criteria
+   * @param {NormalizedExpressionTree} [expression] - Optional validated and optimized expression criteria
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination options
    * @param {number | null} [systemUserId] - Security context
    * @return {Promise<SearchFeatureResultWithRelevancy[]>} Ordered, accessible feature rows
    */
   async searchFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree?: NormalizedExpressionTreeExpression,
+    expression?: NormalizedExpressionTree,
     cursorPagination?: ApiCursorPaginationOptions,
     systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
     const queryOptions = this.getExpressionSearchQueryOptions(cursorPagination);
-    const featureIds = expressionTree
+    const featureIds = expression
       ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
           anchorFeatureType,
-          expressionTree,
+          expression,
           systemUserId ?? null,
           queryOptions
         )
@@ -59,20 +59,20 @@ export class SearchFeatureRepository extends BaseRepository {
    * Counts matching anchor features.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search.
-   * @param {NormalizedExpressionTreeExpression} [expressionTree] - Expression tree criteria.
+   * @param {NormalizedExpressionTree} [expression] - Validated and optimized expression criteria.
    * @param {number | null} [systemUserId] - Security context.
    * @return {Promise<number>} Matching feature count.
    */
   async countFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree?: NormalizedExpressionTreeExpression,
+    expression?: NormalizedExpressionTree,
     systemUserId?: number | null
   ): Promise<number> {
     const knex = getKnex();
-    const featureIds = expressionTree
+    const featureIds = expression
       ? expressionEvaluation.buildExpressionTreeCountFeatureIdsSubquery(
           anchorFeatureType,
-          expressionTree,
+          expression,
           systemUserId ?? null
         )
       : expressionEvaluation.buildBroadFeatureTypeCountSubquery(anchorFeatureType, systemUserId ?? null);
@@ -101,19 +101,19 @@ export class SearchFeatureRepository extends BaseRepository {
    * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTreeExpression} [expressionTree] - Expression tree criteria
+   * @param {NormalizedExpressionTree} [expression] - Validated and optimized expression criteria
    * @param {number | null} [systemUserId] - Security context (null = anonymous)
    * @return {Promise<boolean>} True if matching secured features exist that the caller cannot access
    */
   async hasInaccessibleSecuredFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree?: NormalizedExpressionTreeExpression,
+    expression?: NormalizedExpressionTree,
     systemUserId?: number | null
   ): Promise<boolean> {
     const knex = getKnex();
 
-    const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
+    const expressionFeatureIds = expression
+      ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expression)
       : null;
 
     // Start from the tiny active-security set and project through closure to matching candidates. Broad
@@ -216,14 +216,14 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {Knex} knex - Knex instance
    * @param {string} anchorFeatureType - Route anchor/result feature type
    * @param {Knex.QueryBuilder} featureIds - Paginated subquery returning matching submission_feature_id values.
-   * @param {ExpressionTreeFeatureIdsQueryOptions} queryOptions - Applied cursor pagination and sort options
+   * @param {SearchFeatureQueryOptions} queryOptions - Applied cursor pagination and sort options
    * @return {Knex.QueryBuilder} Knex query builder with security filter applied
    */
   private buildExpressionTreeSearchQuery(
     knex: Knex,
     anchorFeatureType: string,
     featureIds: Knex.QueryBuilder,
-    queryOptions: ExpressionTreeFeatureIdsQueryOptions
+    queryOptions: SearchFeatureQueryOptions
   ): Knex.QueryBuilder {
     const authorizedFeatures = knex
       .from(featureIds.clone().as('expression_matches'))
@@ -469,15 +469,19 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Applies stable SQL-side ordering for expression search results.
    *
+   * @example
+   * Sorting by `create_date DESC` adds `submission_feature_id DESC` as a deterministic tie-breaker. Sorting directly by
+   * `submission_feature_id` adds no second order column because the primary key is already unique.
+   *
    * @param {Knex.QueryBuilder} query - Search query
    * @param {string} tableAlias - Table alias used to qualify sortable columns.
-   * @param {ExpressionTreeFeatureIdsQueryOptions} options - Cursor pagination and sort options
+   * @param {SearchFeatureQueryOptions} options - Cursor pagination and sort options
    * @return {Knex.QueryBuilder} Query with stable ordering applied
    */
   private applyExpressionSearchOrder(
     query: Knex.QueryBuilder,
     tableAlias: string,
-    options: ExpressionTreeFeatureIdsQueryOptions
+    options: SearchFeatureQueryOptions
   ): Knex.QueryBuilder {
     query.orderBy(`${tableAlias}.${options.sort}`, options.order);
 
@@ -493,6 +497,10 @@ export class SearchFeatureRepository extends BaseRepository {
    *
    * Relevance currently has no variable score, so it uses stable feature-ID
    * ordering. Explicit ID and creation-date sorts retain their requested order.
+   *
+   * @example
+   * An omitted sort or `relevancy_score` returns `{ sort: 'submission_feature_id', order: 'asc' }`.
+   * `{ sort: 'create_date', order: 'desc' }` remains unchanged after validation.
    *
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Requested cursor pagination and sorting
    * @return {{ sort: SearchFeatureSort; order: 'asc' | 'desc' }} Validated database sort definition
@@ -522,17 +530,22 @@ export class SearchFeatureRepository extends BaseRepository {
    * The request boundary is already decoded and validated at the HTTP boundary. Only positional
    * values needed by the active sort are used to resume the query.
    *
+   * @example
+   * Input: `{ limit: 25, sort: 'create_date', order: 'desc', boundary }`
+   * Output: `{ limit: 25, sort: 'create_date', order: 'desc', boundary }`
+   *
+   * Relevancy sorting is resolved earlier to stable feature-ID ordering because expression search currently has no
+   * variable relevance score.
+   *
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Requested cursor pagination and sorting
-   * @return {ExpressionTreeFeatureIdsQueryOptions} Database sort, boundary, and optional page limit
+   * @return {SearchFeatureQueryOptions} Database sort, boundary, and optional page limit
    */
-  private getExpressionSearchQueryOptions(
-    cursorPagination?: ApiCursorPaginationOptions
-  ): ExpressionTreeFeatureIdsQueryOptions {
+  private getExpressionSearchQueryOptions(cursorPagination?: ApiCursorPaginationOptions): SearchFeatureQueryOptions {
     const sort = this.getExpressionSearchSort(cursorPagination);
 
     return {
       ...sort,
-      ...(cursorPagination?.boundary && { cursor: cursorPagination.boundary }),
+      ...(cursorPagination?.boundary && { boundary: cursorPagination.boundary }),
       ...(cursorPagination?.limit && { limit: cursorPagination.limit })
     };
   }
