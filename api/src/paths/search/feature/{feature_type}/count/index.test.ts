@@ -127,4 +127,44 @@ describe('countFeatures', () => {
     expect(dbConnectionObj.rollback).to.have.been.calledOnce;
     expect(dbConnectionObj.release).to.have.been.calledOnce;
   });
+
+  it('should cancel database work when the HTTP client disconnects', async () => {
+    let rejectCount!: (error: Error) => void;
+    const cancelStub = sinon.stub().callsFake(async () => rejectCount(new Error('Query cancelled')));
+    const dbConnectionObj = getMockDBConnection({
+      cancel: cancelStub,
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake((options) => {
+      options?.signal?.addEventListener('abort', () => void dbConnectionObj.cancel(), { once: true });
+      return dbConnectionObj;
+    });
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { feature_type: 'species_observation' };
+    mockReq.body = {};
+    const countStub = sinon
+      .stub(SearchFeatureService.prototype, 'countSearchFeaturesByExpressionTree')
+      .returns(new Promise((_, reject) => (rejectCount = reject)));
+
+    const handlerPromise = count.countFeatures()(mockReq, mockRes, mockNext);
+    await Promise.resolve();
+    mockRes.emit('close');
+    try {
+      await handlerPromise;
+      expect.fail('Expected countFeatures to reject');
+    } catch (error) {
+      expect((error as Error).message).to.equal('Query cancelled');
+    }
+
+    expect(countStub).to.have.been.calledOnce;
+    expect(cancelStub).to.have.been.calledOnce;
+    expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+    expect(dbConnectionObj.release).to.have.been.calledOnce;
+    expect(dbConnectionObj.commit).not.to.have.been.called;
+    expect(mockRes.status).not.to.have.been.called;
+  });
 });
