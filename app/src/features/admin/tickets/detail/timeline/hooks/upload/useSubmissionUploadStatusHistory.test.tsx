@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import {
   ISubmissionUploadProcessingStatusHistoryItem,
+  SubmissionUploadJobStatus,
   TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { Mock } from 'vitest';
@@ -11,7 +12,10 @@ vi.mock('hooks/useApi', () => ({
   useApi: vi.fn()
 }));
 
-const makeUpload = (submissionUploadId: string): TicketSubmissionUploadResponse => ({
+const makeUpload = (
+  submissionUploadId: string,
+  uploadStatus: SubmissionUploadJobStatus = 'ingested'
+): TicketSubmissionUploadResponse => ({
   submission_upload_id: submissionUploadId,
   submission_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   upload_id: '44444444-4444-4444-8444-444444444444',
@@ -20,7 +24,7 @@ const makeUpload = (submissionUploadId: string): TicketSubmissionUploadResponse 
   submission_description: null,
   submission_comment: null,
   submitted_by_identifier: null,
-  upload_status: 'ingested',
+  upload_status: uploadStatus,
   review_status: 'submitted',
   validation: null,
   reviews: { validation: null, security: null }
@@ -66,7 +70,11 @@ describe('useSubmissionUploadStatusHistory', () => {
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       'upload-1'
     );
-    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({ status: 'loaded', history });
+    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({
+      status: 'loaded',
+      history,
+      uploadStatus: 'ingested'
+    });
   });
 
   it('caches per upload', async () => {
@@ -97,7 +105,35 @@ describe('useSubmissionUploadStatusHistory', () => {
     });
 
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(2);
-    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({ status: 'loaded', history });
+    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({
+      status: 'loaded',
+      history,
+      uploadStatus: 'ingested'
+    });
+  });
+
+  it('fetches again when the upload has moved to a new status since the cached load', async () => {
+    getSubmissionUploadProcessingStatusHistory.mockResolvedValue(history);
+    const { result } = renderHook(() => useSubmissionUploadStatusHistory());
+
+    await act(async () => {
+      await result.current.loadStatusHistory(makeUpload('upload-1', 'ingesting'));
+    });
+    await act(async () => {
+      await result.current.loadStatusHistory(makeUpload('upload-1', 'ingesting'));
+    });
+    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.loadStatusHistory(makeUpload('upload-1', 'ingested'));
+    });
+
+    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(2);
+    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({
+      status: 'loaded',
+      history,
+      uploadStatus: 'ingested'
+    });
   });
 
   it('does not issue a second request while the first is in flight', async () => {
@@ -124,6 +160,10 @@ describe('useSubmissionUploadStatusHistory', () => {
       resolveHistory(history);
       await firstLoad;
     });
-    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({ status: 'loaded', history });
+    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({
+      status: 'loaded',
+      history,
+      uploadStatus: 'ingested'
+    });
   });
 });
