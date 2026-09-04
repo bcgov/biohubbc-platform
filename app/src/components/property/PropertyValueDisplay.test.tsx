@@ -1,0 +1,69 @@
+import { MemoryRouter } from 'react-router-dom';
+import { render } from 'test-helpers/test-utils';
+import { JsonValue } from 'types/json';
+import { PropertyValueDisplay } from './PropertyValueDisplay';
+
+const taxon = { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' };
+
+const renderValue = (value: JsonValue | undefined) =>
+  render(
+    <MemoryRouter>
+      <PropertyValueDisplay value={value} submissionId={3} featureRouteBasePath="/submission" />
+    </MemoryRouter>
+  );
+
+describe('PropertyValueDisplay', () => {
+  it('renders nothing for absent values', () => {
+    expect(renderValue(null).container).toBeEmptyDOMElement();
+    expect(renderValue(undefined).container).toBeEmptyDOMElement();
+  });
+
+  it('renders scalar values as text', () => {
+    expect(renderValue('wolf').container).toHaveTextContent('wolf');
+    expect(renderValue(12).container).toHaveTextContent('12');
+    expect(renderValue(false).container).toHaveTextContent('false');
+  });
+
+  it('renders non-reference objects such as GeoJSON as JSON text', () => {
+    expect(renderValue({ type: 'Point', coordinates: [1, 2] }).container).toHaveTextContent(
+      '{"type":"Point","coordinates":[1,2]}'
+    );
+    expect(renderValue({ label: 'structured value', meta: { count: 2 } }).container).toHaveTextContent(
+      '{"label":"structured value","meta":{"count":2}}'
+    );
+  });
+
+  it('renders a taxon value as a link to the taxon page', () => {
+    const { getByRole } = renderValue(taxon);
+
+    expect(getByRole('link', { name: 'Ursus americanus' })).toHaveAttribute('href', '/submission/3/taxon/180543');
+  });
+
+  it('renders a code value as a link to the code page', () => {
+    const { getByRole } = renderValue({
+      codeset_key: 'sign',
+      codeset_label: 'Sign',
+      code_key: 'track',
+      code_label: 'Track',
+      label: 'Track'
+    });
+
+    expect(getByRole('link', { name: 'Track' })).toHaveAttribute('href', '/submission/3/code/sign/track');
+  });
+
+  it('renders a feature reference value as a link to the referenced feature', () => {
+    const { getByRole } = renderValue({ urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' });
+
+    expect(getByRole('link', { name: 'urn:18:sample_site:3339' })).toHaveAttribute(
+      'href',
+      '/submission/18/feature/3339'
+    );
+  });
+
+  it('renders multi-value properties inline, comma-separated', () => {
+    const { container, getAllByRole } = renderValue([taxon, { ...taxon, taxon_id: 2, label: 'Canis lupus' }, 'x']);
+
+    expect(container).toHaveTextContent('Ursus americanus, Canis lupus, x');
+    expect(getAllByRole('link')).toHaveLength(2);
+  });
+});

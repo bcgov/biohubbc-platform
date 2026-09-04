@@ -91,11 +91,14 @@ export const LoadingGuard = (props: PropsWithChildren<ILoadingGuardProps>) => {
     // If the loading state changes to false, hide the is loading fallback after a delay
     if (isLoadingFallbackDelay) {
       // If there is a delay, show the is loading fallback for at least `isLoadingFallbackDelay` milliseconds
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         // Disable the is loading fallback after the delay
         setShowIsLoadingFallback(false);
       }, isLoadingFallbackDelay);
-      return;
+
+      // The timer outlives the delay window it was scheduled in: clearing it drops the update when the
+      // component unmounts first, and discards a superseded timer when the loading state changes again.
+      return () => clearTimeout(timeout);
     }
 
     // If there is no delay, disable the is loading fallback immediately
@@ -117,11 +120,13 @@ export const LoadingGuard = (props: PropsWithChildren<ILoadingGuardProps>) => {
     // If there is data to display, hide the no data fallback after a delay
     if (hasNoDataFallbackDelay) {
       // If there is a delay, show the no data fallback for at least `hasNoDataFallbackDelay` milliseconds
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         // Disable the no data fallback after the delay
         setShowHasNoDataFallback(false);
       }, hasNoDataFallbackDelay);
-      return;
+
+      // Same lifetime concern as the loading timer above.
+      return () => clearTimeout(timeout);
     }
 
     // If there is no delay, disable the no data fallback immediately

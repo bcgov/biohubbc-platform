@@ -1,3 +1,4 @@
+import Ajv from 'ajv';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
@@ -52,9 +53,30 @@ describe('properties index', () => {
         .resolves({
           properties: [
             { id: 'species_name', property: 'species name', value: 'Wolf' },
-            { id: 'count', property: 'count', value: '2' }
+            { id: 'count', property: 'count', value: '2' },
+            {
+              id: 'taxon:7',
+              property: 'focal species',
+              value: { taxon_id: 3, tsn: 180596, rank: 'Species', label: 'Canis lupus' }
+            },
+            {
+              id: 'code:8',
+              property: 'sign',
+              value: {
+                codeset_key: 'sign',
+                codeset_label: 'Sign',
+                code_key: 'track',
+                code_label: 'Track',
+                label: 'Track'
+              }
+            },
+            {
+              id: 'feature:9',
+              property: 'sample site',
+              value: { urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' }
+            }
           ],
-          total: 2
+          total: 5
         });
 
       const requestHandler = index.getSubmissionFeatureProperties();
@@ -81,9 +103,24 @@ describe('properties index', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue.properties).to.deep.equal([
         { id: 'species_name', property: 'species name', value: 'Wolf' },
-        { id: 'count', property: 'count', value: '2' }
+        { id: 'count', property: 'count', value: '2' },
+        {
+          id: 'taxon:7',
+          property: 'focal species',
+          value: { taxon_id: 3, tsn: 180596, rank: 'Species', label: 'Canis lupus' }
+        },
+        {
+          id: 'code:8',
+          property: 'sign',
+          value: { codeset_key: 'sign', codeset_label: 'Sign', code_key: 'track', code_label: 'Track', label: 'Track' }
+        },
+        {
+          id: 'feature:9',
+          property: 'sample site',
+          value: { urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' }
+        }
       ]);
-      expect(mockRes.jsonValue.pagination.total).to.equal(2);
+      expect(mockRes.jsonValue.pagination.total).to.equal(5);
     });
 
     it('uses the API user connection for anonymous (no token) requests', async () => {
@@ -112,6 +149,14 @@ describe('properties index', () => {
       expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
       expect(getDBConnectionStub).to.not.have.been.called;
       expect(mockRes.statusValue).to.equal(200);
+    });
+  });
+
+  describe('openapi schema', () => {
+    it('is a valid schema document', () => {
+      const ajv = new Ajv();
+
+      expect(ajv.validateSchema(index.GET.apiDoc as unknown as object)).to.be.true;
     });
   });
 });

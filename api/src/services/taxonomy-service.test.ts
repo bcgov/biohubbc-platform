@@ -49,12 +49,25 @@ describe('TaxonomyService', () => {
     expect(taxonomyService).to.be.instanceof(TaxonomyService);
   });
 
+  describe('findTaxon', () => {
+    it('returns repository rows without throwing when none match', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const taxonomyService = new TaxonomyService(mockDBConnection);
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'findTaxon').resolves([]);
+
+      const response = await taxonomyService.findTaxon({ itis_tsn: 180701 });
+
+      expect(repo).to.have.been.calledOnceWith({ itis_tsn: 180701 });
+      expect(response).to.eql([]);
+    });
+  });
+
   describe('getTaxonByTsnIds', () => {
     it('returns empty without querying when no TSNs are provided', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
-      const repo = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds').resolves([]);
 
       const response = await taxonomyService.getTaxonByTsnIds([]);
 
@@ -68,7 +81,7 @@ describe('TaxonomyService', () => {
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
       const repo = sinon
-        .stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds')
+        .stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds')
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 1 })]);
 
       const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
@@ -85,7 +98,7 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const repo = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds');
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds');
       // Initial existence check returns only taxon 1.
       repo.onFirstCall().resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 1 })]);
       // Re-read after ensuring hierarchy returns both requested taxa.
@@ -112,7 +125,7 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const repo = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds').resolves([]);
       const getHierarchyStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
 
       await taxonomyService.ensureTaxonHierarchyByTsnIds([]);
@@ -127,7 +140,7 @@ describe('TaxonomyService', () => {
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
       sinon
-        .stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds')
+        .stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds')
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 1, parent_taxon_id: 2, rank: 'species' })]);
 
       const getHierarchyStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
@@ -145,7 +158,7 @@ describe('TaxonomyService', () => {
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
       sinon
-        .stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds')
+        .stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds')
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 1, rank: 'Kingdom' })]);
 
       const getHierarchyStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
@@ -162,11 +175,11 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const getTaxonByTsnIdsStub = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds');
-      getTaxonByTsnIdsStub
+      const findTaxonByTsnIdsStub = sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds');
+      findTaxonByTsnIdsStub
         .onFirstCall()
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 180542, rank: 'Species' })]);
-      getTaxonByTsnIdsStub
+      findTaxonByTsnIdsStub
         .onSecondCall()
         .resolves([
           buildTaxonRecord({ taxon_id: 1, itis_tsn: 180540, rank: 'kingdom' }),
@@ -196,7 +209,7 @@ describe('TaxonomyService', () => {
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
       sinon
-        .stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds')
+        .stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds')
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 180542, parent_taxon_id: 2, rank: null })]);
 
       const getHierarchyStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
@@ -219,11 +232,11 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const getTaxonByTsnIdsStub = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds');
-      getTaxonByTsnIdsStub
+      const findTaxonByTsnIdsStub = sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds');
+      findTaxonByTsnIdsStub
         .onFirstCall()
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 180542, parent_taxon_id: null, rank: null })]);
-      getTaxonByTsnIdsStub
+      findTaxonByTsnIdsStub
         .onSecondCall()
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 180542, parent_taxon_id: null, rank: null })]);
 
@@ -250,7 +263,7 @@ describe('TaxonomyService', () => {
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
       sinon
-        .stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds')
+        .stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds')
         .resolves([buildTaxonRecord({ taxon_id: 1, itis_tsn: 180542, parent_taxon_id: null, rank: null })]);
       sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
       sinon.stub(ItisService.prototype, 'searchItisByTSN').resolves([buildItisSolrSearchResponse('180542')]);
@@ -268,7 +281,7 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const getTaxonByTsnIdsStub = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+      const findTaxonByTsnIdsStub = sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds').resolves([]);
       const getHierarchyStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
       sinon
         .stub(ItisService.prototype, 'searchItisByTSN')
@@ -278,7 +291,7 @@ describe('TaxonomyService', () => {
 
       await taxonomyService.ensureTaxonHierarchyByTsnIds([2, 1, 2]);
 
-      expect(getTaxonByTsnIdsStub.firstCall.args[0]).to.eql([2, 1]);
+      expect(findTaxonByTsnIdsStub.firstCall.args[0]).to.eql([2, 1]);
       expect(getHierarchyStub).to.have.been.calledOnceWith([2, 1]);
     });
 
@@ -288,7 +301,7 @@ describe('TaxonomyService', () => {
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
       // Both the initial existence check and the lineage existence check report nothing cached locally.
-      sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+      sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds').resolves([]);
 
       // hierarchyTSN = ['180540$180541$180542'] -> ordered lineage [180540, 180541, 180542].
       const hierarchy: TSNWithHierarchy[] = [{ tsn: 180542, hierarchy: [180540, 180541, 180542] }];
@@ -326,7 +339,7 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+      sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds').resolves([]);
       sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([{ tsn: 2, hierarchy: [1, 2] }]);
 
       const searchItisByTSNStub = sinon
@@ -348,7 +361,7 @@ describe('TaxonomyService', () => {
       const requestedTsnIds = Array.from({ length: 205 }, (_, index) => 1000 + index);
       const hierarchy: TSNWithHierarchy[] = requestedTsnIds.map((tsn) => ({ tsn, hierarchy: [1, tsn] }));
 
-      sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+      sinon.stub(TaxonomyRepository.prototype, 'findTaxonByTsnIds').resolves([]);
       const getHierarchyStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs');
       getHierarchyStub.onFirstCall().resolves(hierarchy.slice(0, 100));
       getHierarchyStub.onSecondCall().resolves(hierarchy.slice(100, 200));

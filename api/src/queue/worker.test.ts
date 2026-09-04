@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { JobQueues } from './jobs';
 import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as computeSubmissionFeatureClosureJob from './jobs/compute-submission-feature-closure-job';
+import * as deleteExpiredMartinContextsJob from './jobs/delete-expired-martin-contexts-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
 import * as pollDownloadSchedulesJob from './jobs/poll-download-schedules-job';
@@ -29,7 +30,7 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(18);
+      expect(createQueueStub.callCount).to.equal(20);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD)).to.be.true;
@@ -39,6 +40,7 @@ describe('worker', () => {
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.SUBMISSION_UPLOAD_SECURITY)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.DELETE_EXPIRED_MARTIN_CONTEXTS)).to.be.true;
 
       expect(
         workStub.calledWith(
@@ -106,6 +108,18 @@ describe('worker', () => {
       ).to.be.true;
       expect(
         workStub.calledWith(
+          JobQueues.DELETE_EXPIRED_MARTIN_CONTEXTS,
+          deleteExpiredMartinContextsJob.deleteExpiredMartinContextsJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.DELETE_EXPIRED_MARTIN_CONTEXTS_FAILED,
+          deleteExpiredMartinContextsJob.deleteExpiredMartinContextsFailedHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
           JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED,
           pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler
         )
@@ -138,8 +152,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 18 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED, POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED
-      expect(createQueueStub.callCount).to.equal(18);
+      // 20 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED, POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED, DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED
+      expect(createQueueStub.callCount).to.equal(20);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -400,10 +414,18 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(scheduleStub.callCount).to.equal(1);
+      // Two recurring infrastructure ticks: the download poll and the tile context sweep.
+      expect(scheduleStub.callCount).to.equal(2);
       expect(scheduleStub.firstCall.args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
       expect(scheduleStub.firstCall.args[1]).to.equal('0 * * * *');
       expect(scheduleStub.firstCall.args[3]).to.deep.equal({ tz: 'UTC' });
+
+      const tileSweepCall = scheduleStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.DELETE_EXPIRED_MARTIN_CONTEXTS);
+      // Offset from the download poll so the two ticks do not fire together.
+      expect(tileSweepCall?.args[1]).to.equal('*/15 * * * *');
+      expect(tileSweepCall?.args[3]).to.deep.equal({ tz: 'UTC' });
 
       // schedule requires the queue to already exist and be worked
       const pollCreateCall = createQueueStub

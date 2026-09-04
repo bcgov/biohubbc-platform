@@ -1,0 +1,185 @@
+# Default values for the biohub-platform-martin chart.
+# Environment specific values are supplied by the biohub-platform umbrella chart
+# (infrastructure/biohub-platform/values-{pr,dev,test,prod}.yaml).
+
+# Environment metadata, supplied by the umbrella chart and the deploy workflows
+environment:
+  licensePlate: "a0ec71"
+  name: "" # Environment name (dev, test, prod)
+  id: "" # Environment id (PR number, or "deploy" for static environments)
+  changeId: "" # Change id (PR number, or build tag for static environments)
+  ts: "" # Timestamp of the deployment
+
+# Official Martin image. Public image, so there is no build step in the deploy workflows.
+# To bump: check https://github.com/maplibre/martin/releases and keep the tag in step with
+# MARTIN_VERSION in env_config/env.docker so local and deployed versions stay compatible.
+image:
+  repository: ghcr.io/maplibre/martin
+  tag: "1.12.0"
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+app:
+  name: biohub-platform-martin
+
+  martin:
+    # Port Martin listens on, INSIDE the pod only (127.0.0.1). Not exposed by the Service.
+    port: 3000
+    # Martin worker threads
+    workerProcesses: 2
+    # Maximum Postgres connections held by Martin
+    poolSize: 5
+    # Lifetime of Martin's built-in tile cache entries. Tiles are security filtered at render
+    # time, so this is the upper bound on how long a newly secured feature can keep appearing in
+    # already-cached tiles. Keep in step with the `cache.expiry` in compose.yml's martin-config.
+    cacheExpiry: "5m"
+
+    # Explicitly published function sources. Automatic publication of tables and functions is
+    # always disabled (see the ConfigMap template), so ONLY the sources listed here are served.
+    functions:
+      # Authorized search-result tiles. Resolves the opaque context id the gateway forwards and
+      # applies the feature security predicate at serve time.
+      # See database/src/procedures/03_martin_search.ts
+      search:
+        schema: biohub
+        function: martin_search
+        minzoom: 0
+        # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+        maxzoom: 15
+        # [west, south, east, north] - British Columbia
+        bounds: [-139.06, 48.30, -114.03, 60.00]
+
+      # Spatial properties of a single submission feature. The submission and feature ids are
+      # carried by the token the gateway verifies, so this source needs no context lookup.
+      # See database/src/procedures/04_martin_feature.ts
+      #
+      # No bounds: a feature's extent is its own, and the client frames the map from the bbox the
+      # tile session returns rather than from TileJSON.
+      feature:
+        schema: biohub
+        function: martin_feature
+        minzoom: 0
+        # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+        maxzoom: 15
+
+  database:
+    port: 5432
+    # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments
+    # (legacy dbHost secret created by the biohub-platform-db chart).
+    useCrunchy: true
+    # e.g. "<cluster>-primary" (biohub-platform-db-dev-primary for DEV). Use primary, not
+    # pgbouncer: Martin's driver uses prepared statements, which are incompatible with
+    # PgBouncer transaction pooling. A "<cluster>-replicas" service also exists and is a
+    # future option for keeping tile bursts off the primary.
+    host: ""
+    # e.g. "<cluster>-pguser-martin" (biohub-platform-db-dev-pguser-martin for DEV).
+    # Created by the Crunchy Postgres Operator from the users block of the PostgresCluster CR.
+    martinSecretName: ""
+    # e.g. "<cluster>-pguser-<cluster>" (biohub-platform-db-dev-pguser-biohub-platform-db-dev)
+    dbNameSecretName: ""
+    # Secret keys default in the templates: uri/user/password/dbname (override here if needed).
+    # Martin's own connection consumes `uri` — the operator-assembled, percent-encoded
+    # connection URI — so credential characters can never invalidate DATABASE_URL. The
+    # user/password/dbname keys remain in use by the wait-for-tile-functions initContainer,
+    # which passes them to psql as discrete arguments (no URI assembly involved).
+    martinUriKey: ""
+    martinUserKey: ""
+    martinPasswordKey: ""
+    dbNameKey: ""
+    # PGO root CA for TLS verification (same secret name in all environments)
+    caSecretName: "pgo-root-cacert"
+    caSecretKey: "root.crt"
+    # Postgres sslmode used in the Martin connection string. Left empty, it defaults to
+    # "verify-full" when useCrunchy is true (matching the CA backed verification the api
+    # performs) and "prefer" otherwise, since the legacy PR database serves no TLS.
+    # Set explicitly to dial back to "verify-ca" if a host name mismatch appears.
+    sslMode: ""
+
+# The Martin Gateway. Runs as a sidecar in the Martin pod and is the only publicly reachable
+# container: Martin binds loopback, so every tile request must pass token verification first.
+gateway:
+  image:
+    registry: image-registry.openshift-image-registry.svc:5000
+    image: a0ec71-tools/biohub-platform-martin-gateway
+    pullPolicy: Always
+
+  nodeEnv: production
+  logLevel: info
+
+  token:
+    audience: biohub-tiles
+    issuer: biohub-api
+    # Secret holding the PUBLIC verification keys, one `<kid>.pem` per accepted key. Created
+    # manually per namespace; see infrastructure/martin/README.md for the runbook.
+    publicKeySecretName: martin-token-public
+    # Key id the api signs with. The gateway asserts a matching `<kid>.pem` exists at startup and
+    # refuses to boot otherwise, so a mis-named key file surfaces as a crashloop with an explicit
+    # message instead of silently 401ing every tile.
+    #
+    # FALLBACK ONLY. In the umbrella chart this is overridden by `global.martin.keyId`, the same
+    # value the api signs with - there is deliberately no second copy to keep in sync. Change it
+    # there, not here; this exists so the martin chart still renders standalone.
+    expectedKeyId: "2026-07"
+
+  # Sources the gateway will serve. Comma separated. Anything else is rejected regardless of what
+  # Martin publishes, so an accidentally published source is still not publicly reachable.
+  allowedSources: search,feature
+
+  # Zoom range the gateway will proxy. Deliberately WIDER than the client floor
+  # (MAP_MIN_ZOOM in app/src/constants/spatial.ts): this is a bound on what a token holder may
+  # request, not a mirror of what the app asks for. maxZoom matches MAP_MAX_ZOOM.
+  minZoom: 0
+  maxZoom: 15
+
+  # Bump to invalidate every tile Martin has cached at deploy time: the gateway appends this to the
+  # upstream URL and Martin's cache keys include the query string. Required whenever
+  # biohub.martin_search changes its output for identical inputs (including its cluster zoom
+  # threshold or grid size).
+  sourceVersion: "3"
+
+  rateLimit:
+    # Must absorb a viewport pan, which requests many tiles at once.
+    perTokenPerMinute: 600
+    # Coarse backstop only: BC government networks NAT heavily.
+    perIpPerMinute: 3000
+
+  # Same origin in OpenShift, so this is effectively unused there.
+  allowedOrigin: "*"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# Public service. Targets the GATEWAY, never Martin.
+service:
+  type: ClusterIP
+  name: 6300-tcp
+  port: 6300
+  targetPort: 6300
+
+# Path based route on the app hostname. Leave host empty to derive it (PR environments).
+route:
+  host: ""
+  path: /martin
+
+# Optional ingress hardening for the gateway port. Disabled by default: the namespace already
+# applies an allow-same-namespace policy, and a policy that omitted the OpenShift router would take
+# the public tile route offline.
+networkPolicy:
+  enabled: false
+  allowedNamespaceSelectors: []
+  allowedPodSelectors: []
+
+# Martin container resources
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

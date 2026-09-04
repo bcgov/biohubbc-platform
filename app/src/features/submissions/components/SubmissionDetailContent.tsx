@@ -28,8 +28,6 @@ export const SubmissionDetailContent = ({
   hasSecuredFeatures,
   rows,
   rowCount,
-  searchTerm,
-  onSearch,
   onRowClick,
   isLoading,
   paginationModel,
@@ -60,8 +58,6 @@ export const SubmissionDetailContent = ({
           rows={rows}
           rowCount={rowCount}
           isLoading={isLoading}
-          searchTerm={searchTerm}
-          onSearch={onSearch}
           onRowClick={onRowClick}
           paginationModel={paginationModel}
           onPaginationModelChange={onPaginationModelChange}

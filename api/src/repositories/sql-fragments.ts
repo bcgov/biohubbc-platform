@@ -115,6 +115,11 @@ export function isAccessibleToUser(featureIdExpr: string): string {
         SELECT 1
         FROM submission_feature_closure c
         JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
+        JOIN security_scope ss ON ss.security_scope_id = ssa.security_scope_id
+        JOIN submission_feature anchor_sf
+          ON anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
+          AND ${isSubmissionFeatureActive('anchor_sf')}
+        JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor_sf.feature_type_id
         JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
         JOIN team t ON t.team_id = tss.team_id
           AND t.record_end_date IS NULL
@@ -123,6 +128,18 @@ export function isAccessibleToUser(featureIdExpr: string): string {
           AND tm.record_end_date IS NULL
         WHERE c.source_submission_feature_id = ${featureIdExpr}
           AND c.is_ancestor = true
+          -- Anchors are an asynchronous cache. Revalidate the security- and scope-sensitive facts
+          -- whose revocation must take effect immediately instead of trusting a stale cache row.
+          AND EXISTS (
+            SELECT 1
+            FROM submission_feature_closure closure_ready
+            WHERE closure_ready.source_submission_feature_id = anchor_sf.submission_feature_id
+              AND closure_ready.target_submission_feature_id = anchor_sf.submission_feature_id
+          )
+          AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
+          AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
+          AND (ss.urn_feature_type = anchor_ft.name OR ss.urn_feature_type = '*')
+          AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
       )
   )`;
 }
@@ -172,4 +189,78 @@ export function buildSecurityFilter(
 
   // Authenticated: feature is unsecured OR user has team scope grant (indexed closure lookups)
   return knex.raw(`${isAccessibleToUser(submissionFeatureIdColumn)}`, [systemUserId]);
+}
+
+/**
+ * Structured value for a taxon-valued submitted property, built from a `taxon` row.
+ *
+ * The object is the read-model shape returned for taxon references by every indexed-property
+ * read path (search result rows and the feature-detail properties list), so the label, the
+ * identifiers and their precedence are defined once here:
+ * - `taxon_id` — BioHub surrogate key, the link target for the UI
+ * - `tsn` — ITIS TSN
+ * - `rank` — ITIS rank (nullable), used by the UI to format scientific-name style labels
+ * - `label` — display text: the ITIS scientific name, which `taxon` stores NOT NULL
+ *
+ * Returns a `jsonb_build_object(...)` expression with zero placeholders.
+ *
+ * @param alias SQL alias for the joined `taxon` row (e.g. 't').
+ * @returns SQL expression producing the taxon value object.
+ */
+export function taxonPropertyValueJson(alias: string): string {
+  return `jsonb_build_object(
+    'taxon_id', ${alias}.taxon_id,
+    'tsn', ${alias}.itis_tsn,
+    'rank', ${alias}.rank,
+    'label', ${alias}.itis_scientific_name
+  )`;
+}
+
+/**
+ * Structured value for a code-valued submitted property, built from a `contributor_codeset_code` row
+ * and its parent `contributor_codeset` row.
+ *
+ * The object is the read-model shape returned for code references by every indexed-property read
+ * path (search result rows and the feature-detail properties list), so the label and the identifiers
+ * are defined once here:
+ * - `codeset_key` / `codeset_label` — the codeset the code belongs to (machine key, display label)
+ * - `code_key` / `code_label` — the code itself (machine key, display label)
+ * - `label` — display text: the code label
+ *
+ * Returns a `jsonb_build_object(...)` expression with zero placeholders.
+ *
+ * @param codeAlias SQL alias for the joined `contributor_codeset_code` row (e.g. 'ccc').
+ * @param codesetAlias SQL alias for the joined `contributor_codeset` row (e.g. 'cs').
+ * @returns SQL expression producing the code value object.
+ */
+export function codePropertyValueJson(codeAlias: string, codesetAlias: string): string {
+  return `jsonb_build_object(
+    'codeset_key', ${codesetAlias}.key,
+    'codeset_label', ${codesetAlias}.label,
+    'code_key', ${codeAlias}.key,
+    'code_label', ${codeAlias}.label,
+    'label', ${codeAlias}.label
+  )`;
+}
+
+/**
+ * Structured value for a feature-valued submitted property, built from the referenced
+ * `submission_feature` row.
+ *
+ * The object is the read-model shape returned for feature references by every indexed-property read
+ * path (search result rows and the feature-detail properties list):
+ * - `urn` — the referenced feature's URN (`urn:<submission_id>:<feature_type_name>:<submission_feature_id>`),
+ *   which identifies the feature a link targets
+ * - `label` — display text: the URN
+ *
+ * Returns a `jsonb_build_object(...)` expression with zero placeholders.
+ *
+ * @param alias SQL alias for the joined referenced `submission_feature` row (e.g. 'referenced_sf').
+ * @returns SQL expression producing the feature reference value object.
+ */
+export function featureReferencePropertyValueJson(alias: string): string {
+  return `jsonb_build_object(
+    'urn', ${alias}.urn,
+    'label', ${alias}.urn
+  )`;
 }

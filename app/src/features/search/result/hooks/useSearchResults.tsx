@@ -84,6 +84,7 @@ export const useSearchResults = (
   const requestIdRef = useRef(0);
   const previousRefreshKeyRef = useRef(refreshKey);
   const previousExpressionTreeRef = useRef(expressionTree);
+  const previousSortRef = useRef<Pick<SearchResultsPagination, 'sort' | 'order'> | null>(null);
 
   useEffect(() => {
     searchApiRef.current = api.search;
@@ -240,13 +241,18 @@ export const useSearchResults = (
     const input = { params: searchParams, expressionTree, featureTypeName };
     const isExplicitExpressionApply = previousRefreshKeyRef.current !== refreshKey;
     const isExpressionTreeChange = previousExpressionTreeRef.current !== expressionTree;
+    const previousSort = previousSortRef.current;
+    const isSortChange =
+      previousSort !== null && (previousSort.sort !== pagination.sort || previousSort.order !== pagination.order);
     previousRefreshKeyRef.current = refreshKey;
     previousExpressionTreeRef.current = expressionTree;
+    previousSortRef.current = { sort: pagination.sort, order: pagination.order };
 
-    // Applying filters should feel immediate. A changed expression comes from the
-    // URL update; an unchanged re-apply comes from refreshKey. Both skip the
-    // debounce and start exactly one request.
-    if (isExplicitExpressionApply || isExpressionTreeChange) {
+    // Applying filters or sort changes should feel immediate. A changed expression
+    // comes from the URL update; an unchanged re-apply comes from refreshKey.
+    // Sort changes also skip the debounce so the previous preview request is
+    // cancelled and replaced right away.
+    if (isExplicitExpressionApply || isExpressionTreeChange || isSortChange) {
       debouncedRefresh.cancel();
       startSearch(input);
       return;

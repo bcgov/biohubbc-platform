@@ -104,6 +104,17 @@ services:
       - LOG_FILE_DATE_PATTERN=${LOG_FILE_DATE_PATTERN}
       - LOG_FILE_MAX_SIZE=${LOG_FILE_MAX_SIZE}
       - LOG_FILE_MAX_FILES=${LOG_FILE_MAX_FILES}
+      # Tile tokens (the api holds the PRIVATE key; only it can mint tokens)
+      - MARTIN_TOKEN_PRIVATE_KEY_PATH=/var/martin-keys/private/${MARTIN_TOKEN_KID}.pem
+      - MARTIN_TOKEN_KID=${MARTIN_TOKEN_KID}
+      - MARTIN_TOKEN_AUD=${MARTIN_TOKEN_AUD}
+      - MARTIN_TOKEN_ISS=${MARTIN_TOKEN_ISS}
+      - MARTIN_TOKEN_TTL_SECONDS=${MARTIN_TOKEN_TTL_SECONDS}
+      - MARTIN_EXTERNAL_URL=${MARTIN_EXTERNAL_URL}
+      - MARTIN_MINT_RATE_LIMIT=${MARTIN_MINT_RATE_LIMIT}
+      - MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES=${MARTIN_MINT_RATE_LIMIT_WINDOW_MINUTES}
+      - MARTIN_CONTEXT_TTL_SECONDS=${MARTIN_CONTEXT_TTL_SECONDS}
+      - MARTIN_CONTEXT_MAX_LIVE=${MARTIN_CONTEXT_MAX_LIVE}
       # Clamav
       - CLAMAV_PORT=${CLAMAV_PORT}
       - CLAMAV_HOST=${CLAMAV_HOST}
@@ -121,12 +132,17 @@ services:
     volumes:
       - ./api:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      # Private signing key ONLY; the gateway mounts the separate public-key volume instead.
+      - martin_keys_private:/var/martin-keys/private:ro
     networks:
       - biohubbc-network
     depends_on:
       db:
         condition: service_healthy
       db_setup:
+        condition: service_completed_successfully
+      # The api signs tile tokens with the locally generated private key
+      martin_keys_setup:
         condition: service_completed_successfully
 
   ## Build the queue worker docker image
@@ -289,6 +305,11 @@ services:
       - VITE_MAX_UPLOAD_TARBALL_SIZE=${MAX_UPLOAD_TARBALL_SIZE}
       - VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE=${MAX_TICKET_ATTACHMENT_FILE_SIZE}
       - VITE_SITEMINDER_LOGOUT_URL=${SITEMINDER_LOGOUT_URL}
+      # Map view
+      - VITE_BASEMAP_URL=${BASEMAP_URL}
+      - VITE_BASEMAP_ATTRIBUTION=${BASEMAP_ATTRIBUTION}
+      # Vite proxies /martin to the gateway, mirroring the same-origin path route used when deployed
+      - VITE_MARTIN_PROXY_TARGET=http://martin_gateway:${MARTIN_GATEWAY_PORT}
       - VITE_KEYCLOAK_HOST=${KEYCLOAK_HOST}
       - VITE_KEYCLOAK_REALM=${KEYCLOAK_REALM}
       - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
@@ -297,6 +318,99 @@ services:
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
     networks:
       - biohubbc-network
+
+  ## Generate the local tile token signing keypair (one-shot, idempotent)
+  ## In OpenShift these come from the martin-token-private / martin-token-public Secrets instead.
+  ## The halves land in SEPARATE volumes, mirroring the OpenShift secret split: the api mounts only
+  ## the private volume and the gateway only the public one, so the gateway's filesystem never
+  ## contains the signing key it must not hold.
+  martin_keys_setup:
+    image: alpine/openssl:latest
+    container_name: ${DOCKER_PROJECT_NAME}-martin-keys-setup-${DOCKER_NAMESPACE}-container
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'mkdir -p /keys/private /keys/public;
+        if [ ! -f "/keys/private/${MARTIN_TOKEN_KID}.pem" ]; then
+        echo "Generating tile token keypair (kid=${MARTIN_TOKEN_KID})...";
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "/keys/private/${MARTIN_TOKEN_KID}.pem";
+        openssl rsa -pubout -in "/keys/private/${MARTIN_TOKEN_KID}.pem" -out "/keys/public/${MARTIN_TOKEN_KID}.pem";
+        chmod -R a+r /keys;
+        echo "Tile token keypair generated.";
+        else echo "Tile token keypair already exists, skipping."; fi'
+    volumes:
+      - martin_keys_private:/keys/private
+      - martin_keys_public:/keys/public
+    networks:
+      - biohubbc-network
+
+  ## Authenticating gateway that fronts Martin. The only public entry point for tiles.
+  martin_gateway:
+    image: ${DOCKER_PROJECT_NAME}-martin-gateway-${DOCKER_NAMESPACE}-img
+    container_name: ${DOCKER_PROJECT_NAME}-martin-gateway-${DOCKER_NAMESPACE}-container
+    build:
+      context: ./martin-gateway
+      dockerfile: ./.docker/martin-gateway/Dockerfile
+    ports:
+      - ${MARTIN_GATEWAY_PORT}:${MARTIN_GATEWAY_PORT}
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - MARTIN_GATEWAY_PORT=${MARTIN_GATEWAY_PORT}
+      - MARTIN_URL=http://martin:3000
+      # Only the PUBLIC keys are needed to verify tokens; the gateway can never mint one.
+      - MARTIN_TOKEN_PUBLIC_KEY_DIR=/var/martin-keys/public
+      # The kid the api signs with; startup asserts a matching public key file is present.
+      - MARTIN_TOKEN_KID=${MARTIN_TOKEN_KID}
+      - MARTIN_TOKEN_AUD=${MARTIN_TOKEN_AUD}
+      - MARTIN_TOKEN_ISS=${MARTIN_TOKEN_ISS}
+      - MARTIN_ALLOWED_SOURCES=${MARTIN_ALLOWED_SOURCES}
+      - MARTIN_MIN_ZOOM=${MARTIN_MIN_ZOOM}
+      - MARTIN_MAX_ZOOM=${MARTIN_MAX_ZOOM}
+      - MARTIN_SOURCE_VERSION=${MARTIN_SOURCE_VERSION}
+      - RATE_LIMIT_JTI_PER_MIN=${RATE_LIMIT_JTI_PER_MIN}
+      - RATE_LIMIT_IP_PER_MIN=${RATE_LIMIT_IP_PER_MIN}
+      - ALLOWED_ORIGIN=${APP_HOST}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ./martin-gateway:/opt/app-root/src
+      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      # Public verification keys ONLY. The private signing key lives in a volume this service
+      # never mounts, so the gateway cannot read it even in local development.
+      - martin_keys_public:/var/martin-keys/public:ro
+    networks:
+      - biohubbc-network
+    depends_on:
+      martin:
+        condition: service_healthy
+      martin_keys_setup:
+        condition: service_completed_successfully
+
+  ## Martin vector tile server (serves vector tiles directly from PostGIS)
+  martin:
+    image: ghcr.io/maplibre/martin:${MARTIN_VERSION}
+    container_name: ${DOCKER_PROJECT_NAME}-martin-${DOCKER_NAMESPACE}-container
+    ports:
+      - ${MARTIN_PORT}:3000
+    command: ["--config", "/etc/martin/config.yaml"]
+    environment:
+      # Martin expands ${DATABASE_URL} itself, inside the config file
+      - DATABASE_URL=postgresql://${DB_USER_MARTIN}:${DB_USER_MARTIN_PASS}@${DB_HOST}:5432/${DB_DATABASE}
+    configs:
+      - source: martin-config
+        target: /etc/martin/config.yaml
+    networks:
+      - biohubbc-network
+    depends_on:
+      db:
+        condition: service_healthy
+      # The martin role is created by the migrations
+      db_setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   ## Run the database migrations and seeding
   db_setup:
@@ -315,6 +429,9 @@ services:
       - DB_SCHEMA=${DB_SCHEMA}
       - DB_USER_API=${DB_USER_API}
       - DB_USER_API_PASS=${DB_USER_API_PASS}
+      # Used to create the least-privilege Martin tile server role
+      - DB_USER_MARTIN=${DB_USER_MARTIN}
+      - DB_USER_MARTIN_PASS=${DB_USER_MARTIN_PASS}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
       - CONTRIBUTOR_SYSTEM_USER_GUID=${CONTRIBUTOR_SYSTEM_USER_GUID}
       - ENABLE_MOCK_FEATURE_SEEDING=${ENABLE_MOCK_FEATURE_SEEDING}
@@ -328,6 +445,78 @@ services:
         condition: service_healthy
     command: ["npm", "run", "setup"]
 
+configs:
+  ## Martin vector tile server configuration (local development).
+  ##
+  ## Martin serves vector tiles directly from PostGIS; tile bytes never pass through the BioHub API:
+  ##
+  ##   MapLibre -> Martin Gateway (auth) -> Martin -> PostGIS
+  ##
+  ## IMPORTANT: keep this in sync with the Helm ConfigMap that renders the same configuration for
+  ## OpenShift: infrastructure/martin/templates/configmap.yaml
+  ##
+  ## Config reference (pinned version): https://maplibre.org/martin/config-file/
+  ## Schema: https://github.com/maplibre/martin/blob/main/schemas/config.json
+  ##
+  ## NOTE: `$$` escapes the `$` so Compose does NOT interpolate it. The literal `${DATABASE_URL}` is
+  ## written into the container, and Martin expands it from the service environment at startup.
+  martin-config:
+    content: |
+      # Bind on all interfaces so the port can be published to the host for local development.
+      listen_addresses: 0.0.0.0:3000
+
+      worker_processes: 2
+
+      # Warn rather than abort when a configured source is invalid at startup. Keeps parity with the
+      # OpenShift config, where Martin can start before the database-setup Job has created the tile
+      # functions; locally compose ordering usually prevents this, but a stale db_setup image can
+      # produce the same missing-function state.
+      on_invalid: warn
+
+      # Martin's built-in tile cache is enabled by default (512 MB) but holds entries with NO
+      # expiry, only size-pressure eviction. Tiles are security filtered at render time, so an
+      # unbounded entry lifetime would let a newly secured feature keep appearing in cached tiles
+      # indefinitely. The expiry bounds that takedown window. Cache keys include the full query
+      # string, so entries never leak across `context` values.
+      cache:
+        expiry: "5m"
+
+      postgres:
+        # Expanded by Martin from the DATABASE_URL environment variable set on the compose service.
+        connection_string: $${DATABASE_URL}
+
+        pool_size: 5
+
+        # CRITICAL: disable automatic discovery. Left enabled, Martin publishes every table and
+        # function its database role can read. Only sources explicitly listed here are served.
+        auto_publish: false
+
+        functions:
+          # Authorized search-result tiles. Resolves the opaque context id the gateway forwards and
+          # applies the feature security predicate at serve time.
+          # See database/src/procedures/03_martin_search.ts
+          search:
+            schema: biohub
+            function: martin_search
+            minzoom: 0
+            # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+            maxzoom: 15
+            # [west, south, east, north] - British Columbia
+            bounds: [-139.06, 48.30, -114.03, 60.00]
+
+          # Spatial properties of a single submission feature. The submission and feature ids are
+          # carried by the token the gateway verifies, so this source needs no context lookup.
+          # See database/src/procedures/04_martin_feature.ts
+          #
+          # No bounds: a feature's extent is its own, and the client frames the map from the bbox
+          # the tile session returns rather than from TileJSON.
+          feature:
+            schema: biohub
+            function: martin_feature
+            minzoom: 0
+            # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+            maxzoom: 15
+
 networks:
   biohubbc-network:
     driver: bridge
@@ -339,3 +528,7 @@ volumes:
     name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-vol
   minio_data:
     name: ${DOCKER_PROJECT_NAME}-minio-${DOCKER_NAMESPACE}-vol
+  martin_keys_private:
+    name: ${DOCKER_PROJECT_NAME}-martin-keys-private-${DOCKER_NAMESPACE}-vol
+  martin_keys_public:
+    name: ${DOCKER_PROJECT_NAME}-martin-keys-public-${DOCKER_NAMESPACE}-vol

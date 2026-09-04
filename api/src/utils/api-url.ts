@@ -11,6 +11,6 @@
  */
 export function getApiBaseUrl(): string {
   const host = process.env.API_HOST || 'localhost';
-  const port = process.env.API_PORT || '6100';
+  const port = process.env.API_PORT || '6200';
   return host === 'localhost' ? `http://${host}:${port}` : `https://${host}`;
 }

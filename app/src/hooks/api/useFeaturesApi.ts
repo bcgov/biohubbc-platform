@@ -16,15 +16,14 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
 export const useFeaturesApi = (axios: AxiosInstance) => {
   /**
    * Get a submission feature by its ID
-   * Also gets related features if there is any
    *
-   * @param {string} submissionId
-   * @param {string} submissionFeatureId
+   * @param {number} submissionId
+   * @param {number} submissionFeatureId
    * @return {Promise<ISubmissionFeatureResponse>}
    */
   const getSubmissionFeatureById = async (
-    submissionId: string,
-    submissionFeatureId: string
+    submissionId: number,
+    submissionFeatureId: number
   ): Promise<ISubmissionFeatureResponse> => {
     const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}`);
 
@@ -34,14 +33,14 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
   /**
    * Get paginated submission feature properties by feature id.
    *
-   * @param {string} submissionId
-   * @param {string} submissionFeatureId
+   * @param {number} submissionId
+   * @param {number} submissionFeatureId
    * @param {ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters} params
    * @return {Promise<ISubmissionFeaturePropertiesResponse>}
    */
   const getSubmissionFeatureProperties = async (
-    submissionId: string,
-    submissionFeatureId: string,
+    submissionId: number,
+    submissionFeatureId: number,
     params: ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters
   ): Promise<ISubmissionFeaturePropertiesResponse> => {
     const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}/properties`, {
