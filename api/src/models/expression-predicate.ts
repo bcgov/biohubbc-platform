@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FEATURE_PROPERTY_TYPE } from './feature-property';
 
 /**
  * Structural predicate operator schema for public expression predicates.
@@ -35,15 +36,13 @@ export const PredicateOperator = z.enum([
 export type PredicateOperator = z.infer<typeof PredicateOperator>;
 
 /**
- * Timestamp comparison value used by normalized search/evaluation predicates.
+ * Feature property types supported by expression predicates.
  *
- * Timestamp property rows are physically split into `date_value` and `time_value`, so the normalized internal payload
- * keeps those parts separate. Date-only, time-only, and date-time predicates set whichever components are applicable.
+ * `artifact_key` is excluded because typed artifact storage and search-result hydration do not yet provide expression
+ * predicate semantics. It can be included after the expression layer defines its supported operators, public value
+ * resolution, internal predicate representation, and SQL evaluation against typed artifact property rows.
  */
-export type InternalTimestampPredicateValue = {
-  date_value: string | null;
-  time_value: string | null;
-};
+export type PredicatePropertyTypeName = Exclude<FEATURE_PROPERTY_TYPE, FEATURE_PROPERTY_TYPE.ARTIFACT_KEY>;
 
 /**
  * Internal normalized predicate payload used after semantic validation.
@@ -56,7 +55,11 @@ export type InternalTypedPredicate =
   | { type: 'string'; operator: PredicateOperator; value?: string }
   | { type: 'number'; operator: PredicateOperator; value?: number }
   | { type: 'boolean'; operator: PredicateOperator; value?: boolean }
-  | { type: 'timestamp'; operator: PredicateOperator; value?: InternalTimestampPredicateValue }
+  | {
+      type: 'timestamp';
+      operator: PredicateOperator;
+      value?: { date_value: string | null; time_value: string | null };
+    }
   | { type: 'taxon'; operator: PredicateOperator; value?: number }
   | { type: 'geometry'; operator: PredicateOperator; value?: unknown }
   | { type: 'code'; operator: PredicateOperator; value?: number };
@@ -66,4 +69,4 @@ export type InternalTypedPredicate =
  *
  * Use this where code needs direct access to split timestamp `date_value` / `time_value` fields.
  */
-export type TimestampInternalPredicate = Extract<InternalTypedPredicate, { type: 'timestamp' }>;
+export type InternalTimestampPredicate = Extract<InternalTypedPredicate, { type: 'timestamp' }>;

@@ -7,8 +7,8 @@ import { Expression, ResolvedExpressionAnchor } from '../models/expression';
 import { ExpressionClause } from '../models/expression-clause';
 import { ExpressionTree, ExpressionTreeClause, ExpressionTreePredicate } from '../models/expression-tree';
 import {
+  NormalizedExpressionTree,
   NormalizedExpressionTreeClause,
-  NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
 import { Predicate, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
@@ -16,7 +16,7 @@ import { ExpressionClauseRepository } from '../repositories/expression-clause-re
 import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
 import { parseTimestamp } from '../utils/timestamp';
-import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { ExpressionTreeService } from './expression-tree-service';
 
 const normalizePredicateForTest = (predicate: ExpressionTreePredicate): NormalizedExpressionTreePredicate => {
@@ -85,15 +85,32 @@ const normalizeClauseForTest = (clause: ExpressionTreeClause): NormalizedExpress
   return normalizePredicateForTest(clause);
 };
 
-const normalizeExpressionTreeForTest = (tree: ExpressionTree): NormalizedExpressionTreeExpression => ({
-  ...tree,
-  clauses: tree.clauses.map(normalizeClauseForTest)
-});
+const normalizeExpressionStructureForTest = (tree: ExpressionTree): ExpressionTree => {
+  const clauses = tree.clauses.flatMap((clause) => {
+    if (clause.type === 'predicate') {
+      return [clause];
+    }
+
+    const expression = normalizeExpressionStructureForTest(clause);
+    return expression.operator === tree.operator ? expression.clauses : [expression];
+  });
+
+  clauses.sort((left, right) =>
+    JSON.stringify(left).localeCompare(JSON.stringify(right), undefined, { numeric: true })
+  );
+
+  return { ...tree, clauses };
+};
+
+const normalizeExpressionTreeForTest = (tree: ExpressionTree): NormalizedExpressionTree => {
+  const expression = normalizeExpressionStructureForTest(tree);
+  return { ...expression, clauses: expression.clauses.map(normalizeClauseForTest) };
+};
 
 describe('ExpressionTreeService', () => {
   beforeEach(() => {
     sinon
-      .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+      .stub(ExpressionTreeNormalizationService.prototype, 'normalize')
       .callsFake(async (tree: ExpressionTree) => normalizeExpressionTreeForTest(tree));
   });
 
@@ -183,7 +200,7 @@ describe('ExpressionTreeService', () => {
         {
           expression_id: 'expr-2',
           sequence: 1,
-          predicate_id: 'pred-2',
+          predicate_id: 'pred-1',
           child_expression_id: null
         }
       ]);
@@ -191,14 +208,14 @@ describe('ExpressionTreeService', () => {
         {
           expression_id: 'expr-1',
           sequence: 1,
-          predicate_id: 'pred-1',
-          child_expression_id: null
+          predicate_id: null,
+          child_expression_id: 'expr-2'
         },
         {
           expression_id: 'expr-1',
           sequence: 2,
-          predicate_id: null,
-          child_expression_id: 'expr-2'
+          predicate_id: 'pred-2',
+          child_expression_id: null
         }
       ]);
     });

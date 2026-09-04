@@ -1,4 +1,4 @@
-import type { PredicateOperator } from '../models/expression-predicate';
+import type { PredicateOperator, PredicatePropertyTypeName } from '../models/expression-predicate';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 
 /**
@@ -31,12 +31,7 @@ export const OperatorsByPropertyType = {
   [FEATURE_PROPERTY_TYPE.TAXON]: ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom', 'Exists'],
   [FEATURE_PROPERTY_TYPE.SPATIAL]: ['Within', 'Intersects', 'Contains', 'Exists'],
   [FEATURE_PROPERTY_TYPE.CODE]: ['Equals', 'NotEquals', 'Exists']
-} as const satisfies Record<
-  Exclude<FEATURE_PROPERTY_TYPE, FEATURE_PROPERTY_TYPE.ARTIFACT_KEY>,
-  readonly PredicateOperator[]
->;
-
-export type PredicatePropertyTypeName = keyof typeof OperatorsByPropertyType;
+} as const satisfies Record<PredicatePropertyTypeName, readonly PredicateOperator[]>;
 
 /**
  * Property types that can be used by expression predicates in this branch.

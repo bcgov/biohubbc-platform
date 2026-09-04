@@ -10,7 +10,7 @@ import { ApiConflictError } from '../../errors/api-error';
 import { DownloadSource } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ExpressionTree } from '../../models/expression-tree';
-import { NormalizedExpressionTreeExpression } from '../../models/expression-tree-internal';
+import { NormalizedExpressionTree } from '../../models/expression-tree-internal';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { PolicyEffect } from '../../models/policy-statement';
@@ -23,7 +23,7 @@ import { DownloadVersionRepository } from '../../repositories/download/download-
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
-import { ExpressionPredicateSemanticValidator } from '../expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from '../expression-tree-normalization-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
@@ -497,10 +497,10 @@ describe('DownloadPipelineService', () => {
         type: 'expression',
         operator: 'AND',
         clauses: []
-      } as unknown as NormalizedExpressionTreeExpression;
+      } as unknown as NormalizedExpressionTree;
       const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(mockTree);
       const validateStub = sinon
-        .stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree')
+        .stub(ExpressionTreeNormalizationService.prototype, 'normalize')
         .resolves(normalizedTree);
       const buildExprSubqueryStub = sinon
         .stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery')
@@ -539,9 +539,9 @@ describe('DownloadPipelineService', () => {
         type: 'expression',
         operator: 'AND',
         clauses: []
-      } as unknown as NormalizedExpressionTreeExpression;
+      } as unknown as NormalizedExpressionTree;
       const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree').resolves(mockTree);
-      sinon.stub(ExpressionPredicateSemanticValidator.prototype, 'validateExpressionTree').resolves(normalizedTree);
+      sinon.stub(ExpressionTreeNormalizationService.prototype, 'normalize').resolves(normalizedTree);
 
       const knex = getKnex();
       const buildExprSubqueryStub = sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
