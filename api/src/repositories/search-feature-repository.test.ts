@@ -105,7 +105,6 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_string');
       expect(sql).to.include("COALESCE(typed_properties.properties, '{}'::jsonb) as properties");
       expect(sql).to.not.include('sf.data');
-      expect(sql).to.not.include('"sf"."submission_feature_id" in');
       expect(sql).to.include('order by "submission_feature_id" asc');
       expect(sql).to.include('limit 25');
     });
@@ -254,8 +253,22 @@ describe('SearchFeatureRepository', () => {
       // The unfiltered subquery is the candidate source directly (it already restricts to active
       // anchor-type features), so it is selected FROM rather than re-wrapped/whereIn'd by feature type.
       expect(sql).to.include('unfiltered_table');
-      expect(sql).to.not.include('"sf"."submission_feature_id" in');
+      expect(sql).to.include('"sf"."submission_feature_id" in');
       expect(sql).to.include('limit 1');
+    });
+
+    it('should scope hidden secured candidates to closure members in the requested submission', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repository = new SearchFeatureRepository(getMockDBConnection({ knex: knexSpy }));
+
+      await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, null, [42]);
+
+      const sql = knexSpy.getCall(0).args[0].toString();
+      expect(sql).to.include('"sf"."submission_id" in (42)');
+      expect(sql).to.include('submission_feature_closure');
+      expect(sql).to.include('submission_scope_closure');
+      expect(sql).to.include('source_submission_feature_id');
+      expect(sql).to.include('target_submission_feature_id');
     });
 
     it('should check effectively-secured and not-accessible (anchor-only) for authenticated users', async () => {

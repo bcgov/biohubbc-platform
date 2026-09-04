@@ -73,7 +73,7 @@ describe('SearchFeatureService', () => {
       const result = await service.searchFeaturesByExpressionTree('survey', undefined, undefined, 42);
 
       expect(repoStub).to.have.been.calledOnce;
-      expect(repoStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, 42]);
+      expect(repoStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, 42, undefined]);
       expect(result).to.equal(mockFeatures);
     });
   });
@@ -108,7 +108,7 @@ describe('SearchFeatureService', () => {
 
       expect(validateStub).to.have.been.calledOnceWith(tree);
       expect(searchStub).to.have.been.calledOnce;
-      expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
+      expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined, undefined]);
       expect(propertiesStub).to.have.been.calledOnceWith('survey', normalized, undefined);
       expect(countStub).to.have.been.calledOnceWith('survey', normalized, undefined);
       expect(hiddenSecuredStub).to.have.been.calledOnceWith('survey', normalized, undefined);
@@ -135,7 +135,7 @@ describe('SearchFeatureService', () => {
     await service.searchFeaturesByExpressionTree('survey', tree);
 
     expect(validateStub).to.have.been.calledOnceWith(tree);
-    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
+    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined, undefined]);
   });
 
   describe('getSearchFeaturesCountByExpressionTree', () => {
@@ -150,7 +150,7 @@ describe('SearchFeatureService', () => {
       const result = await service.getSearchFeaturesCountByExpressionTree('survey', undefined);
 
       expect(countStub).to.have.been.calledOnce;
-      expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, undefined]);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, undefined]);
       expect(result).to.equal(5);
     });
 
@@ -172,7 +172,7 @@ describe('SearchFeatureService', () => {
       const result = await service.getSearchFeaturesCountByExpressionTree('survey', tree);
 
       expect(validateStub).to.have.been.calledOnceWith(tree);
-      expect(countStub.firstCall.args).to.deep.equal(['survey', normalized, undefined]);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', normalized, undefined, undefined]);
       expect(result).to.equal(0);
     });
   });

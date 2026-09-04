@@ -42,7 +42,8 @@ export class SearchFeatureService extends DBService {
     anchorFeatureType: string,
     expressionTree: ExpressionTree | undefined,
     pagination?: ApiPaginationOptions,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByExpressionTree', anchorFeatureType, expressionTree, pagination });
     await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
@@ -53,7 +54,8 @@ export class SearchFeatureService extends DBService {
       anchorFeatureType,
       normalizedExpressionTree,
       pagination,
-      systemUserId
+      systemUserId,
+      submissionIds
     );
   }
 
@@ -70,7 +72,8 @@ export class SearchFeatureService extends DBService {
     anchorFeatureType: string,
     expressionTree: ExpressionTree | undefined,
     pagination?: ApiPaginationOptions,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<{
     features: SearchFeatureResultWithRelevancy[];
     properties: FeatureTypeProperty[];
@@ -94,22 +97,26 @@ export class SearchFeatureService extends DBService {
         anchorFeatureType,
         normalizedExpressionTree,
         pagination,
-        systemUserId
+        systemUserId,
+        submissionIds
       ),
       this.searchFeatureRepository.searchFeaturesByExpressionTreeProperties(
         anchorFeatureType,
         normalizedExpressionTree,
-        systemUserId
+        systemUserId,
+        submissionIds
       ),
       this.searchFeatureRepository.searchFeaturesByExpressionTreeCount(
         anchorFeatureType,
         normalizedExpressionTree,
-        systemUserId
+        systemUserId,
+        submissionIds
       ),
       this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         anchorFeatureType,
         normalizedExpressionTree,
-        systemUserId
+        systemUserId,
+        submissionIds
       )
     ]);
 
@@ -126,7 +133,8 @@ export class SearchFeatureService extends DBService {
   async getSearchFeaturesCountByExpressionTree(
     anchorFeatureType: string,
     expressionTree: ExpressionTree | undefined,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    submissionIds?: number[]
   ): Promise<number> {
     defaultLog.debug({ label: 'getSearchFeaturesCountByExpressionTree', anchorFeatureType, expressionTree });
     await this.validateExpressionTreeTargetFeatureType(anchorFeatureType);
@@ -136,7 +144,8 @@ export class SearchFeatureService extends DBService {
     return this.searchFeatureRepository.searchFeaturesByExpressionTreeCount(
       anchorFeatureType,
       normalizedExpressionTree,
-      systemUserId
+      systemUserId,
+      submissionIds
     );
   }
 

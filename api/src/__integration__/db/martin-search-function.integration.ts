@@ -247,6 +247,7 @@ describe('Tile search function (integration)', function () {
           ctx.feature_type_id,
           ctx.system_user_id,
           ctx.expression_id,
+          ctx.submission_ids,
           public.ST_Transform(public.ST_TileEnvelope(t.z, t.x, t.y), 4326)
         ) v
         WHERE v.submission_feature_id = ${featureId};
@@ -1042,7 +1043,7 @@ describe('Tile search function (integration)', function () {
         SQL`
           EXPLAIN (COSTS OFF)
           SELECT * FROM biohub.martin_search_visible_geometries(
-            ${featureTypeId}, NULL, NULL,
+            ${featureTypeId}, NULL, NULL, NULL,
             public.ST_Transform(public.ST_TileEnvelope(12, 654, 1400), 4326)
           );
         `,

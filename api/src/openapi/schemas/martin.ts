@@ -20,6 +20,13 @@ export const martinSessionRequestBodySchema: OpenAPIV3.RequestBodyObject = {
           expression: {
             ...featureSearchExpressionTreeSchema,
             description: 'Search expression. Omit to map an unfiltered view of the feature type.'
+          },
+          submissionIds: {
+            type: 'array',
+            minItems: 1,
+            uniqueItems: true,
+            items: { type: 'integer', minimum: 1 },
+            description: 'Optional submission scope applied to mapped search results.'
           }
         },
         additionalProperties: false

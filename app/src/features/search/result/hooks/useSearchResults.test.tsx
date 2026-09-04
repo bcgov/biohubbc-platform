@@ -411,6 +411,41 @@ describe('useSearchResults', () => {
     );
   });
 
+  it('uses the latest submission scope after it changes', async () => {
+    vi.useFakeTimers();
+
+    const { rerender } = renderHook(
+      ({ submissionIds }) => useSearchResults('species_observation', true, null, 0, submissionIds),
+      { initialProps: { submissionIds: [1] } }
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      expect.any(Object),
+      expect.objectContaining({ submissionIds: [1] })
+    );
+
+    rerender({ submissionIds: [2] });
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      expect.any(Object),
+      expect.objectContaining({ submissionIds: [2] })
+    );
+  });
+
   it('refreshes with a null expression when the explicit refresh key changes', async () => {
     vi.useFakeTimers();
 

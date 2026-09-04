@@ -40,6 +40,11 @@ describe('computeMartinContextHash', () => {
     expect(computeMartinContextHash({ ...base, featureTypeId: 24 })).to.not.equal(computeMartinContextHash(base));
   });
 
+  it('includes an optional submission scope in the context identity', () => {
+    expect(computeMartinContextHash({ ...base, submissionIds: [42] })).to.not.equal(computeMartinContextHash(base));
+    expect(computeMartinContextHash({ ...base, submissionIds: null })).to.equal(computeMartinContextHash(base));
+  });
+
   it('returns a sha256 hex digest', () => {
     expect(computeMartinContextHash(base)).to.match(/^[0-9a-f]{64}$/);
   });

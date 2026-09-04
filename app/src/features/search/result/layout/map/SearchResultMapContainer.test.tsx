@@ -119,6 +119,19 @@ describe('SearchResultMapContainer', () => {
       );
     });
 
+    it('passes the submission scope when requesting a Martin session', async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+
+      renderContainer({ submissionIds: [42] });
+
+      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalled());
+      expect(mocks.createMartinSession).toHaveBeenCalledWith(
+        'species_observation',
+        null,
+        expect.objectContaining({ submissionIds: [42], signal: expect.anything() })
+      );
+    });
+
     it('shows a loading state until the session resolves', async () => {
       mocks.createMartinSession.mockReturnValue(new Promise(() => undefined));
 

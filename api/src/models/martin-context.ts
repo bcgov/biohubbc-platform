@@ -4,11 +4,11 @@ import { z } from 'zod';
  * A tile context row: the server-side authorization state behind a map Martin session.
  *
  * A context references the persisted search expression (`expression_id`, NULL = unfiltered
- * browse-all) and the caller (`system_user_id`, NULL = anonymous). The tile function evaluates both
- * live at serve time; nothing about the result set is stored. Feature search resolves a system user
- * id that is either null or a number — it has no unfiltered administrator branch — and the map must
- * show exactly what the table shows, so tile contexts mirror that and deliberately offer no third
- * identity.
+ * browse-all), an optional submission scope, and the caller (`system_user_id`, NULL = anonymous).
+ * The tile function evaluates them live at serve time; nothing about the result set is stored.
+ * Feature search resolves a system user id that is either null or a number — it has no unfiltered
+ * administrator branch — and the map must show exactly what the table shows, so tile contexts
+ * mirror that and deliberately offer no third identity.
  */
 export const MartinContext = z.object({
   martin_context_id: z.string().uuid(),
@@ -16,6 +16,7 @@ export const MartinContext = z.object({
   expression_id: z.string().uuid().nullable(),
   feature_type_id: z.number(),
   system_user_id: z.number().nullable(),
+  submission_ids: z.array(z.number()).nullable().optional(),
   record_end_date: z.string(),
   create_date: z.string(),
   create_user: z.number()

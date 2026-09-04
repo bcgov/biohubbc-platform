@@ -60,6 +60,7 @@ describe('searchFeatures', () => {
 
     mockReq.body = {
       expression: expressionTree,
+      submissionIds: [10],
       pagination: {
         page: '1',
         limit: '10'
@@ -76,6 +77,7 @@ describe('searchFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(searchStub.firstCall.args[0]).to.equal('survey');
     expect(searchStub.firstCall.args[1]).to.eql(expressionTree);
+    expect(searchStub.firstCall.args[4]).to.eql([10]);
     expect(mockRes.jsonValue).to.eql({
       features: mockResults,
       properties: [],

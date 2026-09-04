@@ -150,6 +150,30 @@ describe('useSearchApi', () => {
       );
     });
 
+    it('should include submission IDs when the search is submission-scoped', async () => {
+      const mockResponse: SearchFeatureResponse = {
+        features: [],
+        properties: [],
+        pagination: {
+          total: 0,
+          per_page: 10,
+          current_page: 1,
+          last_page: 1,
+          sort: undefined,
+          order: undefined
+        },
+        has_more_secured_features: false
+      };
+
+      mock.onPost('/api/search/feature/survey').reply(200, mockResponse);
+
+      await useSearchApi(axios).searchFeatures('survey', null, { page: 1, limit: 10 }, { submissionIds: [42] });
+
+      expect(mock.history.post[0].data).toEqual(
+        JSON.stringify({ pagination: { page: 1, limit: 10 }, submissionIds: [42] })
+      );
+    });
+
     it('should return empty array when no results', async () => {
       const mockResponse: SearchFeatureResponse = {
         features: [],

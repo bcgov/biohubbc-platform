@@ -51,6 +51,8 @@ export async function seed(knex: Knex): Promise<void> {
     -- CREATE OR REPLACE cannot replace a function under a different signature, so an existing
     -- database would otherwise keep both.
     DROP FUNCTION IF EXISTS biohub.martin_search_visible_geometries(uuid, boolean, integer, text, uuid[], public.geometry);
+    DROP FUNCTION IF EXISTS biohub.martin_search_visible_geometries(integer, integer, uuid, public.geometry);
+    DROP FUNCTION IF EXISTS biohub.martin_search_visible_geometries(integer, integer, uuid, integer[], public.geometry);
 
     ----------------------------------------------------------------------------------------
     -- Effective security probe
@@ -819,6 +821,7 @@ export async function seed(knex: Knex): Promise<void> {
       p_feature_type_id integer,
       p_system_user_id  integer,
       p_expression_id   uuid,
+      p_submission_ids  integer[],
       p_envelope_4326   public.geometry
     )
     RETURNS TABLE (
@@ -837,6 +840,16 @@ export async function seed(knex: Knex): Promise<void> {
         ON sf.submission_feature_id = g.submission_feature_id
       WHERE g.value && p_envelope_4326
         AND sf.feature_type_id = p_feature_type_id
+        AND (p_submission_ids IS NULL OR sf.submission_id = ANY(p_submission_ids))
+        AND (
+          p_submission_ids IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM biohub.submission_feature_closure submission_scope_closure
+            WHERE submission_scope_closure.source_submission_feature_id = sf.submission_feature_id
+              AND submission_scope_closure.target_submission_feature_id = sf.submission_feature_id
+          )
+        )
         AND sf.record_effective_date <= now()
         AND (sf.record_end_date IS NULL OR now() < sf.record_end_date)
         AND biohub.martin_feature_accessible(sf.submission_feature_id, p_system_user_id)
@@ -849,7 +862,7 @@ export async function seed(knex: Knex): Promise<void> {
         );
     $fn$;
 
-    COMMENT ON FUNCTION biohub.martin_search_visible_geometries(integer, integer, uuid, public.geometry) IS
+    COMMENT ON FUNCTION biohub.martin_search_visible_geometries(integer, integer, uuid, integer[], public.geometry) IS
       'Resolves the geometries a tile context may see within a bounding box: envelope-limited candidates filtered by the caller''s live authorization and the persisted search expression. Called only from biohub.martin_search.';
 
     ----------------------------------------------------------------------------------------
@@ -902,7 +915,8 @@ export async function seed(knex: Knex): Promise<void> {
       SELECT
         tc.feature_type_id,
         tc.system_user_id,
-        tc.expression_id
+        tc.expression_id,
+        tc.submission_ids
       INTO v_ctx
       FROM biohub.martin_context tc
       WHERE tc.martin_context_id = v_context_id
@@ -990,6 +1004,7 @@ export async function seed(knex: Knex): Promise<void> {
                 v_ctx.feature_type_id,
                 v_ctx.system_user_id,
                 v_ctx.expression_id,
+                v_ctx.submission_ids,
                 v_candidates_4326
               ) visible
             ) feature_points
@@ -1020,6 +1035,7 @@ export async function seed(knex: Knex): Promise<void> {
             v_ctx.feature_type_id,
             v_ctx.system_user_id,
             v_ctx.expression_id,
+            v_ctx.submission_ids,
             v_candidates_4326
           ) visible
         ) feature_rows
@@ -1048,7 +1064,7 @@ export async function seed(knex: Knex): Promise<void> {
       -- CREATE FUNCTION grants EXECUTE to PUBLIC by default, and pg_restore --no-acl restores that
       -- default at cutover, so the revoke is re-applied on every deploy rather than once.
       REVOKE ALL ON FUNCTION biohub.martin_search(integer, integer, integer, json) FROM PUBLIC;
-      REVOKE ALL ON FUNCTION biohub.martin_search_visible_geometries(integer, integer, uuid, public.geometry) FROM PUBLIC;
+      REVOKE ALL ON FUNCTION biohub.martin_search_visible_geometries(integer, integer, uuid, integer[], public.geometry) FROM PUBLIC;
       REVOKE ALL ON FUNCTION biohub.martin_expression_matches(uuid, integer, integer, integer) FROM PUBLIC;
       REVOKE ALL ON FUNCTION biohub.martin_predicate_matches(uuid, integer, integer, integer) FROM PUBLIC;
       REVOKE ALL ON FUNCTION biohub.martin_feature_accessible(integer, integer) FROM PUBLIC;
@@ -1066,7 +1082,7 @@ export async function seed(knex: Knex): Promise<void> {
         -- The API role needs all of these so the integration tests can exercise the tile SQL and
         -- the evaluator functions directly.
         EXECUTE format('GRANT EXECUTE ON FUNCTION biohub.martin_search(integer, integer, integer, json) TO %I', v_api_role);
-        EXECUTE format('GRANT EXECUTE ON FUNCTION biohub.martin_search_visible_geometries(integer, integer, uuid, public.geometry) TO %I', v_api_role);
+        EXECUTE format('GRANT EXECUTE ON FUNCTION biohub.martin_search_visible_geometries(integer, integer, uuid, integer[], public.geometry) TO %I', v_api_role);
         EXECUTE format('GRANT EXECUTE ON FUNCTION biohub.martin_expression_matches(uuid, integer, integer, integer) TO %I', v_api_role);
         EXECUTE format('GRANT EXECUTE ON FUNCTION biohub.martin_predicate_matches(uuid, integer, integer, integer) TO %I', v_api_role);
         EXECUTE format('GRANT EXECUTE ON FUNCTION biohub.martin_feature_accessible(integer, integer) TO %I', v_api_role);
