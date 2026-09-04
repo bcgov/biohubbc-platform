@@ -1,5 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
+import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 
 /**
  * Optional identity claims for a person on whose behalf an upload is initiated. The authenticated
@@ -246,6 +247,37 @@ export const SubmissionUploadStatusHistoryResponseSchema: OpenAPIV3.SchemaObject
     }
   },
   additionalProperties: false
+};
+
+/**
+ * One entry of an upload's processing status history
+ * (GET /administrative/submission/{submissionUuid}/upload/{submissionUploadId}/status/history).
+ */
+export const SubmissionUploadProcessingStatusHistoryItemSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['submission_upload_status_id', 'submission_upload_id', 'status', 'create_date'],
+  properties: {
+    submission_upload_status_id: {
+      type: 'integer',
+      description: 'Primary key of the submission_upload_status record.'
+    },
+    submission_upload_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Foreign key to the submission_upload record.'
+    },
+    status: {
+      type: 'string',
+      enum: SubmissionUploadJobStatus.options,
+      description: 'Processing status the upload entered.'
+    },
+    create_date: {
+      type: 'string',
+      format: 'date-time',
+      description: 'When the upload entered this status.'
+    }
+  }
 };
 
 /**

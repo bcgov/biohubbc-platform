@@ -1,32 +1,33 @@
 import { AxiosInstance } from 'axios';
 import {
   ICompleteTicketUploadRequest,
-  ICreateTicketCommentRequest,
   ICreateSubmissionUploadReviewRequest,
-  ICreateTicketUploadRequest,
-  ICreateTicketUploadResponse,
-  ICreateTicketSystemUser,
+  ICreateTicketCommentRequest,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
+  ICreateTicketSystemUser,
+  ICreateTicketUploadRequest,
+  ICreateTicketUploadResponse,
   IGetTicketArtifactsQueryParams,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
+  ISubmissionUploadProcessingStatusHistoryItem,
   ISubmissionUploadReviewStatusResponse,
-  ITicketSystemUser,
   ITicket,
   ITicketArtifact,
-  ITicketCommentLog,
-  ITicketReference,
-  ITicketExtended,
   ITicketArtifactDownloadResponse,
+  ITicketCommentLog,
+  ITicketExtended,
+  ITicketReference,
   ITicketsQueryParams,
+  ITicketSystemUser,
   IUpdateSubmissionUploadReviewRequest,
   IUpdateSubmissionUploadReviewStatusRequest,
-  IUpdateTicketSystemUserStatusRequest,
-  IUpdateTicketRequest,
-  TicketSubmissionUploadReviewResponse,
   IUpdateTicketCommentRequest,
-  TicketStatus
+  IUpdateTicketRequest,
+  IUpdateTicketSystemUserStatusRequest,
+  TicketStatus,
+  TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
 import qs from 'qs';
 
@@ -227,6 +228,24 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get the active processing status history of a submission upload, earliest first.
+   *
+   * @param {string} submissionUuid
+   * @param {string} submissionUploadId
+   * @return {Promise<ISubmissionUploadProcessingStatusHistoryItem[]>}
+   */
+  const getSubmissionUploadProcessingStatusHistory = async (
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<ISubmissionUploadProcessingStatusHistoryItem[]> => {
+    const { data } = await axios.get<ISubmissionUploadProcessingStatusHistoryItem[]>(
+      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status/history`
+    );
+
+    return data;
+  };
+
+  /**
    * Update final review status for a submission upload.
    *
    * @param {string} submissionUuid
@@ -407,6 +426,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     completeTicketUpload,
     getTicketArtifacts,
     getTicketArtifactDownloadUrl,
+    getSubmissionUploadProcessingStatusHistory,
     updateSubmissionUploadReviewStatus,
     updateSubmissionUploadReview,
     insertSubmissionUploadReview,

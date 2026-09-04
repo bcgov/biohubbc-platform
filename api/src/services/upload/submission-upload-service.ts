@@ -9,6 +9,7 @@ import {
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
+import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
 import {
   SubmissionUploadReviewStatus,
   UpdateSubmissionUploadReviewStatus
@@ -427,6 +428,36 @@ export class SubmissionUploadService extends DBService {
    */
   async transitionSubmissionUploadToReconciled(submissionUploadId: string): Promise<void> {
     await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciled', ['reconciling']);
+  }
+
+  /**
+   * Find the active processing status history of an upload that belongs to the given submission.
+   *
+   * Rows are returned earliest first, in the order the statuses were entered. Superseded rows
+   * (end-dated by reprocessing) are excluded.
+   *
+   * @param {string} submissionUuid Submission UUID from the request path.
+   * @param {string} submissionUploadId Submission upload UUID from the request path.
+   * @returns {Promise<SubmissionUploadProcessingStatusHistoryItem[]>} Active processing status rows, earliest first.
+   * @throws {ApiNotFoundError} If the upload does not exist or does not belong to the submission.
+   * @memberof SubmissionUploadService
+   */
+  async findSubmissionUploadProcessingStatusHistory(
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<SubmissionUploadProcessingStatusHistoryItem[]> {
+    await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+
+    const rows = await this.submissionUploadProcessingStatusRepository.findActiveSubmissionUploadProcessingStatuses(
+      submissionUploadId
+    );
+
+    return rows.map((row) => ({
+      submission_upload_status_id: row.submission_upload_status_id,
+      submission_upload_id: row.submission_upload_id,
+      status: row.status,
+      create_date: row.create_date
+    }));
   }
 
   /**
