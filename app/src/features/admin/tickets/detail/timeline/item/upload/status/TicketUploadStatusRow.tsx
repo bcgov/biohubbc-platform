@@ -5,8 +5,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Typography from '@mui/material/Typography';
-import { SUBMISSION_UPLOAD_JOB_STATUS_COLORS } from 'constants/submission-upload-status';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { getSubmissionUploadJobStatusPresentation } from 'utils/submission-upload-status';
 import { ITicketUploadStatusRowProps } from '../TicketUploadTimelineItem.interface';
 import { TicketUploadStatusHistory } from './TicketUploadStatusHistory';
@@ -15,8 +14,9 @@ import { TicketUploadStatusHistory } from './TicketUploadStatusHistory';
  * Current processing status of a submission upload, expandable to show how the upload progressed
  * through each processing stage.
  *
- * The history is requested when the row is first expanded and comes from the timeline-level cache,
- * so collapsing and re-expanding reuses a loaded response and retries a failed one.
+ * The history is requested whenever the row is expanded, or the upload's status changes while it is
+ * expanded, and comes from the timeline-level cache, so re-expanding reuses a loaded response and
+ * retries a failed one. Nothing below the current status renders until the row has been expanded.
  *
  * @param {ITicketUploadStatusRowProps} props
  * @return {*}
@@ -28,16 +28,21 @@ export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
 
   const presentation = getSubmissionUploadJobStatusPresentation(upload.upload_status);
   const showStatusIcon = presentation.isTerminal || !presentation.isKnown;
-  const spinnerColor = SUBMISSION_UPLOAD_JOB_STATUS_COLORS[upload.upload_status] ?? 'primary.main';
 
-  const handleToggle = useCallback(() => {
-    const nextIsExpanded = !isExpanded;
-    setIsExpanded(nextIsExpanded);
-
-    if (nextIsExpanded) {
+  useEffect(() => {
+    if (isExpanded) {
       onLoadStatusHistory(upload);
     }
   }, [isExpanded, onLoadStatusHistory, upload]);
+
+  /**
+   * Flip the expanded state; the effect above requests the history for the expanded row.
+   *
+   * @returns {void}
+   */
+  const handleToggle = useCallback(() => {
+    setIsExpanded((previous) => !previous);
+  }, []);
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
@@ -58,7 +63,7 @@ export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
         {showStatusIcon ? (
           <Icon path={presentation.iconPath} size={0.7} style={{ color: presentation.iconColor }} />
         ) : (
-          <CircularProgress size={14} thickness={5} sx={{ color: spinnerColor, flexShrink: 0 }} />
+          <CircularProgress size={14} thickness={5} sx={{ color: 'primary.main', flexShrink: 0 }} />
         )}
         <Typography variant="body2" sx={{ flex: '1 1 auto' }}>
           {presentation.label}
@@ -67,7 +72,7 @@ export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
       </ButtonBase>
       <Collapse in={isExpanded}>
         <Box id={historyRegionId} role="region" aria-label="Processing history" sx={{ px: 2, pb: 1.5, minHeight: 112 }}>
-          <TicketUploadStatusHistory statusHistory={statusHistory} />
+          {(isExpanded || statusHistory) && <TicketUploadStatusHistory statusHistory={statusHistory} />}
         </Box>
       </Collapse>
     </Box>
