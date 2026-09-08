@@ -175,6 +175,10 @@ const appTheme = createTheme({
           }
         }),
         contained: ({ theme, ownerState }) => {
+          if (ownerState.color === 'inherit') {
+            return {};
+          }
+
           const { main, dark, contrastText } = {
             ...theme.palette.primary,
             ...(theme.palette[ownerState.color as keyof typeof theme.palette] as

@@ -37,6 +37,7 @@ export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
         rows={rows}
         rowCount={rowCount}
         onRowClick={onRowClick}
+        disableRowSelectionOnClick
         columns={columns}
         getRowId={(row) => row.submission_feature_id}
         loading={isLoading}

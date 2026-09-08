@@ -43,7 +43,7 @@ export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
           size="small"
           variant="contained"
           color={isCompleted ? 'success' : 'primary'}
-          onSelect={(reviewId) => onOpenReview(scope, reviewId)}>
+          onSelect={onOpenReview}>
           {isCompleted ? 'Completed' : 'Continue'}
         </DropdownButton>
       ) : (

@@ -50,14 +50,14 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
             scope="validation"
             reviews={upload.reviews.validation}
             onCreateReview={setCreateReviewScope}
-            onOpenReview={(scope, reviewId) => onOpenReview(upload, scope, reviewId)}
+            onOpenReview={(reviewId) => onOpenReview(upload, reviewId)}
           />
           <TicketUploadReviewRow
             label="Security Review"
             scope="security"
             reviews={upload.reviews.security}
             onCreateReview={setCreateReviewScope}
-            onOpenReview={(scope, reviewId) => onOpenReview(upload, scope, reviewId)}
+            onOpenReview={(reviewId) => onOpenReview(upload, reviewId)}
           />
 
           <TicketUploadDecisionRow

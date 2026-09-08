@@ -378,6 +378,32 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get all paginated features belonging to one submission upload.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting parameters.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Features belonging to the upload.
+   * @memberof SubmissionService
+   */
+  async getSubmissionUploadFeatures(
+    submissionUploadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    return this.submissionRepository.getSubmissionUploadFeatures(submissionUploadId, pagination);
+  }
+
+  /**
+   * Count all features belonging to one submission upload.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @returns {Promise<number>} Number of features belonging to the upload.
+   * @memberof SubmissionService
+   */
+  async getSubmissionUploadFeaturesCount(submissionUploadId: string): Promise<number> {
+    return this.submissionRepository.getSubmissionUploadFeaturesCount(submissionUploadId);
+  }
+
+  /**
    * Get all messages for a submission.
    *
    * @param {number} submissionId

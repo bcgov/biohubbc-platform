@@ -1684,13 +1684,17 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Build the base query for submission features.
    *
-   * @param {number} submissionId ID of the submission whose features should be queried.
+   * @param {{ submissionId?: number; submissionUploadId?: string; currentOnly?: boolean }} filters Query scope.
    * @param {Knex} knex Knex instance used to construct the query.
    * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
-   * @returns {Knex.QueryBuilder} Query for distinct active submission features.
+   * @returns {Knex.QueryBuilder} Query for distinct submission features.
    * @memberof SubmissionRepository
    */
-  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex, systemUserId?: number | null) {
+  private _getSubmissionFeaturesBaseQuery(
+    filters: { submissionId?: number; submissionUploadId?: string; currentOnly?: boolean },
+    knex: Knex,
+    systemUserId?: number | null
+  ) {
     const baseQuery = knex('submission_feature')
       .select(
         'submission_feature.submission_id',
@@ -1699,9 +1703,19 @@ export class SubmissionRepository extends BaseRepository {
         knex.raw('feature_type.name AS feature_type_name'),
         knex.raw(`${isEffectivelySecured('submission_feature.submission_feature_id')} AS secured`)
       )
-      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
-      .where('submission_feature.submission_id', submissionId)
-      .whereRaw(isSubmissionFeatureCurrent('submission_feature'));
+      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id');
+
+    if (filters.currentOnly !== false) {
+      baseQuery.whereRaw(isSubmissionFeatureCurrent('submission_feature'));
+    }
+
+    if (filters.submissionId) {
+      baseQuery.where('submission_feature.submission_id', filters.submissionId);
+    }
+
+    if (filters.submissionUploadId) {
+      baseQuery.where('submission_feature.submission_upload_id', filters.submissionUploadId);
+    }
 
     const securityFilter = buildSecurityFilter(knex, systemUserId, 'submission_feature.submission_feature_id');
     if (securityFilter) {
@@ -1727,7 +1741,7 @@ export class SubmissionRepository extends BaseRepository {
   ): Promise<SubmissionFeatureForReview[]> {
     const knex = getKnex();
 
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionId }, knex, systemUserId);
 
     this.applyPagination(baseQuery, pagination);
 
@@ -1748,7 +1762,7 @@ export class SubmissionRepository extends BaseRepository {
     const knex = getKnex();
 
     // Wrap the base query as a subquery
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionId }, knex, systemUserId);
     const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
 
     const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
@@ -1761,5 +1775,42 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].count;
+  }
+
+  /**
+   * Get all features belonging to one submission upload, regardless of effective dates.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting parameters.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Features belonging to the upload.
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionUploadFeatures(
+    submissionUploadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    const knex = getKnex();
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionUploadId, currentOnly: false }, knex);
+
+    this.applyPagination(baseQuery, pagination);
+
+    const response = await this.connection.knex(baseQuery, SubmissionFeatureForReview);
+    return response.rows;
+  }
+
+  /**
+   * Count all features belonging to one submission upload, regardless of effective dates.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @returns {Promise<number>} Number of features belonging to the upload.
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionUploadFeaturesCount(submissionUploadId: string): Promise<number> {
+    const knex = getKnex();
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionUploadId, currentOnly: false }, knex);
+    const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
+    const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
+
+    return response.rows[0]?.count ?? 0;
   }
 }

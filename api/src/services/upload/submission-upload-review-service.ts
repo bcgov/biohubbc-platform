@@ -43,6 +43,27 @@ export class SubmissionUploadReviewService extends DBService {
   }
 
   /**
+   * Get one active review belonging to a submission upload.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {string} submissionUploadReviewId Submission upload review identifier.
+   * @returns {Promise<SubmissionUploadReview>} Matching active review.
+   * @memberof SubmissionUploadReviewService
+   */
+  async getSubmissionUploadReview(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionUploadReviewId: string
+  ): Promise<SubmissionUploadReview> {
+    return this.submissionUploadReviewRepository.getSubmissionUploadReview(
+      submissionId,
+      submissionUploadId,
+      submissionUploadReviewId
+    );
+  }
+
+  /**
    * Get active review rows for a submission upload.
    *
    * @param {number} submissionId - The submission ID.

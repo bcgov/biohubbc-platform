@@ -16,6 +16,51 @@ import { BaseRepository } from '../base-repository';
  */
 export class SubmissionUploadReviewRepository extends BaseRepository {
   /**
+   * Get one active review belonging to a submission upload.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {string} submissionUploadReviewId Submission upload review identifier.
+   * @returns {Promise<SubmissionUploadReview>} Matching active review.
+   * @memberof SubmissionUploadReviewRepository
+   */
+  async getSubmissionUploadReview(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionUploadReviewId: string
+  ): Promise<SubmissionUploadReview> {
+    const sqlStatement = SQL`
+      SELECT
+        sur.submission_upload_review_id,
+        sur.submission_upload_id,
+        sur.name,
+        sur.description,
+        sur.scope,
+        sur.status,
+        sur.requested_by
+      FROM submission_upload_review sur
+      INNER JOIN submission_upload su
+        ON su.submission_upload_id = sur.submission_upload_id
+        AND su.record_end_date IS NULL
+      WHERE sur.submission_upload_id = ${submissionUploadId}
+        AND su.submission_id = ${submissionId}
+        AND sur.submission_upload_review_id = ${submissionUploadReviewId}
+        AND sur.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadReview);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Submission upload review not found', [
+        'SubmissionUploadReviewRepository->getSubmissionUploadReview',
+        { submissionId, submissionUploadId, submissionUploadReviewId }
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Get active review rows for a submission upload.
    *
    * @param {string} submissionUploadId - The submission upload ID.

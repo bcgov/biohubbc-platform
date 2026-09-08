@@ -4,40 +4,50 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GridColDef } from '@mui/x-data-grid';
+import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageSection } from 'components/section/PageSection';
-import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse } from 'interfaces/useFeaturesApi.interface';
+import { IFeaturePropertyRow } from 'interfaces/useFeaturesApi.interface';
 import { useMemo } from 'react';
-import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { PropertyValueDisplay } from './PropertyValueDisplay';
 
-interface FeaturePropertiesSectionProps {
+interface SubmissionFeaturePropertiesSectionProps {
   submissionId: number;
-  submissionFeatureId: number;
   pathResolvers: SubmissionPropertyValuePathResolvers;
+  rows: IFeaturePropertyRow[];
+  rowCount: number;
+  isLoading: boolean;
+  paginationModel: GridPaginationModel;
+  setPaginationModel: (model: GridPaginationModel) => void;
+  sortModel: GridSortModel;
+  setSortModel: (model: GridSortModel) => void;
+  searchTerm: string;
+  onSearch: (term: string) => void;
 }
 
 /**
- * "Properties" section of the submission feature detail pages (public and portal).
+ * Server-paginated properties section for a submission feature.
  *
- * Lists the feature's canonical indexed properties from `GET .../features/{id}/properties` with server-side
- * search, sort and pagination, rendering each value via {@link PropertyValueDisplay} so reference values
- * (taxon) display their `label` as a link.
+ * Renders caller-provided submission feature property rows with search, sorting, pagination, and linked reference values.
  *
- * @param {FeaturePropertiesSectionProps} props
- * @returns {JSX.Element}
+ * @param {SubmissionFeaturePropertiesSectionProps} props - Component props.
+ * @returns {JSX.Element} Submission feature properties section.
  */
-export const FeaturePropertiesSection = ({
+export const SubmissionFeaturePropertiesSection = ({
   submissionId,
-  submissionFeatureId,
-  pathResolvers
-}: FeaturePropertiesSectionProps) => {
-  const api = useApi();
-
+  pathResolvers,
+  rows,
+  rowCount,
+  isLoading,
+  paginationModel,
+  setPaginationModel,
+  sortModel,
+  setSortModel,
+  searchTerm,
+  onSearch
+}: SubmissionFeaturePropertiesSectionProps) => {
   const columns = useMemo<GridColDef<IFeaturePropertyRow>[]>(
     () => [
       {
@@ -64,18 +74,6 @@ export const FeaturePropertiesSection = ({
     [submissionId, pathResolvers]
   );
 
-  const propertyGrid = useServerPaginatedDataGrid<IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse>({
-    fetcher: async (search, pagination) =>
-      api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, {
-        search,
-        ...pagination
-      }),
-    extractData: (response) => response.properties,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'property', sort: 'asc' },
-    defaultPageSize: 10
-  });
-
   return (
     <PageSection
       id="submission-feature-properties"
@@ -85,8 +83,8 @@ export const FeaturePropertiesSection = ({
           <TextField
             size="small"
             placeholder="Search by property or value"
-            value={propertyGrid.searchTerm}
-            onChange={(event) => propertyGrid.handleSearch(event.target.value)}
+            value={searchTerm}
+            onChange={(event) => onSearch(event.target.value)}
             slotProps={{
               input: {
                 startAdornment: (
@@ -102,19 +100,19 @@ export const FeaturePropertiesSection = ({
       }>
       <CustomDataGrid
         autoHeight
-        rows={propertyGrid.rows}
+        rows={rows}
         columns={columns}
         getRowId={(row) => row.id}
-        loading={propertyGrid.isLoading}
+        loading={isLoading}
         noRowsMessage="No properties"
         paginationMode="server"
-        paginationModel={propertyGrid.paginationModel}
-        onPaginationModelChange={propertyGrid.handlePaginationChange}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[10, 25, 50]}
-        rowCount={propertyGrid.rowCount}
+        rowCount={rowCount}
         sortingMode="server"
-        sortModel={propertyGrid.sortModel}
-        onSortModelChange={propertyGrid.handleSortChange}
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
         rowSelection={false}
       />
     </PageSection>

@@ -13,11 +13,7 @@ export interface ITicketUploadTimelineItemProps {
     scope: SubmissionUploadReviewScope,
     review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
   ) => void;
-  onOpenReview: (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
-    submissionUploadReviewId: string
-  ) => void;
+  onOpenReview: (upload: TicketSubmissionUploadResponse, submissionUploadReviewId: string) => void;
   onAccept: (upload: TicketSubmissionUploadResponse) => void;
   onReject: (upload: TicketSubmissionUploadResponse) => void;
   onResetDecision: (upload: TicketSubmissionUploadResponse) => void;
@@ -28,7 +24,7 @@ export interface ITicketUploadReviewRowProps {
   scope: SubmissionUploadReviewScope;
   reviews: TicketSubmissionUploadReviewResponse[];
   onCreateReview: (scope: SubmissionUploadReviewScope) => void;
-  onOpenReview: (scope: SubmissionUploadReviewScope, submissionUploadReviewId: string) => void;
+  onOpenReview: (submissionUploadReviewId: string) => void;
 }
 
 export interface ITicketUploadStatusRowProps {

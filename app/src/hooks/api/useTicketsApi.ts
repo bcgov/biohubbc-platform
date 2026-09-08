@@ -20,7 +20,6 @@ import {
   ITicketExtended,
   ITicketArtifactDownloadResponse,
   ITicketsQueryParams,
-  IUpdateSubmissionUploadReviewRequest,
   IUpdateSubmissionUploadReviewStatusRequest,
   IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
@@ -248,29 +247,6 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Update a scoped submission upload review task.
-   *
-   * @param {number} submissionId
-   * @param {string} submissionUploadId
-   * @param {string} submissionUploadReviewId
-   * @param {IUpdateSubmissionUploadReviewRequest} payload
-   * @return {Promise<TicketSubmissionUploadReviewResponse>}
-   */
-  const updateSubmissionUploadReview = async (
-    submissionId: number,
-    submissionUploadId: string,
-    submissionUploadReviewId: string,
-    payload: IUpdateSubmissionUploadReviewRequest
-  ): Promise<TicketSubmissionUploadReviewResponse> => {
-    const { data } = await axios.patch<TicketSubmissionUploadReviewResponse>(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
-      payload
-    );
-
-    return data;
-  };
-
-  /**
    * Create a new scoped submission upload review task.
    *
    * Existing reviews for the requested upload and scope remain unchanged.
@@ -407,7 +383,6 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     getTicketArtifacts,
     getTicketArtifactDownloadUrl,
     updateSubmissionUploadReviewStatus,
-    updateSubmissionUploadReview,
     insertSubmissionUploadReview,
     createTicketReference,
     deleteTicketReference,
