@@ -1,7 +1,10 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SubmissionUploadJobStatus } from '../../models/submission-upload';
-import { SubmissionUploadProcessingStatus } from '../../models/submission-upload-processing-status';
+import {
+  SubmissionUploadProcessingStatus,
+  SubmissionUploadProcessingStatusHistoryRow
+} from '../../models/submission-upload-processing-status';
 import { BaseRepository } from '../base-repository';
 import { processingStatusPredicate } from './submission-upload-status-predicates';
 
@@ -87,39 +90,49 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
   }
 
   /**
-   * Find the active processing status rows for an upload, earliest first.
+   * Find the active processing status history of an upload that belongs to a submission, earliest
+   * first, in one query.
    *
+   * Returns no rows when the upload does not exist, is not active, or is not in the submission.
+   * Returns exactly one row with null status columns when the upload exists but has no processing
+   * history rows. Otherwise returns one row per active processing status.
+   *
+   * @param {string} submissionUuid - Submission the upload must belong to.
    * @param {string} submissionUploadId - Submission upload whose history is requested.
-   * @returns {Promise<SubmissionUploadProcessingStatus[]>} - Active rows ordered by create_date, then id.
+   * @returns {Promise<SubmissionUploadProcessingStatusHistoryRow[]>} - Rows ordered by create_date, then id.
    * @memberof SubmissionUploadProcessingStatusRepository
    */
-  async findActiveSubmissionUploadProcessingStatuses(
+  async findSubmissionUploadProcessingStatusHistory(
+    submissionUuid: string,
     submissionUploadId: string
-  ): Promise<SubmissionUploadProcessingStatus[]> {
+  ): Promise<SubmissionUploadProcessingStatusHistoryRow[]> {
     const sqlStatement = SQL`
       SELECT
-        submission_upload_status_id,
-        submission_upload_id,
-        status,
-        record_end_date,
-        create_date,
-        create_user
+        su.submission_upload_id,
+        sus.submission_upload_status_id,
+        sus.status,
+        sus.create_date
       FROM
-        submission_upload_status
-      WHERE
-        submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL
+        submission_upload su
+      INNER JOIN submission s ON s.submission_id = su.submission_id
+      LEFT JOIN submission_upload_status sus
+        ON sus.submission_upload_id = su.submission_upload_id
+        AND sus.record_end_date IS NULL
         AND `
-      .append(processingStatusPredicate('status'))
+      .append(processingStatusPredicate('sus.status'))
       .append(
         SQL`
+      WHERE
+        s.uuid = ${submissionUuid}
+        AND su.submission_upload_id = ${submissionUploadId}
+        AND su.record_end_date IS NULL
       ORDER BY
-        create_date ASC,
-        submission_upload_status_id ASC;
+        sus.create_date ASC,
+        sus.submission_upload_status_id ASC;
     `
       );
 
-    const response = await this.connection.sql(sqlStatement, SubmissionUploadProcessingStatus);
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadProcessingStatusHistoryRow);
 
     return response.rows;
   }
