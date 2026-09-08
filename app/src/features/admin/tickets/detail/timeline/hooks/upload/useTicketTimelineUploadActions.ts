@@ -123,7 +123,7 @@ export const useTicketTimelineUploadActions = () => {
       );
 
       navigate(
-        `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${scope}/${insertedReview.submission_upload_review_id}`
+        `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${insertedReview.submission_upload_review_id}`
       );
     } catch (error) {
       showUploadActionError(error);
@@ -140,11 +140,11 @@ export const useTicketTimelineUploadActions = () => {
    */
   const handleOpenSubmissionUploadReview = (
     upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
+    _scope: SubmissionUploadReviewScope,
     submissionUploadReviewId: string
   ): void => {
     navigate(
-      `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${scope}/${submissionUploadReviewId}`
+      `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${submissionUploadReviewId}`
     );
   };
 

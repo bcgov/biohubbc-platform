@@ -48,6 +48,33 @@ describe('SubmissionUploadReconciliationService', () => {
     expect(reconcile).to.have.been.calledWith(UPLOAD_ID, 9, 'predecessor-upload-id');
   });
 
+  it('returns immutable reconciliation overview counts for the requested submission upload', async () => {
+    stubUpload();
+    const getCounts = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getSubmissionFeatureReconciliationOverviewCounts')
+      .resolves({ new: 4, modified: 2, unmodified: 7 });
+    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
+
+    expect(await service.getSubmissionFeatureReconciliationCounts(9, UPLOAD_ID)).to.eql({
+      new: 4,
+      modified: 2,
+      unmodified: 7
+    });
+    expect(getCounts).to.have.been.calledOnceWithExactly(UPLOAD_ID);
+  });
+
+  it('rejects reconciliation counts when the upload belongs to another submission', async () => {
+    stubUpload();
+    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
+
+    try {
+      await service.getSubmissionFeatureReconciliationCounts(10, UPLOAD_ID);
+      expect.fail('Expected submission upload ownership check to fail');
+    } catch (error) {
+      expect((error as Error).message).to.equal('Submission upload not found');
+    }
+  });
+
   it('activates the stored reconciliation during approval', async () => {
     stubUpload();
     const getCounts = sinon

@@ -34,6 +34,16 @@ vi.mock('./ticket/TicketsRouter', () => ({
   TicketsRouter: () => <div data-testid="tickets-router">Tickets Router</div>
 }));
 
+vi.mock('features/admin/reviews/SubmissionUploadReviewValidationPage', () => ({
+  SubmissionUploadReviewValidationPage: () => (
+    <div data-testid="submission-upload-review-validation-page">Validation Review</div>
+  )
+}));
+
+vi.mock('features/admin/reviews/SubmissionReviewFeaturePage', () => ({
+  SubmissionReviewFeaturePage: () => <div data-testid="submission-review-feature-page">Review Feature</div>
+}));
+
 describe('AdminRouter ticket route guard', () => {
   const renderAdminRouter = (authState: ReturnType<typeof getMockAuthState>, initialEntry = '/admin/tickets') =>
     render(
@@ -90,6 +100,32 @@ describe('AdminRouter ticket route guard', () => {
 
     await waitFor(() => {
       expect(getByTestId('policy-detail-page')).toBeVisible();
+    });
+  });
+
+  it('renders the validation review route for system admin', async () => {
+    const authState = getMockAuthState({ base: SystemAdminAuthState });
+
+    const { getByTestId } = renderAdminRouter(
+      authState,
+      '/admin/submission/16/upload/11111111-1111-4111-8111-111111111111/review/22222222-2222-4222-8222-222222222222'
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('submission-upload-review-validation-page')).toBeVisible();
+    });
+  });
+
+  it('does not route to a scoped security review URL', async () => {
+    const authState = getMockAuthState({ base: SystemAdminAuthState });
+
+    const { getByTestId } = renderAdminRouter(
+      authState,
+      '/admin/submission/16/upload/11111111-1111-4111-8111-111111111111/review/security/22222222-2222-4222-8222-222222222222'
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('not-found-page')).toBeVisible();
     });
   });
 });

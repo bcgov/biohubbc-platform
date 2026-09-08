@@ -1,31 +1,21 @@
-import { mdiLock } from '@mdi/js';
-import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Chip from '@mui/material/Chip';
-import Container from '@mui/material/Container';
-import Link from '@mui/material/Link';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import { SubmissionFeatureAbout } from 'components/feature/SubmissionFeatureAbout';
-import { PageHeader } from 'components/header/PageHeader';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonPage } from 'components/loading/SkeletonPage';
-import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
-import { PageSection } from 'components/section/PageSection';
-import { SubmissionFeatureMap } from 'features/submissions/page/features/components/map/SubmissionFeatureMap';
+import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
+import { SubmissionFeatureLayout } from 'features/submissions/page/features/components/SubmissionFeatureLayout';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse } from 'interfaces/useFeaturesApi.interface';
 import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 
 /**
  * Portal submission feature detail page scoped to the current user's submission.
  *
- * @returns {JSX.Element}
+ * Owns portal route parsing, feature loading, authorization error handling, and portal-scoped feature detail layout.
+ *
+ * @returns {JSX.Element} Portal submission feature detail page.
  */
 export const PortalSubmissionFeaturePage = () => {
   const navigate = useNavigate();
@@ -55,77 +45,66 @@ export const PortalSubmissionFeaturePage = () => {
   }, [submissionId, submissionFeatureId]);
 
   const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
-
   const pathResolvers = useMemo(
     () => buildSubmissionPropertyValuePathResolvers('/portal/submission', location.search),
     [location.search]
   );
 
-  const featureTypeLabel = feature ? getFeatureTypeDisplayLabel(feature.feature_type_name) : '';
+  const {
+    rows: submissionFeaturePropertyRows,
+    rowCount: submissionFeaturePropertyRowCount,
+    isLoading: isSubmissionFeaturePropertiesLoading,
+    paginationModel: submissionFeaturePropertiesPaginationModel,
+    handlePaginationChange: handleSubmissionFeaturePropertiesPaginationChange,
+    sortModel: submissionFeaturePropertiesSortModel,
+    handleSortChange: handleSubmissionFeaturePropertiesSortChange,
+    searchTerm: submissionFeaturePropertiesSearchTerm,
+    handleSearch: handleSubmissionFeaturePropertiesSearch
+  } = useServerPaginatedDataGrid<IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse>({
+    fetcher: (search: string, pagination: ApiPaginationRequestOptions) => {
+      if (submissionId === null || submissionFeatureId === null) {
+        return Promise.resolve({
+          properties: [],
+          pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+        });
+      }
+
+      return api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, {
+        search,
+        ...pagination
+      });
+    },
+    extractData: (response) => response.properties,
+    extractTotal: (response) => response.pagination.total,
+    defaultSort: { field: 'property', sort: 'asc' },
+    defaultPageSize: 10
+  });
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
   }
 
   return (
-    <LoadingGuard
+    <SubmissionFeatureLayout
       isLoading={featureDataLoader.isLoading}
-      isLoadingFallback={<SkeletonPage />}
-      isLoadingFallbackDelay={300}
-      hasNoData={!feature}
-      hasNoDataFallback={
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-          <Typography color="text.secondary">No data available</Typography>
-        </Box>
-      }>
-      <PageHeader
-        breadcrumbs={
-          <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to="/portal/submission" underline="hover" color="inherit">
-              Portal
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`/portal/submission/${feature?.submission_id}`}
-              underline="hover"
-              color="inherit">
-              {feature?.submission_name}
-            </Link>
-            <Typography color="text.primary">{featureTypeLabel}</Typography>
-          </Breadcrumbs>
-        }
-        label={
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              {featureTypeLabel}
-            </Typography>
-          </Box>
-        }
-        subheader={
-          <Box display="flex" gap={1}>
-            <Chip label={featureTypeLabel} size="small" />
-            {feature?.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
-          </Box>
-        }
+      feature={feature}
+      rootBreadcrumbLabel="Portal"
+      rootBreadcrumbTo="/portal/submission"
+      submissionDetailBasePath="/portal/submission"
+      queryString={location.search}>
+      <SubmissionFeaturePropertiesSection
+        submissionId={submissionId}
+        pathResolvers={pathResolvers}
+        rows={submissionFeaturePropertyRows}
+        rowCount={submissionFeaturePropertyRowCount}
+        isLoading={isSubmissionFeaturePropertiesLoading}
+        paginationModel={submissionFeaturePropertiesPaginationModel}
+        setPaginationModel={handleSubmissionFeaturePropertiesPaginationChange}
+        sortModel={submissionFeaturePropertiesSortModel}
+        setSortModel={handleSubmissionFeaturePropertiesSortChange}
+        searchTerm={submissionFeaturePropertiesSearchTerm}
+        onSearch={handleSubmissionFeaturePropertiesSearch}
       />
-      <Container maxWidth="xl">
-        <Stack spacing={3} py={4}>
-          <FeaturePropertiesSection
-            submissionId={submissionId}
-            submissionFeatureId={submissionFeatureId}
-            pathResolvers={pathResolvers}
-          />
-          <PageSection id="portal-submission-feature-map" label="Map">
-            {feature && (
-              <SubmissionFeatureMap
-                submissionId={feature.submission_id}
-                submissionFeatureId={feature.submission_feature_id}
-              />
-            )}
-          </PageSection>
-          {feature && <SubmissionFeatureAbout feature={feature} />}
-        </Stack>
-      </Container>
-    </LoadingGuard>
+    </SubmissionFeatureLayout>
   );
 };

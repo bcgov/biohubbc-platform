@@ -63,21 +63,86 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
   }
 
   /**
+   * Get paginated indexed properties for a feature belonging to a submission upload.
+   *
+   * This administrative query includes unpublished feature rows and scopes the root feature directly
+   * to the supplied submission upload.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload that owns the feature.
+   * @param {number} submissionFeatureId ID of the submission feature whose properties should be returned.
+   * @param {ApiPaginationOptions} pagination Pagination and sorting parameters.
+   * @param {SubmissionFeaturePropertyFilters} [filters] Optional property search filters.
+   * @returns {Promise<SubmissionFeatureProperty[]>} Indexed properties belonging to the feature.
+   * @memberof SubmissionFeaturePropertyRepository
+   */
+  async getSubmissionFeaturePropertiesBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionFeatureId: number,
+    pagination: ApiPaginationOptions,
+    filters?: SubmissionFeaturePropertyFilters
+  ): Promise<SubmissionFeatureProperty[]> {
+    const normalizedSearch = filters?.search?.trim().toLowerCase();
+    const sqlStatement = this._getSubmissionFeaturePropertiesQuery(
+      submissionFeatureId,
+      normalizedSearch,
+      pagination,
+      submissionUploadId
+    );
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureProperty);
+
+    return response.rows;
+  }
+
+  /**
+   * Count indexed properties for a feature belonging to a submission upload.
+   *
+   * This administrative query includes unpublished feature rows and scopes the root feature directly
+   * to the supplied submission upload.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload that owns the feature.
+   * @param {number} submissionFeatureId ID of the submission feature whose properties should be counted.
+   * @param {SubmissionFeaturePropertyFilters} [filters] Optional property search filters.
+   * @returns {Promise<number>} Number of indexed properties belonging to the feature.
+   * @memberof SubmissionFeaturePropertyRepository
+   */
+  async getSubmissionFeaturePropertiesCountBySubmissionUploadId(
+    submissionUploadId: string,
+    submissionFeatureId: number,
+    filters?: SubmissionFeaturePropertyFilters
+  ): Promise<number> {
+    const normalizedSearch = filters?.search?.trim().toLowerCase();
+    const sqlStatement = this._getSubmissionFeaturePropertiesCountQuery(
+      submissionFeatureId,
+      normalizedSearch,
+      submissionUploadId
+    );
+    const response = await this.connection.sql(sqlStatement, z.object({ count: z.number() }));
+
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
    * Build the count query for `getSubmissionFeaturePropertiesCount`.
    *
-   * This reuses the same active-feature and indexed-property union CTE as the list query so count
+   * This reuses the same feature and indexed-property union CTE as the list query so count
    * semantics stay aligned with the paginated result set.
    *
    * @param {number} submissionFeatureId The submission feature whose indexed properties are being counted.
    * @param {string} [normalizedSearch] Optional trimmed/lowercase search term to apply to property names and value labels.
+   * @param {string} [submissionUploadId] Optional upload scope for administrative review reads.
    * @returns {SQLStatement} SQL statement that returns a single integer `count` row.
    * @memberof SubmissionFeaturePropertyRepository
    */
   private _getSubmissionFeaturePropertiesCountQuery(
     submissionFeatureId: number,
-    normalizedSearch?: string
+    normalizedSearch?: string,
+    submissionUploadId?: string
   ): SQLStatement {
-    const sqlStatement = this._getSubmissionFeaturePropertiesBaseQuery(submissionFeatureId, normalizedSearch);
+    const sqlStatement = this._getSubmissionFeaturePropertiesBaseQuery(
+      submissionFeatureId,
+      normalizedSearch,
+      submissionUploadId
+    );
     sqlStatement.append(`
       SELECT COUNT(*)::int AS count
       FROM filtered_property_rows;
@@ -96,15 +161,21 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
    * @param {number} submissionFeatureId The submission feature whose indexed properties are being listed.
    * @param {string | undefined} normalizedSearch Optional trimmed/lowercase search term to apply to property names and value labels.
    * @param {ApiPaginationOptions} pagination Pagination and sort options from the request.
+   * @param {string} [submissionUploadId] Optional upload scope for administrative review reads.
    * @returns {SQLStatement} SQL statement that returns `id`, `property`, and jsonb `value` rows.
    * @memberof SubmissionFeaturePropertyRepository
    */
   private _getSubmissionFeaturePropertiesQuery(
     submissionFeatureId: number,
     normalizedSearch: string | undefined,
-    pagination: ApiPaginationOptions
+    pagination: ApiPaginationOptions,
+    submissionUploadId?: string
   ): SQLStatement {
-    const sqlStatement = this._getSubmissionFeaturePropertiesBaseQuery(submissionFeatureId, normalizedSearch);
+    const sqlStatement = this._getSubmissionFeaturePropertiesBaseQuery(
+      submissionFeatureId,
+      normalizedSearch,
+      submissionUploadId
+    );
     sqlStatement.append(`
       SELECT id, property, value
       FROM filtered_property_rows
@@ -146,11 +217,11 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Build the shared published-feature and indexed-property CTEs used by the list and count queries.
+   * Build the shared feature and indexed-property CTEs used by the list and count queries.
    *
    * This is the only source of property values for this read path: it unions the typed/indexed property
-   * tables and artifact links, filters the root feature and feature-valued references to published
-   * `submission_feature` records, and intentionally does not read `submission_feature.data`.
+   * tables and artifact links, and intentionally does not read `submission_feature.data`. Public reads
+   * require published root and referenced features; administrative review reads may include unpublished rows.
    *
    * Every branch projects `value` as jsonb: scalar-typed tables contribute their text as a JSON string,
    * while reference-typed tables contribute a structured object carrying a display `label` plus stable
@@ -165,14 +236,19 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
    *
    * @param {number} submissionFeatureId The submission feature whose canonical indexed properties are being read.
    * @param {string} [normalizedSearch] Optional trimmed/lowercase search term to apply to property names and value labels.
+   * @param {string} [submissionUploadId] Optional upload scope for administrative review reads.
    * @returns {SQLStatement} SQL statement prefix ending at the `filtered_property_rows` CTE.
    * @memberof SubmissionFeaturePropertyRepository
    */
   private _getSubmissionFeaturePropertiesBaseQuery(
     submissionFeatureId: number,
-    normalizedSearch?: string
+    normalizedSearch?: string,
+    submissionUploadId?: string
   ): SQLStatement {
     const sqlStatement = SQL``;
+    const referencedFeatureStatusPredicate = submissionUploadId
+      ? 'TRUE'
+      : isSubmissionFeaturePublished('referenced_sf');
 
     sqlStatement.append(`
       WITH active_feature AS (
@@ -180,8 +256,16 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         FROM submission_feature sf
         WHERE sf.submission_feature_id = `);
     sqlStatement.append(SQL`${submissionFeatureId}`);
+    if (submissionUploadId) {
+      sqlStatement.append(`
+          AND sf.submission_upload_id = `);
+      sqlStatement.append(SQL`${submissionUploadId}`);
+      sqlStatement.append(`::uuid`);
+    } else {
+      sqlStatement.append(`
+          AND ${isSubmissionFeaturePublished('sf')}`);
+    }
     sqlStatement.append(`
-          AND ${isSubmissionFeaturePublished('sf')}
       ),
       property_rows AS (
         SELECT
@@ -343,7 +427,7 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
          AND fp.record_end_date IS NULL
         JOIN submission_feature referenced_sf
           ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-         AND ${isSubmissionFeaturePublished('referenced_sf')}
+         AND ${referencedFeatureStatusPredicate}
 
         UNION ALL
 

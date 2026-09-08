@@ -2,6 +2,8 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
 import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
 import { PolicyDetailPage } from 'features/admin/policies/PolicyDetailPage';
+import { SubmissionUploadReviewValidationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationPage';
+import { SubmissionReviewFeaturePage } from 'features/admin/reviews/SubmissionReviewFeaturePage';
 import { ManageSecurityPage } from 'features/admin/security/ManageSecurityPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
 import { SystemRoleGuard } from 'guards/Guards';
@@ -34,6 +36,38 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <SubmissionsRouter />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Submission upload review routes */}
+      <Route
+        path="submission/:submissionId/upload/:submissionUploadId/review/:reviewId/feature/:submissionFeatureId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Review Feature" description="Review submission feature details" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <SubmissionReviewFeaturePage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Validation Review" description="Review submission upload features" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <SubmissionUploadReviewValidationPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

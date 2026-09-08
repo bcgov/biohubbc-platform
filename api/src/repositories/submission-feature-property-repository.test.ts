@@ -48,6 +48,26 @@ describe('SubmissionFeaturePropertyRepository', () => {
       expect(sqlText).to.not.include('jsonb_each');
     });
 
+    it('gets all properties scoped by submission upload ID for administrative review', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const submissionFeaturePropertyRepository = new SubmissionFeaturePropertyRepository(mockDBConnection);
+
+      await submissionFeaturePropertyRepository.getSubmissionFeaturePropertiesBySubmissionUploadId(
+        '11111111-1111-4111-8111-111111111111',
+        10,
+        { page: 1, limit: 25 }
+      );
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.not.include('sf.record_effective_date <= now()');
+      expect(sqlText).to.not.include('referenced_sf.record_effective_date <= now()');
+      expect(sqlText).to.include('sf.submission_upload_id =');
+      expect(sqlStub.firstCall.args[0].values).to.include('11111111-1111-4111-8111-111111111111');
+      expect(sqlText).to.include('JOIN active_feature sf');
+      expect(sqlText).to.include('JOIN submission_feature referenced_sf');
+    });
+
     it('projects scalar values as JSON strings and derives value_text for search and sort', async () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });

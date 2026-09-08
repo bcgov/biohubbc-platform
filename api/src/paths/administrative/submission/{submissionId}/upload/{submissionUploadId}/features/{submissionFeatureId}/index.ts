@@ -3,24 +3,24 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../../../../openapi/schemas/http-responses';
-import { SubmissionUploadReviewResponseSchema } from '../../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewService } from '../../../../../../../../services/upload/submission-upload-review-service';
+import { GetSubmissionFeatureSchema } from '../../../../../../../../schemas/submission-feature';
+import { SubmissionFeatureService } from '../../../../../../../../services/submission-feature-service';
 import { getLogger } from '../../../../../../../../utils/logger';
 
 const defaultLog = getLogger(
-  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review/{submissionUploadReviewId}'
+  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/features/{submissionFeatureId}'
 );
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
     and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
   })),
-  getSubmissionUploadReview()
+  getSubmissionUploadFeature()
 ];
 
 GET.apiDoc = {
-  description: 'Get an active human review for a submission upload.',
+  description: 'Get any feature row belonging to a submission upload for administrative review.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -39,43 +39,43 @@ GET.apiDoc = {
       required: true
     },
     {
-      description: 'Submission upload review ID',
+      description: 'Submission Feature ID',
       in: 'path',
-      name: 'submissionUploadReviewId',
-      schema: { type: 'string', format: 'uuid' },
+      name: 'submissionFeatureId',
+      schema: { type: 'integer', minimum: 1 },
       required: true
     }
   ],
   responses: {
     200: {
-      description: 'Submission upload review.',
-      content: { 'application/json': { schema: SubmissionUploadReviewResponseSchema } }
+      description: 'The requested submission upload feature.',
+      content: { 'application/json': { schema: GetSubmissionFeatureSchema } }
     },
     ...defaultErrorResponses
   }
 };
 
 /**
- * Get an active review belonging to a submission upload.
+ * Get a feature belonging to a submission upload for administrative review.
  *
  * @returns {RequestHandler} Express request handler.
  */
-export function getSubmissionUploadReview(): RequestHandler {
+export function getSubmissionUploadFeature(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
-      const service = new SubmissionUploadReviewService(connection);
-      const review = await service.getSubmissionUploadReview(
+      const service = new SubmissionFeatureService(connection);
+      const feature = await service.getSubmissionUploadFeature(
         Number(req.params.submissionId),
         req.params.submissionUploadId,
-        req.params.submissionUploadReviewId
+        Number(req.params.submissionFeatureId)
       );
       await connection.commit();
-      return res.status(200).json(review);
+      return res.status(200).json({ feature });
     } catch (error) {
-      defaultLog.error({ label: 'getSubmissionUploadReview', message: 'error getting review', error });
+      defaultLog.error({ label: 'getSubmissionUploadFeature', message: 'error getting upload feature', error });
       await connection.rollback();
       throw error;
     } finally {

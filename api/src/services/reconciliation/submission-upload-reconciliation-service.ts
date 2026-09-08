@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP500 } from '../../errors/http-error';
 import { ReconciliationCounts } from '../../models/reconciliation';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
@@ -64,6 +65,33 @@ export class SubmissionUploadReconciliationService extends DBService {
       predecessorSubmissionUploadId
     );
     return predecessorSubmissionUploadId;
+  }
+
+  /**
+   * Get the stored reconciliation outcome counts for a submission upload.
+   *
+   * @param {number} submissionId Submission identifier from the request path.
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<ReconciliationCounts>} Stored new, modified, and unmodified counts.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @memberof SubmissionUploadReconciliationService
+   */
+  async getSubmissionFeatureReconciliationCounts(
+    submissionId: number,
+    submissionUploadId: string
+  ): Promise<ReconciliationCounts> {
+    const upload = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
+
+    if (upload.submission_id !== submissionId) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadReconciliationService->getSubmissionFeatureReconciliationCounts',
+        { submissionId, submissionUploadId }
+      ]);
+    }
+
+    return this.submissionFeatureReconciliationRepository.getSubmissionFeatureReconciliationOverviewCounts(
+      submissionUploadId
+    );
   }
 
   /**
