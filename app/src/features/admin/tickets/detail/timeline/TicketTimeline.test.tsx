@@ -1,6 +1,8 @@
 import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketExtended, TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
 import { MemoryRouter } from 'react-router-dom';
@@ -11,6 +13,10 @@ import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimeli
 
 vi.mock('hooks/useApi', () => ({
   useApi: vi.fn()
+}));
+
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: vi.fn()
 }));
 
 vi.mock('hooks/useContext', () => ({
@@ -106,6 +112,9 @@ describe('TicketTimeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    (useAuthStateContext as Mock).mockReturnValue({
+      biohubUserWrapper: { roleNames: [SYSTEM_ROLE.SYSTEM_ADMIN] }
+    });
     (useApi as Mock).mockReturnValue({
       tickets: {
         updateTicketComment,
@@ -344,5 +353,21 @@ describe('TicketTimeline', () => {
       upload.submission_upload_id
     );
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the current upload status without an expandable history for a viewer who is not a system admin', async () => {
+    const user = userEvent.setup();
+    (useAuthStateContext as Mock).mockReturnValue({
+      biohubUserWrapper: { roleNames: [] }
+    });
+
+    renderTicketTimeline({ ...makeTicket(), submission_uploads: [makeSubmissionUpload()] });
+
+    expect(screen.getByText('Ingested')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Ingested' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Ingested'));
+
+    expect(getSubmissionUploadProcessingStatusHistory).not.toHaveBeenCalled();
   });
 });

@@ -20,6 +20,7 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
   const {
     upload,
     dateLabel,
+    canViewStatusHistory,
     statusHistory,
     onLoadStatusHistory,
     onCreateReview,
@@ -55,6 +56,7 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
 
           <TicketUploadStatusRow
             upload={upload}
+            canViewStatusHistory={canViewStatusHistory}
             statusHistory={statusHistory}
             onLoadStatusHistory={onLoadStatusHistory}
           />

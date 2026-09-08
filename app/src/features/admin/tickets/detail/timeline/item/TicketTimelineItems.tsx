@@ -33,6 +33,7 @@ interface ITicketTimelineItemsProps {
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
+  canViewSubmissionUploadStatusHistory: boolean;
   submissionUploadStatusHistoryByUploadId: Record<string, SubmissionUploadStatusHistoryState>;
   onLoadSubmissionUploadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
   onCreateSubmissionUploadReview: (
@@ -66,6 +67,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onViewFinalizedPolicy,
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
+    canViewSubmissionUploadStatusHistory,
     submissionUploadStatusHistoryByUploadId,
     onLoadSubmissionUploadStatusHistory,
     onCreateSubmissionUploadReview,
@@ -163,6 +165,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                   absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
                 }) ?? ''
               }
+              canViewStatusHistory={canViewSubmissionUploadStatusHistory}
               statusHistory={submissionUploadStatusHistoryByUploadId[item.upload.submission_upload_id]}
               onLoadStatusHistory={onLoadSubmissionUploadStatusHistory}
               onCreateReview={onCreateSubmissionUploadReview}
