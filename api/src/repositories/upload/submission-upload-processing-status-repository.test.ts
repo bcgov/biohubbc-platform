@@ -3,10 +3,14 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { SubmissionUploadProcessingStatus } from '../../models/submission-upload-processing-status';
+import {
+  SubmissionUploadProcessingStatus,
+  SubmissionUploadProcessingStatusHistoryRow
+} from '../../models/submission-upload-processing-status';
 import { SubmissionUploadProcessingStatusRepository } from './submission-upload-processing-status-repository';
 
 const SUBMISSION_UPLOAD_ID = '550e8400-e29b-41d4-a716-446655440000';
+const SUBMISSION_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 describe('SubmissionUploadProcessingStatusRepository', () => {
   afterEach(() => {
@@ -66,26 +70,68 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
     });
   });
 
-  describe('findActiveSubmissionUploadProcessingStatuses', () => {
-    it('returns active processing rows ordered by create_date then id, excluding review rows', async () => {
-      const rows = [
-        buildRow({ submission_upload_status_id: 1, status: 'uploaded' }),
-        buildRow({ status: 'ingesting' })
+  describe('findSubmissionUploadProcessingStatusHistory', () => {
+    it('joins the upload to its active processing rows in one query, ordered by create_date then id', async () => {
+      const rows: SubmissionUploadProcessingStatusHistoryRow[] = [
+        buildHistoryRow({ submission_upload_status_id: 1, status: 'uploaded' }),
+        buildHistoryRow({ submission_upload_status_id: 2, status: 'ingesting' })
       ];
-      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows } as QueryResult<SubmissionUploadProcessingStatus>);
+      const sqlStub = sinon
+        .stub()
+        .resolves({ rowCount: 2, rows } as QueryResult<SubmissionUploadProcessingStatusHistoryRow>);
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.findActiveSubmissionUploadProcessingStatuses(SUBMISSION_UPLOAD_ID);
+      const result = await repository.findSubmissionUploadProcessingStatusHistory(
+        SUBMISSION_UUID,
+        SUBMISSION_UPLOAD_ID
+      );
 
       expect(result).to.eql(rows);
+      expect(sqlStub).to.have.been.calledOnce;
       const statement = sqlStub.firstCall.args[0];
-      expect(statement.text).to.contain('record_end_date IS NULL');
-      expect(statement.text).to.contain('ORDER BY\n        create_date ASC,\n        submission_upload_status_id ASC');
-      expect(statement.values[0]).to.equal(SUBMISSION_UPLOAD_ID);
-      expect(statement.values[1]).to.include.members(['uploaded', 'indexed', 'invalid', 'failed']);
-      expect(statement.values[1]).not.to.include.members(['submitted', 'approved', 'denied', 'deleted']);
+      expect(statement.text).to.contain('LEFT JOIN submission_upload_status sus');
+      expect(statement.text).to.contain('sus.record_end_date IS NULL');
+      expect(statement.text).to.contain('su.record_end_date IS NULL');
+      expect(statement.text).to.contain(
+        'ORDER BY\n        sus.create_date ASC,\n        sus.submission_upload_status_id ASC'
+      );
+      expect(statement.values[0]).to.include.members(['uploaded', 'indexed', 'invalid', 'failed']);
+      expect(statement.values[0]).not.to.include.members(['submitted', 'approved', 'denied', 'deleted']);
+      expect(statement.values.slice(1)).to.eql([SUBMISSION_UUID, SUBMISSION_UPLOAD_ID]);
+    });
+
+    it('returns the rows as delivered, including the null row for an upload with no history', async () => {
+      const rows: SubmissionUploadProcessingStatusHistoryRow[] = [
+        {
+          submission_upload_id: SUBMISSION_UPLOAD_ID,
+          submission_upload_status_id: null,
+          status: null,
+          create_date: null
+        }
+      ];
+      const sqlStub = sinon
+        .stub()
+        .resolves({ rowCount: 1, rows } as QueryResult<SubmissionUploadProcessingStatusHistoryRow>);
+      const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.findSubmissionUploadProcessingStatusHistory(
+        SUBMISSION_UUID,
+        SUBMISSION_UPLOAD_ID
+      );
+
+      expect(result).to.eql(rows);
     });
   });
+});
+
+const buildHistoryRow = (params: {
+  submission_upload_status_id: number;
+  status: SubmissionUploadProcessingStatus['status'];
+}): SubmissionUploadProcessingStatusHistoryRow => ({
+  submission_upload_id: SUBMISSION_UPLOAD_ID,
+  submission_upload_status_id: params.submission_upload_status_id,
+  status: params.status,
+  create_date: '2026-09-03T00:00:00.000Z'
 });
 
 const buildRow = (params: {

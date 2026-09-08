@@ -24,12 +24,16 @@ export const SUBMISSION_UPLOAD_PROCESSING_STAGES: SubmissionUpload['status'][] =
 export const SUBMISSION_UPLOAD_FAILURE_STATUSES: SubmissionUpload['status'][] = ['invalid', 'failed'];
 
 /**
- * Upload statuses that represent a terminal ingestion lifecycle.
+ * Upload statuses that represent a terminal ingestion lifecycle: the final stage plus every
+ * failure outcome.
  *
  * Used by queue guards (for example in `process-submission-features-job`) to
  * short-circuit work once the upload has reached a final non-retryable state.
  */
-export const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['indexed', 'invalid', 'failed'];
+export const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = [
+  'indexed',
+  ...SUBMISSION_UPLOAD_FAILURE_STATUSES
+];
 
 /**
  * Processing stages during which an attempt can still end in `invalid` or `failed`: every stage

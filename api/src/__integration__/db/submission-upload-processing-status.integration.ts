@@ -50,6 +50,26 @@ describe('submission upload processing status (integration)', function () {
     return result.rows as { status: string; record_end_date: Date | null }[];
   }
 
+  async function submissionUuid(submissionUploadId: string): Promise<string> {
+    const result = await connection.sql(SQL`
+      SELECT s.uuid
+      FROM submission_upload su
+      INNER JOIN submission s ON s.submission_id = su.submission_id
+      WHERE su.submission_upload_id = ${submissionUploadId}::uuid;
+    `);
+    return result.rows[0].uuid;
+  }
+
+  /**
+   * Active processing history as the administrative history endpoint reads it.
+   */
+  async function activeHistory(submissionUploadId: string) {
+    return processingStatusRepository.findSubmissionUploadProcessingStatusHistory(
+      await submissionUuid(submissionUploadId),
+      submissionUploadId
+    );
+  }
+
   async function currentStatus(submissionUploadId: string): Promise<string> {
     const result = await connection.sql(SQL`
       SELECT status FROM submission_upload WHERE submission_upload_id = ${submissionUploadId}::uuid;
@@ -85,9 +105,9 @@ describe('submission upload processing status (integration)', function () {
     await service.transitionSubmissionUploadToIngesting(submissionUploadId);
     await service.transitionSubmissionUploadToIngested(submissionUploadId);
 
-    const active = await processingStatusRepository.findActiveSubmissionUploadProcessingStatuses(submissionUploadId);
+    const active = await activeHistory(submissionUploadId);
     expect(active.map((row) => row.status)).to.eql(['uploaded', 'ingesting', 'ingested']);
-    expect(active.every((row) => row.record_end_date === null)).to.be.true;
+    expect(active.every((row) => row.submission_upload_id === submissionUploadId)).to.be.true;
     expect(await currentStatus(submissionUploadId)).to.equal('ingested');
   });
 
@@ -118,9 +138,33 @@ describe('submission upload processing status (integration)', function () {
       ['failed', false],
       ['ingesting', true]
     ]);
-    const active = await processingStatusRepository.findActiveSubmissionUploadProcessingStatuses(submissionUploadId);
+    const active = await activeHistory(submissionUploadId);
     expect(active.map((row) => row.status)).to.eql(['uploaded', 'ingesting']);
     expect(await currentStatus(submissionUploadId)).to.equal('ingesting');
+  });
+
+  it('history lookup distinguishes an upload with no history from an upload outside the submission', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const submissionUploadId = await createTestUploadWithFeatures(connection, submissionId, 'survey', [], 'uploaded');
+    const otherSubmissionId = await createTestSubmission(connection);
+    const otherSubmissionUploadId = await createTestUploadWithFeatures(
+      connection,
+      otherSubmissionId,
+      'survey',
+      [],
+      'uploaded'
+    );
+
+    const noHistory = await activeHistory(submissionUploadId);
+    expect(noHistory).to.eql([
+      { submission_upload_id: submissionUploadId, submission_upload_status_id: null, status: null, create_date: null }
+    ]);
+
+    const wrongSubmission = await processingStatusRepository.findSubmissionUploadProcessingStatusHistory(
+      await submissionUuid(submissionUploadId),
+      otherSubmissionUploadId
+    );
+    expect(wrongSubmission).to.eql([]);
   });
 
   it('review decision readers ignore processing rows sharing the table', async () => {
