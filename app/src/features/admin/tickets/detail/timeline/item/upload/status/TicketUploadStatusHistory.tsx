@@ -7,23 +7,35 @@ import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import {
   COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON,
-  COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON_COLOR
+  COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON_COLOR,
+  SUBMISSION_UPLOAD_FAILURE_JOB_STATUSES
 } from 'constants/submission-upload-status';
-import { getSubmissionUploadJobStatusPresentation } from 'utils/submission-upload-status';
+import { getSubmissionUploadJobStatusPresentation, isSubmissionUploadJobStatus } from 'utils/submission-upload-status';
 import { getFormattedDate } from 'utils/Utils';
 import { ITicketUploadStatusHistoryProps } from '../TicketUploadTimelineItem.interface';
 
 /**
  * Processing status history of a submission upload, in the order the API returned it.
  *
- * Every row but the last is a stage the upload has moved past, so it shows a completed checkmark;
- * the last row is the status the upload currently holds and keeps that status's own icon. Renders
- * the loading, error and empty states in the same footprint as the loaded list so the timeline does
- * not jump while the history is fetched or retried.
+ * A row shows a completed checkmark only when the upload went on to a later stage from it. The last
+ * row is the status the upload currently holds, and a stage that ended in `invalid` or `failed`
+ * never completed, so both keep the status's own icon. Renders the loading, error and empty states
+ * in the same footprint as the loaded list so the timeline does not jump while the history is
+ * fetched or retried.
  *
  * @param {ITicketUploadStatusHistoryProps} props
  * @return {*}
  */
+/**
+ * Whether a history row's stage completed, judged by what the upload moved on to next.
+ *
+ * @param {string | undefined} nextStatus Status of the following history row, if any.
+ * @returns {boolean} True when a later row exists and it is not a failure outcome.
+ */
+const isStageCompleted = (nextStatus: string | undefined): boolean =>
+  nextStatus !== undefined &&
+  !(isSubmissionUploadJobStatus(nextStatus) && SUBMISSION_UPLOAD_FAILURE_JOB_STATUSES.includes(nextStatus));
+
 export const TicketUploadStatusHistory = (props: ITicketUploadStatusHistoryProps) => {
   const { statusHistory } = props;
 
@@ -54,7 +66,7 @@ export const TicketUploadStatusHistory = (props: ITicketUploadStatusHistoryProps
     <Stack component="ol" sx={{ listStyle: 'none', m: 0, p: 0, minHeight: 112 }}>
       {statusHistory.history.map((item, index) => {
         const presentation = getSubmissionUploadJobStatusPresentation(item.status);
-        const isCompleted = index < statusHistory.history.length - 1;
+        const isCompleted = isStageCompleted(statusHistory.history[index + 1]?.status);
         const iconPath = isCompleted ? COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON : presentation.iconPath;
         const iconColor = isCompleted ? COMPLETED_SUBMISSION_UPLOAD_JOB_STATUS_ICON_COLOR : presentation.iconColor;
 

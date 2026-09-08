@@ -14,15 +14,18 @@ import { TicketUploadStatusHistory } from './TicketUploadStatusHistory';
  * Current processing status of a submission upload, expandable to show how the upload progressed
  * through each processing stage.
  *
- * The history is requested whenever the row is expanded, or the upload's status changes while it is
- * expanded, and comes from the timeline-level cache, so re-expanding reuses a loaded response and
- * retries a failed one. Nothing below the current status renders until the row has been expanded.
+ * The history endpoint is admin-only, so the row is expandable only when `canViewStatusHistory` is
+ * set; otherwise it is a static row showing the current status and never requests the history. When
+ * expandable, the history is requested whenever the row is expanded, or the upload's status changes
+ * while it is expanded, and comes from the timeline-level cache, so re-expanding reuses a loaded
+ * response and retries a failed one. Nothing below the current status renders until the row has
+ * been expanded.
  *
  * @param {ITicketUploadStatusRowProps} props
  * @return {*}
  */
 export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
-  const { upload, statusHistory, onLoadStatusHistory } = props;
+  const { upload, canViewStatusHistory, statusHistory, onLoadStatusHistory } = props;
   const [isExpanded, setIsExpanded] = useState(false);
   const historyRegionId = useId();
 
@@ -30,10 +33,10 @@ export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
   const showStatusIcon = presentation.isTerminal || !presentation.isKnown;
 
   useEffect(() => {
-    if (isExpanded) {
+    if (canViewStatusHistory && isExpanded) {
       onLoadStatusHistory(upload);
     }
-  }, [isExpanded, onLoadStatusHistory, upload]);
+  }, [canViewStatusHistory, isExpanded, onLoadStatusHistory, upload]);
 
   /**
    * Flip the expanded state; the effect above requests the history for the expanded row.
@@ -44,30 +47,38 @@ export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
     setIsExpanded((previous) => !previous);
   }, []);
 
+  const currentStatus = (
+    <>
+      {showStatusIcon ? (
+        <Icon path={presentation.iconPath} size={0.7} style={{ color: presentation.iconColor }} />
+      ) : (
+        <CircularProgress size={14} thickness={5} sx={{ color: 'primary.main', flexShrink: 0 }} />
+      )}
+      <Typography variant="body2" sx={{ flex: '1 1 auto' }}>
+        {presentation.label}
+      </Typography>
+    </>
+  );
+
+  const rowSx = {
+    width: '100%',
+    px: 2,
+    py: 1.5,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 1.5,
+    textAlign: 'left'
+  } as const;
+
+  if (!canViewStatusHistory) {
+    return <Box sx={{ ...rowSx, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>{currentStatus}</Box>;
+  }
+
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-      <ButtonBase
-        onClick={handleToggle}
-        aria-expanded={isExpanded}
-        aria-controls={historyRegionId}
-        sx={{
-          width: '100%',
-          px: 2,
-          py: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          gap: 1.5,
-          textAlign: 'left'
-        }}>
-        {showStatusIcon ? (
-          <Icon path={presentation.iconPath} size={0.7} style={{ color: presentation.iconColor }} />
-        ) : (
-          <CircularProgress size={14} thickness={5} sx={{ color: 'primary.main', flexShrink: 0 }} />
-        )}
-        <Typography variant="body2" sx={{ flex: '1 1 auto' }}>
-          {presentation.label}
-        </Typography>
+      <ButtonBase onClick={handleToggle} aria-expanded={isExpanded} aria-controls={historyRegionId} sx={rowSx}>
+        {currentStatus}
         <Icon path={isExpanded ? mdiChevronUp : mdiChevronDown} size={0.9} aria-hidden="true" />
       </ButtonBase>
       <Collapse in={isExpanded}>

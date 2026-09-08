@@ -1,4 +1,4 @@
-import { mdiCheck, mdiProgressClock } from '@mdi/js';
+import { mdiCheck, mdiClose, mdiProgressClock } from '@mdi/js';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -41,10 +41,16 @@ const makeHistoryItem = (
 const renderRow = (
   upload: TicketSubmissionUploadResponse,
   statusHistory: SubmissionUploadStatusHistoryState | undefined,
-  onLoadStatusHistory = vi.fn()
+  onLoadStatusHistory = vi.fn(),
+  canViewStatusHistory = true
 ) => {
   const view = render(
-    <TicketUploadStatusRow upload={upload} statusHistory={statusHistory} onLoadStatusHistory={onLoadStatusHistory} />
+    <TicketUploadStatusRow
+      upload={upload}
+      canViewStatusHistory={canViewStatusHistory}
+      statusHistory={statusHistory}
+      onLoadStatusHistory={onLoadStatusHistory}
+    />
   );
 
   return { ...view, onLoadStatusHistory };
@@ -59,6 +65,19 @@ describe('TicketUploadStatusRow', () => {
     const region = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
     expect(region).not.toBeVisible();
     expect(region).toBeEmptyDOMElement();
+    expect(onLoadStatusHistory).not.toHaveBeenCalled();
+  });
+
+  it('renders a static status row with no toggle or request when the viewer cannot see the history', async () => {
+    const user = userEvent.setup();
+    const { onLoadStatusHistory } = renderRow(makeUpload('ingested'), undefined, vi.fn(), false);
+
+    expect(screen.getByText('Ingested')).toBeVisible();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { hidden: true })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Ingested'));
+
     expect(onLoadStatusHistory).not.toHaveBeenCalled();
   });
 
@@ -161,7 +180,27 @@ describe('TicketUploadStatusRow', () => {
     expect(items[0].textContent).toMatch(/Sep 3, 2026, \d{1,2}:45 [ap]m$/);
   });
 
-  it('marks every stage before the current one as completed and keeps the current stage icon', async () => {
+  it('keeps the icon of a stage that ended in failure instead of marking it completed', async () => {
+    const user = userEvent.setup();
+    renderRow(makeUpload('failed'), {
+      status: 'loaded',
+      uploadStatus: 'failed',
+      history: [
+        makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
+        makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
+        makeHistoryItem(3, 'ingested', '2026-09-03T18:32:00.000Z'),
+        makeHistoryItem(4, 'reconciling', '2026-09-03T18:45:00.000Z'),
+        makeHistoryItem(5, 'failed', '2026-09-03T18:46:00.000Z')
+      ]
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Failed' }));
+
+    const iconPaths = screen.getAllByRole('listitem').map((item) => item.querySelector('svg path')?.getAttribute('d'));
+    expect(iconPaths).toEqual([mdiCheck, mdiCheck, mdiCheck, mdiProgressClock, mdiClose]);
+  });
+
+  it('marks every stage the upload moved on from as completed and keeps the current stage icon', async () => {
     const user = userEvent.setup();
     renderRow(makeUpload('reconciling'), {
       status: 'loaded',

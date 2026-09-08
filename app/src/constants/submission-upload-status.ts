@@ -28,7 +28,13 @@ export const SUBMISSION_UPLOAD_JOB_STATUS_LABELS: Record<SubmissionUploadJobStat
   failed: 'Failed'
 };
 
-export const TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES: SubmissionUploadJobStatus[] = ['indexed', 'invalid', 'failed'];
+/** Outcomes that end a processing attempt without completing the stage that was running. */
+export const SUBMISSION_UPLOAD_FAILURE_JOB_STATUSES: SubmissionUploadJobStatus[] = ['invalid', 'failed'];
+
+export const TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES: SubmissionUploadJobStatus[] = [
+  'indexed',
+  ...SUBMISSION_UPLOAD_FAILURE_JOB_STATUSES
+];
 
 export const SUBMISSION_UPLOAD_JOB_STATUS_ICONS: Record<SubmissionUploadJobStatus, string> = {
   uploaded: mdiCloudUploadOutline,

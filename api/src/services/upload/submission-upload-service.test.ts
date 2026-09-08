@@ -511,37 +511,59 @@ describe('SubmissionUploadService', () => {
   });
 
   describe('findSubmissionUploadProcessingStatusHistory', () => {
-    it('validates the upload belongs to the submission and returns the history items', async () => {
-      const ownershipStub = sinon
-        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
-        .resolves(buildUpload('ingested'));
-      const row = buildProcessingStatus('artifact-1', 'ingesting');
+    it('resolves ownership and history in one query and returns the history items', async () => {
       const findStub = sinon
-        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findActiveSubmissionUploadProcessingStatuses')
-        .resolves([row]);
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 1,
+            status: 'uploaded',
+            create_date: '2026-09-03T00:00:00.000Z'
+          },
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 2,
+            status: 'ingesting',
+            create_date: '2026-09-03T00:01:00.000Z'
+          }
+        ]);
 
       const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
 
-      expect(ownershipStub).to.have.been.calledOnceWith('submission-uuid', 'artifact-1');
-      expect(findStub).to.have.been.calledOnceWith('artifact-1');
+      expect(findStub).to.have.been.calledOnceWith('submission-uuid', 'artifact-1');
       expect(result).to.eql([
         {
-          submission_upload_status_id: row.submission_upload_status_id,
-          submission_upload_id: row.submission_upload_id,
-          status: row.status,
-          create_date: row.create_date
+          submission_upload_status_id: 1,
+          submission_upload_id: 'artifact-1',
+          status: 'uploaded',
+          create_date: '2026-09-03T00:00:00.000Z'
+        },
+        {
+          submission_upload_status_id: 2,
+          submission_upload_id: 'artifact-1',
+          status: 'ingesting',
+          create_date: '2026-09-03T00:01:00.000Z'
         }
       ]);
     });
 
-    it('does not read history when the upload is not in the submission', async () => {
+    it('returns an empty history for an upload in the submission that has no processing rows', async () => {
       sinon
-        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionUuid')
-        .rejects(new ApiNotFoundError('Submission upload not found'));
-      const findStub = sinon.stub(
-        SubmissionUploadProcessingStatusRepository.prototype,
-        'findActiveSubmissionUploadProcessingStatuses'
-      );
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          { submission_upload_id: 'artifact-1', submission_upload_status_id: null, status: null, create_date: null }
+        ]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+
+      expect(result).to.eql([]);
+    });
+
+    it('throws ApiNotFoundError when the upload is not in the submission', async () => {
+      sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([]);
 
       try {
         await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
@@ -549,8 +571,6 @@ describe('SubmissionUploadService', () => {
       } catch (err) {
         expect(err).to.be.instanceOf(ApiNotFoundError);
       }
-
-      expect(findStub).not.to.have.been.called;
     });
   });
 

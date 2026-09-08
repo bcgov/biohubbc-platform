@@ -1,6 +1,6 @@
 import { ACTIVE_UPLOAD_PROCESSING_STAGES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import {
   CreateSubmissionUpload,
@@ -441,8 +441,10 @@ export class SubmissionUploadService extends DBService {
   /**
    * Find the active processing status history of an upload that belongs to the given submission.
    *
-   * Rows are returned earliest first, in the order the statuses were entered. Superseded rows
-   * (end-dated by reprocessing) are excluded.
+   * One query resolves both the ownership check and the rows: no rows means the upload is not an
+   * active upload of that submission, and a single row with null status columns means the upload
+   * has no processing history yet. Rows are returned earliest first, in the order the statuses were
+   * entered. Superseded rows (end-dated by reprocessing) are excluded.
    *
    * @param {string} submissionUuid Submission UUID from the request path.
    * @param {string} submissionUploadId Submission upload UUID from the request path.
@@ -454,18 +456,30 @@ export class SubmissionUploadService extends DBService {
     submissionUuid: string,
     submissionUploadId: string
   ): Promise<SubmissionUploadProcessingStatusHistoryItem[]> {
-    await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
-
-    const rows = await this.submissionUploadProcessingStatusRepository.findActiveSubmissionUploadProcessingStatuses(
+    const rows = await this.submissionUploadProcessingStatusRepository.findSubmissionUploadProcessingStatusHistory(
+      submissionUuid,
       submissionUploadId
     );
 
-    return rows.map((row) => ({
-      submission_upload_status_id: row.submission_upload_status_id,
-      submission_upload_id: row.submission_upload_id,
-      status: row.status,
-      create_date: row.create_date
-    }));
+    if (!rows.length) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadService->findSubmissionUploadProcessingStatusHistory',
+        { submissionUuid, submissionUploadId }
+      ]);
+    }
+
+    return rows.flatMap((row) =>
+      row.submission_upload_status_id === null
+        ? []
+        : [
+            {
+              submission_upload_status_id: row.submission_upload_status_id,
+              submission_upload_id: row.submission_upload_id,
+              status: row.status,
+              create_date: row.create_date
+            }
+          ]
+    );
   }
 
   /**
