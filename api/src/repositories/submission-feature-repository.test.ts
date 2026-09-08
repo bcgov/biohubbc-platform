@@ -7,6 +7,20 @@ import { SubmissionFeatureRepository } from './submission-feature-repository';
 describe('SubmissionFeatureRepository feature lookup', () => {
   afterEach(() => sinon.restore());
 
+  it('scopes a review feature by submission, upload, and feature IDs without requiring publication', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([{}], 1));
+    const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));
+
+    await repository.getSubmissionUploadFeature(16, '11111111-1111-4111-8111-111111111111', 12);
+
+    const statement = sql.firstCall.args[0];
+    expect(statement.text).to.include('sf.submission_feature_id =');
+    expect(statement.text).to.include('sf.submission_id =');
+    expect(statement.text).to.include('sf.submission_upload_id =');
+    expect(statement.text).not.to.include('record_effective_date');
+    expect(statement.values).to.eql([12, 16, '11111111-1111-4111-8111-111111111111']);
+  });
+
   it('counts every upload-owned feature that has ever been published', async () => {
     const sql = sinon.stub().resolves(mockQueryResult([{ count: 2 }], 1));
     const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));

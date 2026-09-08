@@ -6,6 +6,7 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
+import { submissionFeaturePropertyValueSchema } from './submission-feature-property-value';
 
 /**
  * Schema for a feature property.
@@ -72,6 +73,32 @@ export const FeaturePropertiesListResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: FeaturePropertySchema,
       description: 'List of feature properties'
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
+ * Schema for paginated submission feature properties list response.
+ */
+export const SubmissionFeaturePropertiesListResponseSchema: OpenAPIV3.SchemaObject = {
+  title: 'SubmissionFeaturePropertiesListResponse',
+  type: 'object',
+  required: ['properties', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    properties: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'property', 'value'],
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string' },
+          property: { type: 'string' },
+          value: submissionFeaturePropertyValueSchema
+        }
+      }
     },
     pagination: paginationResponseSchema
   }

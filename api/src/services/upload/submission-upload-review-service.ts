@@ -43,6 +43,27 @@ export class SubmissionUploadReviewService extends DBService {
   }
 
   /**
+   * Get one active review belonging to a submission upload.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {string} submissionUploadReviewId Submission upload review identifier.
+   * @returns {Promise<SubmissionUploadReview>} Matching active review.
+   * @memberof SubmissionUploadReviewService
+   */
+  async getSubmissionUploadReview(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionUploadReviewId: string
+  ): Promise<SubmissionUploadReview> {
+    return this.submissionUploadReviewRepository.getSubmissionUploadReview(
+      submissionId,
+      submissionUploadId,
+      submissionUploadReviewId
+    );
+  }
+
+  /**
    * Get active review rows for a submission upload.
    *
    * @param {number} submissionId - The submission ID.
@@ -100,6 +121,33 @@ export class SubmissionUploadReviewService extends DBService {
     data: UpdateSubmissionUploadReview
   ): Promise<SubmissionUploadReview> {
     return this.submissionUploadReviewRepository.updateSubmissionUploadReview(
+      submissionId,
+      submissionUploadId,
+      submissionUploadReviewId,
+      data
+    );
+  }
+
+  /**
+   * Update an active review using its numeric submission ID.
+   *
+   * This changes only the human review workflow status and does not change the
+   * submission upload disposition.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {string} submissionUploadReviewId Submission upload review identifier.
+   * @param {UpdateSubmissionUploadReview} data Review update details.
+   * @returns {Promise<SubmissionUploadReview>} Updated review.
+   * @memberof SubmissionUploadReviewService
+   */
+  async updateSubmissionUploadReviewBySubmissionId(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionUploadReviewId: string,
+    data: UpdateSubmissionUploadReview
+  ): Promise<SubmissionUploadReview> {
+    return this.submissionUploadReviewRepository.updateSubmissionUploadReviewBySubmissionId(
       submissionId,
       submissionUploadId,
       submissionUploadReviewId,

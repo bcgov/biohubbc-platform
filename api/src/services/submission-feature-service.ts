@@ -41,6 +41,27 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
+   * Get any feature row owned by an upload for administrative review.
+   *
+   * @param {number} submissionId ID of the submission that owns the upload.
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {number} submissionFeatureId ID of the feature to return.
+   * @returns {Promise<SubmissionFeature>} The requested submission feature.
+   * @memberof SubmissionFeatureService
+   */
+  async getSubmissionUploadFeature(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeatureId: number
+  ): Promise<SubmissionFeature> {
+    return this.submissionFeatureRepository.getSubmissionUploadFeature(
+      submissionId,
+      submissionUploadId,
+      submissionFeatureId
+    );
+  }
+
+  /**
    * Count features owned by an upload that have ever been activated.
    *
    * @param {string} submissionUploadId Submission upload identifier.

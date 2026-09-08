@@ -19,6 +19,54 @@ import { SubmissionFeature, SubmissionFeatureRecord } from './submission-reposit
  */
 export class SubmissionFeatureRepository extends BaseRepository {
   /**
+   * Get any feature row owned by an upload for administrative review.
+   *
+   * @param {number} submissionId ID of the submission that owns the upload.
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {number} submissionFeatureId ID of the feature to return.
+   * @returns {Promise<SubmissionFeature>} The requested submission feature.
+   * @memberof SubmissionFeatureRepository
+   */
+  async getSubmissionUploadFeature(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeatureId: number
+  ): Promise<SubmissionFeature> {
+    const response = await this.connection.sql(
+      SQL`
+        SELECT
+          sf.submission_feature_id,
+          sf.uuid,
+          sf.urn,
+          sf.submission_id,
+          sf.feature_type_id,
+          sf.source_id,
+          ft.name AS feature_type_name,
+          ft.display_name AS feature_type_display_name,
+          s.name AS submission_name,
+          false AS secured,
+          ARRAY[]::varchar[] AS security_reasons
+        FROM submission_feature sf
+        JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+        JOIN submission s ON s.submission_id = sf.submission_id
+        WHERE sf.submission_feature_id = ${submissionFeatureId}
+          AND sf.submission_id = ${submissionId}
+          AND sf.submission_upload_id = ${submissionUploadId}::uuid;
+      `,
+      SubmissionFeature
+    );
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission upload feature record', [
+        'SubmissionFeatureRepository->getSubmissionUploadFeature',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Count feature rows from an upload that have ever been published.
    *
    * Historical and superseded features remain included because prior publication permanently makes the

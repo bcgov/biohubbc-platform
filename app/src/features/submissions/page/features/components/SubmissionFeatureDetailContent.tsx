@@ -12,39 +12,42 @@ import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { AlertBanner } from 'components/notifications/AlertBanner';
-import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
-import { ReactNode } from 'react';
+import { PropsWithChildren, ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 
 interface SubmissionFeatureDetailContentProps {
   isLoading: boolean;
   feature?: ISubmissionFeature;
-  submissionId: number;
-  submissionFeatureId: number;
   rootBreadcrumbLabel: string;
   rootBreadcrumbTo: string;
   submissionDetailBasePath: string;
-  pathResolvers: SubmissionPropertyValuePathResolvers;
   queryString?: string;
   buttons?: ReactNode;
+  breadcrumbs?: ReactNode;
 }
 
+/**
+ * Shared layout for submission feature detail pages.
+ *
+ * Renders the common loading guard, page header, secured-feature messaging, caller-provided content, and map section.
+ *
+ * @param {PropsWithChildren<SubmissionFeatureDetailContentProps>} props - Component props.
+ * @returns {JSX.Element} Submission feature detail layout.
+ */
 export const SubmissionFeatureDetailContent = ({
   isLoading,
   feature,
-  submissionId,
-  submissionFeatureId,
   rootBreadcrumbLabel,
   rootBreadcrumbTo,
   submissionDetailBasePath,
-  pathResolvers,
   queryString = '',
-  buttons
-}: SubmissionFeatureDetailContentProps) => {
+  buttons,
+  breadcrumbs,
+  children
+}: PropsWithChildren<SubmissionFeatureDetailContentProps>) => {
   return (
     <LoadingGuard
       isLoading={isLoading}
@@ -59,19 +62,21 @@ export const SubmissionFeatureDetailContent = ({
       <PageHeader
         buttons={buttons}
         breadcrumbs={
-          <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to={rootBreadcrumbTo} underline="hover" color="inherit">
-              {rootBreadcrumbLabel}
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`${submissionDetailBasePath}/${feature?.submission_id}${queryString}`}
-              underline="hover"
-              color="inherit">
-              {feature?.submission_name}
-            </Link>
-            <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
-          </Breadcrumbs>
+          breadcrumbs ?? (
+            <Breadcrumbs aria-label="breadcrumb">
+              <Link component={RouterLink} to={rootBreadcrumbTo} underline="hover" color="inherit">
+                {rootBreadcrumbLabel}
+              </Link>
+              <Link
+                component={RouterLink}
+                to={`${submissionDetailBasePath}/${feature?.submission_id}${queryString}`}
+                underline="hover"
+                color="inherit">
+                {feature?.submission_name}
+              </Link>
+              <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
+            </Breadcrumbs>
+          )
         }
         label={
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -102,11 +107,7 @@ export const SubmissionFeatureDetailContent = ({
           </AlertBanner>
         )}
         <Stack spacing={3} py={4}>
-          <FeaturePropertiesSection
-            submissionId={submissionId}
-            submissionFeatureId={submissionFeatureId}
-            pathResolvers={pathResolvers}
-          />
+          {children}
           <PageSection id="submission-feature-map" label="Map">
             {feature && (
               <SubmissionFeatureMap
