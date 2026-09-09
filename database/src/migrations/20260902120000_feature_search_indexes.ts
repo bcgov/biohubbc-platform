@@ -35,11 +35,9 @@ export async function up(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS submission_feature_property_geometry_idx2;
     DROP INDEX IF EXISTS submission_feature_property_code_idx1;
     DROP INDEX IF EXISTS submission_feature_property_code_idx2;
-    DROP INDEX IF EXISTS submission_feature_property_code_idx3;
     DROP INDEX IF EXISTS submission_feature_property_code_presence_idx;
     DROP INDEX IF EXISTS submission_feature_property_taxon_idx1;
     DROP INDEX IF EXISTS submission_feature_property_taxon_idx2;
-    DROP INDEX IF EXISTS submission_feature_property_taxon_idx3;
     DROP INDEX IF EXISTS submission_feature_property_taxon_presence_idx;
 
     --------------------------------------------------------------------------------
@@ -250,13 +248,11 @@ export async function down(knex: Knex): Promise<void> {
 
     CREATE INDEX submission_feature_property_code_idx1 ON submission_feature_property_code (submission_feature_id);
     CREATE INDEX submission_feature_property_code_idx2 ON submission_feature_property_code (feature_type_property_id);
-    CREATE INDEX submission_feature_property_code_idx3 ON submission_feature_property_code (contributor_codeset_code_id);
     CREATE INDEX submission_feature_property_code_presence_idx
       ON submission_feature_property_code (submission_feature_id, feature_type_property_id);
 
     CREATE INDEX submission_feature_property_taxon_idx1 ON submission_feature_property_taxon (submission_feature_id);
     CREATE INDEX submission_feature_property_taxon_idx2 ON submission_feature_property_taxon (feature_type_property_id);
-    CREATE INDEX submission_feature_property_taxon_idx3 ON submission_feature_property_taxon (taxon_id);
     CREATE INDEX submission_feature_property_taxon_presence_idx
       ON submission_feature_property_taxon (submission_feature_id, feature_type_property_id);
 
