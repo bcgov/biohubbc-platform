@@ -19,13 +19,23 @@ vi.mock('maplibre-gl', () => ({ addProtocol: mocks.addProtocol }));
 const PROVIDER_TEMPLATE = 'https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}';
 const TILE_SIZE = 256;
 
+/** A blank tile's pixels: the service's grey, fully opaque. Built once, since every tile starts from it. */
+const BLANK_PIXELS = (() => {
+  const data = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4).fill(204);
+
+  for (let offset = 3; offset < data.length; offset += 4) {
+    data[offset] = 255;
+  }
+
+  return data;
+})();
+
 /** RGBA pixels of a tile: the service's grey everywhere, with any overrides applied by pixel index. */
 const buildPixels = (overrides: Record<number, [number, number, number]> = {}): Uint8ClampedArray => {
-  const data = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4);
+  const data = BLANK_PIXELS.slice();
 
-  for (let index = 0; index < TILE_SIZE * TILE_SIZE; index++) {
-    const [red, green, blue] = overrides[index] ?? [204, 204, 204];
-    data.set([red, green, blue, 255], index * 4);
+  for (const [index, [red, green, blue]] of Object.entries(overrides)) {
+    data.set([red, green, blue, 255], Number(index) * 4);
   }
 
   return data;
@@ -172,7 +182,10 @@ describe('bc-basemap-protocol', () => {
 
       const response = await load();
 
-      expect(response.data).toMatchObject({ width: TILE_SIZE, height: TILE_SIZE, pixels });
+      // The pixels are compared by reference: this is the very bitmap the handler decoded, and deep-comparing a
+      // tile's worth of them costs far more than the assertion is worth.
+      expect(response.data).toMatchObject({ width: TILE_SIZE, height: TILE_SIZE });
+      expect(response.data.pixels).toBe(pixels);
       expect(findBcTileClassification('11/323/700')).toBe('content');
     });
 
