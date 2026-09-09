@@ -94,7 +94,7 @@ export function buildBroadFeatureTypeSubquery(featureTypeName: string, systemUse
  *
  * This is the expression-matched candidate set *before* the caller access filter is applied.
  * It exists solely to detect whether a search matched secured features the caller cannot see
- * (`has_more_secured_features`) — it must never be used to return feature rows to a caller,
+ * (`has_inaccessible_secured_features`) — it must never be used to return feature rows to a caller,
  * because it does not exclude inaccessible secured features.
  *
  * Routes through the same `buildExpressionTargetIdsQuery` substrate as the filtered variant, but

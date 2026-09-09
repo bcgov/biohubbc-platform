@@ -886,7 +886,7 @@ describe('Security scope search (integration)', function () {
     });
   });
 
-  // ── has_more_secured_features (hidden-secured-match signal) ───────────
+  // ── has_inaccessible_secured_features (hidden-secured-match signal) ───────────
   //
   // Drives the "Request Data" banner. True when the search matched secured features the caller
   // cannot access. Wildcard-grant holders are excluded via direct URN scope matching so anchor

@@ -4,7 +4,7 @@ import Snackbar from '@mui/material/Snackbar';
 import { ErrorDialog, IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { IOkDialogProps, OkDialog } from 'components/dialog/OkDialog';
 import YesNoDialog, { IYesNoDialogProps } from 'components/dialog/YesNoDialog';
-import { createContext, ReactNode, useState } from 'react';
+import { createContext, ReactNode, useCallback, useState } from 'react';
 
 export interface IDialogContext {
   /**
@@ -152,9 +152,9 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
     setYesNoDialogProps({ ...yesNoDialogProps, ...partialProps });
   };
 
-  const setSnackbar = function (partialProps: Partial<ISnackbarProps>) {
-    setSnackbarProps({ ...snackbarProps, ...partialProps });
-  };
+  const setSnackbar = useCallback((partialProps: Partial<ISnackbarProps>) => {
+    setSnackbarProps((previous) => ({ ...previous, ...partialProps }));
+  }, []);
 
   const setErrorDialog = function (partialProps: Partial<IErrorDialogProps>) {
     setErrorDialogProps({ ...errorDialogProps, ...partialProps });

@@ -6,6 +6,7 @@ export const URL_PARAMS = {
   LIMIT: 'limit',
   SORT: 'sort',
   ORDER: 'order',
+  CURSOR: 'cursor',
   EXPR: 'expr'
 } as const;
 

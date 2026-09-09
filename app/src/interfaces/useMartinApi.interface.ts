@@ -22,7 +22,7 @@ export interface IMartinSession {
   /** Tile URL template for MapLibre, e.g. `/martin/search/{z}/{x}/{y}`. */
   martin_url_template: string;
   /** True when the search matched secured features the caller cannot see. */
-  has_more_secured_features: boolean;
+  has_inaccessible_secured_features: boolean;
 }
 
 /**

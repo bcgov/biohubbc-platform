@@ -1,41 +1,35 @@
 import { MenuItem, PaginationItem, Select, SelectChangeEvent, Stack, Typography } from '@mui/material';
 import { PAGE_SIZE_OPTIONS } from 'constants/pagination';
-import { getPaginationItems } from 'utils/pagination';
+import { CursorPagination } from 'types/pagination';
 
 interface CustomPaginationProps {
-  /** One-based active page number. */
-  currentPage: number;
-  /** Number of rows displayed per page. */
-  pageSize: number;
-  /** Total number of rows across every page. */
-  totalCount: number;
-  /** One-based final page number. */
-  lastPage: number;
-  /** Applies a new one-based page number. */
-  onPageChange: (page: number) => void;
+  /** Cursor pagination state for the current result page. */
+  cursor: CursorPagination;
+  /** Number of rows displayed on the current page. */
+  rowCount: number;
+  /** Total number of matching rows from the separate count request. */
+  totalCount?: number;
+  /** Navigates to the supplied cursor position. */
+  onPageChange: (cursor: string) => void;
   /** Applies a new row count per page. */
   onPageSizeChange: (pageSize: number) => void;
 }
 
 /**
  * Renders a compact pagination footer with result count, page-size selection,
- * previous/next controls, and a bounded page-number window.
+ * and previous/next controls.
  *
  * @param {CustomPaginationProps} props - Current pagination state and change handlers.
  * @returns {JSX.Element} Pagination footer for server-backed result lists.
  */
 export const CustomPagination = ({
-  currentPage,
-  pageSize,
+  cursor,
+
+  rowCount,
   totalCount,
-  lastPage,
   onPageChange,
   onPageSizeChange
 }: CustomPaginationProps) => {
-  const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const lastItem = Math.min(currentPage * pageSize, totalCount);
-  const paginationItems = getPaginationItems(currentPage, lastPage);
-
   /**
    * Handles row-count selection changes from the page-size dropdown.
    *
@@ -50,11 +44,12 @@ export const CustomPagination = ({
     <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="nowrap">
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2" color="text.secondary">
-          {firstItem}–{lastItem} of {totalCount}
+          Showing {rowCount}
+          {totalCount !== undefined && ` of ${totalCount}`} {rowCount === 1 ? 'row' : 'rows'}
         </Typography>
         <Select<number>
           size="small"
-          value={pageSize}
+          value={cursor.limit}
           onChange={handlePageSizeChange}
           inputProps={{ 'aria-label': 'rows per page' }}
           sx={{ fontSize: '0.875rem' }}>
@@ -71,32 +66,16 @@ export const CustomPagination = ({
           type="previous"
           shape="rounded"
           aria-label="Go to previous page"
-          disabled={currentPage <= 1}
-          onClick={() => onPageChange(currentPage - 1)}
+          disabled={!cursor.previous}
+          onClick={() => cursor.previous && onPageChange(cursor.previous)}
         />
-
-        {paginationItems.map((item) =>
-          typeof item === 'number' ? (
-            <PaginationItem
-              key={item}
-              type="page"
-              page={item}
-              selected={item === currentPage}
-              shape="rounded"
-              aria-label={item === currentPage ? `page ${item}` : `Go to page ${item}`}
-              onClick={() => onPageChange(item)}
-            />
-          ) : (
-            <PaginationItem key={item} type={item} shape="rounded" />
-          )
-        )}
 
         <PaginationItem
           type="next"
           shape="rounded"
           aria-label="Go to next page"
-          disabled={currentPage >= lastPage}
-          onClick={() => onPageChange(currentPage + 1)}
+          disabled={!cursor.next}
+          onClick={() => cursor.next && onPageChange(cursor.next)}
         />
       </Stack>
     </Stack>

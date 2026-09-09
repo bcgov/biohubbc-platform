@@ -18,7 +18,7 @@ export interface MartinContextResult {
   /** Remaining context lifetime, seconds. */
   expiresInSeconds: number;
   /** True when the search matched secured features this caller may not see. */
-  hasMoreSecuredFeatures: boolean;
+  hasInaccessibleSecuredFeatures: boolean;
 }
 
 /**
@@ -92,11 +92,12 @@ export class MartinContextService extends DBService {
 
     // Recomputed even for a reused context: features may have been secured since it was created, and
     // this drives the "some results are hidden" notice.
-    const hasMoreSecuredFeatures = await this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
-      featureTypeName,
-      normalizedExpression,
-      systemUserId
-    );
+    const hasInaccessibleSecuredFeatures =
+      await this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
+        featureTypeName,
+        normalizedExpression,
+        systemUserId
+      );
 
     // Reuse and creation are one statement, serialized per context hash: two identical mints racing
     // here would otherwise both find nothing and both insert, and Martin would cache one search's
@@ -145,7 +146,7 @@ export class MartinContextService extends DBService {
     return {
       martinContextId: context.martin_context_id,
       expiresInSeconds: context.expires_in_seconds,
-      hasMoreSecuredFeatures
+      hasInaccessibleSecuredFeatures
     };
   }
 
