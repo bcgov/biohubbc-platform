@@ -2,6 +2,7 @@ import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 
 // The map owns its own data loading and is covered by its own suite; this one is about the page layout.
@@ -40,7 +41,8 @@ const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   submissionFeatureId: 10,
   rootBreadcrumbLabel: 'Submissions',
   rootBreadcrumbTo: '/submissions',
-  submissionDetailBasePath: '/submission'
+  submissionDetailBasePath: '/submission',
+  pathResolvers: buildSubmissionPropertyValuePathResolvers('/submission')
 };
 
 const renderComponent = (props?: Partial<ComponentProps<typeof SubmissionFeatureDetailContent>>) =>

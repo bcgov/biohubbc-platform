@@ -17,8 +17,8 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { parseRouteId } from 'utils/routes';
+import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 
 /**
  * Portal submission feature detail page scoped to the current user's submission.
@@ -27,6 +27,7 @@ import { parseRouteId } from 'utils/routes';
  */
 export const PortalSubmissionFeaturePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const api = useApi();
   const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
   const submissionId = parseRouteId(params.submissionId);
@@ -52,6 +53,10 @@ export const PortalSubmissionFeaturePage = () => {
   }, [submissionId, submissionFeatureId]);
 
   const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/portal/submission', location.search),
+    [location.search]
+  );
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
@@ -103,7 +108,7 @@ export const PortalSubmissionFeaturePage = () => {
           <FeaturePropertiesSection
             submissionId={submissionId}
             submissionFeatureId={submissionFeatureId}
-            featureRouteBasePath="/portal/submission"
+            pathResolvers={pathResolvers}
           />
           <PageSection id="portal-submission-feature-map" label="Map">
             {feature && (

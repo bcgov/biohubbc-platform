@@ -3,7 +3,7 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { parseRouteId } from 'utils/routes';
+import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 import { SubmissionFeatureDetailContent } from './components/SubmissionFeatureDetailContent';
 
 export const SubmissionFeaturePage = () => {
@@ -36,6 +36,10 @@ export const SubmissionFeaturePage = () => {
 
   const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
   const isLoading = featureDataLoader.isLoading;
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
+    [location.search]
+  );
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
@@ -50,7 +54,7 @@ export const SubmissionFeaturePage = () => {
       rootBreadcrumbLabel="Search"
       rootBreadcrumbTo={`/search/${location.search}`}
       submissionDetailBasePath="/submission"
-      featureRouteBasePath="/submission"
+      pathResolvers={pathResolvers}
       queryString={location.search}
     />
   );

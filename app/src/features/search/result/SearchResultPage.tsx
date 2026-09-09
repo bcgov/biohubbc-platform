@@ -5,9 +5,9 @@ import dayjs from 'dayjs';
 import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
 import { useCodesContext } from 'hooks/useContext';
 import { useMemo, useState } from 'react';
-import { Navigate, useParams } from 'react-router';
+import { Navigate, useLocation, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
-import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
+import { buildSubmissionPropertyValuePathResolvers, getSearchFeatureTypeRouteConfig } from 'utils/routes';
 import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultMapContainer } from './layout/map/SearchResultMapContainer';
@@ -34,6 +34,7 @@ import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
  */
 export const SearchResultPage = () => {
   const { featureType } = useParams<{ featureType: string }>();
+  const location = useLocation();
   const { codesDataLoader } = useCodesContext();
   const [view, setView] = useState<SEARCH_RESULT_VIEW>(SEARCH_RESULT_VIEW.TABLE);
 
@@ -41,6 +42,10 @@ export const SearchResultPage = () => {
   const featureTypeLinks = useMemo(
     () => buildSearchFeatureTypeLinks(codesDataLoader.data?.feature_type_with_properties),
     [codesDataLoader.data?.feature_type_with_properties]
+  );
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
+    [location.search]
   );
   const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
   const { rows, properties, hasMoreSecuredFeatures, isLoading, searchParams, setSearchParams, pagination } =
@@ -87,6 +92,7 @@ export const SearchResultPage = () => {
           <SearchResultPanel
             rows={rows}
             featureTypeProperties={properties}
+            pathResolvers={pathResolvers}
             isLoading={isLoading}
             pagination={pagination}
             sortOptions={sortOptions}

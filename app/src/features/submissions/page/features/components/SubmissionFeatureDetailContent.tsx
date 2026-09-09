@@ -17,18 +17,18 @@ import { PageSection } from 'components/section/PageSection';
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 
 interface SubmissionFeatureDetailContentProps {
   isLoading: boolean;
   feature?: ISubmissionFeature;
   submissionId: number;
-  /** Feature whose indexed properties the Properties section lists. */
   submissionFeatureId: number;
   rootBreadcrumbLabel: string;
   rootBreadcrumbTo: string;
   submissionDetailBasePath: string;
-  featureRouteBasePath?: string;
+  pathResolvers: SubmissionPropertyValuePathResolvers;
   queryString?: string;
   buttons?: ReactNode;
 }
@@ -41,7 +41,7 @@ export const SubmissionFeatureDetailContent = ({
   rootBreadcrumbLabel,
   rootBreadcrumbTo,
   submissionDetailBasePath,
-  featureRouteBasePath = submissionDetailBasePath,
+  pathResolvers,
   queryString = '',
   buttons
 }: SubmissionFeatureDetailContentProps) => {
@@ -105,7 +105,7 @@ export const SubmissionFeatureDetailContent = ({
           <FeaturePropertiesSection
             submissionId={submissionId}
             submissionFeatureId={submissionFeatureId}
-            featureRouteBasePath={featureRouteBasePath}
+            pathResolvers={pathResolvers}
           />
           <PageSection id="submission-feature-map" label="Map">
             {feature && (

@@ -1,5 +1,6 @@
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import { cleanup, render, screen } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { SearchResultPanel } from './SearchResultPanel';
 
 vi.mock('./option/SearchResultOptions', () => ({
@@ -10,6 +11,7 @@ const panel = (view: SEARCH_RESULT_VIEW) => (
   <SearchResultPanel
     rows={[]}
     featureTypeProperties={[]}
+    pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission')}
     isLoading={false}
     pagination={{ current_page: 1, per_page: 10, total: 42, last_page: 5, sort: undefined, order: undefined }}
     sortOptions={[]}
