@@ -48,8 +48,7 @@ export const buildSearchResultsSource = (martinUrlTemplate: string, contextId: s
 /**
  * Build the layers rendering the search results.
  *
- * Ordered so areas sit beneath lines, and lines beneath points. They draw above whatever style the map was created
- * with.
+ * Ordered so areas sit beneath lines, and lines beneath points; the basemap layer is added by the caller before these.
  *
  * Only the cluster layer is interactive: selecting a cluster offers a zoom-in. Feature tiles are geometry only — they
  * carry nothing a click could resolve — so the raw feature layers stay display-only and take no part in hit testing.

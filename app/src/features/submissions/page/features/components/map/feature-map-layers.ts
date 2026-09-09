@@ -53,8 +53,7 @@ export const buildFeatureTileSource = (
  * point among polygons would silently not appear. `geometry-type` reports multi-geometries under their singular name,
  * so these four layers also cover MultiPoint, MultiLineString and MultiPolygon.
  *
- * Ordered so areas sit beneath lines, and lines beneath points. They draw above whatever style the map was created
- * with.
+ * Ordered so areas sit beneath lines, and lines beneath points; the basemap layer is added by the caller before these.
  *
  * All of them are display-only: feature tiles carry geometry alone, so there is nothing a click could resolve to.
  *

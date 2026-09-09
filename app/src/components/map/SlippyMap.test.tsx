@@ -80,6 +80,26 @@ const mocks = vi.hoisted(() => {
 
     setStyle = vi.fn();
 
+    // Paint currently set on each layer through `setPaintProperty`, for asserting in-place updates.
+    paint: Record<string, Record<string, unknown>> = {};
+
+    setPaintProperty = vi.fn((layerId: string, name: string, value: unknown) => {
+      (this.paint[layerId] ??= {})[name] = value;
+      this.operations.push(`setPaintProperty:${layerId}:${name}`);
+    });
+
+    // The tiles `coveringTiles` reports, settable per test.
+    coveringTileIds: { canonical: { z: number; x: number; y: number } }[] = [];
+
+    coveringTiles = vi.fn(() => this.coveringTileIds);
+
+    getBounds = vi.fn(() => ({
+      toArray: () => [
+        [-130, 48],
+        [-114, 60]
+      ]
+    }));
+
     queryRenderedFeatures = vi.fn(() => this.renderedFeatures);
 
     // Stand-in projection: a fixed pan offset applied to the coordinates, enough to assert that a popup is placed
@@ -1165,6 +1185,148 @@ describe('SlippyMap', () => {
 
       expect(map.queryRenderedFeatures).toHaveBeenCalledWith({ x: 1, y: 1 }, { layers: ['search-clusters'] });
       expect(map.canvas.style.cursor).toBe('pointer');
+    });
+  });
+
+  describe('paint updates', () => {
+    const tileSources = {
+      'bc-basemap': { type: 'raster' as const, tiles: ['bc-basemap://{z}/{x}/{y}?template=x'], tileSize: 256 },
+      'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+    };
+
+    const basemapLayer = (opacity: number): ISlippyMapLayer => ({
+      specification: {
+        id: 'bc-basemap',
+        type: 'raster',
+        source: 'bc-basemap',
+        paint: { 'raster-opacity': opacity }
+      }
+    });
+
+    const clusterLayer: ISlippyMapLayer = {
+      specification: { id: 'search-clusters', type: 'circle', source: 'search-results', 'source-layer': 'clusters' },
+      popupRender: (context) => <button onClick={context.close}>cluster</button>
+    };
+
+    it("updates a layer's paint in place when only its paint changes", () => {
+      const { map, rerender } = renderSlippyMap({ tileSources, layers: [basemapLayer(1)] });
+      loadMap(map);
+      map.operations.length = 0;
+
+      rerender(<SlippyMap tileSources={tileSources} layers={[basemapLayer(0)]} />);
+
+      expect(map.setPaintProperty).toHaveBeenCalledWith('bc-basemap', 'raster-opacity', 0);
+      // Nothing torn down: no source or layer was removed or added, so no tile is re-requested.
+      expect(map.operations).toEqual(['setPaintProperty:bc-basemap:raster-opacity']);
+    });
+
+    it('keeps an open popup through a paint-only change', () => {
+      const { map, rerender, getByText } = renderSlippyMap({ tileSources, layers: [basemapLayer(1), clusterLayer] });
+      loadMap(map);
+
+      map.renderedFeatures = [{ layer: { id: 'search-clusters' }, properties: {} }];
+      act(() => {
+        map.fire('click', { point: { x: 10, y: 10 }, lngLat: { lng: 40, lat: 60 } });
+      });
+      expect(getByText('cluster')).toBeInTheDocument();
+
+      rerender(<SlippyMap tileSources={tileSources} layers={[basemapLayer(0), clusterLayer]} />);
+
+      expect(getByText('cluster')).toBeInTheDocument();
+    });
+
+    it('resets a paint property the layer stops declaring', () => {
+      const { map, rerender } = renderSlippyMap({ tileSources, layers: [basemapLayer(0)] });
+      loadMap(map);
+
+      rerender(
+        <SlippyMap
+          tileSources={tileSources}
+          layers={[{ specification: { id: 'bc-basemap', type: 'raster', source: 'bc-basemap' } }]}
+        />
+      );
+
+      expect(map.setPaintProperty).toHaveBeenCalledWith('bc-basemap', 'raster-opacity', undefined);
+    });
+
+    it("re-applies content with each layer's current paint", () => {
+      const { map, rerender } = renderSlippyMap({ tileSources, layers: [basemapLayer(1)] });
+      loadMap(map);
+
+      rerender(<SlippyMap tileSources={tileSources} layers={[basemapLayer(0)]} />);
+      const replacedSources = {
+        ...tileSources,
+        'search-results': { type: 'vector' as const, tiles: ['https://example.test/other/{z}/{x}/{y}'] }
+      };
+      rerender(<SlippyMap tileSources={replacedSources} layers={[basemapLayer(0)]} />);
+
+      const lastBasemapAdd = map.addLayer.mock.calls.filter(([layer]) => layer.id === 'bc-basemap').at(-1);
+      expect(lastBasemapAdd?.[0]).toMatchObject({ paint: { 'raster-opacity': 0 } });
+    });
+  });
+
+  describe('viewport', () => {
+    it('reports the viewport once the map has loaded and after every move', () => {
+      const onViewportChange = vi.fn();
+      const { map } = renderSlippyMap({ onViewportChange });
+
+      expect(onViewportChange).not.toHaveBeenCalled();
+
+      loadMap(map);
+
+      expect(onViewportChange).toHaveBeenCalledTimes(1);
+      expect(onViewportChange.mock.calls[0][0]).toMatchObject({ bounds: [-130, 48, -114, 60], zoom: 7 });
+
+      act(() => {
+        map.fire('moveend');
+      });
+
+      expect(onViewportChange).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops reporting once unmounted', () => {
+      const { map, unmount } = renderSlippyMap({ onViewportChange: vi.fn() });
+      loadMap(map);
+
+      unmount();
+
+      expect(map.off).toHaveBeenCalledWith('moveend', expect.any(Function));
+    });
+
+    it('lists the tiles MapLibre requests for an applied source, flagging those its bounds exclude', () => {
+      const onViewportChange = vi.fn();
+      const tileSources = {
+        bc: {
+          type: 'raster' as const,
+          tiles: ['bc-basemap://{z}/{x}/{y}?template=x'],
+          tileSize: 256,
+          minzoom: 4,
+          maxzoom: 17,
+          bounds: [-149.3343, 44.6472, -103.1591, 63.5881] as [number, number, number, number]
+        },
+        vec: { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+      };
+      const { map } = renderSlippyMap({ tileSources, onViewportChange });
+      // Vancouver, Winnipeg, and Vancouver again from a repeated world copy.
+      map.coveringTileIds = [
+        { canonical: { z: 11, x: 323, y: 700 } },
+        { canonical: { z: 11, x: 471, y: 695 } },
+        { canonical: { z: 11, x: 323, y: 700 } }
+      ];
+      loadMap(map);
+
+      const viewport = onViewportChange.mock.calls[0][0];
+
+      expect(viewport.coveringTiles('bc')).toEqual([
+        { z: 11, x: 323, y: 700, withinBounds: true },
+        { z: 11, x: 471, y: 695, withinBounds: false }
+      ]);
+      expect(map.coveringTiles).toHaveBeenLastCalledWith({ tileSize: 256, minzoom: 4, maxzoom: 17, roundZoom: true });
+
+      viewport.coveringTiles('vec');
+      expect(map.coveringTiles).toHaveBeenLastCalledWith({ tileSize: 512, minzoom: 0, maxzoom: 22, roundZoom: false });
+
+      expect(viewport.coveringTiles('not-applied')).toEqual([]);
     });
   });
 

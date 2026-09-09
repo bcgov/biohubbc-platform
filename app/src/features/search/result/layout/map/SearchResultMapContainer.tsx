@@ -5,6 +5,7 @@ import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { buildMartinRequestTransform } from 'components/map/martin-request';
 import { SlippyMap } from 'components/map/SlippyMap';
 import type { ISlippyMapLayer, ISlippyMapPopupContext } from 'components/map/SlippyMap.interface';
+import { useBcBasemap } from 'components/map/useBcBasemap';
 import {
   ALL_OF_BC_BBOX,
   MAP_CLUSTER_ZOOM_INCREMENT,
@@ -76,8 +77,10 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     isActive
   );
 
+  const bcBasemap = useBcBasemap(config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION);
+
   const tileSources = useMemo((): Record<string, SourceSpecification> => {
-    const sources: Record<string, SourceSpecification> = {};
+    const sources: Record<string, SourceSpecification> = { ...bcBasemap.tileSources };
 
     if (session) {
       sources[SEARCH_RESULTS_SOURCE_ID] = buildSearchResultsSource(
@@ -87,7 +90,7 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     }
 
     return sources;
-  }, [session]);
+  }, [bcBasemap.tileSources, session]);
 
   /**
    * Describe a clicked cluster. A cluster whose properties do not resolve to a selection gets no popper at all, so a
@@ -119,14 +122,14 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
   }, []);
 
   const layers = useMemo((): ISlippyMapLayer[] => {
-    const mapLayers: ISlippyMapLayer[] = [];
+    const mapLayers: ISlippyMapLayer[] = [...bcBasemap.layers];
 
     if (session) {
       mapLayers.push(...buildSearchResultLayers(renderClusterPopup));
     }
 
     return mapLayers;
-  }, [session, renderClusterPopup]);
+  }, [bcBasemap.layers, session, renderClusterPopup]);
 
   // Only Martin tiles carry the token; the basemap style and its assets are requested as MapLibre built them.
   const transformRequest = useMemo(
@@ -182,7 +185,7 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
         // neither the context id nor the nonce and therefore never remounts.
         key={`${session.martin_context_id}:${reloadNonce}`}
         readOnly
-        mapStyle={config?.BASEMAP_STYLE_URL || undefined}
+        mapStyle={config?.BASEMAP_FALLBACK_STYLE_URL || undefined}
         mapOptions={{
           minZoom: MAP_MIN_ZOOM,
           maxZoom: MAP_MAX_ZOOM,
@@ -202,6 +205,7 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
         layers={layers}
         transformRequest={transformRequest}
         onSourceError={handleSourceError}
+        onViewportChange={bcBasemap.onViewportChange}
         sx={{ flex: '1 1 auto', minHeight: MAP_VIEW_MIN_HEIGHT }}
       />
     </MapFrame>

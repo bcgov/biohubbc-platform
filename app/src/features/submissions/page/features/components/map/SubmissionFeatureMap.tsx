@@ -5,6 +5,7 @@ import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { buildMartinRequestTransform } from 'components/map/martin-request';
 import { SlippyMap } from 'components/map/SlippyMap';
 import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
+import { useBcBasemap } from 'components/map/useBcBasemap';
 import {
   MAP_FIT_MAX_ZOOM,
   MAP_FIT_PADDING,
@@ -62,8 +63,10 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
     submissionFeatureId
   );
 
+  const bcBasemap = useBcBasemap(config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION);
+
   const tileSources = useMemo((): Record<string, SourceSpecification> => {
-    const sources: Record<string, SourceSpecification> = {};
+    const sources: Record<string, SourceSpecification> = { ...bcBasemap.tileSources };
 
     if (session) {
       sources[FEATURE_GEOMETRIES_SOURCE_ID] = buildFeatureTileSource(
@@ -75,17 +78,17 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
     }
 
     return sources;
-  }, [session, submissionId, submissionFeatureId]);
+  }, [bcBasemap.tileSources, session, submissionId, submissionFeatureId]);
 
   const layers = useMemo((): ISlippyMapLayer[] => {
-    const mapLayers: ISlippyMapLayer[] = [];
+    const mapLayers: ISlippyMapLayer[] = [...bcBasemap.layers];
 
     if (session) {
       mapLayers.push(...buildFeatureLayers(session.source_layer));
     }
 
     return mapLayers;
-  }, [session]);
+  }, [bcBasemap.layers, session]);
 
   // Only Martin tiles carry the token; the basemap style and its assets are requested as MapLibre built them.
   const transformRequest = useMemo(
@@ -155,7 +158,7 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
         // remount that re-requests the tiles; a token-only refresh before expiry changes neither and never remounts.
         key={`${submissionId}:${submissionFeatureId}:${reloadNonce}`}
         readOnly
-        mapStyle={config?.BASEMAP_STYLE_URL || undefined}
+        mapStyle={config?.BASEMAP_FALLBACK_STYLE_URL || undefined}
         mapOptions={{
           minZoom: MAP_MIN_ZOOM,
           maxZoom: MAP_MAX_ZOOM,
@@ -171,6 +174,7 @@ export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
         layers={layers}
         transformRequest={transformRequest}
         onSourceError={handleSourceError}
+        onViewportChange={bcBasemap.onViewportChange}
         sx={{ flex: '1 1 auto' }}
       />
     </MapFrame>

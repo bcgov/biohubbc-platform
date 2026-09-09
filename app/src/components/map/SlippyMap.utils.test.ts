@@ -7,6 +7,7 @@ import {
   hasEnabledDrawControl,
   isDrawModeEnabled,
   isSupportedDrawFeature,
+  isTileWithinBounds,
   normalizeFeaturesForDraw,
   toComparableFeature
 } from './SlippyMap.utils';
@@ -33,6 +34,33 @@ const getPolygonFeature = (overrides?: Partial<Feature>): Feature => {
 };
 
 describe('SlippyMap.utils', () => {
+  describe('isTileWithinBounds', () => {
+    // The BC Government basemap cache extent; MapLibre's rule is intersection, so a tile touching it is served.
+    const bounds: [number, number, number, number] = [-149.3343, 44.6472, -103.1591, 63.5881];
+
+    it('accepts tiles inside the bounds', () => {
+      expect(isTileWithinBounds({ z: 11, x: 323, y: 700 }, bounds)).toBe(true); // Vancouver
+      expect(isTileWithinBounds({ z: 11, x: 428, y: 690 }, bounds)).toBe(true); // Regina
+      expect(isTileWithinBounds({ z: 11, x: 255, y: 586 }, bounds)).toBe(true); // Whitehorse
+      expect(isTileWithinBounds({ z: 5, x: 5, y: 10 }, bounds)).toBe(true);
+      expect(isTileWithinBounds({ z: 5, x: 6, y: 10 }, bounds)).toBe(true);
+    });
+
+    it('rejects tiles beyond each edge of the bounds', () => {
+      expect(isTileWithinBounds({ z: 11, x: 471, y: 695 }, bounds)).toBe(false); // Winnipeg, east
+      expect(isTileWithinBounds({ z: 11, x: 327, y: 791 }, bounds)).toBe(false); // San Francisco, south
+      expect(isTileWithinBounds({ z: 11, x: 183, y: 535 }, bounds)).toBe(false); // Fairbanks, north
+    });
+
+    it('accepts every tile when the source declares no bounds', () => {
+      expect(isTileWithinBounds({ z: 11, x: 471, y: 695 })).toBe(true);
+    });
+
+    it('clamps bounds to the world', () => {
+      expect(isTileWithinBounds({ z: 0, x: 0, y: 0 }, [-200, -100, 200, 100])).toBe(true);
+    });
+  });
+
   describe('isSupportedDrawFeature', () => {
     it('returns true for Point, LineString, and Polygon geometries', () => {
       expect(isSupportedDrawFeature(getPolygonFeature())).toBe(true);
