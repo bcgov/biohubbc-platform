@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { SkeletonMap } from 'components/loading/SkeletonLoaders';
-import { BASEMAP_SOURCE_ID, buildBasemapLayer, buildBasemapSource } from 'components/map/basemap-layers';
+import { buildMartinRequestTransform } from 'components/map/martin-request';
 import { SlippyMap } from 'components/map/SlippyMap';
 import type { ISlippyMapLayer, ISlippyMapPopupContext } from 'components/map/SlippyMap.interface';
 import {
@@ -79,10 +79,6 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
   const tileSources = useMemo((): Record<string, SourceSpecification> => {
     const sources: Record<string, SourceSpecification> = {};
 
-    if (config?.BASEMAP_URL) {
-      sources[BASEMAP_SOURCE_ID] = buildBasemapSource(config.BASEMAP_URL, config.BASEMAP_ATTRIBUTION ?? '');
-    }
-
     if (session) {
       sources[SEARCH_RESULTS_SOURCE_ID] = buildSearchResultsSource(
         session.martin_url_template,
@@ -91,7 +87,7 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     }
 
     return sources;
-  }, [config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION, session]);
+  }, [session]);
 
   /**
    * Describe a clicked cluster. A cluster whose properties do not resolve to a selection gets no popper at all, so a
@@ -125,39 +121,22 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
   const layers = useMemo((): ISlippyMapLayer[] => {
     const mapLayers: ISlippyMapLayer[] = [];
 
-    if (config?.BASEMAP_URL) {
-      mapLayers.push(buildBasemapLayer());
-    }
-
     if (session) {
       mapLayers.push(...buildSearchResultLayers(renderClusterPopup));
     }
 
     return mapLayers;
-  }, [config?.BASEMAP_URL, session, renderClusterPopup]);
+  }, [session, renderClusterPopup]);
 
-  /**
-   * Attach the tile token to map requests.
-   *
-   * Read from a ref at request time rather than captured, so a refreshed token applies to the next request without
-   * the map being rebuilt. Requests made before a session exists carry no header.
-   */
-  const transformRequest = useCallback(
-    (url: string) => {
-      const token = tokenRef.current;
-
-      if (!token) {
-        return { url };
-      }
-
-      return { url, headers: { Authorization: `Bearer ${token}` } };
-    },
-    [tokenRef]
+  // Only Martin tiles carry the token; the basemap style and its assets are requested as MapLibre built them.
+  const transformRequest = useMemo(
+    () => buildMartinRequestTransform(session?.martin_url_template, tokenRef),
+    [session?.martin_url_template, tokenRef]
   );
 
   const handleSourceError = useCallback(
     (sourceId: string) => {
-      // Only the tile source is worth recovering from; a basemap failure is the provider's problem.
+      // Only the tile source is recoverable here: a rejected tile means the token or context expired.
       if (sourceId === SEARCH_RESULTS_SOURCE_ID) {
         onTileError();
       }
@@ -203,6 +182,7 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
         // neither the context id nor the nonce and therefore never remounts.
         key={`${session.martin_context_id}:${reloadNonce}`}
         readOnly
+        mapStyle={config?.BASEMAP_STYLE_URL || undefined}
         mapOptions={{
           minZoom: MAP_MIN_ZOOM,
           maxZoom: MAP_MAX_ZOOM,

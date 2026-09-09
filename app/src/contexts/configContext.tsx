@@ -19,14 +19,10 @@ export interface IConfig {
   MAX_UPLOAD_TARBALL_SIZE: number;
   MAX_TICKET_ATTACHMENT_FILE_SIZE: number;
   /**
-   * Raster basemap tile URL template rendered beneath the map's vector layers. Configurable so the basemap provider
-   * can be changed without a code change.
+   * MapLibre style JSON URL for the basemap drawn beneath the map's data layers. Attribution is carried by the style's
+   * own sources. Configurable so the basemap provider can be changed without a code change.
    */
-  BASEMAP_URL: string;
-  /**
-   * Attribution text displayed on the map, as required by the basemap provider's terms.
-   */
-  BASEMAP_ATTRIBUTION: string;
+  BASEMAP_STYLE_URL: string;
 }
 
 export const ConfigContext = React.createContext<IConfig | undefined>({
@@ -45,8 +41,7 @@ export const ConfigContext = React.createContext<IConfig | undefined>({
   MAX_UPLOAD_FILE_SIZE: 52428800,
   MAX_UPLOAD_TARBALL_SIZE: 10737418240,
   MAX_TICKET_ATTACHMENT_FILE_SIZE: 15728640,
-  BASEMAP_URL: '',
-  BASEMAP_ATTRIBUTION: ''
+  BASEMAP_STYLE_URL: ''
 });
 
 /**
@@ -76,10 +71,7 @@ const getLocalConfig = (): IConfig => {
     MAX_UPLOAD_FILE_SIZE: Number(import.meta.env.VITE_MAX_UPLOAD_FILE_SIZE) || 52428800,
     MAX_UPLOAD_TARBALL_SIZE: Number(import.meta.env.VITE_MAX_UPLOAD_TARBALL_SIZE) || 10737418240,
     MAX_TICKET_ATTACHMENT_FILE_SIZE: Number(import.meta.env.VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE) || 15728640,
-    BASEMAP_URL:
-      import.meta.env.VITE_BASEMAP_URL ||
-      'https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}',
-    BASEMAP_ATTRIBUTION: import.meta.env.VITE_BASEMAP_ATTRIBUTION || '\u00a9 Province of British Columbia'
+    BASEMAP_STYLE_URL: import.meta.env.VITE_BASEMAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/bright'
   };
 };
 

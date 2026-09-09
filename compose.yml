@@ -306,8 +306,7 @@ services:
       - VITE_MAX_TICKET_ATTACHMENT_FILE_SIZE=${MAX_TICKET_ATTACHMENT_FILE_SIZE}
       - VITE_SITEMINDER_LOGOUT_URL=${SITEMINDER_LOGOUT_URL}
       # Map view
-      - VITE_BASEMAP_URL=${BASEMAP_URL}
-      - VITE_BASEMAP_ATTRIBUTION=${BASEMAP_ATTRIBUTION}
+      - VITE_BASEMAP_STYLE_URL=${BASEMAP_STYLE_URL}
       # Vite proxies /martin to the gateway, mirroring the same-origin path route used when deployed
       - VITE_MARTIN_PROXY_TARGET=http://martin_gateway:${MARTIN_GATEWAY_PORT}
       - VITE_KEYCLOAK_HOST=${KEYCLOAK_HOST}

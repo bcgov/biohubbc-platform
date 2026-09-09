@@ -23,10 +23,7 @@ vi.mock('hooks/useApi', () => ({
 }));
 
 vi.mock('hooks/useContext', () => ({
-  useConfigContext: () => ({
-    BASEMAP_URL: 'https://basemap.test/{z}/{y}/{x}',
-    BASEMAP_ATTRIBUTION: '© Province of British Columbia'
-  })
+  useConfigContext: () => ({ BASEMAP_STYLE_URL: 'https://style.test/bright' })
 }));
 
 // SlippyMap is exercised by its own suite; here we only care what the feature map hands it.
@@ -116,20 +113,28 @@ describe('SubmissionFeatureMap', () => {
       expect(source.tiles[0]).not.toContain('super-secret-token');
     });
 
-    it('attaches the token as an Authorization header once a session exists', async () => {
+    it('attaches the token only to Martin tile requests', async () => {
       await renderReadyMap(buildSession({ token: 'token-abc' }));
 
       const { transformRequest } = latestMapProps();
 
-      expect(transformRequest('https://biohub.test/martin/feature/5/5/11')).toEqual({
-        url: 'https://biohub.test/martin/feature/5/5/11',
+      expect(transformRequest('https://biohub.test/martin/feature/5/5/11?ctx=1%3A3')).toEqual({
+        url: 'https://biohub.test/martin/feature/5/5/11?ctx=1%3A3',
         headers: { Authorization: 'Bearer token-abc' }
       });
 
-      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({
-        url: 'https://basemap.test/5/11/5',
-        headers: { Authorization: 'Bearer token-abc' }
+      // The basemap provider gets the request as MapLibre built it: a credential for our origin never leaves it.
+      expect(transformRequest('https://style.test/planet/5/5/11.pbf')).toEqual({
+        url: 'https://style.test/planet/5/5/11.pbf'
       });
+    });
+  });
+
+  describe('basemap', () => {
+    it('passes the configured style url to the map', async () => {
+      await renderReadyMap();
+
+      expect(latestMapProps().mapStyle).toBe('https://style.test/bright');
     });
   });
 
@@ -303,18 +308,18 @@ describe('SubmissionFeatureMap', () => {
       });
     });
 
-    it('ignores a basemap failure, which is the provider’s problem and not the feature’s', async () => {
+    it('recovers only from the feature tile source', async () => {
       await renderReadyMap();
 
       for (let attempt = 0; attempt < 3; attempt++) {
         await act(async () => {
-          latestMapProps().onSourceError('basemap', new Error('basemap unavailable'));
+          latestMapProps().onSourceError('openmaptiles', new Error('style source unavailable'));
         });
       }
 
       expect(screen.queryByTestId('submission-feature-map-error')).not.toBeInTheDocument();
       expect(screen.getByTestId('submission-feature-map')).toBeInTheDocument();
-      // No re-mint either: the tile session is unaffected by the basemap.
+      // No re-mint either: the tile session is independent of the style's own sources.
       expect(mocks.createSubmissionFeatureTileSession).toHaveBeenCalledTimes(1);
     });
 

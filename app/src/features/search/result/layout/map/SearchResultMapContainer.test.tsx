@@ -21,10 +21,7 @@ vi.mock('hooks/useApi', () => ({
 
 vi.mock('hooks/useContext', () => ({
   useDialogContext: () => ({ setSnackbar: mocks.setSnackbar }),
-  useConfigContext: () => ({
-    BASEMAP_URL: 'https://basemap.test/{z}/{y}/{x}',
-    BASEMAP_ATTRIBUTION: '© Province of British Columbia'
-  })
+  useConfigContext: () => ({ BASEMAP_STYLE_URL: 'https://style.test/bright' })
 }));
 
 // SlippyMap is exercised by its own suite; here we only care what the search page hands it. The stub stands in for
@@ -222,8 +219,19 @@ describe('SearchResultMapContainer', () => {
     });
   });
 
+  describe('basemap', () => {
+    it('passes the configured style url to the map', async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+
+      renderContainer();
+      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+
+      expect(latestMapProps().mapStyle).toBe('https://style.test/bright');
+    });
+  });
+
   describe('token transport', () => {
-    it('attaches the token as an Authorization header once a session exists', async () => {
+    it('attaches the token only to Martin tile requests', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession({ token: 'token-abc' }));
 
       renderContainer();
@@ -231,14 +239,14 @@ describe('SearchResultMapContainer', () => {
 
       const { transformRequest } = latestMapProps();
 
-      expect(transformRequest('https://biohub.test/martin/search/5/5/11')).toEqual({
-        url: 'https://biohub.test/martin/search/5/5/11',
+      expect(transformRequest('https://biohub.test/martin/search/5/5/11?ctx=ctx-1')).toEqual({
+        url: 'https://biohub.test/martin/search/5/5/11?ctx=ctx-1',
         headers: { Authorization: 'Bearer token-abc' }
       });
 
-      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({
-        url: 'https://basemap.test/5/11/5',
-        headers: { Authorization: 'Bearer token-abc' }
+      // The basemap provider gets the request as MapLibre built it: a credential for our origin never leaves it.
+      expect(transformRequest('https://style.test/planet/5/5/11.pbf')).toEqual({
+        url: 'https://style.test/planet/5/5/11.pbf'
       });
     });
   });
@@ -506,14 +514,14 @@ describe('SearchResultMapContainer', () => {
       });
     });
 
-    it('ignores failures from the basemap source', async () => {
+    it('recovers only from the search-result source', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
       renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       await act(async () => {
-        latestMapProps().onSourceError('basemap');
+        latestMapProps().onSourceError('openmaptiles');
       });
 
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
