@@ -78,6 +78,8 @@ const mocks = vi.hoisted(() => {
 
     getStyle = vi.fn(() => ({ layers: this.layerOrder.map((id) => this.layers.get(id)) }));
 
+    setStyle = vi.fn();
+
     queryRenderedFeatures = vi.fn(() => this.renderedFeatures);
 
     // Stand-in projection: a fixed pan offset applied to the coordinates, enough to assert that a popup is placed
@@ -1195,6 +1197,71 @@ describe('SlippyMap', () => {
       });
 
       expect(onSourceError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('style failures', () => {
+    const tileSources = {
+      'search-results': { type: 'vector' as const, tiles: ['https://example.test/tiles/{z}/{x}/{y}'] }
+    };
+
+    /** A style that never arrives: MapLibre reports it against the map, with no source to blame. */
+    const failStyle = (map: InstanceType<typeof mocks.MockMaplibreMap>) => {
+      act(() => {
+        map.fire('error', { error: new Error('style unreachable') });
+      });
+    };
+
+    it('falls back to the blank style when the configured style cannot be loaded', () => {
+      const { map } = renderSlippyMap({ mapStyle: 'https://style.test/bright', tileSources });
+
+      failStyle(map);
+
+      expect(map.setStyle).toHaveBeenCalledWith(SLIPPY_MAP_DEFAULT_STYLE);
+    });
+
+    it('still applies the consumer sources and layers after falling back', () => {
+      const layers = [{ specification: { id: 'search-points', type: 'circle' as const, source: 'search-results' } }];
+      const { map } = renderSlippyMap({ mapStyle: 'https://style.test/bright', tileSources, layers });
+
+      failStyle(map);
+      // The swap re-runs the load path, which is where map content is applied.
+      loadMap(map);
+
+      expect(map.getSource('search-results')).toEqual(tileSources['search-results']);
+      expect(map.layerOrder).toContain('search-points');
+    });
+
+    it('swaps the style once, however many failures the provider reports', () => {
+      const { map } = renderSlippyMap({ mapStyle: 'https://style.test/bright', tileSources });
+
+      failStyle(map);
+      failStyle(map);
+      failStyle(map);
+
+      expect(map.setStyle).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the style once the map has loaded, when a failure belongs to a source', () => {
+      const { map } = renderSlippyMap({ mapStyle: 'https://style.test/bright', tileSources });
+      loadMap(map);
+
+      failStyle(map);
+
+      expect(map.setStyle).not.toHaveBeenCalled();
+    });
+
+    it('reports applied source failures rather than swapping the style', () => {
+      const onSourceError = vi.fn();
+      const { map } = renderSlippyMap({ mapStyle: 'https://style.test/bright', tileSources, onSourceError });
+      loadMap(map);
+
+      act(() => {
+        map.fire('error', { sourceId: 'search-results', error: new Error('tile request rejected') });
+      });
+
+      expect(onSourceError).toHaveBeenCalledTimes(1);
+      expect(map.setStyle).not.toHaveBeenCalled();
     });
   });
 

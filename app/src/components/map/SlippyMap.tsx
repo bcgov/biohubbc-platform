@@ -104,6 +104,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   // Source/layer ids this component applied, so replacing them never touches the drawing library's own
   const appliedSourceIdsRef = useRef<string[]>([]);
   const appliedLayerIdsRef = useRef<string[]>([]);
+  const hasMapLoadedRef = useRef(false);
+  const hasFallenBackToDefaultStyleRef = useRef(false);
   const mapContentRef = useRef({ tileSources, layers });
   // Layers that take part in hit testing: those declaring a click handler or a popup.
   const interactiveLayersRef = useRef<ISlippyMapLayer[]>([]);
@@ -414,13 +416,41 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     };
 
     /**
+     * Replace a style that never loaded with the blank default.
+     *
+     * MapLibre fires `load` only once a complete style is in place, and the consumer's sources and layers are applied
+     * there, so a style document that fails to arrive would otherwise leave the map with no data on it at all. The
+     * blank style makes no network requests and cannot fail in turn, and the swap re-runs the load path, so the cost
+     * of an unreachable provider stays what it should be: the backdrop, not the map.
+     *
+     * Only ever done once, and only before the map has loaded — past that point the style is in place and a failure
+     * belongs to a source rather than the style document.
+     */
+    const fallBackToDefaultStyle = () => {
+      if (hasFallenBackToDefaultStyleRef.current || hasMapLoadedRef.current) {
+        return;
+      }
+
+      hasFallenBackToDefaultStyleRef.current = true;
+      map.setStyle(SLIPPY_MAP_DEFAULT_STYLE);
+    };
+
+    /**
      * Surfaces source load failures, which is how a consumer learns that a tile request was rejected:
      * `transformRequest` only sees outgoing requests, never responses.
+     *
+     * A failure carrying no source is the style document's own: MapLibre reports those against the map rather than
+     * against any source it never got as far as reading.
      */
     const handleMapError = (event: ErrorEvent & { sourceId?: string }) => {
       const sourceId = event.sourceId;
 
-      if (!sourceId || !appliedSourceIdsRef.current.includes(sourceId)) {
+      if (!sourceId) {
+        fallBackToDefaultStyle();
+        return;
+      }
+
+      if (!appliedSourceIdsRef.current.includes(sourceId)) {
         return;
       }
 
@@ -455,6 +485,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       // inserted below them (drawn geometry always renders on top).
       applyMapContent(map);
 
+      hasMapLoadedRef.current = true;
       setIsMapLoaded(true);
       callbacksRef.current.onMapLoad?.();
     };
@@ -491,6 +522,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
       appliedLayerIdsRef.current = [];
       appliedSourceIdsRef.current = [];
+      hasMapLoadedRef.current = false;
+      hasFallenBackToDefaultStyleRef.current = false;
       setIsMapLoaded(false);
 
       const draw = drawRef.current;
