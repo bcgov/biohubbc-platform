@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ExpressionTree } from '../../models/expression-tree';
 import { buildExpressionTreeFeatureIdsSubquery } from '../../repositories/expression-evaluation';
-import { ExpressionPredicateSemanticValidator } from '../../services/expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from '../../services/expression-tree-normalization-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
 import { addTeamMember, createTeam, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
@@ -491,8 +491,8 @@ describe('Tile search function (integration)', function () {
       featureIds: number[],
       expectedMatches: number[]
     ): Promise<void> => {
-      const validator = new ExpressionPredicateSemanticValidator(connection);
-      const normalized = await validator.validateExpressionTree(expressionTree);
+      const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
+      const normalized = await expressionTreeNormalizationService.normalize(expressionTree);
 
       // The TypeScript evaluator, exactly as the search endpoint composes it (anonymous caller).
       const subquery = buildExpressionTreeFeatureIdsSubquery(FEATURE_TYPE, normalized, null).whereIn(

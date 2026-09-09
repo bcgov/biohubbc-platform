@@ -14,12 +14,14 @@ import { DownloadVersionRepository } from '../../repositories/download/download-
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { buildParquetKey } from '../../utils/export-utils';
+import { optimizeExpression } from '../../utils/expression-optimization';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
+import { ExpressionTreeNormalizationService } from '../expression-tree-normalization-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
@@ -67,6 +69,7 @@ export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   downloadVersionRepository: DownloadVersionRepository;
   expressionTreeService: ExpressionTreeService;
+  expressionTreeNormalizationService: ExpressionTreeNormalizationService;
   policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
 
@@ -75,6 +78,7 @@ export class DownloadPipelineService extends DBService {
     this.downloadRepository = new DownloadRepository(connection);
     this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
+    this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
   }
@@ -265,11 +269,9 @@ export class DownloadPipelineService extends DBService {
     // the abort path can't run and the upload either hangs or leaks. Building the
     // cursor descriptor is cheap and side-effect-free until the stream is iterated.
     //
-    // The expression evaluator consumes the *normalized* internal tree shape
-    // (predicates carry resolved property type metadata). `readExpressionTree`
-    // returns the public API tree, so we re-normalize through the same semantic
-    // validator the search path uses — keeping read-time SQL semantics identical
-    // for the two consumers of the evaluator.
+    // The expression evaluator consumes the optimized internal tree shape.
+    // `readExpressionTree` returns the public API tree, so validate and optimize
+    // through the same stages used by search before generating SQL.
     const expressionIds =
       statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
 
@@ -279,12 +281,13 @@ export class DownloadPipelineService extends DBService {
     } else {
       const expressionSubqueries = [];
       for (const expressionId of expressionIds) {
-        const tree = await this.expressionTreeService.readExpressionTree(expressionId);
-        const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
+        const expressionTree = await this.expressionTreeService.readExpressionTree(expressionId);
+        const normalizedExpression = await this.expressionTreeNormalizationService.normalize(expressionTree);
+        const optimizedExpression = optimizeExpression(normalizedExpression);
         expressionSubqueries.push(
           expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
             featureTypeName,
-            normalizedTree,
+            optimizedExpression,
             source.requested_by
           )
         );

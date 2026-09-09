@@ -1,24 +1,23 @@
 import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { ApiBuildSQLError } from '../errors/api-error';
-import { InternalTypedPredicate, TimestampInternalPredicate } from '../models/expression-predicate';
+import { InternalTimestampPredicate, InternalTypedPredicate } from '../models/expression-predicate';
 import {
+  NormalizedExpressionTree,
   NormalizedExpressionTreeClause,
-  NormalizedExpressionTreeExpression,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
-import { SearchFeatureCursor, SearchFeatureSort } from '../models/search-feature-pagination';
+import type { LogicalOperator } from '../models/logical-operator';
+import type {
+  SearchFeatureCursor,
+  SearchFeatureQueryOptions,
+  SearchFeatureSort
+} from '../models/search-feature-pagination';
+import { hasCompatiblePredicates } from '../utils/expression-optimization';
 import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureCurrent } from './sql-fragments';
 
-export interface ExpressionTreeFeatureIdsQueryOptions {
-  sort: SearchFeatureSort;
-  order: 'asc' | 'desc';
-  cursor?: SearchFeatureCursor;
-  limit?: number;
-}
-
 /**
- * Pure SQL builders that compile a normalized expression tree into Knex
+ * Pure SQL builders that compile an expression tree into Knex
  * subqueries returning matching submission_feature_id values for an anchor
  * feature type.
  *
@@ -34,8 +33,8 @@ export interface ExpressionTreeFeatureIdsQueryOptions {
  * emitted SQL, so a single substrate keeps semantics — including security
  * filtering — identical across both consumers.
  *
- * Inputs are assumed to be normalized: semantic validation runs at write time
- * inside `writeExpressionTree`. These functions only emit SQL.
+ * Inputs are assumed to be validated and optimized before reaching this module.
+ * These functions only translate the explicit optimized representation into SQL.
  *
  * Shape parallels `sql-fragments.ts`: stateless module functions that emit
  * knex QueryBuilders without ever executing SQL or holding a connection.
@@ -43,7 +42,7 @@ export interface ExpressionTreeFeatureIdsQueryOptions {
 
 /**
  * Build a Knex subquery that returns submission_feature_id rows matching the
- * given normalized expression tree, scoped to the anchor feature type, with
+ * given expression tree, scoped to the anchor feature type, with
  * the security filter applied for the given system user — without executing.
  *
  * Used by:
@@ -54,19 +53,19 @@ export interface ExpressionTreeFeatureIdsQueryOptions {
  *   sets).
  *
  * @param {string} anchorFeatureType - Route anchor/result feature type
- * @param {NormalizedExpressionTreeExpression} normalizedExpression - Normalized expression tree criteria
+ * @param {NormalizedExpressionTree} expression - Expression tree criteria
  * @param {number | null} systemUserId - Security context (null = anonymous)
- * @param {ExpressionTreeFeatureIdsQueryOptions} [options] - Optional anchor ordering and pagination
+ * @param {SearchFeatureQueryOptions} [options] - Optional anchor ordering and pagination
  * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows
  */
 export function buildExpressionTreeFeatureIdsSubquery(
   anchorFeatureType: string,
-  normalizedExpression: NormalizedExpressionTreeExpression,
+  expression: NormalizedExpressionTree,
   systemUserId: number | null,
-  options?: ExpressionTreeFeatureIdsQueryOptions
+  options?: SearchFeatureQueryOptions
 ): Knex.QueryBuilder {
   const knex = getKnex();
-  return buildExpressionTargetIdsQuery(anchorFeatureType, normalizedExpression, knex, systemUserId, options);
+  return buildExpressionTargetIdsQuery(anchorFeatureType, expression, knex, systemUserId, options);
 }
 
 /**
@@ -81,13 +80,13 @@ export function buildExpressionTreeFeatureIdsSubquery(
  *
  * @param {string} featureTypeName - The feature type name to project.
  * @param {number | null} systemUserId - Security context (null = anonymous, only unsecured features).
- * @param {ExpressionTreeFeatureIdsQueryOptions} [options] - Optional search ordering and page limit.
+ * @param {SearchFeatureQueryOptions} [options] - Optional search ordering and page limit.
  * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows.
  */
 export function buildBroadFeatureTypeSubquery(
   featureTypeName: string,
   systemUserId: number | null,
-  options?: ExpressionTreeFeatureIdsQueryOptions
+  options?: SearchFeatureQueryOptions
 ): Knex.QueryBuilder {
   const knex = getKnex();
   let query = knex('submission_feature as sf').select('sf.submission_feature_id');
@@ -165,7 +164,7 @@ export function buildBroadFeatureTypeCountSubquery(
 }
 
 /**
- * Build a Knex subquery that returns submission_feature_id rows matching the given normalized
+ * Build a Knex subquery that returns submission_feature_id rows matching the given
  * expression tree, scoped to the anchor feature type, WITHOUT any security/access filtering.
  *
  * This is the expression-matched candidate set *before* the caller access filter is applied.
@@ -178,44 +177,44 @@ export function buildBroadFeatureTypeCountSubquery(
  * the evidence-level and target-level filters), leaving the candidate set unfiltered.
  *
  * @param {string} anchorFeatureType - Route anchor/result feature type
- * @param {NormalizedExpressionTreeExpression} normalizedExpression - Normalized expression tree criteria
+ * @param {NormalizedExpressionTree} expression - Expression tree criteria
  * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows, no security filter applied
  */
 export function buildUnfilteredExpressionTreeFeatureIdsSubquery(
   anchorFeatureType: string,
-  normalizedExpression: NormalizedExpressionTreeExpression
+  expression: NormalizedExpressionTree
 ): Knex.QueryBuilder {
   const knex = getKnex();
   // systemUserId omitted → buildSecurityFilter returns null at every layer → no access filtering.
-  return buildExpressionTargetIdsQuery(anchorFeatureType, normalizedExpression, knex);
+  return buildExpressionTargetIdsQuery(anchorFeatureType, expression, knex);
 }
 
 /**
- * Builds the exact anchor-feature set for a normalized expression tree.
+ * Builds the exact anchor-feature set for an expression tree.
  *
  * This count-oriented projection starts from indexed typed-property rows, maps each predicate's
  * evidence through closure to the requested anchor type, then combines those anchor ID sets using
  * the expression's AND/OR operators. Starting from evidence avoids evaluating the expression once
  * for every possible anchor while still counting the same feature type returned by search.
  *
- * @param {NormalizedExpressionTreeExpression} normalizedExpression - Normalized expression tree criteria.
+ * @param {NormalizedExpressionTree} expression - Expression tree criteria.
  * @param {number | null} systemUserId - Security context (null = anonymous).
  * @return {Knex.QueryBuilder} Unexecuted query returning unique matching anchor IDs.
  */
 export function buildExpressionTreeCountFeatureIdsSubquery(
   anchorFeatureType: string,
-  normalizedExpression: NormalizedExpressionTreeExpression,
+  expression: NormalizedExpressionTree,
   systemUserId: number | null
 ): Knex.QueryBuilder {
   const knex = getKnex();
   const denied = buildDeniedEvidenceFeatureIdsQuery(knex, systemUserId);
-  const matchingAnchors = buildCountClauseAnchorIdsQuery(normalizedExpression, anchorFeatureType, knex);
+  const matchingAnchors = buildCountClauseAnchorIdsQuery(expression, anchorFeatureType, knex);
 
   return knex
     .with('denied', denied)
     .from(matchingAnchors.as('matching_anchors'))
     .select('matching_anchors.submission_feature_id')
-    .whereRaw(buildEvidenceAvailabilityExpression(normalizedExpression, knex))
+    .whereRaw(buildExpressionAvailability(expression, knex))
     .whereNotIn('matching_anchors.submission_feature_id', knex('denied').select('denied.submission_feature_id'));
 }
 
@@ -232,6 +231,21 @@ export const dependencies = {
   buildExpressionTreeCountFeatureIdsSubquery
 };
 
+/**
+ * Recursively builds the anchor IDs matching one expression clause.
+ *
+ * Predicates and compatible predicate expressions use evidence-first queries. Other expressions combine complete
+ * child anchor sets with SQL intersection or union according to their logical operator.
+ *
+ * @example
+ * `AND(Count > 7, Name = 'elk')` builds the intersection of the independently resolved Count and Name anchor sets.
+ * `OR(Name = 'elk', Name = 'deer')` is compatible and instead builds one evidence query with an `IN` filter.
+ *
+ * @param {NormalizedExpressionTreeClause} clause - Predicate or expression to evaluate.
+ * @param {string} anchorFeatureType - Feature type returned by the count query.
+ * @param {Knex} knex - Knex instance used to build the query.
+ * @return {Knex.QueryBuilder} Query returning matching anchor IDs.
+ */
 function buildCountClauseAnchorIdsQuery(
   clause: NormalizedExpressionTreeClause,
   anchorFeatureType: string,
@@ -239,6 +253,12 @@ function buildCountClauseAnchorIdsQuery(
 ): Knex.QueryBuilder {
   if (clause.type === 'predicate') {
     return buildPredicateAnchorIdsQuery(clause, anchorFeatureType, knex);
+  }
+
+  if (hasCompatiblePredicates(clause)) {
+    return isAndEqualityExpression(clause)
+      ? buildAndEqualityAnchorIdsQuery(clause, anchorFeatureType, knex)
+      : buildPredicateAnchorIdsQuery(clause, anchorFeatureType, knex);
   }
 
   const [firstClause, ...remainingClauses] = clause.clauses.map((childClause, index) => {
@@ -254,13 +274,28 @@ function buildCountClauseAnchorIdsQuery(
     : firstClause.union(remainingClauses, true);
 }
 
-/** Maps one indexed predicate evidence set to closure-eligible anchors of the requested type. */
+/**
+ * Maps one indexed predicate evidence set to closure-eligible anchors of the requested type.
+ *
+ * @example
+ * For a `Survey.name = 'wetland'` predicate with `SampleSite` as the requested anchor type, matching Survey evidence is
+ * projected through closure to related SampleSite anchors. A matching SampleSite property row is returned directly.
+ * Anchors and evidence without closure self-loops are excluded as inactive or ineligible.
+ *
+ * @param {NormalizedExpressionTreeClause} evidence - Predicate or compatible same-property expression.
+ * @param {string} anchorFeatureType - Feature type returned by the count query.
+ * @param {Knex} knex - Knex instance used to build the query.
+ * @return {Knex.QueryBuilder} Query returning matching anchor IDs.
+ */
 function buildPredicateAnchorIdsQuery(
-  clause: NormalizedExpressionTreePredicate,
+  evidence: NormalizedExpressionTreeClause,
   anchorFeatureType: string,
   knex: Knex
 ): Knex.QueryBuilder {
-  const { tableName } = getPredicateTableConfig(clause.internal_predicate);
+  const predicates = getEvidencePredicates(evidence);
+  const property = predicates[0];
+  const operator = evidence.type === 'expression' ? evidence.operator : 'AND';
+  const { tableName } = getPredicateTableConfig(property.internal_predicate);
   const anchorFeatureTypeId = () =>
     knex('feature_type as count_ft')
       .select('count_ft.feature_type_id')
@@ -275,22 +310,23 @@ function buildPredicateAnchorIdsQuery(
       LIMIT 1
     ) IS TRUE`);
   const buildDirectEvidence = (anchorId: string) =>
-    applyPredicateEvidenceFilters(
+    applyEvidenceFilters(
       knex(`${tableName} as p`)
         .select(knex.raw('1'))
         .whereRaw(`p.submission_feature_id = ${anchorId}`)
         .where(
           'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(clause, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
+          buildPredicateFeatureTypePropertyIdsQuery(property, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
         ),
-      clause,
-      knex
+      predicates,
+      knex,
+      operator
     );
 
   // The property-assignment trigger guarantees that a property's feature type matches its feature.
   // Resolving the anchor's concrete property id therefore establishes the direct feature type without
   // probing submission_feature once per match; the closure self join remains the current-state gate.
-  const directEvidence = applyPredicateEvidenceFilters(
+  const directEvidence = applyEvidenceFilters(
     knex(`${tableName} as p`)
       .select('p.submission_feature_id')
       .distinctOn('p.submission_feature_id')
@@ -302,11 +338,12 @@ function buildPredicateAnchorIdsQuery(
       )
       .where(
         'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(clause, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
+        buildPredicateFeatureTypePropertyIdsQuery(property, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
       )
       .orderBy('p.submission_feature_id'),
-    clause,
-    knex
+    predicates,
+    knex,
+    operator
   );
   const direct = knex.from(directEvidence.as('count_direct')).select('count_direct.submission_feature_id');
 
@@ -315,16 +352,17 @@ function buildPredicateAnchorIdsQuery(
     anchorColumn: 'source_submission_feature_id' | 'target_submission_feature_id',
     evidenceColumn: 'source_submission_feature_id' | 'target_submission_feature_id'
   ) => {
-    const relatedPropertyRows = applyPredicateEvidenceFilters(
+    const relatedPropertyRows = applyEvidenceFilters(
       knex(`${tableName} as p`)
         .select('p.submission_feature_id')
         .whereRaw('p.feature_type_property_id = count_related_ftp.feature_type_property_id'),
-      clause,
-      knex
+      predicates,
+      knex,
+      operator
     ).offset(knex.raw('0') as unknown as number);
     const relatedEvidence = knex
       .from(
-        buildPredicateFeatureTypePropertyIdsQuery(clause, knex)
+        buildPredicateFeatureTypePropertyIdsQuery(property, knex)
           .whereNot('ftp.feature_type_id', anchorFeatureTypeId())
           .as('count_related_ftp')
       )
@@ -375,6 +413,123 @@ function buildPredicateAnchorIdsQuery(
   // comparatively sparse related set lets the large direct set stream through UNION ALL without a
   // global sort/hash solely for deduplication.
   return direct.unionAll([relatedOnly], true);
+}
+
+/**
+ * Maps one AND expression to anchors and requires every requested value.
+ *
+ * Property rows are filtered once, projected through the same direct/forward/reverse
+ * closure rules as ordinary predicates, and grouped only after evidence has been
+ * mapped to its result anchor. Distinct evidence rows and distinct related features
+ * may therefore jointly satisfy the expression.
+ *
+ * @example
+ * For `Count = 77 AND Count = 100`, an anchor with values `[77, 100]` matches, as does an anchor related to two visible
+ * evidence features contributing 77 and 100 separately. An anchor with only 77 does not match. Aggregation occurs after
+ * evidence-to-anchor projection and requires the number of distinct matched values to equal the requested value count.
+ *
+ * @param {NormalizedExpressionTree} expression - AND expression containing same-property equality predicates.
+ * @param {string} anchorFeatureType - Feature type returned by the count query.
+ * @param {Knex} knex - Knex instance used to build the query.
+ * @return {Knex.QueryBuilder} Query returning anchors that matched every equality value.
+ */
+function buildAndEqualityAnchorIdsQuery(
+  expression: NormalizedExpressionTree,
+  anchorFeatureType: string,
+  knex: Knex
+): Knex.QueryBuilder {
+  const predicates = getEvidencePredicates(expression);
+  const property = predicates[0];
+  const { tableName, valueColumn } = getPredicateTableConfig(property.internal_predicate);
+  const values = getScalarPredicateValues(predicates);
+  const anchorFeatureTypeId = () =>
+    knex('feature_type as grouped_count_ft')
+      .select('grouped_count_ft.feature_type_id')
+      .where('grouped_count_ft.name', anchorFeatureType)
+      .whereNull('grouped_count_ft.record_end_date');
+
+  const directRows = applyPropertyReferenceLifecycleFilters(
+    knex(`${tableName} as p`)
+      .select({ submission_feature_id: 'p.submission_feature_id', matched_value: valueColumn })
+      .join('submission_feature_closure as grouped_direct_self', function () {
+        this.on('grouped_direct_self.source_submission_feature_id', '=', 'p.submission_feature_id').andOn(
+          'grouped_direct_self.target_submission_feature_id',
+          '=',
+          'p.submission_feature_id'
+        );
+      })
+      .whereIn(
+        'p.feature_type_property_id',
+        buildPredicateFeatureTypePropertyIdsQuery(property, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
+      )
+      .whereIn(valueColumn, values),
+    property.internal_predicate
+  );
+
+  /**
+   * Maps related equality evidence to count-query anchors in one closure direction.
+   *
+   * @param {string} closureAlias - Unique alias for the closure relation.
+   * @param {'source_submission_feature_id' | 'target_submission_feature_id'} anchorColumn - Closure column containing the anchor ID.
+   * @param {'source_submission_feature_id' | 'target_submission_feature_id'} evidenceColumn - Closure column containing the evidence ID.
+   * @return {Knex.QueryBuilder} Query returning anchor IDs and their matched equality values.
+   */
+  const buildRelatedRows = (
+    closureAlias: string,
+    anchorColumn: 'source_submission_feature_id' | 'target_submission_feature_id',
+    evidenceColumn: 'source_submission_feature_id' | 'target_submission_feature_id'
+  ) =>
+    applyPropertyReferenceLifecycleFilters(
+      knex(`${tableName} as p`)
+        .select({ submission_feature_id: `${closureAlias}.${anchorColumn}`, matched_value: valueColumn })
+        .join(
+          `submission_feature_closure as ${closureAlias}`,
+          `${closureAlias}.${evidenceColumn}`,
+          'p.submission_feature_id'
+        )
+        .join(
+          'submission_feature as grouped_anchor',
+          'grouped_anchor.submission_feature_id',
+          `${closureAlias}.${anchorColumn}`
+        )
+        .where('grouped_anchor.feature_type_id', anchorFeatureTypeId())
+        .whereIn(
+          'p.feature_type_property_id',
+          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereNot(
+            'ftp.feature_type_id',
+            anchorFeatureTypeId()
+          )
+        )
+        .whereIn(valueColumn, values)
+        .whereExists(
+          knex('submission_feature_closure as grouped_evidence_self')
+            .select(knex.raw('1'))
+            .whereRaw('grouped_evidence_self.source_submission_feature_id = p.submission_feature_id')
+            .whereRaw('grouped_evidence_self.target_submission_feature_id = p.submission_feature_id')
+        )
+        .whereExists(
+          knex('submission_feature_closure as grouped_anchor_self')
+            .select(knex.raw('1'))
+            .whereRaw('grouped_anchor_self.source_submission_feature_id = grouped_anchor.submission_feature_id')
+            .whereRaw('grouped_anchor_self.target_submission_feature_id = grouped_anchor.submission_feature_id')
+        )
+        .whereNotIn('p.submission_feature_id', knex('denied').select('denied.submission_feature_id')),
+      property.internal_predicate
+    );
+
+  const mappedEvidence = directRows.unionAll(
+    [
+      buildRelatedRows('grouped_count_forward', 'source_submission_feature_id', 'target_submission_feature_id'),
+      buildRelatedRows('grouped_count_reverse', 'target_submission_feature_id', 'source_submission_feature_id')
+    ],
+    true
+  );
+
+  return knex
+    .from(mappedEvidence.as('grouped_evidence'))
+    .select('grouped_evidence.submission_feature_id')
+    .groupBy('grouped_evidence.submission_feature_id')
+    .havingRaw('count(DISTINCT grouped_evidence.matched_value) = ?', [values.length]);
 }
 
 /**
@@ -456,11 +611,16 @@ function buildGrantedFeatureIdsQuery(knex: Knex, systemUserId: number): Knex.Que
  *
  * Keeping the anchor relation outside the expression lets PostgreSQL apply the
  * feature-type and ordering indexes once. The recursive compiler below adds
- * nested AND/OR predicate groups without materializing and deduplicating a full
+ * nested AND/OR expressions without materializing and deduplicating a full
  * target-id set for every leaf.
  *
+ * @example
+ * Input: anchor type `species_observation`, expression `Count > 7 AND Count < 9`.
+ * Output: a query scanning eligible species-observation anchors once and attaching one correlated numeric-evidence
+ * probe whose property row must satisfy both bounds.
+ *
  * @param {string} anchorFeatureType - Feature type name that result IDs must belong to.
- * @param {NormalizedExpressionTreeClause} clause - Normalized predicate or expression clause to compile.
+ * @param {NormalizedExpressionTreeClause} clause - Predicate or expression clause.
  * @param {Knex} knex - Knex instance used to build the subquery.
  * @param {number | null} [systemUserId] - Security context (null = anonymous).
  * @return {Knex.QueryBuilder} Unexecuted subquery returning target submission_feature_id rows.
@@ -470,7 +630,7 @@ function buildExpressionTargetIdsQuery(
   clause: NormalizedExpressionTreeClause,
   knex: Knex,
   systemUserId?: number | null,
-  options?: ExpressionTreeFeatureIdsQueryOptions
+  options?: SearchFeatureQueryOptions
 ): Knex.QueryBuilder {
   // A scalar LIMIT probe is deliberate here. PostgreSQL may decorrelate a regular EXISTS into a
   // closure-first semi-join, scanning every self-loop before the outer page LIMIT.
@@ -494,7 +654,7 @@ function buildExpressionTargetIdsQuery(
   // uncorrelated and mirrors only the expression's boolean shape: every actual match requires the
   // corresponding typed evidence to exist somewhere. It does not project anchors or apply access
   // filtering, so it can only short-circuit an empty evidence set and cannot remove a valid result.
-  query.whereRaw(buildEvidenceAvailabilityExpression(clause, knex));
+  query.whereRaw(buildExpressionAvailability(clause, knex));
 
   applyExpressionClause(query, clause, knex, systemUserId);
 
@@ -515,55 +675,122 @@ function buildExpressionTargetIdsQuery(
  * structure. Scalar LIMIT probes prevent PostgreSQL from turning closure readiness into a scan of
  * the complete closure table. Security remains on the authoritative correlated expression below;
  * this guard only proves that an empty raw evidence set makes the expression impossible.
+ *
+ * @example
+ * `AND(A, B)` becomes `available(A) AND available(B)`, while `OR(A, B)` becomes
+ * `available(A) OR available(B)`. This is only an early impossibility check; authoritative security and relationship
+ * evaluation still occurs in the correlated expression query.
+ *
+ * @param {NormalizedExpressionTreeClause} clause - Predicate or expression whose evidence must exist.
+ * @param {Knex} knex - Knex instance used to build the availability expression.
+ * @return {Knex.Raw} Boolean SQL expression that is false when required evidence is unavailable.
  */
-function buildEvidenceAvailabilityExpression(clause: NormalizedExpressionTreeClause, knex: Knex): Knex.Raw {
-  if (clause.type === 'predicate') {
-    const { tableName } = getPredicateTableConfig(clause.internal_predicate);
-    const evidence = applyPredicateEvidenceFilters(
-      knex(`${tableName} as p`)
-        .select(knex.raw('true'))
-        .whereIn('p.feature_type_property_id', buildPredicateFeatureTypePropertyIdsQuery(clause, knex))
-        .whereRaw(
-          `(
+function buildExpressionAvailability(clause: NormalizedExpressionTreeClause, knex: Knex): Knex.Raw {
+  if (clause.type === 'predicate' || hasCompatiblePredicates(clause)) {
+    return buildEvidenceAvailability(clause, knex);
+  }
+
+  const operator = clause.operator === 'AND' ? ' AND ' : ' OR ';
+  const children = clause.clauses.map((childClause) => buildExpressionAvailability(childClause, knex));
+
+  return knex.raw(`(${children.map(() => '?').join(operator)})`, children);
+}
+
+/**
+ * Builds the uncorrelated availability probe for predicates that must match one property row.
+ *
+ * @param {NormalizedExpressionTreeClause} evidence - Predicate or compatible same-property expression.
+ * @param {Knex} knex - Knex instance used to build the probe.
+ * @return {Knex.Raw} Boolean scalar-subquery expression.
+ */
+function buildEvidenceAvailability(evidence: NormalizedExpressionTreeClause, knex: Knex): Knex.Raw {
+  const predicates = getEvidencePredicates(evidence);
+  const property = predicates[0];
+  const { tableName, valueColumn } = getPredicateTableConfig(property.internal_predicate);
+
+  if (isAndEqualityExpression(evidence)) {
+    const values = getScalarPredicateValues(predicates);
+    const query = knex(`${tableName} as p`)
+      .select(knex.raw('true'))
+      .whereIn('p.feature_type_property_id', buildPredicateFeatureTypePropertyIdsQuery(property, knex))
+      .whereIn(valueColumn, values)
+      .whereRaw(
+        `(
           SELECT true
           FROM submission_feature_closure evidence_available_self
           WHERE evidence_available_self.source_submission_feature_id = p.submission_feature_id
             AND evidence_available_self.target_submission_feature_id = p.submission_feature_id
           LIMIT 1
         ) IS TRUE`
-        )
-        .limit(1),
-      clause,
-      knex
-    );
+      )
+      .havingRaw(`count(DISTINCT ${valueColumn}) = ?`, [values.length])
+      .limit(1);
 
-    return knex.raw('(?) IS TRUE', [evidence]);
+    return knex.raw('(?) IS TRUE', [query]);
   }
 
-  const operator = clause.operator === 'AND' ? ' AND ' : ' OR ';
-  const children = clause.clauses.map((childClause) => buildEvidenceAvailabilityExpression(childClause, knex));
+  const query = applyEvidenceFilters(
+    knex(`${tableName} as p`)
+      .select(knex.raw('true'))
+      .whereIn('p.feature_type_property_id', buildPredicateFeatureTypePropertyIdsQuery(property, knex))
+      .whereRaw(
+        `(
+          SELECT true
+          FROM submission_feature_closure evidence_available_self
+          WHERE evidence_available_self.source_submission_feature_id = p.submission_feature_id
+            AND evidence_available_self.target_submission_feature_id = p.submission_feature_id
+          LIMIT 1
+        ) IS TRUE`
+      )
+      .limit(1),
+    predicates,
+    knex,
+    evidence.type === 'expression' ? evidence.operator : 'AND'
+  );
 
-  return knex.raw(`(${children.map(() => '?').join(operator)})`, children);
+  return knex.raw('(?) IS TRUE', [query]);
 }
 
+/**
+ * Returns the opposite SQL sort direction.
+ *
+ * @example
+ * `invertOrder('asc')` returns `'desc'`; `invertOrder('desc')` returns `'asc'`.
+ *
+ * @param {'asc' | 'desc'} order - Sort direction to reverse.
+ * @return {'asc' | 'desc'} Opposite sort direction.
+ */
 const invertOrder = (order: 'asc' | 'desc'): 'asc' | 'desc' => (order === 'asc' ? 'desc' : 'asc');
 
+/**
+ * Applies stable keyset ordering, an optional cursor boundary, and an optional page limit.
+ *
+ * @example
+ * `{ sort: 'create_date', order: 'desc', boundary: nextCursor, limit: 25 }` applies a descending tuple boundary on
+ * `(create_date, submission_feature_id)`, orders by both columns, and limits the query to 25 rows. A previous-page
+ * boundary reverses traversal so the adjacent rows can be fetched efficiently; the caller restores display order.
+ *
+ * @param {Knex.QueryBuilder} query - Anchor query to paginate.
+ * @param {string} tableAlias - Alias qualifying the sortable anchor columns.
+ * @param {SearchFeatureQueryOptions} [options] - Validated ordering, cursor boundary, and page limit.
+ * @return {void}
+ */
 function applySearchQueryOptions(
   query: Knex.QueryBuilder,
   tableAlias: string,
-  options?: ExpressionTreeFeatureIdsQueryOptions
+  options?: SearchFeatureQueryOptions
 ): void {
   if (!options) {
     return;
   }
 
-  const isPreviousPage = options.cursor?.direction === 'previous';
+  const isPreviousPage = options.boundary?.direction === 'previous';
   const traversalOrder = isPreviousPage ? invertOrder(options.order) : options.order;
   const resultIdOrder = options.sort === 'create_date' ? options.order : 'asc';
   const idTraversalOrder = isPreviousPage ? invertOrder(resultIdOrder) : resultIdOrder;
 
-  if (options.cursor) {
-    applySearchCursor(query, tableAlias, options.sort, traversalOrder, idTraversalOrder, options.cursor);
+  if (options.boundary) {
+    applySearchCursor(query, tableAlias, options.sort, traversalOrder, idTraversalOrder, options.boundary);
   }
 
   query.orderBy(`${tableAlias}.${options.sort}`, traversalOrder);
@@ -577,6 +804,22 @@ function applySearchQueryOptions(
   }
 }
 
+/**
+ * Applies the exclusive keyset boundary represented by a search cursor.
+ *
+ * @example
+ * ID sort ascending with cursor ID 100 adds `submission_feature_id > 100`.
+ * Creation-date sort descending adds `(create_date, submission_feature_id) < (?, ?)` so equal timestamps resume from
+ * the unique feature-ID tie-breaker without gaps or duplicates.
+ *
+ * @param {Knex.QueryBuilder} query - Query receiving the cursor predicate.
+ * @param {string} tableAlias - Alias qualifying the cursor columns.
+ * @param {SearchFeatureSort} sort - Active sort column.
+ * @param {'asc' | 'desc'} order - Traversal direction for the primary sort column.
+ * @param {'asc' | 'desc'} idOrder - Traversal direction for the feature-ID tie-breaker.
+ * @param {SearchFeatureCursor} cursor - Decoded exclusive boundary.
+ * @return {void}
+ */
 function applySearchCursor(
   query: Knex.QueryBuilder,
   tableAlias: string,
@@ -604,7 +847,11 @@ function applySearchCursor(
 /**
  * Recursively appends one expression-tree clause to the anchor query.
  *
- * @param {Knex.QueryBuilder} query - Anchor query or nested boolean group.
+ * @example
+ * A predicate appends one correlated evidence condition. A regular `AND(A, OR(B, C))` recursively creates nested Knex
+ * groups. A compatible range or equality expression takes the coalesced single-scan pathway before general recursion.
+ *
+ * @param {Knex.QueryBuilder} query - Anchor query or nested boolean expression.
  * @param {NormalizedExpressionTreeClause} clause - Clause to append.
  * @param {Knex} knex - Knex instance used to build predicate subqueries.
  * @param {number | null} [systemUserId] - Security context.
@@ -617,7 +864,15 @@ function applyExpressionClause(
   systemUserId?: number | null
 ): Knex.QueryBuilder {
   if (clause.type === 'predicate') {
-    return query.whereRaw(buildPredicateEvidenceExpression(clause, knex, systemUserId));
+    return query.whereRaw(buildEvidenceExpression(clause, knex, systemUserId));
+  }
+
+  if (hasCompatiblePredicates(clause)) {
+    return query.whereRaw(
+      isAndEqualityExpression(clause)
+        ? buildAndEqualityExpression(clause, knex, systemUserId)
+        : buildEvidenceExpression(clause, knex, systemUserId)
+    );
   }
 
   return query.where((expressionGroup) => {
@@ -636,6 +891,106 @@ function applyExpressionClause(
 }
 
 /**
+ * Builds a correlated match for an AND expression over one property scan per evidence direction.
+ *
+ * Evidence values are mapped to the current anchor before aggregation. This preserves
+ * multi-valued semantics and allows separate visible related evidence features to
+ * contribute different required values without repeating metadata and closure work
+ * once for every predicate.
+ *
+ * @example
+ * `Count = 77 AND Count = 100` filters one property domain to both values, maps visible direct and related evidence to
+ * the current anchor, then applies `COUNT(DISTINCT matched_value) = 2`. This preserves multi-valued AND semantics while
+ * avoiding two complete metadata, closure, and security probes.
+ *
+ * @param {NormalizedExpressionTree} expression - AND expression containing same-property equality predicates.
+ * @param {Knex} knex - Knex instance used to build the expression.
+ * @param {number | null} [systemUserId] - Security context for related evidence.
+ * @return {Knex.Raw} Correlated boolean expression for the current anchor.
+ */
+function buildAndEqualityExpression(
+  expression: NormalizedExpressionTree,
+  knex: Knex,
+  systemUserId?: number | null
+): Knex.Raw {
+  const predicates = getEvidencePredicates(expression);
+  const property = predicates[0];
+  const { tableName, valueColumn } = getPredicateTableConfig(property.internal_predicate);
+  const values = getScalarPredicateValues(predicates);
+
+  const directRows = applyPropertyReferenceLifecycleFilters(
+    knex(`${tableName} as p`)
+      .select({ matched_value: valueColumn })
+      .whereRaw('p.submission_feature_id = anchor_sf.submission_feature_id')
+      .whereIn(
+        'p.feature_type_property_id',
+        buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
+          'ftp.feature_type_id = anchor_sf.feature_type_id'
+        )
+      )
+      .whereIn(valueColumn, values),
+    property.internal_predicate
+  );
+
+  /**
+   * Maps related equality evidence to the current search anchor in one closure direction.
+   *
+   * @param {string} closureAlias - Unique alias for the closure relation.
+   * @param {'source_submission_feature_id' | 'target_submission_feature_id'} anchorColumn - Closure column containing the anchor ID.
+   * @param {'source_submission_feature_id' | 'target_submission_feature_id'} evidenceColumn - Closure column containing the evidence ID.
+   * @return {Knex.QueryBuilder} Query returning matched values visible to the caller.
+   */
+  const buildRelatedRows = (
+    closureAlias: string,
+    anchorColumn: 'source_submission_feature_id' | 'target_submission_feature_id',
+    evidenceColumn: 'source_submission_feature_id' | 'target_submission_feature_id'
+  ) => {
+    let relatedRows = applyPropertyReferenceLifecycleFilters(
+      knex(`submission_feature_closure as ${closureAlias}`)
+        .select({ matched_value: valueColumn })
+        .join(`${tableName} as p`, 'p.submission_feature_id', `${closureAlias}.${evidenceColumn}`)
+        .whereRaw(`${closureAlias}.${anchorColumn} = anchor_sf.submission_feature_id`)
+        .whereIn(
+          'p.feature_type_property_id',
+          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
+            'ftp.feature_type_id <> anchor_sf.feature_type_id'
+          )
+        )
+        .whereIn(valueColumn, values)
+        .whereExists(
+          knex('submission_feature_closure as grouped_search_evidence_self')
+            .select(knex.raw('1'))
+            .whereRaw('grouped_search_evidence_self.source_submission_feature_id = p.submission_feature_id')
+            .whereRaw('grouped_search_evidence_self.target_submission_feature_id = p.submission_feature_id')
+        ),
+      property.internal_predicate
+    );
+
+    const evidenceSecurityFilter = buildSecurityFilter(knex, systemUserId, 'p.submission_feature_id');
+    if (evidenceSecurityFilter) {
+      relatedRows = relatedRows.whereRaw(evidenceSecurityFilter);
+    }
+
+    return relatedRows;
+  };
+
+  const mappedEvidence = directRows.unionAll(
+    [
+      buildRelatedRows('grouped_search_forward', 'source_submission_feature_id', 'target_submission_feature_id'),
+      buildRelatedRows('grouped_search_reverse', 'target_submission_feature_id', 'source_submission_feature_id')
+    ],
+    true
+  );
+  const match = knex
+    .from(mappedEvidence.as('grouped_search_evidence'))
+    .select(knex.raw('true'))
+    .havingRaw('count(DISTINCT grouped_search_evidence.matched_value) = ?', [values.length])
+    .limit(1);
+
+  return knex.raw('(?) IS TRUE', [match]);
+}
+
+/**
  * Builds the correlated evidence probe for one predicate leaf.
  *
  * The leaf contains three correlated scalar probes: direct same-type evidence,
@@ -644,31 +999,38 @@ function applyExpressionClause(
  * PostgreSQL decorrelates these broad predicates it may materialize millions of
  * evidence rows before the outer page LIMIT can stop the anchor scan.
  *
- * @param {NormalizedExpressionTreePredicate} clause - Predicate leaf to compile.
+ * @example
+ * For a Survey predicate and SampleSite anchor, the returned boolean is true when the anchor itself has matching
+ * same-type evidence or when visible Survey evidence is connected to it through closure in either direction.
+ *
+ * @param {NormalizedExpressionTreeClause} evidence - Predicate or compatible same-property expression.
  * @param {Knex} knex - Knex instance used to build the subquery.
  * @param {number | null} [systemUserId] - Security context.
  * @return {Knex.Raw} Correlated boolean expression for the anchor WHERE clause.
  */
-function buildPredicateEvidenceExpression(
-  clause: NormalizedExpressionTreePredicate,
+function buildEvidenceExpression(
+  evidence: NormalizedExpressionTreeClause,
   knex: Knex,
   systemUserId?: number | null
 ): Knex.Raw {
-  const predicate = clause.internal_predicate;
-  const { tableName } = getPredicateTableConfig(predicate);
+  const predicates = getEvidencePredicates(evidence);
+  const property = predicates[0];
+  const operator = evidence.type === 'expression' ? evidence.operator : 'AND';
+  const { tableName } = getPredicateTableConfig(property.internal_predicate);
 
-  const directEvidence = applyPredicateEvidenceFilters(
+  const directEvidence = applyEvidenceFilters(
     knex(`${tableName} as p`)
       .select(knex.raw('true'))
       .whereRaw('p.submission_feature_id = anchor_sf.submission_feature_id')
       .whereIn(
         'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(clause, knex).whereRaw(
+        buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
           'ftp.feature_type_id = anchor_sf.feature_type_id'
         )
       ),
-    clause,
-    knex
+    predicates,
+    knex,
+    operator
   ).limit(1);
 
   const buildCrossTypeEvidence = (
@@ -676,14 +1038,14 @@ function buildPredicateEvidenceExpression(
     anchorColumn: 'source_submission_feature_id' | 'target_submission_feature_id',
     evidenceColumn: 'source_submission_feature_id' | 'target_submission_feature_id'
   ) => {
-    let crossTypeEvidence = applyPredicateEvidenceFilters(
+    let crossTypeEvidence = applyEvidenceFilters(
       knex(`submission_feature_closure as ${closureAlias}`)
         .select(knex.raw('true'))
         .join(`${tableName} as p`, 'p.submission_feature_id', `${closureAlias}.${evidenceColumn}`)
         .whereRaw(`${closureAlias}.${anchorColumn} = anchor_sf.submission_feature_id`)
         .whereIn(
           'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(clause, knex).whereRaw(
+          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
             'ftp.feature_type_id <> anchor_sf.feature_type_id'
           )
         )
@@ -693,8 +1055,9 @@ function buildPredicateEvidenceExpression(
             .whereRaw('evidence_self.source_submission_feature_id = p.submission_feature_id')
             .whereRaw('evidence_self.target_submission_feature_id = p.submission_feature_id')
         ),
-      clause,
-      knex
+      predicates,
+      knex,
+      operator
     );
 
     const evidenceSecurityFilter = buildSecurityFilter(knex, systemUserId, 'p.submission_feature_id');
@@ -725,57 +1088,138 @@ function buildPredicateEvidenceExpression(
 /**
  * Resolves active concrete feature-type-property ids for one semantic property.
  *
- * @param {NormalizedExpressionTreePredicate} clause - Predicate leaf to resolve.
+ * @example
+ * A predicate with `feature_property_id = 14` and `feature_type_property_id = null` returns every active assignment of
+ * property 14. Supplying assignment 108 adds that exact assignment constraint and returns at most 108.
+ *
+ * @param {NormalizedExpressionTreePredicate} property - Predicate containing the resolved property identity.
  * @param {Knex} knex - Knex instance used to build the metadata query.
  * @return {Knex.QueryBuilder} Query returning concrete feature_type_property_id rows.
  */
 function buildPredicateFeatureTypePropertyIdsQuery(
-  clause: NormalizedExpressionTreePredicate,
+  property: NormalizedExpressionTreePredicate,
   knex: Knex
 ): Knex.QueryBuilder {
   const query = knex('feature_type_property as ftp')
     .select('ftp.feature_type_property_id')
-    .where('ftp.feature_property_id', clause.feature_property_id)
+    .where('ftp.feature_property_id', property.feature_property_id)
     .whereNull('ftp.record_end_date');
 
-  if (clause.feature_type_property_id !== null) {
-    query.where('ftp.feature_type_property_id', clause.feature_type_property_id);
+  if (property.feature_type_property_id !== null) {
+    query.where('ftp.feature_type_property_id', property.feature_type_property_id);
   }
 
   return query;
 }
 
 /**
+ * Returns the predicates that must be applied to the same typed-property row.
+ *
+ * @example
+ * A predicate returns `[predicate]`. A compatible `AND(Count > 7, Count < 9)` expression returns both contained bounds.
+ * General mixed expressions never reach this helper because `hasCompatiblePredicates` rejects them first.
+ *
+ * @param {NormalizedExpressionTreeClause} evidence - Predicate evidence representation.
+ * @return {NormalizedExpressionTreePredicate[]} Predicates represented by the evidence.
+ */
+function getEvidencePredicates(evidence: NormalizedExpressionTreeClause): NormalizedExpressionTreePredicate[] {
+  return evidence.type === 'predicate' ? [evidence] : evidence.clauses.filter((clause) => clause.type === 'predicate');
+}
+
+/**
+ * Determines whether evidence is an AND expression of same-property equality predicates.
+ *
+ * @example
+ * `AND(Count = 77, Count = 100)` returns true. `OR(Count = 77, Count = 100)`, a numeric range, and a single predicate
+ * each return false.
+ *
+ * @param {NormalizedExpressionTreeClause} evidence - Predicate evidence representation.
+ * @return {boolean} True when every predicate in an AND expression is an equality.
+ */
+function isAndEqualityExpression(evidence: NormalizedExpressionTreeClause): boolean {
+  return (
+    evidence.type === 'expression' &&
+    evidence.operator === 'AND' &&
+    evidence.clauses.every((clause) => clause.type === 'predicate' && clause.operator === 'Equals')
+  );
+}
+
+/**
+ * Applies predicates that share one typed-property-row query.
+ *
+ * @example
+ * `AND(Count > 7, Count < 9)` appends both comparisons to the same `p` row. `OR(Count = 77, Count = 100)` appends one
+ * `p.value IN (100, 77)` filter. The OR pathway is only called for compatible equality groups.
+ *
+ * @param {Knex.QueryBuilder} query - Query containing the shared `p` property-row alias.
+ * @param {NormalizedExpressionTreePredicate[]} predicates - Predicates applied to that row.
+ * @param {Knex} knex - Knex instance used by predicate helpers.
+ * @param {LogicalOperator} operator - Logical operator joining the predicates.
+ * @return {Knex.QueryBuilder} Query constrained by the combined predicates.
+ */
+function applyEvidenceFilters(
+  query: Knex.QueryBuilder,
+  predicates: NormalizedExpressionTreePredicate[],
+  knex: Knex,
+  operator: LogicalOperator
+): Knex.QueryBuilder {
+  if (operator === 'OR') {
+    const predicate = predicates[0].internal_predicate;
+    const { valueColumn } = getPredicateTableConfig(predicate);
+    return applyPropertyReferenceLifecycleFilters(query, predicate).whereIn(
+      valueColumn,
+      getScalarPredicateValues(predicates)
+    );
+  }
+
+  return predicates.reduce((filteredQuery, predicate) => applyPredicateFilters(filteredQuery, predicate, knex), query);
+}
+
+/**
  * Adds value and reference-lifecycle filters shared by each evidence direction.
  *
  * @param {Knex.QueryBuilder} query - Query containing the `p` alias.
- * @param {NormalizedExpressionTreePredicate} clause - Predicate leaf to apply.
+ * @param {NormalizedExpressionTreePredicate} predicate - Predicate to apply.
  * @param {Knex} knex - Knex instance used by predicate helpers.
  * @return {Knex.QueryBuilder} Filtered evidence query.
  */
-function applyPredicateEvidenceFilters(
+function applyPredicateFilters(
   query: Knex.QueryBuilder,
-  clause: NormalizedExpressionTreePredicate,
+  predicate: NormalizedExpressionTreePredicate,
   knex: Knex
 ): Knex.QueryBuilder {
-  const predicate = clause.internal_predicate;
-  const { tableName, valueColumn } = getPredicateTableConfig(predicate);
+  const { tableName, valueColumn } = getPredicateTableConfig(predicate.internal_predicate);
+  query = applyPropertyReferenceLifecycleFilters(query, predicate.internal_predicate);
 
+  return predicate.operator === 'NotEquals'
+    ? applyExpressionPredicateNotEquals(query, predicate, tableName, valueColumn, knex)
+    : applyExpressionPredicateOperator(query, predicate.internal_predicate, valueColumn, knex);
+}
+
+/**
+ * Applies lifecycle joins required by property values backed by reference tables.
+ *
+ * @param {Knex.QueryBuilder} query - Query containing the shared `p` property-row alias.
+ * @param {InternalTypedPredicate} predicate - Typed predicate identifying the property table.
+ * @return {Knex.QueryBuilder} Query constrained to active referenced values.
+ */
+function applyPropertyReferenceLifecycleFilters(
+  query: Knex.QueryBuilder,
+  predicate: InternalTypedPredicate
+): Knex.QueryBuilder {
   if (predicate.type === 'taxon') {
-    query = query.join('taxon as t', 't.taxon_id', 'p.taxon_id').whereNull('t.record_end_date');
+    return query.join('taxon as t', 't.taxon_id', 'p.taxon_id').whereNull('t.record_end_date');
   }
 
   if (predicate.type === 'code') {
-    query = query
+    return query
       .join('contributor_codeset_code as csc', 'csc.contributor_codeset_code_id', 'p.contributor_codeset_code_id')
       .join('contributor_codeset as cs', 'cs.contributor_codeset_id', 'csc.contributor_codeset_id')
       .whereNull('csc.record_end_date')
       .whereNull('cs.record_end_date');
   }
 
-  return predicate.operator === 'NotEquals'
-    ? applyExpressionPredicateNotEquals(query, clause, tableName, valueColumn, knex)
-    : applyExpressionPredicateOperator(query, predicate, valueColumn, knex);
+  return query;
 }
 
 /**
@@ -883,6 +1327,28 @@ function getScalarPredicateValue(predicate: InternalTypedPredicate): string | nu
     'expression-evaluation->getScalarPredicateValue',
     { predicate }
   ]);
+}
+
+/**
+ * Extracts defined scalar values from equality predicates in an optimized expression.
+ *
+ * @param {NormalizedExpressionTreePredicate[]} predicates - Predicates requiring scalar values.
+ * @return {(string | number | boolean)[]} Defined values suitable for SQL IN and aggregation.
+ */
+function getScalarPredicateValues(
+  predicates: readonly NormalizedExpressionTreePredicate[]
+): (string | number | boolean)[] {
+  return predicates.map((predicate) => {
+    const value = getScalarPredicateValue(predicate.internal_predicate);
+    if (value === undefined) {
+      throw new ApiBuildSQLError('Optimized equality predicate requires a scalar value', [
+        'expression-evaluation->getScalarPredicateValues',
+        { predicate }
+      ]);
+    }
+
+    return value;
+  });
 }
 
 /**
@@ -1002,12 +1468,12 @@ function applyComparableExpressionOperator(
  * Applies a timestamp expression operator.
  *
  * @param {Knex.QueryBuilder} query - Evidence query to constrain.
- * @param {TimestampInternalPredicate} predicate - Normalized timestamp predicate payload.
+ * @param {InternalTimestampPredicate} predicate - Normalized timestamp predicate payload.
  * @return {Knex.QueryBuilder} Evidence query with the timestamp operator applied.
  */
 function applyTimestampExpressionOperator(
   query: Knex.QueryBuilder,
-  predicate: TimestampInternalPredicate
+  predicate: InternalTimestampPredicate
 ): Knex.QueryBuilder {
   const columns = { date: 'p.date_value', time: 'p.time_value' };
 
@@ -1047,14 +1513,14 @@ function applyTimestampExpressionOperator(
  * Applies Before/After comparisons using the timestamp component(s) present in the predicate value.
  *
  * @param {Knex.QueryBuilder} query - Evidence query to constrain.
- * @param {TimestampInternalPredicate} predicate - Normalized timestamp predicate payload.
+ * @param {InternalTimestampPredicate} predicate - Normalized timestamp predicate payload.
  * @param {'Before' | 'After'} operator - Timestamp comparison operator.
  * @param {{ date: string; time: string }} columns - Timestamp date/time column references.
  * @return {Knex.QueryBuilder} Evidence query with the timestamp comparison applied.
  */
 function applyTimestampComparisonOperator(
   query: Knex.QueryBuilder,
-  predicate: TimestampInternalPredicate,
+  predicate: InternalTimestampPredicate,
   operator: 'Before' | 'After',
   columns: { date: string; time: string }
 ): Knex.QueryBuilder {
