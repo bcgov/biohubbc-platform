@@ -9,6 +9,7 @@ import {
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { getLogger } from '../../../../utils/logger';
 import { makeCursorPaginationOptionsFromBody } from '../../../../utils/pagination';
+import { registerRequestCancellation } from '../../../../utils/request-cancellation';
 import { getSearchExpressionTree, getSearchFeatureType } from '../../../../utils/search-feature-request';
 import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
@@ -54,7 +55,11 @@ POST.apiDoc = {
 export function searchFeatures(): RequestHandler {
   return async (req, res) => {
     const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const cancellation = registerRequestCancellation(res);
+    const connectionOptions = { signal: cancellation.signal };
+    const connection = isAuthenticated
+      ? getDBConnection(req.keycloak_token, connectionOptions)
+      : getAPIUserDBConnection(connectionOptions);
 
     try {
       await connection.open();
@@ -87,10 +92,12 @@ export function searchFeatures(): RequestHandler {
       });
     } catch (error) {
       defaultLog.error({ label: 'searchFeatures', message: 'error', error });
+      cancellation.unregister();
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      cancellation.unregister();
+      await connection.release();
     }
   };
 }

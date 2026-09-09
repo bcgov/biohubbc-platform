@@ -66,7 +66,7 @@ describe('db', () => {
 
       let queryStub: SinonStub;
       let releaseStub: SinonStub;
-      let mockClient: { query: SinonStub; release: SinonStub };
+      let mockClient: { query: SinonStub; release: SinonStub; processID: number };
       let connectStub: SinonStub;
       let mockPool: { connect: SinonStub };
       let connection: IDBConnection;
@@ -74,7 +74,7 @@ describe('db', () => {
       beforeEach(() => {
         queryStub = sinonSandbox.stub().resolves();
         releaseStub = sinonSandbox.stub().resolves();
-        mockClient = { query: queryStub, release: releaseStub };
+        mockClient = { query: queryStub, release: releaseStub, processID: 123 };
         connectStub = sinonSandbox.stub().resolves(mockClient);
         mockPool = { connect: connectStub };
         connection = getDBConnection(mockKeycloakToken);
@@ -85,6 +85,28 @@ describe('db', () => {
       });
 
       describe('open', () => {
+        it('does not acquire a client when its signal is already aborted', async () => {
+          const controller = new AbortController();
+          controller.abort();
+          connection = getDBConnection(mockKeycloakToken, { signal: controller.signal });
+          const getDBPoolStub = sinonSandbox
+            .stub(db.dbDependencies, 'getDBPool')
+            .returns(mockPool as unknown as pg.Pool);
+
+          try {
+            await connection.open();
+            expect.fail('Expected open to reject');
+          } catch (error) {
+            expect((error as ApiExecuteSQLError).errors).to.deep.include({
+              name: 'AbortError',
+              message: 'Database work was aborted'
+            });
+          }
+
+          expect(getDBPoolStub).not.to.have.been.called;
+          expect(connectStub).not.to.have.been.called;
+        });
+
         describe('when not previously called', () => {
           it('opens a new connection, sets the user context, and sends a `BEGIN` query', async () => {
             const getDBPoolStub = sinonSandbox
@@ -160,6 +182,32 @@ describe('db', () => {
       });
 
       describe('release', () => {
+        it('waits for cancellation dispatch before returning the client to the pool', async () => {
+          const controller = new AbortController();
+          connection = getDBConnection(mockKeycloakToken, { signal: controller.signal });
+          sinonSandbox.stub(db.dbDependencies, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+          sinonSandbox.stub(pg.Client.prototype, 'connect').resolves();
+          let finishCancellation!: () => void;
+          sinonSandbox.stub(pg.Client.prototype, 'query').returns(
+            new Promise((resolve) => {
+              finishCancellation = () => resolve({} as any);
+            }) as any
+          );
+          sinonSandbox.stub(pg.Client.prototype, 'end').resolves();
+
+          await connection.open();
+          controller.abort();
+          const releasePromise = connection.release();
+          await Promise.resolve();
+
+          expect(releaseStub).not.to.have.been.called;
+
+          finishCancellation();
+          await releasePromise;
+
+          expect(releaseStub).to.have.been.calledOnce;
+        });
+
         describe('when a connection is open', () => {
           describe('when not previously called', () => {
             it('releases the open connection', async () => {
@@ -199,6 +247,72 @@ describe('db', () => {
 
             expect(releaseStub).not.to.have.been.called;
           });
+        });
+      });
+
+      describe('cancel', () => {
+        it('cancels the active PostgreSQL backend using a separate client', async () => {
+          sinonSandbox.stub(db.dbDependencies, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+          const cancellationConnectStub = sinonSandbox.stub(pg.Client.prototype, 'connect').resolves();
+          const cancellationQueryStub = sinonSandbox.stub(pg.Client.prototype, 'query').resolves({} as any);
+          const cancellationEndStub = sinonSandbox.stub(pg.Client.prototype, 'end').resolves();
+
+          await connection.open();
+          await connection.cancel();
+
+          expect(cancellationConnectStub).to.have.been.calledOnce;
+          expect(cancellationQueryStub).to.have.been.calledOnceWith('SELECT pg_cancel_backend($1)', [123]);
+          expect(cancellationEndStub).to.have.been.calledOnce;
+        });
+
+        it('does nothing when the connection is not open', async () => {
+          const cancellationConnectStub = sinonSandbox.stub(pg.Client.prototype, 'connect').resolves();
+
+          await connection.cancel();
+
+          expect(cancellationConnectStub).not.to.have.been.called;
+        });
+
+        it('cancels once when the connection signal is aborted', async () => {
+          const controller = new AbortController();
+          connection = getDBConnection(mockKeycloakToken, { signal: controller.signal });
+          sinonSandbox.stub(db.dbDependencies, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+          const cancellationConnectStub = sinonSandbox.stub(pg.Client.prototype, 'connect').resolves();
+          const cancellationQueryStub = sinonSandbox.stub(pg.Client.prototype, 'query').resolves({} as any);
+          sinonSandbox.stub(pg.Client.prototype, 'end').resolves();
+
+          await connection.open();
+          controller.abort();
+          await Promise.all([connection.cancel(), connection.cancel()]);
+
+          expect(cancellationConnectStub).to.have.been.calledOnce;
+          expect(cancellationQueryStub).to.have.been.calledOnceWith('SELECT pg_cancel_backend($1)', [123]);
+        });
+
+        it('does not allow another application query after its signal is aborted', async () => {
+          const controller = new AbortController();
+          connection = getDBConnection(mockKeycloakToken, { signal: controller.signal });
+          sinonSandbox.stub(db.dbDependencies, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+          sinonSandbox.stub(pg.Client.prototype, 'connect').resolves();
+          sinonSandbox.stub(pg.Client.prototype, 'query').resolves({} as any);
+          sinonSandbox.stub(pg.Client.prototype, 'end').resolves();
+
+          await connection.open();
+          queryStub.resetHistory();
+          controller.abort();
+
+          try {
+            await connection.query('SELECT 1');
+            expect.fail('Expected query to reject');
+          } catch (error) {
+            expect((error as ApiExecuteSQLError).errors).to.deep.include({
+              name: 'AbortError',
+              message: 'Database work was aborted'
+            });
+          }
+
+          expect(queryStub).not.to.have.been.called;
+          await connection.release();
         });
       });
 
@@ -291,6 +405,33 @@ describe('db', () => {
       });
 
       describe('rollback', () => {
+        it('waits for cancellation dispatch before sending `ROLLBACK`', async () => {
+          const controller = new AbortController();
+          connection = getDBConnection(mockKeycloakToken, { signal: controller.signal });
+          sinonSandbox.stub(db.dbDependencies, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+          sinonSandbox.stub(pg.Client.prototype, 'connect').resolves();
+          let finishCancellation!: () => void;
+          sinonSandbox.stub(pg.Client.prototype, 'query').returns(
+            new Promise((resolve) => {
+              finishCancellation = () => resolve({} as any);
+            }) as any
+          );
+          sinonSandbox.stub(pg.Client.prototype, 'end').resolves();
+
+          await connection.open();
+          queryStub.resetHistory();
+          controller.abort();
+          const rollbackPromise = connection.rollback();
+          await Promise.resolve();
+
+          expect(queryStub).not.to.have.been.calledWith('ROLLBACK');
+
+          finishCancellation();
+          await rollbackPromise;
+
+          expect(queryStub).to.have.been.calledOnceWith('ROLLBACK');
+        });
+
         describe('when a connection is open', () => {
           it('sends a `ROLLBACK` query', async () => {
             sinonSandbox.stub(db.dbDependencies, 'getDBPool').returns(mockPool as unknown as pg.Pool);
