@@ -3,7 +3,7 @@
 This is an umbrella Helm chart that deploys all BioHub BC components together:
 
 1. **app** - React frontend application
-2. **database** - PostgreSQL database with PostGIS
+2. **database** - PostgreSQL database with PostGIS. Off by default and enabled only for PR previews; static environments use the separate Crunchy Postgres release (`infrastructure/crunchy-db`)
 3. **database-setup** - Database initialization and migration job
 4. **api** - Node.js API server
 5. **queue** - Background job worker
