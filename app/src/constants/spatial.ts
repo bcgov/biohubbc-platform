@@ -41,6 +41,9 @@ export const MAP_VIEW_MIN_HEIGHT = 500;
  */
 export const MAP_SECTION_HEIGHT = 400;
 
+/** Height of the submission feature detail map, in pixels. */
+export const SUBMISSION_FEATURE_MAP_SECTION_HEIGHT = 320;
+
 /**
  * Zoom levels added when the user zooms into a cluster from its popper. Server-side clusters carry no expansion
  * zoom, so a fixed increment is used; each level doubles the clustering grid's resolution. Always capped at

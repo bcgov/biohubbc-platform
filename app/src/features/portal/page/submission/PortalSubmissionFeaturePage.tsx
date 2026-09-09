@@ -7,6 +7,7 @@ import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { SubmissionFeatureAbout } from 'components/feature/SubmissionFeatureAbout';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
@@ -18,6 +19,7 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo } from 'react';
 import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { parseRouteId } from 'utils/routes';
 
 /**
@@ -53,6 +55,8 @@ export const PortalSubmissionFeaturePage = () => {
 
   const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
 
+  const featureTypeLabel = feature ? getFeatureTypeDisplayLabel(feature.feature_type_name) : '';
+
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
   }
@@ -81,19 +85,19 @@ export const PortalSubmissionFeaturePage = () => {
               color="inherit">
               {feature?.submission_name}
             </Link>
-            <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
+            <Typography color="text.primary">{featureTypeLabel}</Typography>
           </Breadcrumbs>
         }
         label={
           <Box display="flex" alignItems="center" gap={1.5}>
             <Typography variant="h1" sx={{ ml: '-2px' }}>
-              {feature?.feature_type_display_name}
+              {featureTypeLabel}
             </Typography>
           </Box>
         }
         subheader={
           <Box display="flex" gap={1}>
-            <Chip label={feature?.feature_type_name} size="small" />
+            <Chip label={featureTypeLabel} size="small" />
             {feature?.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
           </Box>
         }
@@ -113,6 +117,7 @@ export const PortalSubmissionFeaturePage = () => {
               />
             )}
           </PageSection>
+          {feature && <SubmissionFeatureAbout feature={feature} />}
         </Stack>
       </Container>
     </LoadingGuard>

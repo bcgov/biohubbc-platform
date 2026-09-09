@@ -80,12 +80,14 @@ export const SubmissionFeature = z.object({
   submission_feature_id: z.number(),
   uuid: z.string(),
   urn: z.string(),
+  create_date: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
+  successor_submission_feature_id: z.number().nullable(),
   feature_type_name: z.string(),
-  feature_type_display_name: z.string(),
   submission_name: z.string(),
+  contributor_name: z.string(),
   secured: z.boolean(),
   security_reasons: z.array(z.string())
 });
@@ -94,7 +96,6 @@ export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
 
 export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
   feature_type_name: z.string(),
-  feature_type_display_name: z.string(),
   submission_feature_security_ids: z.array(z.number())
 });
 
@@ -1075,7 +1076,6 @@ export class SubmissionRepository extends BaseRepository {
       SELECT
         submission_feature.*,
         feature_type.name as feature_type_name,
-        feature_type.display_name as feature_type_display_name,
         array_remove(array_agg(submission_feature_security.submission_feature_security_id), NULL) AS submission_feature_security_ids
       FROM
         submission_feature

@@ -1006,7 +1006,6 @@ describe('SubmissionRepository', () => {
     it('should succeed with valid data', async () => {
       const mockResponse = {
         feature_type_name: 'name',
-        feature_type_display_name: 'display',
         submission_feature_security_ids: [1]
       };
 
@@ -1047,7 +1046,6 @@ describe('SubmissionRepository', () => {
     it('should succeed with valid data', async () => {
       const mockResponse = {
         feature_type_name: 'name',
-        feature_type_display_name: 'display',
         submission_feature_security_ids: [1]
       };
 
@@ -1240,7 +1238,6 @@ describe('SubmissionRepository', () => {
           {
             submission_feature_id: 1,
             feature_type_name: 'Type A',
-            feature_type_display_name: 'Display A',
             submission_feature_security_ids: [1, 2]
           }
         ],
@@ -1256,7 +1253,6 @@ describe('SubmissionRepository', () => {
         {
           submission_feature_id: 1,
           feature_type_name: 'Type A',
-          feature_type_display_name: 'Display A',
           submission_feature_security_ids: [1, 2]
         }
       ]);

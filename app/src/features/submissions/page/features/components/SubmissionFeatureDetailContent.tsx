@@ -1,122 +1,57 @@
-import { mdiLock } from '@mdi/js';
-import Icon from '@mdi/react';
 import AlertTitle from '@mui/material/AlertTitle';
-import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { PageHeader } from 'components/header/PageHeader';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonPage } from 'components/loading/SkeletonPage';
+import { SubmissionFeatureAbout } from 'components/feature/SubmissionFeatureAbout';
 import { AlertBanner } from 'components/notifications/AlertBanner';
 import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
-import { ReactNode } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 
 interface SubmissionFeatureDetailContentProps {
-  isLoading: boolean;
-  feature?: ISubmissionFeature;
-  submissionId: number;
-  /** Feature whose indexed properties the Properties section lists. */
-  submissionFeatureId: number;
-  rootBreadcrumbLabel: string;
-  rootBreadcrumbTo: string;
-  submissionDetailBasePath: string;
-  featureRouteBasePath?: string;
-  queryString?: string;
-  buttons?: ReactNode;
+  /** Submission feature displayed by the page. */
+  feature: ISubmissionFeature;
+  /** Base route used for links rendered from feature property values. */
+  featureRouteBasePath: string;
 }
 
+/**
+ * Renders the content of a loaded submission feature detail page.
+ *
+ * Displays the superseded warning, indexed properties, map, and identifying
+ * metadata. Loading and missing-data states are handled by the
+ * parent page so this component always receives a valid feature.
+ *
+ * @param {SubmissionFeatureDetailContentProps} props - Feature data and the base route for property links.
+ * @returns {JSX.Element} The loaded submission feature detail content.
+ */
 export const SubmissionFeatureDetailContent = ({
-  isLoading,
   feature,
-  submissionId,
-  submissionFeatureId,
-  rootBreadcrumbLabel,
-  rootBreadcrumbTo,
-  submissionDetailBasePath,
-  featureRouteBasePath = submissionDetailBasePath,
-  queryString = '',
-  buttons
+  featureRouteBasePath
 }: SubmissionFeatureDetailContentProps) => {
   return (
-    <LoadingGuard
-      isLoading={isLoading}
-      isLoadingFallback={<SkeletonPage />}
-      isLoadingFallbackDelay={300}
-      hasNoData={!feature}
-      hasNoDataFallback={
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-          <Typography color="text.secondary">No data available</Typography>
-        </Box>
-      }>
-      <PageHeader
-        buttons={buttons}
-        breadcrumbs={
-          <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to={rootBreadcrumbTo} underline="hover" color="inherit">
-              {rootBreadcrumbLabel}
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`${submissionDetailBasePath}/${feature?.submission_id}${queryString}`}
-              underline="hover"
-              color="inherit">
-              {feature?.submission_name}
-            </Link>
-            <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
-          </Breadcrumbs>
-        }
-        label={
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              {feature?.feature_type_display_name}
-            </Typography>
-          </Box>
-        }
-        subheader={
-          <Box display="flex" gap={1}>
-            <Chip label={feature?.feature_type_name} size="small" />
-            {feature?.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
-          </Box>
-        }
-      />
-      <Container maxWidth="xl">
-        {feature?.secured && (
-          <AlertBanner
-            variant="standard"
-            icon={<Icon path={mdiLock} size={0.75} style={{ marginTop: '1px' }} />}
-            sx={{ mb: 3 }}>
-            <AlertTitle sx={{ mb: 0 }}>This feature is secured</AlertTitle>
-            {(feature.security_reasons ?? []).length > 0 && (
-              <Typography fontSize="0.8rem">
-                This feature is restricted for the following reasons: {feature.security_reasons.join(', ')}.
-              </Typography>
-            )}
-          </AlertBanner>
-        )}
-        <Stack spacing={3} py={4}>
-          <FeaturePropertiesSection
-            submissionId={submissionId}
-            submissionFeatureId={submissionFeatureId}
-            featureRouteBasePath={featureRouteBasePath}
+    <Container maxWidth="xl">
+      {feature.successor_submission_feature_id && (
+        <AlertBanner severity="warning" variant="standard" sx={{ mt: 4 }}>
+          <AlertTitle sx={{ mb: 0 }}>This feature has been superseded</AlertTitle>
+          <Typography fontSize="0.8rem">This information has been updated with a newer version.</Typography>
+        </AlertBanner>
+      )}
+      <Stack spacing={3} py={4}>
+        <FeaturePropertiesSection
+          submissionId={feature.submission_id}
+          submissionFeatureId={feature.submission_feature_id}
+          featureRouteBasePath={featureRouteBasePath}
+        />
+        <PageSection id="submission-feature-map" label="Map">
+          <SubmissionFeatureMap
+            submissionId={feature.submission_id}
+            submissionFeatureId={feature.submission_feature_id}
           />
-          <PageSection id="submission-feature-map" label="Map">
-            {feature && (
-              <SubmissionFeatureMap
-                submissionId={feature.submission_id}
-                submissionFeatureId={feature.submission_feature_id}
-              />
-            )}
-          </PageSection>
-        </Stack>
-      </Container>
-    </LoadingGuard>
+        </PageSection>
+        <SubmissionFeatureAbout feature={feature} />
+      </Stack>
+    </Container>
   );
 };
