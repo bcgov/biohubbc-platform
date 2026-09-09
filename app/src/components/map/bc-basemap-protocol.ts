@@ -10,7 +10,7 @@ import { bcTileKey, recordBcTileClassification } from './bc-basemap-registry';
 /** URL scheme MapLibre hands to {@link loadBcBasemapTile} instead of fetching itself. */
 export const BC_BASEMAP_PROTOCOL = 'bc-basemap';
 
-const TILE_URL_PATTERN = new RegExp(`^${BC_BASEMAP_PROTOCOL}://(\\d+)/(\\d+)/(\\d+)\\?template=([^&]+)$`);
+const TILE_URL_PATTERN = new RegExp(String.raw`^${BC_BASEMAP_PROTOCOL}://(\d+)/(\d+)/(\d+)\?template=([^&]+)$`);
 
 interface ITileCoordinates {
   z: number;
