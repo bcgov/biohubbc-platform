@@ -1,15 +1,11 @@
 import { CodePropertyValue } from 'interfaces/property-value.interface';
-import { useLocation } from 'react-router-dom';
-import { buildSubmissionCodePath } from 'utils/routes';
+import { type SubmissionCodePathResolver } from 'utils/routes.interface';
 import { PropertyValueLink } from './PropertyValueLink';
 
-export interface CodePropertyValueLinkProps {
-  /** Structured code value from the indexed-property read model. */
+interface CodePropertyValueLinkProps {
   value: CodePropertyValue;
-  /** Submission the referencing feature belongs to. */
   submissionId: number;
-  /** Submission route base, e.g. `/submission` or `/portal/submission`. */
-  featureRouteBasePath: string;
+  getSubmissionCodePath: SubmissionCodePathResolver;
 }
 
 /**
@@ -20,18 +16,10 @@ export interface CodePropertyValueLinkProps {
  * @param {CodePropertyValueLinkProps} props
  * @returns {JSX.Element}
  */
-export const CodePropertyValueLink = ({ value, submissionId, featureRouteBasePath }: CodePropertyValueLinkProps) => {
-  const location = useLocation();
-
+export const CodePropertyValueLink = ({ value, submissionId, getSubmissionCodePath }: CodePropertyValueLinkProps) => {
   return (
     <PropertyValueLink
-      to={buildSubmissionCodePath(
-        featureRouteBasePath,
-        submissionId,
-        value.codeset_key,
-        value.code_key,
-        location.search
-      )}
+      to={getSubmissionCodePath(submissionId, value.codeset_key, value.code_key)}
       label={value.label}
       title={`${value.codeset_label} / ${value.code_label}`}
     />
