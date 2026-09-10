@@ -48,7 +48,9 @@ import { fileURLToPath } from 'url';
       BASEMAP_URL:
         process.env.VITE_BASEMAP_URL ||
         'https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}',
-      BASEMAP_ATTRIBUTION: process.env.VITE_BASEMAP_ATTRIBUTION || '© Province of British Columbia'
+      BASEMAP_ATTRIBUTION: process.env.VITE_BASEMAP_ATTRIBUTION || '© Province of British Columbia',
+      BASEMAP_FALLBACK_STYLE_URL:
+        process.env.VITE_BASEMAP_FALLBACK_STYLE_URL || 'https://tiles.openfreemap.org/styles/bright'
     };
     resp.status(200).json(config);
   });

@@ -1,4 +1,5 @@
 import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
+import { resolveMartinTileUrlTemplate } from 'components/map/martin-request';
 import type { SourceSpecification } from 'maplibre-gl';
 
 export const FEATURE_GEOMETRIES_SOURCE_ID = 'feature-geometries';
@@ -13,8 +14,8 @@ const GEOMETRY_COLOR = '#1f6fb2';
 /**
  * Build the vector tile source for a feature's spatial properties.
  *
- * The tile URL template is returned by the API and is relative, so it resolves against the app's own origin: the same
- * path is served by the dev server proxy locally and by an OpenShift route when deployed.
+ * The tile URL template is returned by the API and is relative; see {@link resolveMartinTileUrlTemplate} for how it
+ * becomes absolute.
  *
  * The cache key is appended purely as a client-side cache buster. Tiles are authorized by the token in the request
  * header, and the gateway discards every client-supplied query parameter, so this changes nothing server side. Without
@@ -32,9 +33,7 @@ export const buildFeatureTileSource = (
   minZoom: number,
   maxZoom: number
 ): SourceSpecification => {
-  const absoluteTemplate = martinUrlTemplate.startsWith('http')
-    ? martinUrlTemplate
-    : `${window.location.origin}${martinUrlTemplate}`;
+  const absoluteTemplate = resolveMartinTileUrlTemplate(martinUrlTemplate);
 
   const separator = absoluteTemplate.includes('?') ? '&' : '?';
 
@@ -54,7 +53,7 @@ export const buildFeatureTileSource = (
  * point among polygons would silently not appear. `geometry-type` reports multi-geometries under their singular name,
  * so these four layers also cover MultiPoint, MultiLineString and MultiPolygon.
  *
- * Ordered so areas sit beneath lines, and lines beneath points; the basemap is added by the caller before these.
+ * Ordered so areas sit beneath lines, and lines beneath points; the basemap layer is added by the caller before these.
  *
  * All of them are display-only: feature tiles carry geometry alone, so there is nothing a click could resolve to.
  *

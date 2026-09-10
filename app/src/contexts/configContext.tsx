@@ -19,14 +19,20 @@ export interface IConfig {
   MAX_UPLOAD_TARBALL_SIZE: number;
   MAX_TICKET_ATTACHMENT_FILE_SIZE: number;
   /**
-   * Raster basemap tile URL template rendered beneath the map's vector layers. Configurable so the basemap provider
-   * can be changed without a code change.
+   * Raster tile URL template of the BC Government basemap, drawn wherever the service has tiles. Its footprint and
+   * blank-tile signature are fixed in `constants/basemap.ts`, so pointing this at another provider needs a code
+   * change. Empty disables the layer.
    */
   BASEMAP_URL: string;
   /**
    * Attribution text displayed on the map, as required by the basemap provider's terms.
    */
   BASEMAP_ATTRIBUTION: string;
+  /**
+   * MapLibre style JSON URL for the worldwide basemap shown wherever the BC basemap has no tile. Attribution is
+   * carried by the style's own sources. Empty leaves the blank neutral background there instead.
+   */
+  BASEMAP_FALLBACK_STYLE_URL: string;
 }
 
 export const ConfigContext = React.createContext<IConfig | undefined>({
@@ -46,7 +52,8 @@ export const ConfigContext = React.createContext<IConfig | undefined>({
   MAX_UPLOAD_TARBALL_SIZE: 10737418240,
   MAX_TICKET_ATTACHMENT_FILE_SIZE: 15728640,
   BASEMAP_URL: '',
-  BASEMAP_ATTRIBUTION: ''
+  BASEMAP_ATTRIBUTION: '',
+  BASEMAP_FALLBACK_STYLE_URL: ''
 });
 
 /**
@@ -79,7 +86,9 @@ const getLocalConfig = (): IConfig => {
     BASEMAP_URL:
       import.meta.env.VITE_BASEMAP_URL ||
       'https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}',
-    BASEMAP_ATTRIBUTION: import.meta.env.VITE_BASEMAP_ATTRIBUTION || '\u00a9 Province of British Columbia'
+    BASEMAP_ATTRIBUTION: import.meta.env.VITE_BASEMAP_ATTRIBUTION || '© Province of British Columbia',
+    BASEMAP_FALLBACK_STYLE_URL:
+      import.meta.env.VITE_BASEMAP_FALLBACK_STYLE_URL || 'https://tiles.openfreemap.org/styles/bright'
   };
 };
 

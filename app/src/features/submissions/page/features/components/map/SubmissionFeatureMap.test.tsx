@@ -1,3 +1,4 @@
+import { BC_BASEMAP_LAYER_ID, BC_BASEMAP_SOURCE_ID } from 'components/map/bc-basemap-layers';
 import { MAP_FIT_MAX_ZOOM } from 'constants/spatial';
 import type { ISubmissionFeatureTileSession } from 'interfaces/useMartinApi.interface';
 import { act, cleanup, render, screen, waitFor } from 'test-helpers/test-utils';
@@ -15,7 +16,19 @@ const mocks = vi.hoisted(() => ({
   slippyMapProps: [] as Record<string, any>[],
   // Counts MOUNTS, not renders: a keyed remount is how the component forces tiles to be
   // re-requested, so the recovery tests assert on when a remount happens.
-  slippyMapMounts: { count: 0 }
+  slippyMapMounts: { count: 0 },
+  bcBasemap: {
+    mode: 'bc',
+    tileSources: {
+      'bc-basemap': { type: 'raster', tiles: ['bc-basemap://{z}/{x}/{y}?template=x'], tileSize: 256 }
+    },
+    layers: [
+      {
+        specification: { id: 'bc-basemap', type: 'raster', source: 'bc-basemap', paint: { 'raster-opacity': 1 } }
+      }
+    ],
+    onViewportChange: vi.fn()
+  } as Record<string, any>
 }));
 
 vi.mock('hooks/useApi', () => ({
@@ -24,9 +37,14 @@ vi.mock('hooks/useApi', () => ({
 
 vi.mock('hooks/useContext', () => ({
   useConfigContext: () => ({
-    BASEMAP_URL: 'https://basemap.test/{z}/{y}/{x}',
-    BASEMAP_ATTRIBUTION: '© Province of British Columbia'
+    BASEMAP_URL: 'https://basemap.test/tile/{z}/{y}/{x}',
+    BASEMAP_ATTRIBUTION: '© Province of British Columbia',
+    BASEMAP_FALLBACK_STYLE_URL: 'https://style.test/bright'
   })
+}));
+
+vi.mock('components/map/useBcBasemap', () => ({
+  useBcBasemap: () => mocks.bcBasemap
 }));
 
 // SlippyMap is exercised by its own suite; here we only care what the feature map hands it.
@@ -43,6 +61,8 @@ vi.mock('components/map/SlippyMap', async () => {
     }
   };
 });
+
+const DEFAULT_BC_BASEMAP = { ...mocks.bcBasemap };
 
 const buildSession = (overrides: Partial<ISubmissionFeatureTileSession> = {}): ISubmissionFeatureTileSession => ({
   has_spatial_properties: true,
@@ -76,6 +96,7 @@ describe('SubmissionFeatureMap', () => {
     mocks.slippyMapProps.length = 0;
     mocks.slippyMapMounts.count = 0;
     mocks.createSubmissionFeatureTileSession.mockReset();
+    mocks.bcBasemap = { ...DEFAULT_BC_BASEMAP, onViewportChange: mocks.bcBasemap.onViewportChange };
     vi.stubGlobal('location', { origin: 'https://biohub.test' });
   });
 
@@ -116,20 +137,60 @@ describe('SubmissionFeatureMap', () => {
       expect(source.tiles[0]).not.toContain('super-secret-token');
     });
 
-    it('attaches the token as an Authorization header once a session exists', async () => {
+    it('attaches the token only to Martin tile requests', async () => {
       await renderReadyMap(buildSession({ token: 'token-abc' }));
 
       const { transformRequest } = latestMapProps();
 
-      expect(transformRequest('https://biohub.test/martin/feature/5/5/11')).toEqual({
-        url: 'https://biohub.test/martin/feature/5/5/11',
+      expect(transformRequest('https://biohub.test/martin/feature/5/5/11?ctx=1%3A3')).toEqual({
+        url: 'https://biohub.test/martin/feature/5/5/11?ctx=1%3A3',
         headers: { Authorization: 'Bearer token-abc' }
       });
 
-      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({
-        url: 'https://basemap.test/5/11/5',
-        headers: { Authorization: 'Bearer token-abc' }
+      // The basemap providers get their requests as MapLibre built them: a credential for our origin never leaves it.
+      expect(transformRequest('https://style.test/planet/5/5/11.pbf')).toEqual({
+        url: 'https://style.test/planet/5/5/11.pbf'
       });
+      expect(transformRequest('bc-basemap://11/323/700?template=x')).toEqual({
+        url: 'bc-basemap://11/323/700?template=x'
+      });
+    });
+  });
+
+  describe('basemaps', () => {
+    it('passes the fallback style url to the map', async () => {
+      await renderReadyMap();
+
+      expect(latestMapProps().mapStyle).toBe('https://style.test/bright');
+    });
+
+    it('draws the BC basemap beneath the feature layers', async () => {
+      await renderReadyMap();
+
+      const { tileSources, layers } = latestMapProps();
+
+      expect(Object.keys(tileSources)).toEqual([BC_BASEMAP_SOURCE_ID, FEATURE_GEOMETRIES_SOURCE_ID]);
+      expect(layers[0].specification.id).toBe(BC_BASEMAP_LAYER_ID);
+      expect(layers.slice(1).every((layer: any) => layer.specification.source === FEATURE_GEOMETRIES_SOURCE_ID)).toBe(
+        true
+      );
+    });
+
+    it("hands the map's viewport to the basemap mode", async () => {
+      await renderReadyMap();
+
+      expect(latestMapProps().onViewportChange).toBe(mocks.bcBasemap.onViewportChange);
+    });
+
+    it('shows only the fallback style when no BC basemap is configured', async () => {
+      mocks.bcBasemap = { ...mocks.bcBasemap, tileSources: {}, layers: [] };
+
+      await renderReadyMap();
+
+      const { tileSources, layers } = latestMapProps();
+
+      expect(Object.keys(tileSources)).toEqual([FEATURE_GEOMETRIES_SOURCE_ID]);
+      expect(layers.every((layer: any) => layer.specification.source === FEATURE_GEOMETRIES_SOURCE_ID)).toBe(true);
     });
   });
 
@@ -303,18 +364,19 @@ describe('SubmissionFeatureMap', () => {
       });
     });
 
-    it('ignores a basemap failure, which is the provider’s problem and not the feature’s', async () => {
+    it('recovers only from the feature tile source', async () => {
       await renderReadyMap();
 
       for (let attempt = 0; attempt < 3; attempt++) {
         await act(async () => {
-          latestMapProps().onSourceError('basemap', new Error('basemap unavailable'));
+          latestMapProps().onSourceError('openmaptiles', new Error('style source unavailable'));
+          latestMapProps().onSourceError(BC_BASEMAP_SOURCE_ID, new Error('basemap unavailable'));
         });
       }
 
       expect(screen.queryByTestId('submission-feature-map-error')).not.toBeInTheDocument();
       expect(screen.getByTestId('submission-feature-map')).toBeInTheDocument();
-      // No re-mint either: the tile session is unaffected by the basemap.
+      // No re-mint either: the tile session is independent of the style's own sources.
       expect(mocks.createSubmissionFeatureTileSession).toHaveBeenCalledTimes(1);
     });
 

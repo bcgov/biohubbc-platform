@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
     'import.meta.env.VITE_KEYCLOAK_REALM': JSON.stringify(env.VITE_KEYCLOAK_REALM),
     'import.meta.env.VITE_KEYCLOAK_CLIENT_ID': JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID),
     'import.meta.env.VITE_BASEMAP_URL': JSON.stringify(env.VITE_BASEMAP_URL),
-    'import.meta.env.VITE_BASEMAP_ATTRIBUTION': JSON.stringify(env.VITE_BASEMAP_ATTRIBUTION)
+    'import.meta.env.VITE_BASEMAP_ATTRIBUTION': JSON.stringify(env.VITE_BASEMAP_ATTRIBUTION),
+    'import.meta.env.VITE_BASEMAP_FALLBACK_STYLE_URL': JSON.stringify(env.VITE_BASEMAP_FALLBACK_STYLE_URL)
   };
 
   return {

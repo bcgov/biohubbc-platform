@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import type { Feature } from 'geojson';
 import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
+import { isEqual, omit } from 'lodash-es';
 import { Map as MapLibreMap, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import { SlippyMapDrawToolbar } from './components/SlippyMapDrawToolbar';
 import type { ISlippyMapLayer, ISlippyMapProps, MapClickPosition, SlippyMapDrawMode } from './SlippyMap.interface';
 import {
   areFeatureSetsEqual,
+  coveringTilesForSource,
   extractSnapshotFeatures,
   hasEnabledDrawControl,
   isDrawModeEnabled,
@@ -23,6 +25,15 @@ import {
   normalizeFeaturesForDraw,
   SLIPPY_MAP_DEFAULT_STYLE
 } from './SlippyMap.utils';
+
+/**
+ * The paint a layer declares, as a plain record; every layer type's `paint` is optional.
+ *
+ * @param {ISlippyMapLayer} layer
+ * @return {*}  {Record<string, unknown>}
+ */
+const paintOf = (layer: ISlippyMapLayer): Record<string, unknown> =>
+  ('paint' in layer.specification && layer.specification.paint) || {};
 
 /**
  * Select mode flags enabling feature editing per draw mode: features can be dragged, and line/polygon vertices can
@@ -83,6 +94,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     onEmptyMapClick,
     onMapLoad,
     onSourceError,
+    onViewportChange,
     sx
   } = props;
 
@@ -98,12 +110,25 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   const realFeatureIdsRef = useRef<Set<string | number>>(new Set());
   const selectedFeatureIdRef = useRef<string | number | null>(null);
   // Latest props, so drawing event handlers (bound once on map load) never read stale values
-  const callbacksRef = useRef({ onDrawCreate, onDrawUpdate, onDrawDelete, onEmptyMapClick, onMapLoad, onSourceError });
+  const callbacksRef = useRef({
+    onDrawCreate,
+    onDrawUpdate,
+    onDrawDelete,
+    onEmptyMapClick,
+    onMapLoad,
+    onSourceError,
+    onViewportChange
+  });
   const featuresRef = useRef<Feature[]>(features ?? []);
   const isEditableRef = useRef(isEditable);
   // Source/layer ids this component applied, so replacing them never touches the drawing library's own
   const appliedSourceIdsRef = useRef<string[]>([]);
   const appliedLayerIdsRef = useRef<string[]>([]);
+  // Paint each applied layer currently carries, so a paint change can be applied in place rather than by re-applying
+  // every source and layer.
+  const appliedPaintRef = useRef<Record<string, Record<string, unknown>>>({});
+  const hasMapLoadedRef = useRef(false);
+  const hasFallenBackToDefaultStyleRef = useRef(false);
   const mapContentRef = useRef({ tileSources, layers });
   // Layers that take part in hit testing: those declaring a click handler or a popup.
   const interactiveLayersRef = useRef<ISlippyMapLayer[]>([]);
@@ -142,7 +167,15 @@ export const SlippyMap = (props: ISlippyMapProps) => {
   useImperativeHandle(ref, () => ({ easeTo, getZoom }), [easeTo, getZoom]);
 
   useEffect(() => {
-    callbacksRef.current = { onDrawCreate, onDrawUpdate, onDrawDelete, onEmptyMapClick, onMapLoad, onSourceError };
+    callbacksRef.current = {
+      onDrawCreate,
+      onDrawUpdate,
+      onDrawDelete,
+      onEmptyMapClick,
+      onMapLoad,
+      onSourceError,
+      onViewportChange
+    };
     featuresRef.current = features ?? [];
     isEditableRef.current = isEditable;
     mapContentRef.current = { tileSources, layers };
@@ -180,6 +213,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
     appliedLayerIdsRef.current = [];
     appliedSourceIdsRef.current = [];
+    appliedPaintRef.current = {};
 
     for (const [sourceId, source] of Object.entries(currentSources ?? {})) {
       map.addSource(sourceId, source);
@@ -194,6 +228,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     for (const layer of currentLayers ?? []) {
       map.addLayer(layer.specification, firstDrawLayerId);
       appliedLayerIdsRef.current.push(layer.specification.id);
+      appliedPaintRef.current[layer.specification.id] = { ...paintOf(layer) };
     }
   }, []);
 
@@ -414,17 +449,58 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     };
 
     /**
+     * Replace a style that never loaded with the blank default.
+     *
+     * MapLibre fires `load` only once a complete style is in place, and the consumer's sources and layers are applied
+     * there, so a style document that fails to arrive would otherwise leave the map with no data on it at all. The
+     * blank style makes no network requests and cannot fail in turn, and the swap re-runs the load path, so the cost
+     * of an unreachable provider stays what it should be: the backdrop, not the map.
+     *
+     * Only ever done once, and only before the map has loaded — past that point the style is in place and a failure
+     * belongs to a source rather than the style document.
+     */
+    const fallBackToDefaultStyle = () => {
+      if (hasFallenBackToDefaultStyleRef.current || hasMapLoadedRef.current) {
+        return;
+      }
+
+      hasFallenBackToDefaultStyleRef.current = true;
+      map.setStyle(SLIPPY_MAP_DEFAULT_STYLE);
+    };
+
+    /**
      * Surfaces source load failures, which is how a consumer learns that a tile request was rejected:
      * `transformRequest` only sees outgoing requests, never responses.
+     *
+     * A failure carrying no source is the style document's own: MapLibre reports those against the map rather than
+     * against any source it never got as far as reading.
      */
     const handleMapError = (event: ErrorEvent & { sourceId?: string }) => {
       const sourceId = event.sourceId;
 
-      if (!sourceId || !appliedSourceIdsRef.current.includes(sourceId)) {
+      if (!sourceId) {
+        fallBackToDefaultStyle();
+        return;
+      }
+
+      if (!appliedSourceIdsRef.current.includes(sourceId)) {
         return;
       }
 
       callbacksRef.current.onSourceError?.(sourceId, event.error);
+    };
+
+    /**
+     * Reports the viewport to the consumer, with the means to ask which tiles any applied source needs for it.
+     */
+    const emitViewport = () => {
+      const [[west, south], [east, north]] = map.getBounds().toArray();
+
+      callbacksRef.current.onViewportChange?.({
+        bounds: [west, south, east, north],
+        zoom: map.getZoom(),
+        coveringTiles: (sourceId) => coveringTilesForSource(map, mapContentRef.current.tileSources?.[sourceId])
+      });
     };
 
     const handleMapLoad = () => {
@@ -455,13 +531,17 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       // inserted below them (drawn geometry always renders on top).
       applyMapContent(map);
 
+      hasMapLoadedRef.current = true;
       setIsMapLoaded(true);
+      emitViewport();
       callbacksRef.current.onMapLoad?.();
     };
     map.once('load', handleMapLoad);
     map.on('click', handleMapClick);
     map.on('mousemove', handleMapMouseMove);
     map.on('error', handleMapError);
+    // Fires after a resize as well, so a map shown after being hidden reports the viewport it now has.
+    map.on('moveend', emitViewport);
 
     let resizeObserver: ResizeObserver | undefined;
 
@@ -488,9 +568,13 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       map.off('click', handleMapClick);
       map.off('mousemove', handleMapMouseMove);
       map.off('error', handleMapError);
+      map.off('moveend', emitViewport);
 
       appliedLayerIdsRef.current = [];
       appliedSourceIdsRef.current = [];
+      appliedPaintRef.current = {};
+      hasMapLoadedRef.current = false;
+      hasFallenBackToDefaultStyleRef.current = false;
       setIsMapLoaded(false);
 
       const draw = drawRef.current;
@@ -526,8 +610,43 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     applyMapContent(map);
     // Compared against the layer specifications rather than the layers themselves: the click handlers are read from a
     // ref at event time, and a deep compare tests functions by reference, so an inline handler would re-apply (and
-    // re-request every tile) on every render.
-  }, [tileSources ?? {}, (layers ?? []).map((layer) => layer.specification), isMapLoaded, applyMapContent]);
+    // re-request every tile) on every render. Paint is left out too: it is applied in place by the effect below.
+  }, [
+    tileSources ?? {},
+    (layers ?? []).map((layer) => omit(layer.specification, 'paint')),
+    isMapLoaded,
+    applyMapContent
+  ]);
+
+  // Paint is the one class of layer property MapLibre updates without laying anything out again or requesting a
+  // tile, so it is the path a consumer can drive state through (an opacity, a colour) without the sources being torn
+  // down around it. A property the layer stops declaring is reset to its default.
+  useDeepCompareEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapLoaded) {
+      return;
+    }
+
+    for (const layer of layers ?? []) {
+      const layerId = layer.specification.id;
+
+      if (!map.getLayer(layerId)) {
+        continue;
+      }
+
+      const nextPaint = paintOf(layer);
+      const previousPaint = appliedPaintRef.current[layerId] ?? {};
+
+      for (const name of new Set([...Object.keys(previousPaint), ...Object.keys(nextPaint)])) {
+        if (!isEqual(previousPaint[name], nextPaint[name])) {
+          map.setPaintProperty(layerId, name, nextPaint[name]);
+        }
+      }
+
+      appliedPaintRef.current[layerId] = { ...nextPaint };
+    }
+  }, [(layers ?? []).map((layer) => [layer.specification.id, paintOf(layer)]), isMapLoaded]);
 
   // The drawing library's mode is state of its own, so it has to be re-reconciled with the props on every change to
   // them, not only when editability flips. A mode whose control has since been withdrawn keeps interpreting map

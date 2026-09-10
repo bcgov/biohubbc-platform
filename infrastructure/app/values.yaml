@@ -17,11 +17,15 @@ app:
 
   # Siteminder
   siteminderLogoutURL: "" # Siteminder URL to log out and clear the session for the logged in user
-  # Raster basemap drawn beneath the search-result vector layers. Configurable so the provider can be
-  # changed without a code change.
+  # `url` is the raster tile template of the BC Government basemap, drawn wherever the service has
+  # tiles; its footprint and blank-tile signature are fixed in app/src/constants/basemap.ts, so
+  # pointing it at another provider needs a code change, and empty disables the layer.
+  # `fallbackStyleUrl` is the MapLibre style shown wherever the BC basemap has no tile; its
+  # attribution is carried by the style's own sources, and empty leaves the blank background there.
   basemap:
     url: "https://maps.gov.bc.ca/arcgis/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}"
     attribution: "© Province of British Columbia"
+    fallbackStyleUrl: "https://tiles.openfreemap.org/styles/bright"
 
   # Keycloak
   keycloak:
