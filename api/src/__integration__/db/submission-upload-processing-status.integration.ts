@@ -6,7 +6,6 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
-import { SubmissionUploadReviewStatusRepository } from '../../repositories/upload/submission-upload-review-status-repository';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { createTestSubmission, createTestUploadWithFeatures } from '../helpers/test-submission-helpers';
 
@@ -77,26 +76,29 @@ describe('submission upload processing status (integration)', function () {
     return result.rows[0].status;
   }
 
-  it('accepts every processing status value in submission_upload_status.status', async () => {
+  it('types the status log with the job status enum, whose values match the model', async () => {
     const result = await connection.sql(SQL`
       SELECT
-        array_agg(job.enumlabel::text ORDER BY job.enumsortorder) AS job_statuses,
-        array_agg(job.enumlabel::text ORDER BY job.enumsortorder) FILTER (
-          WHERE NOT EXISTS (
-            SELECT 1
-            FROM pg_enum status
-            INNER JOIN pg_type status_type ON status_type.oid = status.enumtypid
-            WHERE status_type.typname = 'submission_upload_status_type'
-              AND status.enumlabel = job.enumlabel
-          )
-        ) AS missing_statuses
-      FROM pg_enum job
-      INNER JOIN pg_type job_type ON job_type.oid = job.enumtypid
-      WHERE job_type.typname = 'submission_upload_job_status';
+        t.typname AS column_type,
+        (
+          SELECT array_agg(e.enumlabel::text ORDER BY e.enumsortorder)
+          FROM pg_enum e
+          INNER JOIN pg_type t ON t.oid = e.enumtypid
+          WHERE t.typname = 'submission_upload_job_status'
+        ) AS job_statuses,
+        EXISTS (SELECT 1 FROM pg_type WHERE typname = 'submission_upload_status_type') AS review_enum_exists
+      FROM pg_attribute a
+      INNER JOIN pg_class c ON c.oid = a.attrelid
+      INNER JOIN pg_namespace n ON n.oid = c.relnamespace
+      INNER JOIN pg_type t ON t.oid = a.atttypid
+      WHERE n.nspname = 'biohub'
+        AND c.relname = 'submission_upload_status'
+        AND a.attname = 'status';
     `);
 
-    expect(result.rows[0].job_statuses).to.have.members([...SubmissionUploadJobStatus.options]);
-    expect(result.rows[0].missing_statuses).to.be.null;
+    expect(result.rows[0].column_type).to.equal('submission_upload_job_status');
+    expect(result.rows[0].job_statuses).to.eql([...SubmissionUploadJobStatus.options]);
+    expect(result.rows[0].review_enum_exists).to.be.false;
   });
 
   it('records each transition as an active row in order and keeps submission_upload.status current', async () => {
@@ -167,33 +169,29 @@ describe('submission upload processing status (integration)', function () {
     expect(wrongSubmission).to.eql([]);
   });
 
-  it('review decision readers ignore processing rows sharing the table', async () => {
+  it('processing transitions leave the decision untouched and the publish history reports it', async () => {
     const submissionUploadId = await createUploadedUpload();
-    const reviewStatusRepository = new SubmissionUploadReviewStatusRepository(connection);
-    await reviewStatusRepository.insertSubmissionUploadReviewStatus({
-      submission_upload_id: submissionUploadId,
-      status: 'submitted'
-    });
     await service.transitionSubmissionUploadToIngesting(submissionUploadId);
     await service.transitionSubmissionUploadToIngested(submissionUploadId);
 
-    const reviewStatus = await reviewStatusRepository.getSubmissionUploadReviewStatus(submissionUploadId);
-    expect(reviewStatus.status).to.equal('submitted');
-
     const upload = await connection.sql(SQL`
-      SELECT su.ticket_id, s.uuid
+      SELECT su.ticket_id, su.decision, s.uuid
       FROM submission_upload su
       INNER JOIN submission s ON s.submission_id = su.submission_id
       WHERE su.submission_upload_id = ${submissionUploadId}::uuid;
     `);
+    expect(upload.rows[0].decision).to.equal('pending');
+
     const ticketUploads = await new SubmissionUploadRepository(connection).findSubmissionUploadsByTicketId(
       upload.rows[0].ticket_id
     );
     const ticketUpload = ticketUploads.find((row) => row.submission_upload_id === submissionUploadId);
-    expect(ticketUpload?.review_status).to.equal('submitted');
+    expect(ticketUpload?.decision).to.equal('pending');
     expect(ticketUpload?.upload_status).to.equal('ingested');
 
-    const history = await reviewStatusRepository.getStatusHistoryBySubmissionUuid(upload.rows[0].uuid);
-    expect(history.map((row) => row.status)).to.eql(['submitted']);
+    const history = await service.findSubmissionDecisionHistoryByUuid(upload.rows[0].uuid);
+    expect(history.history.map((row) => [row.submissionUploadId, row.status])).to.eql([
+      [submissionUploadId, 'submitted']
+    ]);
   });
 });

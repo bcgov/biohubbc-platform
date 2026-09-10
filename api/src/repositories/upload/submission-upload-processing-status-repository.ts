@@ -6,20 +6,17 @@ import {
   SubmissionUploadProcessingStatusHistoryRow
 } from '../../models/submission-upload-processing-status';
 import { BaseRepository } from '../base-repository';
-import { processingStatusPredicate } from './submission-upload-status-predicates';
 
 /**
- * Repository for the processing status rows in `submission_upload_status`.
+ * Repository for the processing status transition log `submission_upload_status`.
  *
- * The table also holds review decision rows; every statement here filters on the processing
- * status values so the two row classes never mix. `submission_upload.status` stays the
- * authoritative current status; these rows are its history.
+ * `submission_upload.status` stays the authoritative current status; these rows are its history.
  */
 export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
   /**
    * Insert an active processing status row.
    *
-   * `create_user` and `create_date` are populated by the audit trigger.
+   * `create_date` is populated by the audit trigger.
    *
    * @param {string} submissionUploadId - Submission upload the status belongs to.
    * @param {SubmissionUploadJobStatus} status - Processing status entered.
@@ -44,8 +41,7 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
         submission_upload_id,
         status,
         record_end_date,
-        create_date,
-        create_user;
+        create_date;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadProcessingStatus);
@@ -81,7 +77,7 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
       WHERE
         submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL
-        AND status = ANY(${statuses}::submission_upload_status_type[]);
+        AND status = ANY(${statuses}::submission_upload_job_status[]);
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -118,10 +114,6 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
       LEFT JOIN submission_upload_status sus
         ON sus.submission_upload_id = su.submission_upload_id
         AND sus.record_end_date IS NULL
-        AND `
-      .append(processingStatusPredicate('sus.status'))
-      .append(
-        SQL`
       WHERE
         s.uuid = ${submissionUuid}
         AND su.submission_upload_id = ${submissionUploadId}
@@ -129,8 +121,7 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
       ORDER BY
         sus.create_date ASC,
         sus.submission_upload_status_id ASC;
-    `
-      );
+    `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadProcessingStatusHistoryRow);
 

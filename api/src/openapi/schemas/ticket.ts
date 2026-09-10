@@ -1,5 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
-import { SubmissionUploadJobStatus } from '../../models/submission-upload';
+import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { DataRequestResponseSchema } from './data-request';
 import { paginationResponseSchema } from './pagination';
 import { TicketSystemUserWithUserSchema } from './ticket-system-user';
@@ -8,7 +8,7 @@ import { SubmissionUploadReviewResponseSchema } from './upload';
 const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
 const TicketStatusEnum = ['open', 'closed'];
 const SubmissionUploadJobStatusEnum = SubmissionUploadJobStatus.options;
-const SubmissionUploadReviewStatusEnum = ['submitted', 'approved', 'denied', 'deleted'];
+const SubmissionUploadDecisionEnum = SubmissionUploadDecision.options;
 const SubmissionValidationStatusEnum = ['pending', 'started', 'completed', 'invalid', 'failed'];
 
 export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
@@ -57,7 +57,7 @@ const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
     'submission_comment',
     'submitted_by_identifier',
     'upload_status',
-    'review_status',
+    'decision',
     'validation',
     'reviews'
   ],
@@ -71,7 +71,7 @@ const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
     submission_comment: { type: 'string', nullable: true },
     submitted_by_identifier: { type: 'string', nullable: true },
     upload_status: { type: 'string', enum: SubmissionUploadJobStatusEnum },
-    review_status: { type: 'string', enum: SubmissionUploadReviewStatusEnum },
+    decision: { type: 'string', enum: SubmissionUploadDecisionEnum },
     validation: { ...TicketSubmissionValidationSchema, nullable: true },
     reviews: {
       type: 'object',

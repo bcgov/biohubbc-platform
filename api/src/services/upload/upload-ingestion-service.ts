@@ -17,7 +17,6 @@ import { TicketService } from '../ticket-service';
 import { UserService } from '../user-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
-import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadArtifactService } from './upload-artifact-service';
@@ -39,7 +38,6 @@ export class UploadIngestionService extends DBService {
   artifactService = new ArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
-  submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
   teamAuthorizationService = new TeamAuthorizationService(this.connection);
@@ -197,13 +195,7 @@ export class UploadIngestionService extends DBService {
       submitterSystemUserIds
     );
 
-    // 4. Create initial review status (submitted = unreviewed)
-    await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
-      submission_upload_id,
-      status: 'submitted'
-    });
-
-    // 5. Create placeholder artifact for archive
+    // 4. Create placeholder artifact for archive
     const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
@@ -215,7 +207,7 @@ export class UploadIngestionService extends DBService {
       format: 'tar'
     });
 
-    // 6. Create upload_archive metadata
+    // 5. Create upload_archive metadata
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,

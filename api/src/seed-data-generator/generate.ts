@@ -199,6 +199,7 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
     upload_id: chain.uploadId,
     team_id: chain.teamId,
     status: 'uploaded',
+    decision: 'pending',
     ticket_id: chain.ticketId,
     blueprint_id: chain.blueprintId
   });

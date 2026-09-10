@@ -7,7 +7,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import * as db from '../../../../database/db';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewStatusService } from '../../../../services/upload/submission-upload-review-status-service';
+import { SubmissionUploadService } from '../../../../services/upload/submission-upload-service';
 
 chai.use(sinonChai);
 
@@ -45,7 +45,7 @@ describe('submission history handler', () => {
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
     const historyStub = sinon
-      .stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionHistoryByUuid')
+      .stub(SubmissionUploadService.prototype, 'findSubmissionDecisionHistoryByUuid')
       .resolves({ submissionId: 1, history: [] });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

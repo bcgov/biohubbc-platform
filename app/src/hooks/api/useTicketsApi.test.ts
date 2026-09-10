@@ -223,14 +223,13 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(response);
   });
 
-  it('updateSubmissionUploadReviewStatus patches the final upload disposition endpoint', async () => {
+  it('updateSubmissionUploadDecision patches the upload decision endpoint', async () => {
     const submissionId = 17;
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
-    const payload = { status: 'approved' as const };
+    const payload = { decision: 'approved' as const };
     const response = {
-      submission_upload_status_id: 12,
       submission_upload_id: submissionUploadId,
-      status: 'approved' as const
+      decision: 'approved' as const
     };
 
     mock
@@ -238,7 +237,7 @@ describe('useTicketsApi', () => {
       .reply(200, response);
 
     await expect(
-      useTicketsApi(axios).updateSubmissionUploadReviewStatus(submissionId, submissionUploadId, payload)
+      useTicketsApi(axios).updateSubmissionUploadDecision(submissionId, submissionUploadId, payload)
     ).resolves.toEqual(response);
   });
 
