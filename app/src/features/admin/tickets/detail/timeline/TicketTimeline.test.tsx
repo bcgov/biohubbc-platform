@@ -63,7 +63,7 @@ const makeSubmissionUpload = (): TicketSubmissionUploadResponse => ({
   submission_comment: null,
   submitted_by_identifier: 'sarah@example.com',
   upload_status: 'ingested',
-  review_status: 'submitted',
+  decision: 'pending',
   validation: null,
   reviews: { validation: null, security: null }
 });

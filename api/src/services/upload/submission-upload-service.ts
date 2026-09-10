@@ -9,12 +9,12 @@ import {
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
-import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
 import {
   SubmissionUploadDecisionResult,
   SubmissionUploadHistoryStatus,
   UpdateSubmissionUploadDecision
 } from '../../models/submission-upload-decision';
+import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
 import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';

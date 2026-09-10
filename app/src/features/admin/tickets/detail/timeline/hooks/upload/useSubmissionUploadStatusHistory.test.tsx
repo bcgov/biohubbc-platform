@@ -25,7 +25,7 @@ const makeUpload = (
   submission_comment: null,
   submitted_by_identifier: null,
   upload_status: uploadStatus,
-  review_status: 'submitted',
+  decision: 'pending',
   validation: null,
   reviews: { validation: null, security: null }
 });

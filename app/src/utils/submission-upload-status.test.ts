@@ -14,8 +14,8 @@ describe('isSubmissionUploadJobStatus', () => {
 
 describe('getSubmissionUploadJobStatusPresentation', () => {
   it('resolves the shared label and icon for an in-progress stage', () => {
-    expect(getSubmissionUploadJobStatusPresentation('reconciling')).toEqual({
-      label: 'Reconciling',
+    expect(getSubmissionUploadJobStatusPresentation('indexing')).toEqual({
+      label: 'Indexing',
       iconPath: mdiProgressClock,
       iconColor: appTheme.palette.text.secondary,
       isKnown: true,
