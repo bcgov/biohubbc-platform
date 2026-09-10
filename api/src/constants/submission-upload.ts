@@ -10,9 +10,7 @@ export const SUBMISSION_UPLOAD_PROCESSING_STAGES: SubmissionUpload['status'][] =
   'uploaded',
   'ingesting',
   'ingested',
-  'reconciling',
   'reconciled',
-  'promoting',
   'promoted',
   'indexing',
   'indexed'
@@ -60,5 +58,9 @@ export const PROCESS_START_STATUSES: SubmissionUpload['status'][] = ['uploaded',
  */
 export const INDEX_START_STATUSES: SubmissionUpload['status'][] = ['reconciled', 'indexing'];
 
-/** Upload statuses from which reconciliation may start or resume. */
-export const RECONCILE_START_STATUSES: SubmissionUpload['status'][] = ['ingested', 'reconciling'];
+/**
+ * Upload statuses from which reconciliation may start.
+ *
+ * Reconciliation runs inside one transaction, so there is no intermediate status to resume from.
+ */
+export const RECONCILE_START_STATUSES: SubmissionUpload['status'][] = ['ingested'];

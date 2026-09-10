@@ -11,8 +11,8 @@ import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { TeamService } from '../access-policy/team-service';
+import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
-import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 
 chai.use(sinonChai);
@@ -25,8 +25,8 @@ describe('SubmissionUploadService', () => {
     mockDBConnection = getMockDBConnection();
     service = new SubmissionUploadService(mockDBConnection);
     sinon
-      .stub(SubmissionUploadReviewStatusService.prototype, 'assertSubmissionUploadHasNoActivatedFeatures')
-      .resolves();
+      .stub(SubmissionFeatureService.prototype, 'getActivatedSubmissionFeatureCountBySubmissionUploadId')
+      .resolves(0);
   });
 
   afterEach(() => {
@@ -41,6 +41,7 @@ describe('SubmissionUploadService', () => {
         upload_id: 'upload-1',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       };
@@ -75,6 +76,7 @@ describe('SubmissionUploadService', () => {
         upload_id: 'upload-1',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -88,6 +90,7 @@ describe('SubmissionUploadService', () => {
         upload_id: 'upload-1',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -115,6 +118,7 @@ describe('SubmissionUploadService', () => {
           upload_id: 'upload-1',
           team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           status: 'uploaded',
+          decision: 'pending',
           ticket_id: '11111111-1111-1111-1111-111111111111',
           blueprint_id: 1
         },
@@ -124,6 +128,7 @@ describe('SubmissionUploadService', () => {
           upload_id: 'upload-2',
           team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           status: 'uploaded',
+          decision: 'pending',
           ticket_id: '22222222-2222-2222-2222-222222222222',
           blueprint_id: 1
         }
@@ -310,6 +315,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -333,6 +339,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -351,12 +358,13 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexed',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
-      const guard = SubmissionUploadReviewStatusService.prototype
-        .assertSubmissionUploadHasNoActivatedFeatures as sinon.SinonStub;
-      guard.rejects(new HTTP409('Approved submission uploads are immutable'));
+      const guard = SubmissionFeatureService.prototype
+        .getActivatedSubmissionFeatureCountBySubmissionUploadId as sinon.SinonStub;
+      guard.resolves(1);
       const update = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload');
 
       try {
@@ -381,6 +389,7 @@ describe('SubmissionUploadService', () => {
         upload_id: '44444444-4444-4444-4444-444444444444',
         team_id: teamId,
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '55555555-5555-5555-5555-555555555555',
         blueprint_id: 1,
         comment: null
@@ -391,52 +400,31 @@ describe('SubmissionUploadService', () => {
         upload_id: '44444444-4444-4444-4444-444444444444',
         team_id: teamId,
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '55555555-5555-5555-5555-555555555555',
         blueprint_id: 1,
         comment: null
       });
     });
 
-    it('soft-deletes the upload, records deleted status, and retires its team', async () => {
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: submissionUploadId,
-        status: 'submitted'
-      });
+    it('soft-deletes a pending upload and retires its team without touching its decision', async () => {
       const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload').resolves();
-      // A delete records the status directly — it must not route through the reconciliation-aware
-      // update path (which now lives on SubmissionUploadService).
-      const insertStatusStub = sinon
-        .stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus')
-        .resolves({
-          submission_upload_status_id: 2,
-          submission_upload_id: submissionUploadId,
-          status: 'deleted'
-        });
+      const decisionStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision');
       const deleteTeamStub = sinon.stub(TeamService.prototype, 'deleteTeam').resolves();
 
       await service.deleteSubmissionUpload(submissionId, submissionUploadId);
 
       expect(service.getSubmissionUploadBySubmissionUuid).to.have.been.calledOnceWith(submissionId, submissionUploadId);
       expect(deleteUploadStub).to.have.been.calledOnceWith(submissionUploadId);
-      expect(insertStatusStub).to.have.been.calledOnceWith({
-        submission_upload_id: submissionUploadId,
-        status: 'deleted'
-      });
+      expect(decisionStub).not.to.have.been.called;
       expect(deleteTeamStub).to.have.been.calledOnceWith(teamId);
     });
 
     it('rejects a reviewed upload without deleting the upload or its team', async () => {
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: submissionUploadId,
-        status: 'approved'
-      });
-      const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
-      const insertStatusStub = sinon.stub(
-        SubmissionUploadReviewStatusService.prototype,
-        'insertSubmissionUploadReviewStatus'
+      (service.getSubmissionUploadBySubmissionUuid as sinon.SinonStub).resolves(
+        buildUpload('indexed', { submission_upload_id: submissionUploadId, team_id: teamId, decision: 'approved' })
       );
+      const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
       const deleteTeamStub = sinon.stub(TeamService.prototype, 'deleteTeam');
 
       try {
@@ -445,20 +433,14 @@ describe('SubmissionUploadService', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
         expect(deleteUploadStub).not.to.have.been.called;
-        expect(insertStatusStub).not.to.have.been.called;
         expect(deleteTeamStub).not.to.have.been.called;
       }
     });
 
-    it('rejects deletion when the upload has been approved', async () => {
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'getSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: submissionUploadId,
-        status: 'submitted'
-      });
-      const guard = SubmissionUploadReviewStatusService.prototype
-        .assertSubmissionUploadHasNoActivatedFeatures as sinon.SinonStub;
-      guard.rejects(new HTTP409('Approved submission uploads are immutable'));
+    it('rejects deletion when the upload has activated features', async () => {
+      const guard = SubmissionFeatureService.prototype
+        .getActivatedSubmissionFeatureCountBySubmissionUploadId as sinon.SinonStub;
+      guard.resolves(1);
       const deleteUpload = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
 
       try {
@@ -478,6 +460,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -491,8 +474,8 @@ describe('SubmissionUploadService', () => {
     it('locks and guards every upload before bulk soft deletion', async () => {
       const lock = sinon.stub(SubmissionUploadRepository.prototype, 'lockSubmissionUploadsForSubmissionId').resolves();
       const bulkGuard = sinon
-        .stub(SubmissionUploadReviewStatusService.prototype, 'assertSubmissionHasNoActivatedFeatures')
-        .resolves();
+        .stub(SubmissionFeatureService.prototype, 'getActivatedSubmissionFeatureCountBySubmissionId')
+        .resolves(0);
       const remove = sinon
         .stub(SubmissionUploadRepository.prototype, 'softDeleteSubmissionUploadsBySubmissionId')
         .resolves(2);
@@ -527,9 +510,7 @@ describe('SubmissionUploadService', () => {
       expect(endStub).to.have.been.calledOnceWith('artifact-1', [
         'ingesting',
         'ingested',
-        'reconciling',
         'reconciled',
-        'promoting',
         'promoted',
         'indexing',
         'indexed',
@@ -601,7 +582,7 @@ describe('SubmissionUploadService', () => {
 
   describe('transitionSubmissionUploadToInvalid', () => {
     it('updates status from any non-terminal stage to invalid and ends only a prior invalid row', async () => {
-      sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('promoting'));
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('promoted'));
       const { endStub, updateStub } = stubTransitionWrites();
 
       await service.transitionSubmissionUploadToInvalid('artifact-1');
@@ -625,7 +606,7 @@ describe('SubmissionUploadService', () => {
 
   describe('transitionSubmissionUploadToFailed', () => {
     it('updates status from any non-terminal stage to failed', async () => {
-      sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('reconciling'));
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('ingested'));
       const { endStub, updateStub } = stubTransitionWrites();
 
       await service.transitionSubmissionUploadToFailed('artifact-1');
@@ -663,6 +644,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'ingesting',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -678,6 +660,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexed',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -728,6 +711,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -763,6 +747,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'indexed',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -778,6 +763,7 @@ describe('SubmissionUploadService', () => {
         submission_id: 1,
         upload_id: 'upload-1',
         status: 'ingested',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -798,14 +784,19 @@ describe('SubmissionUploadService', () => {
  * @param {SubmissionUpload['status']} status Current processing status.
  * @returns {SubmissionUpload} Upload row.
  */
-const buildUpload = (status: SubmissionUpload['status']): SubmissionUpload => ({
+const buildUpload = (
+  status: SubmissionUpload['status'],
+  overrides: Partial<SubmissionUpload> = {}
+): SubmissionUpload => ({
   submission_upload_id: 'artifact-1',
   submission_id: 1,
   upload_id: 'upload-1',
   team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   status,
+  decision: 'pending',
   ticket_id: '11111111-1111-1111-1111-111111111111',
-  blueprint_id: 1
+  blueprint_id: 1,
+  ...overrides
 });
 
 /**
@@ -823,8 +814,7 @@ const buildProcessingStatus = (
   submission_upload_id: submissionUploadId,
   status,
   record_end_date: null,
-  create_date: '2026-09-03T00:00:00.000Z',
-  create_user: 1
+  create_date: '2026-09-03T00:00:00.000Z'
 });
 
 /**

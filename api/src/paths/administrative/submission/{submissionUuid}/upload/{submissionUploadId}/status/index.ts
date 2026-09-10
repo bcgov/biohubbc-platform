@@ -4,8 +4,8 @@ import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import {
-  SubmissionUploadReviewStatusResponseSchema,
-  UpdateSubmissionUploadReviewStatusRequestSchema
+  SubmissionUploadDecisionResponseSchema,
+  UpdateSubmissionUploadDecisionRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
 import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
@@ -22,12 +22,12 @@ export const PATCH: Operation = [
       }
     ]
   })),
-  updateSubmissionUploadReviewStatus()
+  updateSubmissionUploadDecision()
 ];
 
 PATCH.apiDoc = {
   description:
-    'Update the review status of a submission upload to approved or denied. Only system administrators may perform this action.',
+    'Record the human review decision on a submission upload: approved, denied, or pending to clear a prior decision. Only system administrators may perform this action.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -56,16 +56,16 @@ PATCH.apiDoc = {
     required: true,
     content: {
       'application/json': {
-        schema: UpdateSubmissionUploadReviewStatusRequestSchema
+        schema: UpdateSubmissionUploadDecisionRequestSchema
       }
     }
   },
   responses: {
     200: {
-      description: 'Submission upload review status updated successfully.',
+      description: 'Submission upload decision recorded successfully.',
       content: {
         'application/json': {
-          schema: SubmissionUploadReviewStatusResponseSchema
+          schema: SubmissionUploadDecisionResponseSchema
         }
       }
     },
@@ -79,18 +79,18 @@ PATCH.apiDoc = {
         'Submission not found (invalid submissionUuid) or submission upload not found (submissionUploadId does not belong to this submission).'
     },
     409: {
-      description: 'The review decision conflicts with the upload lifecycle or would reverse published feature state.'
+      description: 'The decision would reverse published feature state.'
     }
   }
 };
 
 /**
- * Updates the review status (approved or denied) for a submission upload.
+ * Records the human review decision for a submission upload.
  * Only system administrators are authorized to call this endpoint.
  *
  * @returns {RequestHandler}
  */
-export function updateSubmissionUploadReviewStatus(): RequestHandler {
+export function updateSubmissionUploadDecision(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -98,20 +98,20 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
       await connection.open();
 
       const { submissionUuid, submissionUploadId } = req.params;
-      const { status } = req.body;
+      const { decision } = req.body;
 
       const submissionUploadService = new SubmissionUploadService(connection);
       await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
 
-      const result = await submissionUploadService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });
+      const result = await submissionUploadService.updateSubmissionUploadDecision(submissionUploadId, { decision });
 
       await connection.commit();
 
       return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({
-        label: 'updateSubmissionUploadReviewStatus',
-        message: 'error updating submission upload review status',
+        label: 'updateSubmissionUploadDecision',
+        message: 'error recording submission upload decision',
         error
       });
       await connection.rollback();

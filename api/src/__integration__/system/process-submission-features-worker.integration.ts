@@ -288,6 +288,7 @@ describe('Process Submission Features Worker', function () {
         upload_id: params.uploadId,
         team_id: params.teamId,
         status: 'uploaded',
+        decision: 'pending',
         ticket_id: params.ticketId,
         blueprint_id: params.blueprintId
       });
@@ -610,6 +611,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       upload_id: setup.uploadId,
       team_id: setup.teamId,
       status: 'uploaded',
+      decision: 'pending',
       ticket_id: setup.ticketId,
       blueprint_id: setup.blueprintId
     });

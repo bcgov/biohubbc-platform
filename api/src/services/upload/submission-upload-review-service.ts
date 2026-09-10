@@ -14,10 +14,10 @@ import { DBService } from '../db-service';
  * `submission_upload_review` rows represent review work that an admin or
  * system workflow requested for a specific upload. They are separate from:
  *
- * - `submission_upload.status`, which tracks ingestion/indexing lifecycle.
+ * - `submission_upload.status`, which tracks the processing lifecycle.
+ * - `submission_upload.decision`, which holds the final human disposition
+ *   (`pending`, `approved`, `denied`).
  * - automated validation rows, which track job output and machine checks.
- * - `submission_upload_status`, which tracks final disposition
- *   (`submitted`, `approved`, `denied`, `deleted`).
  *
  * This service owns the review business rules: creating scoped reviews and
  * creating default validation/security task rows and requesting them after

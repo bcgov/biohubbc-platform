@@ -8,16 +8,14 @@ export type SubmissionUploadJobStatus =
   | 'uploaded'
   | 'ingesting'
   | 'ingested'
-  | 'reconciling'
   | 'reconciled'
-  | 'promoting'
   | 'promoted'
   | 'indexing'
   | 'indexed'
   | 'invalid'
   | 'failed';
 export type SubmissionValidationStatus = 'pending' | 'started' | 'completed' | 'invalid' | 'failed';
-export type SubmissionUploadReviewStatus = 'submitted' | 'approved' | 'denied' | 'deleted';
+export type SubmissionUploadDecision = 'pending' | 'approved' | 'denied';
 export type SubmissionUploadReviewScope = 'validation' | 'security';
 export type SubmissionUploadReviewTaskStatus =
   | 'pending'
@@ -123,7 +121,7 @@ export interface TicketSubmissionUploadResponse {
   submission_comment: string | null;
   submitted_by_identifier: string | null;
   upload_status: SubmissionUploadJobStatus;
-  review_status: SubmissionUploadReviewStatus;
+  decision: SubmissionUploadDecision;
   validation: {
     submission_validation_id: number;
     job_id: string;
@@ -186,14 +184,13 @@ export interface ITicketArtifactDownloadResponse {
   signed_url: string;
 }
 
-export interface IUpdateSubmissionUploadReviewStatusRequest {
-  status: 'submitted' | 'approved' | 'denied';
+export interface IUpdateSubmissionUploadDecisionRequest {
+  decision: SubmissionUploadDecision;
 }
 
-export interface ISubmissionUploadReviewStatusResponse {
-  submission_upload_status_id: number;
+export interface ISubmissionUploadDecisionResponse {
   submission_upload_id: string;
-  status: SubmissionUploadReviewStatus;
+  decision: SubmissionUploadDecision;
 }
 
 export interface IUpdateSubmissionUploadReviewRequest {

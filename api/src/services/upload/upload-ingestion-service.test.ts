@@ -10,7 +10,6 @@ import { HTTP401, HTTP403 } from '../../errors/http-error';
 import { ArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
-import { SubmissionUploadReviewStatus } from '../../models/submission-upload-review-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ICreateSubmission, ISubmissionModel } from '../../repositories/submission-repository';
@@ -21,7 +20,6 @@ import { UserService } from '../user-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
 import { SubmissionUploadReviewService } from './submission-upload-review-service';
-import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadIngestionService } from './upload-ingestion-service';
@@ -88,11 +86,6 @@ describe('UploadIngestionService', () => {
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
       const createDefaultReviewsStub = SubmissionUploadReviewService.prototype
         .createDefaultReviewsForUpload as sinon.SinonStub;
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-id-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -204,11 +197,6 @@ describe('UploadIngestionService', () => {
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-id-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
         .rejects(new Error('Database error: artifact insert failed'));
@@ -234,11 +222,6 @@ describe('UploadIngestionService', () => {
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-id-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-789' });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -284,11 +267,6 @@ describe('UploadIngestionService', () => {
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-append-1' });
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-append-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')

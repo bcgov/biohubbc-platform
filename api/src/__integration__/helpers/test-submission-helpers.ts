@@ -153,8 +153,9 @@ export async function createTestFeature(
 
   // Mark the upload as approved so features are eligible for security scope anchors
   await connection.sql(SQL`
-    INSERT INTO submission_upload_status (submission_upload_id, status, create_user)
-    VALUES (${submissionUploadId}, 'approved', ${systemUserId});
+    UPDATE submission_upload
+    SET decision = 'approved'
+    WHERE submission_upload_id = ${submissionUploadId};
   `);
 
   const result = await connection.sql(SQL`
@@ -221,8 +222,9 @@ export async function createTestFeaturesInBulk(
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
 
   await connection.sql(SQL`
-    INSERT INTO submission_upload_status (submission_upload_id, status, create_user)
-    VALUES (${submissionUploadId}, 'approved', ${systemUserId});
+    UPDATE submission_upload
+    SET decision = 'approved'
+    WHERE submission_upload_id = ${submissionUploadId};
   `);
 
   // Bulk insert using generate_series — one query creates all N features

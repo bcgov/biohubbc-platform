@@ -37,7 +37,6 @@ describe('reconcile-submission-features-job', () => {
       blueprint_id: 1,
       status: 'ingested'
     });
-    sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToReconciling').resolves();
     sinon.stub(SecurityService.prototype, 'copyPredecessorSecurityRulesToSuccessors').resolves();
   }
 

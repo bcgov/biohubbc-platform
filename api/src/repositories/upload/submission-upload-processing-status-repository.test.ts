@@ -95,9 +95,7 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
       expect(statement.text).to.contain(
         'ORDER BY\n        sus.create_date ASC,\n        sus.submission_upload_status_id ASC'
       );
-      expect(statement.values[0]).to.include.members(['uploaded', 'indexed', 'invalid', 'failed']);
-      expect(statement.values[0]).not.to.include.members(['submitted', 'approved', 'denied', 'deleted']);
-      expect(statement.values.slice(1)).to.eql([SUBMISSION_UUID, SUBMISSION_UPLOAD_ID]);
+      expect(statement.values).to.eql([SUBMISSION_UUID, SUBMISSION_UPLOAD_ID]);
     });
 
     it('returns the rows as delivered, including the null row for an upload with no history', async () => {
@@ -142,6 +140,5 @@ const buildRow = (params: {
   submission_upload_id: SUBMISSION_UPLOAD_ID,
   status: params.status,
   record_end_date: null,
-  create_date: '2026-09-03T00:00:00.000Z',
-  create_user: 1
+  create_date: '2026-09-03T00:00:00.000Z'
 });

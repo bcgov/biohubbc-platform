@@ -35,7 +35,6 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
         return;
       }
 
-      await submissionUploadService.transitionSubmissionUploadToReconciling(submissionUploadId);
       const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(connection);
       const invalidSourceIdentityFeatureCount =
         await submissionUploadReconciliationService.validateSubmissionFeatureSourceIdentity(submissionUploadId);

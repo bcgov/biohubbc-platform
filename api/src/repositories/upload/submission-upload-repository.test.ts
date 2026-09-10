@@ -207,7 +207,7 @@ describe('SubmissionUploadRepository', () => {
   });
 
   describe('findSubmissionUploadsByTicketId', () => {
-    it('uses the latest submission upload status row for each upload', async () => {
+    it('reads the decision from submission_upload and does not join the processing status log', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -216,11 +216,8 @@ describe('SubmissionUploadRepository', () => {
       await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
 
       expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('INNER JOIN LATERAL');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_status sus');
-      expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
-      expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
-      expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('su.decision');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('submission_upload_status');
       expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
     });
 
@@ -361,6 +358,68 @@ describe('SubmissionUploadRepository', () => {
       const result = await repo.updateSubmissionUpload('id-1', payload);
 
       expect(result).to.eql(mockRow);
+    });
+  });
+
+  describe('updateSubmissionUploadDecision', () => {
+    it('throws an error if no active record was updated', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.updateSubmissionUploadDecision('id-1', 'approved');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update submission_upload decision');
+      }
+    });
+
+    it('returns the decision and audit revision of the active record', async () => {
+      const mockRow = { submission_upload_id: 'id-1', decision: 'approved', revision_count: 4 };
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.updateSubmissionUploadDecision('id-1', 'approved');
+
+      expect(result).to.eql(mockRow);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date IS NULL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('revision_count');
+      expect(sqlStub.firstCall.args[0].values).to.eql(['approved', 'id-1']);
+    });
+  });
+
+  describe('findSubmissionUploadDecisionHistoryBySubmissionUuid', () => {
+    it('returns every upload of the submission, deleted ones included, newest first', async () => {
+      const rows = [
+        {
+          submission_id: 7,
+          submission_upload_id: 'id-2',
+          decision: 'pending',
+          record_end_date: '2026-09-03T01:00:00.000Z',
+          create_date: '2026-09-03T00:30:00.000Z'
+        },
+        {
+          submission_id: 7,
+          submission_upload_id: 'id-1',
+          decision: 'approved',
+          record_end_date: null,
+          create_date: '2026-09-03T00:00:00.000Z'
+        }
+      ];
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.findSubmissionUploadDecisionHistoryBySubmissionUuid('uuid-1');
+
+      expect(result).to.eql(rows);
+      const statement = sqlStub.firstCall.args[0];
+      expect(statement.text).not.to.contain('su.record_end_date IS NULL');
+      expect(statement.text).to.contain('ORDER BY\n        su.create_date DESC');
+      expect(statement.values).to.eql(['uuid-1']);
     });
   });
 
