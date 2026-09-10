@@ -22,7 +22,7 @@ const makeUpload = (uploadStatus: SubmissionUploadJobStatus): TicketSubmissionUp
   submission_comment: null,
   submitted_by_identifier: null,
   upload_status: uploadStatus,
-  review_status: 'submitted',
+  decision: 'pending',
   validation: null,
   reviews: { validation: null, security: null }
 });
@@ -129,11 +129,11 @@ describe('TicketUploadStatusRow', () => {
 
   it('keeps the current status visible while the history loads', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('reconciling'), { status: 'loading' });
+    renderRow(makeUpload('indexing'), { status: 'loading' });
 
-    await user.click(screen.getByRole('button', { name: 'Reconciling' }));
+    await user.click(screen.getByRole('button', { name: 'Indexing' }));
 
-    expect(screen.getByRole('button', { name: 'Reconciling' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Indexing' })).toBeVisible();
     expect(screen.getByRole('region', { name: 'Processing history' })).toBeVisible();
     expect(screen.queryByText('No processing history')).not.toBeInTheDocument();
   });
@@ -189,7 +189,7 @@ describe('TicketUploadStatusRow', () => {
         makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
         makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
         makeHistoryItem(3, 'ingested', '2026-09-03T18:32:00.000Z'),
-        makeHistoryItem(4, 'reconciling', '2026-09-03T18:45:00.000Z'),
+        makeHistoryItem(4, 'indexing', '2026-09-03T18:45:00.000Z'),
         makeHistoryItem(5, 'failed', '2026-09-03T18:46:00.000Z')
       ]
     });
@@ -202,17 +202,17 @@ describe('TicketUploadStatusRow', () => {
 
   it('marks every stage the upload moved on from as completed and keeps the current stage icon', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('reconciling'), {
+    renderRow(makeUpload('indexing'), {
       status: 'loaded',
       uploadStatus: 'ingested',
       history: [
         makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
         makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
-        makeHistoryItem(3, 'reconciling', '2026-09-03T18:45:00.000Z')
+        makeHistoryItem(3, 'indexing', '2026-09-03T18:45:00.000Z')
       ]
     });
 
-    await user.click(screen.getByRole('button', { name: 'Reconciling' }));
+    await user.click(screen.getByRole('button', { name: 'Indexing' }));
 
     const iconPaths = screen.getAllByRole('listitem').map((item) => item.querySelector('svg path')?.getAttribute('d'));
     expect(iconPaths).toEqual([mdiCheck, mdiCheck, mdiProgressClock]);
