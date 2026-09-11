@@ -18,7 +18,6 @@ import { UserService } from '../user-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
 import { SubmissionUploadReviewService } from './submission-upload-review-service';
-import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadArtifactService } from './upload-artifact-service';
@@ -41,7 +40,6 @@ export class UploadIngestionService extends DBService {
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
   submissionUploadReviewService = new SubmissionUploadReviewService(this.connection);
-  submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
   teamAuthorizationService = new TeamAuthorizationService(this.connection);
@@ -206,13 +204,7 @@ export class UploadIngestionService extends DBService {
       this.connection.systemUserId()
     );
 
-    // 5. Create initial review status (submitted = unreviewed)
-    await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
-      submission_upload_id,
-      status: 'submitted'
-    });
-
-    // 6. Create placeholder artifact for archive
+    // 5. Create placeholder artifact for archive
     const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),

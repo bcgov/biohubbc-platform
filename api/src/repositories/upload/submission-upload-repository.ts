@@ -5,10 +5,16 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUploadWithTeam,
   SubmissionUpload,
+  SubmissionUploadDecision,
   SubmissionUploadFilters,
+  SubmissionUploadJobStatus,
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
+import {
+  SubmissionUploadDecisionHistoryRow,
+  SubmissionUploadDecisionRow
+} from '../../models/submission-upload-decision';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -30,6 +36,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         team_id,
         status,
+        decision,
         ticket_id,
         blueprint_id,
         comment
@@ -77,6 +84,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         team_id,
         status,
+        decision,
         ticket_id,
         blueprint_id,
         successor_submission_upload_id,
@@ -128,6 +136,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.upload_id,
         su.team_id,
         su.status,
+        su.decision,
         su.ticket_id,
         su.blueprint_id,
         su.comment,
@@ -182,6 +191,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.upload_id',
         'submission_upload.team_id',
         'submission_upload.status',
+        'submission_upload.decision',
         'submission_upload.ticket_id',
         'submission_upload.blueprint_id',
         'submission_upload.comment'
@@ -223,7 +233,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.comment AS submission_comment,
         submitter.user_identifier AS submitted_by_identifier,
         su.status AS upload_status,
-        sus.status AS review_status,
+        su.decision,
         sv.validation,
         json_build_object(
           'validation',
@@ -259,18 +269,6 @@ export class SubmissionUploadRepository extends BaseRepository {
         "system_user" submitter
       ON
         submitter.system_user_id = s.system_user_id
-      INNER JOIN LATERAL (
-        SELECT
-          sus.status
-        FROM
-          submission_upload_status sus
-        WHERE
-          sus.submission_upload_id = su.submission_upload_id
-        ORDER BY
-          sus.create_date DESC,
-          sus.submission_upload_status_id DESC
-        LIMIT 1
-      ) sus ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           json_build_object(
@@ -432,7 +430,6 @@ export class SubmissionUploadRepository extends BaseRepository {
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
-        status = COALESCE(${submissionUpload.status}, status),
         ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
@@ -452,6 +449,117 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Set the processing status of an active submission_upload record.
+   *
+   * Only `SubmissionUploadService.transitionSubmissionUploadStatus` should call this: it holds the
+   * row lock, validates the transition and records the history row around this write.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to update.
+   * @param {SubmissionUploadJobStatus} status - The processing status to persist.
+   * @returns {Promise<{ submission_upload_id: string }>} - The ID of the updated submission_upload.
+   * @throws {ApiExecuteSQLError} - If no active record was updated.
+   * @memberof SubmissionUploadRepository
+   */
+  async updateSubmissionUploadStatus(
+    submissionUploadId: string,
+    status: SubmissionUploadJobStatus
+  ): Promise<{ submission_upload_id: string }> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET
+        status = ${status}
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+      RETURNING submission_upload_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission_upload status', [
+        'SubmissionUploadRepository->updateSubmissionUploadStatus',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Record the human review decision on an active submission_upload record.
+   *
+   * Only `SubmissionUploadService.updateSubmissionUploadDecision` should call this: it holds the row
+   * lock and applies the lifecycle effects of the decision around this write.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to update.
+   * @param {SubmissionUploadDecision} decision - The decision to persist.
+   * @returns {Promise<SubmissionUploadDecisionRow>} - The updated id, decision and audit revision.
+   * @throws {ApiExecuteSQLError} - If no active record was updated.
+   * @memberof SubmissionUploadRepository
+   */
+  async updateSubmissionUploadDecision(
+    submissionUploadId: string,
+    decision: SubmissionUploadDecision
+  ): Promise<SubmissionUploadDecisionRow> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET
+        decision = ${decision}
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+      RETURNING
+        submission_upload_id,
+        decision,
+        revision_count;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadDecisionRow);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission_upload decision', [
+        'SubmissionUploadRepository->updateSubmissionUploadDecision',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Find every upload of a submission with its decision, newest first, including soft-deleted uploads.
+   *
+   * @param {string} submissionUuid - The submission UUID to look up.
+   * @returns {Promise<SubmissionUploadDecisionHistoryRow[]>} - One row per upload of the submission.
+   * @memberof SubmissionUploadRepository
+   */
+  async findSubmissionUploadDecisionHistoryBySubmissionUuid(
+    submissionUuid: string
+  ): Promise<SubmissionUploadDecisionHistoryRow[]> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_id,
+        su.submission_upload_id,
+        su.decision,
+        su.record_end_date,
+        su.create_date
+      FROM
+        submission_upload su
+      INNER JOIN submission s ON s.submission_id = su.submission_id
+      WHERE
+        s.uuid = ${submissionUuid}
+      ORDER BY
+        su.create_date DESC,
+        su.submission_upload_id DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUploadDecisionHistoryRow);
+
+    return response.rows;
+  }
+
+  /**
    * Get an active submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId - The upload_id to look up.
@@ -468,6 +576,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         upload_id,
         team_id,
         status,
+        decision,
         ticket_id,
         blueprint_id,
         comment

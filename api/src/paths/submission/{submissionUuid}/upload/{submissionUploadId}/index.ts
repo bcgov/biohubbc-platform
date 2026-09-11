@@ -25,7 +25,7 @@ export const DELETE: Operation = [
 
 DELETE.apiDoc = {
   description:
-    'Soft-delete a submission upload. The bearer token must identify a member of the upload team, or a system administrator. Deletion is only allowed when the upload has a status of "submitted" (unreviewed).',
+    'Soft-delete a submission upload. The bearer token must identify a member of the upload team, or a system administrator. Deletion is only allowed while the upload decision is still pending (unreviewed).',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -57,7 +57,7 @@ DELETE.apiDoc = {
     ...defaultErrorResponses,
     404: {
       description:
-        'Submission not found (invalid submissionUuid) or submission upload not found (invalid submissionUploadId, no status record, or upload does not belong to this submission).'
+        'Submission not found (invalid submissionUuid) or submission upload not found (invalid submissionUploadId, or upload does not belong to this submission).'
     },
     409: {
       description: 'Cannot delete a submission upload that has already been reviewed (approved or denied).'

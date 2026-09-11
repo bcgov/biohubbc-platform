@@ -11,7 +11,7 @@ import {
   IGetTicketArtifactsQueryParams,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
-  ISubmissionUploadReviewStatusResponse,
+  ISubmissionUploadDecisionResponse,
   ITicketSystemUser,
   ITicket,
   ITicketArtifact,
@@ -21,7 +21,7 @@ import {
   ITicketArtifactDownloadResponse,
   ITicketsQueryParams,
   IUpdateSubmissionUploadReviewRequest,
-  IUpdateSubmissionUploadReviewStatusRequest,
+  IUpdateSubmissionUploadDecisionRequest,
   IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
   TicketSubmissionUploadReviewResponse,
@@ -227,19 +227,19 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Update final review status for a submission upload.
+   * Record the human review decision for a submission upload.
    *
    * @param {string} submissionUuid
    * @param {string} submissionUploadId
-   * @param {IUpdateSubmissionUploadReviewStatusRequest} payload
-   * @return {Promise<ISubmissionUploadReviewStatusResponse>}
+   * @param {IUpdateSubmissionUploadDecisionRequest} payload
+   * @return {Promise<ISubmissionUploadDecisionResponse>}
    */
-  const updateSubmissionUploadReviewStatus = async (
+  const updateSubmissionUploadDecision = async (
     submissionUuid: string,
     submissionUploadId: string,
-    payload: IUpdateSubmissionUploadReviewStatusRequest
-  ): Promise<ISubmissionUploadReviewStatusResponse> => {
-    const { data } = await axios.patch<ISubmissionUploadReviewStatusResponse>(
+    payload: IUpdateSubmissionUploadDecisionRequest
+  ): Promise<ISubmissionUploadDecisionResponse> => {
+    const { data } = await axios.patch<ISubmissionUploadDecisionResponse>(
       `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`,
       payload
     );
@@ -407,7 +407,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     completeTicketUpload,
     getTicketArtifacts,
     getTicketArtifactDownloadUrl,
-    updateSubmissionUploadReviewStatus,
+    updateSubmissionUploadDecision,
     updateSubmissionUploadReview,
     insertSubmissionUploadReview,
     createTicketReference,

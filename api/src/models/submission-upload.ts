@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { SubmissionUploadReview } from './submission-upload-review';
-import { SubmissionUploadStatusTypeEnum } from './submission-upload-review-status';
 import { TicketSubmissionValidation } from './submission-validation';
 import { UploadArtifactRoleEnum } from './upload-artifact';
 
@@ -8,8 +7,8 @@ export const SubmissionUploadJobStatus = z.enum([
   'uploaded',
   'ingesting',
   'ingested',
-  'reconciling',
   'reconciled',
+  'promoted',
   'indexing',
   'indexed',
   // Terminal failure states
@@ -17,6 +16,12 @@ export const SubmissionUploadJobStatus = z.enum([
   'failed'
 ]);
 export type SubmissionUploadJobStatus = z.infer<typeof SubmissionUploadJobStatus>;
+
+/**
+ * Human review decision on a submission upload, independent of its processing status.
+ */
+export const SubmissionUploadDecision = z.enum(['pending', 'approved', 'denied']);
+export type SubmissionUploadDecision = z.infer<typeof SubmissionUploadDecision>;
 
 /**
  * SubmissionUpload table schema
@@ -27,6 +32,7 @@ export const SubmissionUpload = z.object({
   upload_id: z.string().uuid(),
   team_id: z.string().uuid(),
   status: SubmissionUploadJobStatus,
+  decision: SubmissionUploadDecision,
   ticket_id: z.string().uuid(),
   blueprint_id: z.number(),
   successor_submission_upload_id: z.string().uuid().nullable().optional(),
@@ -57,12 +63,15 @@ export const CreateSubmissionUploadWithTeam = CreateSubmissionUpload.extend({
 export type CreateSubmissionUploadWithTeam = z.infer<typeof CreateSubmissionUploadWithTeam>;
 
 /**
- * Payload for updating an existing SubmissionUpload
+ * Payload for updating an existing SubmissionUpload.
+ *
+ * `status` and `decision` are not updatable here: processing status changes go through
+ * `SubmissionUploadService.transitionSubmissionUploadStatus`, which also records the history row,
+ * and decisions go through `SubmissionUploadService.updateSubmissionUploadDecision`.
  */
 export const UpdateSubmissionUpload = z.object({
   submission_id: z.number().optional(),
   upload_id: z.string().uuid().optional(),
-  status: SubmissionUploadJobStatus.optional(),
   ticket_id: z.string().uuid().optional()
 });
 export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
@@ -87,7 +96,7 @@ export const TicketSubmissionUpload = z.object({
   submission_comment: z.string().nullable(),
   submitted_by_identifier: z.string().nullable(),
   upload_status: SubmissionUploadJobStatus,
-  review_status: SubmissionUploadStatusTypeEnum,
+  decision: SubmissionUploadDecision,
   validation: TicketSubmissionValidation.nullable(),
   reviews: TicketSubmissionUploadReviews
 });
