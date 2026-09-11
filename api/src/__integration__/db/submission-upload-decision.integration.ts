@@ -1,7 +1,7 @@
 // Run with: npm run test:db -- --grep "submission upload decision"
 
 import chai, { expect } from 'chai';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
