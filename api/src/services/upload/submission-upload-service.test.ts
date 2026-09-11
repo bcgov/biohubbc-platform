@@ -415,13 +415,15 @@ describe('SubmissionUploadService', () => {
       await service.deleteSubmissionUpload(submissionId, submissionUploadId);
 
       expect(service.getSubmissionUploadBySubmissionUuid).to.have.been.calledOnceWith(submissionId, submissionUploadId);
+      expect(service.getSubmissionUploadWithLock).to.have.been.calledOnceWith(submissionUploadId);
+      expect(service.getSubmissionUploadWithLock).to.have.been.calledBefore(deleteUploadStub);
       expect(deleteUploadStub).to.have.been.calledOnceWith(submissionUploadId);
       expect(decisionStub).not.to.have.been.called;
       expect(deleteTeamStub).to.have.been.calledOnceWith(teamId);
     });
 
     it('rejects a reviewed upload without deleting the upload or its team', async () => {
-      (service.getSubmissionUploadBySubmissionUuid as sinon.SinonStub).resolves(
+      (service.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
         buildUpload('indexed', { submission_upload_id: submissionUploadId, team_id: teamId, decision: 'approved' })
       );
       const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
@@ -435,6 +437,27 @@ describe('SubmissionUploadService', () => {
         expect(deleteUploadStub).not.to.have.been.called;
         expect(deleteTeamStub).not.to.have.been.called;
       }
+    });
+
+    it('checks the decision on the locked row, not the earlier ownership read', async () => {
+      (service.getSubmissionUploadBySubmissionUuid as sinon.SinonStub).resolves(
+        buildUpload('indexed', { submission_upload_id: submissionUploadId, team_id: teamId, decision: 'pending' })
+      );
+      (service.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload('indexed', { submission_upload_id: submissionUploadId, team_id: teamId, decision: 'approved' })
+      );
+      const deleteUploadStub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload');
+      const deleteTeamStub = sinon.stub(TeamService.prototype, 'deleteTeam');
+
+      try {
+        await service.deleteSubmissionUpload(submissionId, submissionUploadId);
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
+
+      expect(deleteUploadStub).not.to.have.been.called;
+      expect(deleteTeamStub).not.to.have.been.called;
     });
 
     it('rejects deletion when the upload has activated features', async () => {

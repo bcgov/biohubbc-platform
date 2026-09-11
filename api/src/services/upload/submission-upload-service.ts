@@ -664,20 +664,23 @@ export class SubmissionUploadService extends DBService {
    * preventing a concurrent approval from racing the immutability check.
    *
    * @param {string} submissionUploadId Submission upload identifier.
-   * @returns {Promise<void>} Resolves when the locked upload remains mutable.
+   * @returns {Promise<SubmissionUpload>} The locked upload row, for callers that guard on its current state.
    * @throws {HTTP409} When the upload has already been approved.
    * @memberof SubmissionUploadService
    */
-  private async assertSubmissionUploadCanBeChanged(submissionUploadId: string): Promise<void> {
-    await this.getSubmissionUploadWithLock(submissionUploadId);
+  private async assertSubmissionUploadCanBeChanged(submissionUploadId: string): Promise<SubmissionUpload> {
+    const lockedUpload = await this.getSubmissionUploadWithLock(submissionUploadId);
     await this.assertSubmissionUploadHasNoActivatedFeatures(submissionUploadId);
+
+    return lockedUpload;
   }
 
   /**
    * Delete an unreviewed submission upload and retire its dedicated access team.
    *
-   * Verifies that the upload belongs to the submission, requires its decision to still be `pending`,
-   * soft-deletes the upload and soft-deletes its team. Deletion is expressed by the upload's
+   * Verifies that the upload belongs to the submission, locks the upload, requires the locked row's
+   * decision to still be `pending` (so a concurrent approval cannot slip past the check), soft-deletes
+   * the upload and soft-deletes its team. Deletion is expressed by the upload's
    * `record_end_date`; the decision is left as it was. The caller is responsible for running this
    * method in a transaction.
    *
@@ -688,17 +691,17 @@ export class SubmissionUploadService extends DBService {
    * @memberof SubmissionUploadService
    */
   async deleteSubmissionUpload(submissionUuid: string, submissionUploadId: string): Promise<void> {
-    const submissionUpload = await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
-    await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
+    await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+    const lockedUpload = await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
 
-    if (submissionUpload.decision !== 'pending') {
+    if (lockedUpload.decision !== 'pending') {
       throw new HTTP409(
-        `Cannot delete a submission upload with decision "${submissionUpload.decision}". Only uploads with a pending decision may be deleted.`
+        `Cannot delete a submission upload with decision "${lockedUpload.decision}". Only uploads with a pending decision may be deleted.`
       );
     }
 
     await this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
-    await this.teamService.deleteTeam(submissionUpload.team_id);
+    await this.teamService.deleteTeam(lockedUpload.team_id);
   }
 }
 
