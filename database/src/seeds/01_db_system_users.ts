@@ -85,14 +85,24 @@ const systemUsers: SystemUserSeed[] = [
 ];
 
 /**
- * Insert system_user rows for each member of the development team if they don't already exist in the system user table.
+ * Insert system_user rows for each member of the development team if they don't already exist in the system user table,
+ * and link them to the `KEYCLOAK_CLIENT_ID` contributor.
+ *
+ * When `CONTRIBUTOR_SYSTEM_USER_GUID` is set, a SYSTEM system_user for the `service-account-<value>` Keycloak service
+ * account is also inserted if missing and linked to that contributor, which authorizes the service account to publish
+ * submissions. When it is empty or unset, no service account user is inserted.
  *
  * Note: This seed will only be necessary while there is no in-app functionality to manage users.
+ *
+ * @param {Knex} knex
+ * @return {*}  {Promise<void>}
  */
 export async function seed(knex: Knex): Promise<void> {
   const contributorClientId = process.env.KEYCLOAK_CLIENT_ID;
-  const contributorSystemUserGuidSuffix = process.env.CONTRIBUTOR_SYSTEM_USER_GUID;
-  const contributorSystemUserGuid = `${SERVICE_ACCOUNT_PREFIX}${contributorSystemUserGuidSuffix}`;
+  const contributorSystemUserGuidSuffix = process.env.CONTRIBUTOR_SYSTEM_USER_GUID?.trim();
+  const contributorSystemUserGuid = contributorSystemUserGuidSuffix
+    ? `${SERVICE_ACCOUNT_PREFIX}${contributorSystemUserGuidSuffix}`
+    : null;
 
   await knex.raw(`
     set schema '${DB_SCHEMA}';
@@ -119,22 +129,20 @@ export async function seed(knex: Knex): Promise<void> {
     }
   }
 
-  if (contributorClientId) {
-    await knex.raw(`
-      ${insertContributorSQL(contributorClientId)}
-    `);
-  }
-
   if (contributorSystemUserGuid) {
     await knex.raw(`
       ${insertSystemServiceAccountUserSQL(contributorSystemUserGuid)}
     `);
+  }
 
-    if (contributorClientId) {
-      await knex.raw(`
-        ${insertContributorSystemUserSQL(contributorClientId, contributorSystemUserGuid)}
-      `);
-    }
+  if (contributorClientId) {
+    await knex.raw(`
+      ${insertContributorSQL(contributorClientId)}
+    `);
+
+    await knex.raw(`
+      ${insertContributorSystemUserSQL(contributorClientId, contributorSystemUserGuid)}
+    `);
   }
 }
 
@@ -262,19 +270,28 @@ const insertContributorSQL = (contributorClientId: string) => `
 `;
 
 /**
- * SQL to join seeded system users to the contributor.
+ * SQL to join the seeded development team users, and the service account user when one is configured, to the
+ * contributor. A system user that already has an active contributor link is left unchanged.
  *
  * @param {string} contributorClientId
- * @param {string} contributorSystemUserGuid
+ * @param {(string | null)} contributorSystemUserGuid Service account user guid, or `null` to link only the development
+ * team users.
+ * @return {*}  {string}
  */
-const insertContributorSystemUserSQL = (contributorClientId: string, contributorSystemUserGuid: string) => `
+const insertContributorSystemUserSQL = (contributorClientId: string, contributorSystemUserGuid: string | null) => {
+  const seededUserIdentifiers = systemUsers.map((user) => `'${user.identifier.toLowerCase()}'`).join(', ');
+  const serviceAccountCondition = contributorSystemUserGuid
+    ? `OR LOWER(su.user_guid) = LOWER('${contributorSystemUserGuid}')`
+    : '';
+
+  return `
   WITH seeded_system_user AS (
     SELECT su.system_user_id
     FROM "system_user" su
     WHERE su.record_end_date IS NULL
       AND (
-        LOWER(su.user_identifier) IN (${systemUsers.map((user) => `'${user.identifier.toLowerCase()}'`).join(', ')})
-        OR LOWER(su.user_guid) = LOWER('${contributorSystemUserGuid}')
+        LOWER(su.user_identifier) IN (${seededUserIdentifiers})
+        ${serviceAccountCondition}
       )
   )
   INSERT INTO contributor_system_user (
@@ -298,3 +315,4 @@ const insertContributorSystemUserSQL = (contributorClientId: string, contributor
     )
   ON CONFLICT DO NOTHING;
 `;
+};
