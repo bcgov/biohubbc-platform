@@ -1,8 +1,8 @@
-// System integration tests for the download pipeline. Requires MinIO (S3) to be running.
+// System integration tests for the download pipeline. Requires local S3 (RustFS) to be running.
 // Worker test: publish job → worker picks up → per-feature-type .parquet files → S3 → download_status = ready.
 //
 // Run: make test-sys
-// Requires: make web (database + MinIO must be running)
+// Requires: make web (database + RustFS must be running)
 
 import { ParquetReader } from '@dsnp/parquetjs';
 import { expect } from 'chai';

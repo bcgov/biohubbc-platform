@@ -3,7 +3,7 @@
 // deployments and computes their security-scope anchors synchronously.
 //
 // The committed deliverable is the fixture dumped from the rows this produces, not the generator
-// itself — running it requires DB + MinIO (not the queue). It is intentionally NOT wired into any
+// itself — running it requires DB + S3 (not the queue). It is intentionally NOT wired into any
 // build or request flow.
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -166,12 +166,17 @@ function assertRuleRow(rows: SecurityRuleIdRow[], ruleName: string): number {
 export async function generateSnapshot(options: GenerateSnapshotOptions): Promise<GenerateSnapshotResult> {
   const { tarPath, submissionName } = options;
 
-  // Step 1: Obtain the tar bytes and stage them in MinIO under the snapshot namespace.
+  // Step 1: Obtain the tar bytes and stage them in S3 under the snapshot namespace.
   const tarBuffer = await readOrPackTarBuffer(tarPath);
   const objectKey = `${SEED_SNAPSHOT_PREFIX}/${submissionName}/archive.tar`;
 
   await new ObjectStorageService().uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
-  defaultLog.info({ label: 'generateSnapshot', message: 'staged tar to MinIO', objectKey, byteSize: tarBuffer.length });
+  defaultLog.info({
+    label: 'generateSnapshot',
+    message: 'staged tar to object store',
+    objectKey,
+    byteSize: tarBuffer.length
+  });
 
   // Step 2: Remove any prior snapshot submission and artifact for this name so re-runs do not duplicate it.
   await withConnection((connection) => deletePriorSnapshot(connection, submissionName, objectKey));

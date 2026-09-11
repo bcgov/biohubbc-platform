@@ -31,7 +31,7 @@ export class ObjectStorageService {
   buckets: Map<BucketType, BucketConfig>;
 
   // Separate clients for presigned URLs that need a public-facing endpoint.
-  // In Docker, the internal endpoint (minio:9000) differs from the external one (localhost:9000).
+  // In Docker, the internal endpoint (rustfs:9000) differs from the external one (host.docker.internal:9000).
   // In deployed environments these are typically the same, so the fallback is the internal client.
   publicBuckets: Map<BucketType, BucketConfig>;
 

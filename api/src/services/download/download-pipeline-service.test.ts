@@ -778,7 +778,7 @@ describe('DownloadPipelineService', () => {
     });
 
     it('does NOT deadlock when the upload promise never settles after a hydrate error (sticky-upload guard)', async () => {
-      // Real S3/MinIO multipart uploads can swallow `passThrough.destroy(...)` and
+      // Real S3 multipart uploads can swallow `passThrough.destroy(...)` and
       // leave `uploadPromise` pending indefinitely if the SDK has buffered bytes
       // mid-flight. Without the bounded race in finally, the worker hangs in the
       // try/finally → withConnection never rolls back → connection state is stuck
