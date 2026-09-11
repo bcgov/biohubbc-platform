@@ -16,6 +16,7 @@ import {
   TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
+import { SubmissionUploadStatusHistoryState } from '../hooks/upload/useSubmissionUploadStatusHistory';
 import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
 import { TicketTimelineCommentItem } from './comment/TicketTimelineCommentItem';
 import { TicketTimelineDataRequestItem } from './data-request/TicketTimelineDataRequestItem';
@@ -33,6 +34,9 @@ interface ITicketTimelineItemsProps {
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
+  canViewSubmissionUploadStatusHistory: boolean;
+  submissionUploadStatusHistoryByUploadId: Record<string, SubmissionUploadStatusHistoryState>;
+  onLoadSubmissionUploadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
   onRequestSubmissionUploadReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
   onUpdateSubmissionUploadReview: (
     upload: TicketSubmissionUploadResponse,
@@ -64,6 +68,9 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onViewFinalizedPolicy,
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
+    canViewSubmissionUploadStatusHistory,
+    submissionUploadStatusHistoryByUploadId,
+    onLoadSubmissionUploadStatusHistory,
     onRequestSubmissionUploadReview,
     onUpdateSubmissionUploadReview,
     onConfirmSubmissionUploadDecisionUpdate,
@@ -159,6 +166,9 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                   absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
                 }) ?? ''
               }
+              canViewStatusHistory={canViewSubmissionUploadStatusHistory}
+              statusHistory={submissionUploadStatusHistoryByUploadId[item.upload.submission_upload_id]}
+              onLoadStatusHistory={onLoadSubmissionUploadStatusHistory}
               onRequestReview={onRequestSubmissionUploadReview}
               onUpdateReview={onUpdateSubmissionUploadReview}
               onAccept={(upload) => onConfirmSubmissionUploadDecisionUpdate(upload, 'approved')}

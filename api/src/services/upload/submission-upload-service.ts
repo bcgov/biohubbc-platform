@@ -1,6 +1,6 @@
 import { ACTIVE_UPLOAD_PROCESSING_STAGES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import {
   CreateSubmissionUpload,
@@ -14,6 +14,7 @@ import {
   SubmissionUploadHistoryStatus,
   UpdateSubmissionUploadDecision
 } from '../../models/submission-upload-decision';
+import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
 import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
@@ -435,6 +436,50 @@ export class SubmissionUploadService extends DBService {
    */
   async transitionSubmissionUploadToReconciled(submissionUploadId: string): Promise<void> {
     await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciled', ['ingested']);
+  }
+
+  /**
+   * Find the active processing status history of an upload that belongs to the given submission.
+   *
+   * One query resolves both the ownership check and the rows: no rows means the upload is not an
+   * active upload of that submission, and a single row with null status columns means the upload
+   * has no processing history yet. Rows are returned earliest first, in the order the statuses were
+   * entered. Superseded rows (end-dated by reprocessing) are excluded.
+   *
+   * @param {string} submissionUuid Submission UUID from the request path.
+   * @param {string} submissionUploadId Submission upload UUID from the request path.
+   * @returns {Promise<SubmissionUploadProcessingStatusHistoryItem[]>} Active processing status rows, earliest first.
+   * @throws {ApiNotFoundError} If the upload does not exist or does not belong to the submission.
+   * @memberof SubmissionUploadService
+   */
+  async findSubmissionUploadProcessingStatusHistory(
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<SubmissionUploadProcessingStatusHistoryItem[]> {
+    const rows = await this.submissionUploadProcessingStatusRepository.findSubmissionUploadProcessingStatusHistory(
+      submissionUuid,
+      submissionUploadId
+    );
+
+    if (!rows.length) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadService->findSubmissionUploadProcessingStatusHistory',
+        { submissionUuid, submissionUploadId }
+      ]);
+    }
+
+    return rows.flatMap((row) =>
+      row.submission_upload_status_id === null
+        ? []
+        : [
+            {
+              submission_upload_status_id: row.submission_upload_status_id,
+              submission_upload_id: row.submission_upload_id,
+              status: row.status,
+              create_date: row.create_date
+            }
+          ]
+    );
   }
 
   /**

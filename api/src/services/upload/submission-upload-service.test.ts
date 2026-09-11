@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatus } from '../../models/submission-upload-processing-status';
@@ -507,6 +507,70 @@ describe('SubmissionUploadService', () => {
       expect(lock).to.have.been.calledOnceWith(1);
       expect(bulkGuard).to.have.been.calledOnceWith(1);
       expect(remove).to.have.been.calledOnceWith(1);
+    });
+  });
+
+  describe('findSubmissionUploadProcessingStatusHistory', () => {
+    it('resolves ownership and history in one query and returns the history items', async () => {
+      const findStub = sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 1,
+            status: 'uploaded',
+            create_date: '2026-09-03T00:00:00.000Z'
+          },
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 2,
+            status: 'ingesting',
+            create_date: '2026-09-03T00:01:00.000Z'
+          }
+        ]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+
+      expect(findStub).to.have.been.calledOnceWith('submission-uuid', 'artifact-1');
+      expect(result).to.eql([
+        {
+          submission_upload_status_id: 1,
+          submission_upload_id: 'artifact-1',
+          status: 'uploaded',
+          create_date: '2026-09-03T00:00:00.000Z'
+        },
+        {
+          submission_upload_status_id: 2,
+          submission_upload_id: 'artifact-1',
+          status: 'ingesting',
+          create_date: '2026-09-03T00:01:00.000Z'
+        }
+      ]);
+    });
+
+    it('returns an empty history for an upload in the submission that has no processing rows', async () => {
+      sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          { submission_upload_id: 'artifact-1', submission_upload_status_id: null, status: null, create_date: null }
+        ]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+
+      expect(result).to.eql([]);
+    });
+
+    it('throws ApiNotFoundError when the upload is not in the submission', async () => {
+      sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([]);
+
+      try {
+        await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+        expect.fail('Expected ApiNotFoundError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+      }
     });
   });
 

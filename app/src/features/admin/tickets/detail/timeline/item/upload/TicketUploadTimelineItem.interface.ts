@@ -4,10 +4,15 @@ import {
   TicketSubmissionUploadResponse,
   TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
+import { SubmissionUploadStatusHistoryState } from '../../hooks/upload/useSubmissionUploadStatusHistory';
 
 export interface ITicketUploadTimelineItemProps {
   upload: TicketSubmissionUploadResponse;
   dateLabel: string;
+  /** Whether the viewer may expand the status row to load the processing history (admin-only endpoint). */
+  canViewStatusHistory: boolean;
+  statusHistory: SubmissionUploadStatusHistoryState | undefined;
+  onLoadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
   onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
   onUpdateReview: (
     upload: TicketSubmissionUploadResponse,
@@ -39,6 +44,15 @@ export interface ITicketUploadReviewRequestRowProps {
 
 export interface ITicketUploadStatusRowProps {
   upload: TicketSubmissionUploadResponse;
+  /** Whether the row is expandable; false renders the current status only, with no toggle or request. */
+  canViewStatusHistory: boolean;
+  /** Cached history state for this upload; undefined until it has been requested. */
+  statusHistory: SubmissionUploadStatusHistoryState | undefined;
+  onLoadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
+}
+
+export interface ITicketUploadStatusHistoryProps {
+  statusHistory: SubmissionUploadStatusHistoryState | undefined;
 }
 
 export interface ITicketUploadDecisionRowProps {

@@ -1,8 +1,10 @@
 import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketArtifact, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { ITicketArtifact, ITicketExtended, TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -11,6 +13,10 @@ import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimeli
 
 vi.mock('hooks/useApi', () => ({
   useApi: vi.fn()
+}));
+
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: vi.fn()
 }));
 
 vi.mock('hooks/useContext', () => ({
@@ -46,6 +52,21 @@ const ticketArtifact: ITicketArtifact = {
   create_date: '2026-02-25T00:00:00.000Z',
   object_key: 'tickets/test/notes.txt'
 };
+
+const makeSubmissionUpload = (): TicketSubmissionUploadResponse => ({
+  submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+  submission_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  upload_id: '77777777-7777-4777-8777-777777777777',
+  create_date: '2026-02-26T00:00:00.000Z',
+  submission_name: 'Moose survey',
+  submission_description: null,
+  submission_comment: null,
+  submitted_by_identifier: 'sarah@example.com',
+  upload_status: 'ingested',
+  decision: 'pending',
+  validation: null,
+  reviews: { validation: null, security: null }
+});
 
 const makeTicket = (): ITicketExtended => ({
   ticket_id: ticketId,
@@ -83,6 +104,7 @@ const renderTicketTimeline = (ticket: ITicketExtended) =>
 describe('TicketTimeline', () => {
   const updateTicketComment = vi.fn();
   const deleteTicketComment = vi.fn();
+  const getSubmissionUploadProcessingStatusHistory = vi.fn();
   const setData = vi.fn();
   const setSnackbar = vi.fn();
   const setYesNoDialog = vi.fn();
@@ -90,10 +112,14 @@ describe('TicketTimeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    (useAuthStateContext as Mock).mockReturnValue({
+      biohubUserWrapper: { roleNames: [SYSTEM_ROLE.SYSTEM_ADMIN] }
+    });
     (useApi as Mock).mockReturnValue({
       tickets: {
         updateTicketComment,
         deleteTicketComment,
+        getSubmissionUploadProcessingStatusHistory,
         createTicketUpload: vi.fn(),
         completeTicketUpload: vi.fn(),
         getTicketArtifactDownloadUrl: vi.fn()
@@ -301,5 +327,47 @@ describe('TicketTimeline', () => {
       });
     });
     expect(setData).not.toHaveBeenCalled();
+  });
+
+  it('requests an upload processing history only when its status row is expanded', async () => {
+    const user = userEvent.setup();
+    const upload = makeSubmissionUpload();
+    getSubmissionUploadProcessingStatusHistory.mockResolvedValue([
+      {
+        submission_upload_status_id: 1,
+        submission_upload_id: upload.submission_upload_id,
+        status: 'uploaded',
+        create_date: '2026-02-26T00:00:00.000Z'
+      }
+    ]);
+
+    renderTicketTimeline({ ...makeTicket(), submission_uploads: [upload] });
+
+    expect(getSubmissionUploadProcessingStatusHistory).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Ingested' }));
+
+    await waitFor(() => expect(screen.getByText('Uploaded')).toBeVisible());
+    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledWith(
+      upload.submission_uuid,
+      upload.submission_upload_id
+    );
+    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the current upload status without an expandable history for a viewer who is not a system admin', async () => {
+    const user = userEvent.setup();
+    (useAuthStateContext as Mock).mockReturnValue({
+      biohubUserWrapper: { roleNames: [] }
+    });
+
+    renderTicketTimeline({ ...makeTicket(), submission_uploads: [makeSubmissionUpload()] });
+
+    expect(screen.getByText('Ingested')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Ingested' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Ingested'));
+
+    expect(getSubmissionUploadProcessingStatusHistory).not.toHaveBeenCalled();
   });
 });

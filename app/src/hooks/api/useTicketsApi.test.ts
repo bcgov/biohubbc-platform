@@ -10,6 +10,7 @@ import {
   ICreateTicketUploadResponse,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
+  ISubmissionUploadProcessingStatusHistoryItem,
   ITicket,
   ITicketArtifact,
   ITicketArtifactDownloadResponse,
@@ -33,6 +34,30 @@ describe('useTicketsApi', () => {
 
   afterEach(() => {
     mock.restore();
+  });
+
+  it('getSubmissionUploadProcessingStatusHistory fetches the history for the upload', async () => {
+    const submissionUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const submissionUploadId = '550e8400-e29b-41d4-a716-446655440000';
+    const response: ISubmissionUploadProcessingStatusHistoryItem[] = [
+      {
+        submission_upload_status_id: 1,
+        submission_upload_id: submissionUploadId,
+        status: 'uploaded',
+        create_date: '2026-09-03T00:00:00.000Z'
+      }
+    ];
+
+    mock
+      .onGet(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status/history`)
+      .reply(200, response);
+
+    const result = await useTicketsApi(axios).getSubmissionUploadProcessingStatusHistory(
+      submissionUuid,
+      submissionUploadId
+    );
+
+    expect(result).toEqual(response);
   });
 
   it('getTickets supports optional filters and pagination', async () => {
