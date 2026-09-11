@@ -86,6 +86,39 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('getSubmissionUploadBySubmissionId', () => {
+    it('throws ApiNotFoundError when no matching record found', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.getSubmissionUploadBySubmissionId(17, 'upload-id');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
+      }
+    });
+
+    it('returns the submission upload when it belongs to the submission', async () => {
+      const mockRow = {
+        submission_upload_id: 'upload-id',
+        submission_id: 17,
+        upload_id: 'upload-uuid',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.getSubmissionUploadBySubmissionId(17, 'upload-id');
+      expect(result).to.eql(mockRow);
+    });
+  });
+
   describe('getSubmissionUploadsBySubmissionId', () => {
     it('returns an array of records without filters', async () => {
       const mockQueryResponse = {
@@ -216,6 +249,8 @@ describe('SubmissionUploadRepository', () => {
       await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
 
       expect(sqlStub.calledOnce).to.equal(true);
+      expect(sqlStub.firstCall.args[0].text).to.contain('su.submission_id');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('AS submission_uuid');
       expect(sqlStub.firstCall.args[0].text).to.contain('INNER JOIN LATERAL');
       expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_status sus');
       expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
@@ -236,7 +271,7 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].text).not.to.contain('validation.validation');
     });
 
-    it('returns scoped reviews as explicit keyed objects', async () => {
+    it('returns every active review grouped by scope without multiplying upload rows', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -245,10 +280,15 @@ describe('SubmissionUploadRepository', () => {
       await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
 
       expect(sqlStub.firstCall.args[0].text).not.to.contain('json_object_agg');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_review validation_review');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_review security_review');
-      expect(sqlStub.firstCall.args[0].text).to.contain("'validation'");
-      expect(sqlStub.firstCall.args[0].text).to.contain("'security'");
+      expect(sqlStub.firstCall.args[0].text).to.contain(') reviews ON TRUE');
+      expect(sqlStub.firstCall.args[0].text).to.contain("FILTER (WHERE sur.scope = 'validation')");
+      expect(sqlStub.firstCall.args[0].text).to.contain("FILTER (WHERE sur.scope = 'security')");
+      expect(sqlStub.firstCall.args[0].text).to.contain("COALESCE(reviews.validation, '[]'::json)");
+      expect(sqlStub.firstCall.args[0].text).to.contain("COALESCE(reviews.security, '[]'::json)");
+      expect(sqlStub.firstCall.args[0].text.match(/LEFT JOIN LATERAL/g)).to.have.length(2);
+      expect(sqlStub.firstCall.args[0].text.match(/sur\.create_date DESC/g)).to.have.length(2);
+      expect(sqlStub.firstCall.args[0].text.match(/sur\.submission_upload_review_id DESC/g)).to.have.length(2);
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('LIMIT 1\n      ) reviews');
     });
   });
 

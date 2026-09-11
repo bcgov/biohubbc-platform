@@ -160,6 +160,55 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Get a single active submission_upload record by submission ID and submission_upload_id.
+   * Use to validate that an upload belongs to the given submission.
+   *
+   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission_upload_id.
+   * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found or does not belong to the submission.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   * @memberof SubmissionUploadRepository
+   */
+  async getSubmissionUploadBySubmissionId(submissionId: number, submissionUploadId: string): Promise<SubmissionUpload> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_upload_id,
+        su.submission_id,
+        su.upload_id,
+        su.team_id,
+        su.status,
+        su.ticket_id,
+        su.blueprint_id,
+        su.comment,
+        su.record_end_date
+      FROM
+        submission_upload su
+      WHERE
+        su.submission_id = ${submissionId}
+        AND su.submission_upload_id = ${submissionUploadId}
+        AND su.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getSubmissionUploadBySubmissionId',
+        { submissionId, submissionUploadId }
+      ]);
+    }
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUploadBySubmissionId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Retrieves submission_upload records with optional filters and pagination.
    *
    * @param {number} submissionId - The ID of the submission.
@@ -215,7 +264,7 @@ export class SubmissionUploadRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT
         su.submission_upload_id,
-        s.uuid AS submission_uuid,
+        su.submission_id,
         su.upload_id,
         su.create_date,
         s.name AS submission_name,
@@ -227,27 +276,9 @@ export class SubmissionUploadRepository extends BaseRepository {
         sv.validation,
         json_build_object(
           'validation',
-          CASE
-            WHEN validation_review.submission_upload_review_id IS NULL THEN NULL
-            ELSE json_build_object(
-              'submission_upload_review_id', validation_review.submission_upload_review_id,
-              'submission_upload_id', validation_review.submission_upload_id,
-              'scope', validation_review.scope,
-              'status', validation_review.status,
-              'requested_by', validation_review.requested_by
-            )
-          END,
+          COALESCE(reviews.validation, '[]'::json),
           'security',
-          CASE
-            WHEN security_review.submission_upload_review_id IS NULL THEN NULL
-            ELSE json_build_object(
-              'submission_upload_review_id', security_review.submission_upload_review_id,
-              'submission_upload_id', security_review.submission_upload_id,
-              'scope', security_review.scope,
-              'status', security_review.status,
-              'requested_by', security_review.requested_by
-            )
-          END
+          COALESCE(reviews.security, '[]'::json)
         ) AS reviews
       FROM
         submission_upload su
@@ -290,18 +321,38 @@ export class SubmissionUploadRepository extends BaseRepository {
           sv.create_date DESC
         LIMIT 1
       ) sv ON TRUE
-      LEFT JOIN
-        submission_upload_review validation_review
-      ON
-        validation_review.submission_upload_id = su.submission_upload_id
-        AND validation_review.scope = 'validation'
-        AND validation_review.record_end_date IS NULL
-      LEFT JOIN
-        submission_upload_review security_review
-      ON
-        security_review.submission_upload_id = su.submission_upload_id
-        AND security_review.scope = 'security'
-        AND security_review.record_end_date IS NULL
+      LEFT JOIN LATERAL (
+        SELECT
+          json_agg(
+            json_build_object(
+              'submission_upload_review_id', sur.submission_upload_review_id,
+              'submission_upload_id', sur.submission_upload_id,
+              'name', sur.name,
+              'description', sur.description,
+              'scope', sur.scope,
+              'status', sur.status,
+              'requested_by', sur.requested_by
+            )
+            ORDER BY sur.create_date DESC, sur.submission_upload_review_id DESC
+          ) FILTER (WHERE sur.scope = 'validation') AS validation,
+          json_agg(
+            json_build_object(
+              'submission_upload_review_id', sur.submission_upload_review_id,
+              'submission_upload_id', sur.submission_upload_id,
+              'name', sur.name,
+              'description', sur.description,
+              'scope', sur.scope,
+              'status', sur.status,
+              'requested_by', sur.requested_by
+            )
+            ORDER BY sur.create_date DESC, sur.submission_upload_review_id DESC
+          ) FILTER (WHERE sur.scope = 'security') AS security
+        FROM
+          submission_upload_review sur
+        WHERE
+          sur.submission_upload_id = su.submission_upload_id
+          AND sur.record_end_date IS NULL
+      ) reviews ON TRUE
       WHERE
         su.ticket_id = ${ticketId}
         AND su.record_end_date IS NULL

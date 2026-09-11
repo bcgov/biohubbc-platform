@@ -13,7 +13,7 @@ import { SubmissionUploadReviewService } from '../../../../../../../../services/
 import { getLogger } from '../../../../../../../../utils/logger';
 
 const defaultLog = getLogger(
-  'paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review/{submissionUploadReviewId}'
+  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review/{submissionUploadReviewId}'
 );
 
 export const PATCH: Operation = [
@@ -29,10 +29,10 @@ PATCH.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission UUID',
+      description: 'Submission ID',
       in: 'path',
-      name: 'submissionUuid',
-      schema: { type: 'string', format: 'uuid' },
+      name: 'submissionId',
+      schema: { type: 'integer', minimum: 1 },
       required: true
     },
     {
@@ -84,10 +84,10 @@ DELETE.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission UUID',
+      description: 'Submission ID',
       in: 'path',
-      name: 'submissionUuid',
-      schema: { type: 'string', format: 'uuid' },
+      name: 'submissionId',
+      schema: { type: 'integer', minimum: 1 },
       required: true
     },
     {
@@ -120,12 +120,12 @@ export function updateSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUuid, submissionUploadId, submissionUploadReviewId } = req.params;
+      const { submissionId, submissionUploadId, submissionUploadReviewId } = req.params;
       const { status }: { status: SubmissionUploadReviewStatus } = req.body;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       const result = await submissionUploadReviewService.updateSubmissionUploadReview(
-        submissionUuid,
+        Number(submissionId),
         submissionUploadId,
         submissionUploadReviewId,
         { status }
@@ -155,11 +155,11 @@ export function deleteSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUuid, submissionUploadId, submissionUploadReviewId } = req.params;
+      const { submissionId, submissionUploadId, submissionUploadReviewId } = req.params;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       await submissionUploadReviewService.deleteSubmissionUploadReview(
-        submissionUuid,
+        Number(submissionId),
         submissionUploadId,
         submissionUploadReviewId
       );

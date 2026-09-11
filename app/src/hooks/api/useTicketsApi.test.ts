@@ -224,7 +224,7 @@ describe('useTicketsApi', () => {
   });
 
   it('updateSubmissionUploadReviewStatus patches the final upload disposition endpoint', async () => {
-    const submissionUuid = '11111111-1111-1111-1111-111111111111';
+    const submissionId = 17;
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
     const payload = { status: 'approved' as const };
     const response = {
@@ -234,22 +234,24 @@ describe('useTicketsApi', () => {
     };
 
     mock
-      .onPatch(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`, payload)
+      .onPatch(`/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status`, payload)
       .reply(200, response);
 
     await expect(
-      useTicketsApi(axios).updateSubmissionUploadReviewStatus(submissionUuid, submissionUploadId, payload)
+      useTicketsApi(axios).updateSubmissionUploadReviewStatus(submissionId, submissionUploadId, payload)
     ).resolves.toEqual(response);
   });
 
   it('updateSubmissionUploadReview patches a scoped upload review task', async () => {
-    const submissionUuid = '11111111-1111-1111-1111-111111111111';
+    const submissionId = 17;
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
     const submissionUploadReviewId = '11111111-1111-4111-8111-111111111111';
     const payload = { status: 'completed' as const };
     const response: TicketSubmissionUploadReviewResponse = {
       submission_upload_review_id: submissionUploadReviewId,
       submission_upload_id: submissionUploadId,
+      name: 'Access rules',
+      description: 'Review access rules',
       scope: 'security',
       status: 'completed',
       requested_by: 7
@@ -257,13 +259,13 @@ describe('useTicketsApi', () => {
 
     mock
       .onPatch(
-        `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+        `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
         payload
       )
       .reply(200, response);
 
     const result = await useTicketsApi(axios).updateSubmissionUploadReview(
-      submissionUuid,
+      submissionId,
       submissionUploadId,
       submissionUploadReviewId,
       payload
@@ -272,23 +274,30 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(response);
   });
 
-  it('insertSubmissionUploadReview posts a scoped upload review request', async () => {
-    const submissionUuid = '11111111-1111-1111-1111-111111111111';
+  it('insertSubmissionUploadReview posts a scoped upload review', async () => {
+    const submissionId = 17;
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';
-    const payload = { scope: 'security' as const, status: 'requested' as const };
+    const payload = {
+      name: 'Access rules',
+      description: 'Review access rules',
+      scope: 'security' as const,
+      status: 'in_progress' as const
+    };
     const response: TicketSubmissionUploadReviewResponse = {
       submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
       submission_upload_id: submissionUploadId,
+      name: 'Access rules',
+      description: 'Review access rules',
       scope: 'security',
-      status: 'requested',
+      status: 'in_progress',
       requested_by: 7
     };
 
     mock
-      .onPost(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review`, payload)
+      .onPost(`/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review`, payload)
       .reply(201, response);
 
-    const result = await useTicketsApi(axios).insertSubmissionUploadReview(submissionUuid, submissionUploadId, payload);
+    const result = await useTicketsApi(axios).insertSubmissionUploadReview(submissionId, submissionUploadId, payload);
 
     expect(result).toEqual(response);
   });

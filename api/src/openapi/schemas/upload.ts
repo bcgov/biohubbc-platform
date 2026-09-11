@@ -267,10 +267,20 @@ export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaOb
 export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
+  required: [
+    'submission_upload_review_id',
+    'submission_upload_id',
+    'name',
+    'description',
+    'scope',
+    'status',
+    'requested_by'
+  ],
   properties: {
     submission_upload_review_id: { type: 'string', format: 'uuid' },
     submission_upload_id: { type: 'string', format: 'uuid' },
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    description: { type: 'string', maxLength: 500, nullable: true },
     scope: { type: 'string', enum: ['validation', 'security'] },
     status: {
       type: 'string',
@@ -283,8 +293,10 @@ export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
 export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['scope', 'status'],
+  required: ['name', 'description', 'scope', 'status'],
   properties: {
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    description: { type: 'string', maxLength: 500, nullable: true },
     scope: { type: 'string', enum: ['validation', 'security'] },
     status: {
       type: 'string',

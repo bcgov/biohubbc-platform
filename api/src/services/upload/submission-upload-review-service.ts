@@ -19,9 +19,8 @@ import { DBService } from '../db-service';
  * - `submission_upload_status`, which tracks final disposition
  *   (`submitted`, `approved`, `denied`, `deleted`).
  *
- * This service owns the review business rules: creating scoped reviews and
- * creating default validation/security task rows and requesting them after
- * successful ingestion. Repository methods remain row-oriented CRUD helpers.
+ * This service owns the review business rules for explicitly created scoped
+ * reviews. Repository methods remain row-oriented CRUD helpers.
  *
  * @export
  * @class SubmissionUploadReviewService
@@ -46,17 +45,17 @@ export class SubmissionUploadReviewService extends DBService {
   /**
    * Get active review rows for a submission upload.
    *
-   * @param {string} submissionUuid - The submission UUID.
+   * @param {number} submissionId - The submission ID.
    * @param {string} submissionUploadId - The submission upload ID.
    * @return {Promise<SubmissionUploadReview[]>} Active review rows.
    * @memberof SubmissionUploadReviewService
    */
   async findReviewsBySubmissionUploadId(
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string
   ): Promise<SubmissionUploadReview[]> {
-    const submissionUpload = await this.submissionUploadRepository.getSubmissionUploadBySubmissionUuid(
-      submissionUuid,
+    const submissionUpload = await this.submissionUploadRepository.getSubmissionUploadBySubmissionId(
+      submissionId,
       submissionUploadId
     );
 
@@ -66,74 +65,19 @@ export class SubmissionUploadReviewService extends DBService {
   /**
    * Insert a scoped review for a submission upload.
    *
-   * Review requests are replacement operations for a scope: before creating the
-   * new active row, the service soft-deletes any active review rows for the same
-   * upload and scope. That preserves historical rows and prevents conflicts with
-   * the `submission_upload_review_nuk1` active-row unique index.
+   * Review requests are append-only. Existing reviews for the same upload and
+   * scope remain active and unchanged.
    *
-   * @param {string} submissionUuid - The submission UUID.
+   * @param {number} submissionId - The submission ID.
    * @param {CreateSubmissionUploadReview} params - Review insert details, including the initial task status.
    * @return {Promise<SubmissionUploadReview>} The created active review row.
    * @memberof SubmissionUploadReviewService
    */
   async insertSubmissionUploadReview(
-    submissionUuid: string,
+    submissionId: number,
     params: CreateSubmissionUploadReview
   ): Promise<SubmissionUploadReview> {
-    await this.submissionUploadReviewRepository.softDeleteActiveSubmissionUploadReviewsByScope(
-      submissionUuid,
-      params.submission_upload_id,
-      params.scope
-    );
-
-    return this.submissionUploadReviewRepository.insertSubmissionUploadReview(submissionUuid, {
-      submission_upload_id: params.submission_upload_id,
-      scope: params.scope,
-      status: params.status,
-      requested_by: params.requested_by
-    });
-  }
-
-  /**
-   * Create pending default validation and security reviews for an upload.
-   *
-   * @param {number} submissionId - The submission ID.
-   * @param {string} submissionUploadId - The submission upload ID.
-   * @param {number} requestedBy - The system user ID assigned as requester.
-   * @return {Promise<SubmissionUploadReview[]>} The pending validation and security review rows.
-   * @memberof SubmissionUploadReviewService
-   */
-  async createDefaultReviewsForUpload(
-    submissionId: number,
-    submissionUploadId: string,
-    requestedBy: number
-  ): Promise<SubmissionUploadReview[]> {
-    return this.submissionUploadReviewRepository.insertDefaultSubmissionUploadReviews(
-      submissionId,
-      submissionUploadId,
-      requestedBy
-    );
-  }
-
-  /**
-   * Promote pending default reviews to requested.
-   *
-   * @param {number} submissionId - The submission ID.
-   * @param {string} submissionUploadId - The submission upload ID.
-   * @param {number} requestedBy - The system user ID requesting the reviews.
-   * @return {Promise<SubmissionUploadReview[]>} The validation and security review rows.
-   * @memberof SubmissionUploadReviewService
-   */
-  async requestDefaultReviewsForUpload(
-    submissionId: number,
-    submissionUploadId: string,
-    requestedBy: number
-  ): Promise<SubmissionUploadReview[]> {
-    return this.submissionUploadReviewRepository.requestDefaultSubmissionUploadReviews(
-      submissionId,
-      submissionUploadId,
-      requestedBy
-    );
+    return this.submissionUploadReviewRepository.insertSubmissionUploadReview(submissionId, params);
   }
 
   /**
@@ -142,7 +86,7 @@ export class SubmissionUploadReviewService extends DBService {
    * This changes the human-review workflow state only. It does not approve or
    * deny the upload; final disposition remains owned by `SubmissionUploadService`.
    *
-   * @param {string} submissionUuid - The submission UUID.
+   * @param {number} submissionId - The submission ID.
    * @param {string} submissionUploadId - The submission upload ID.
    * @param {string} submissionUploadReviewId - The submission upload review ID.
    * @param {UpdateSubmissionUploadReview} data - Review update details.
@@ -150,13 +94,13 @@ export class SubmissionUploadReviewService extends DBService {
    * @memberof SubmissionUploadReviewService
    */
   async updateSubmissionUploadReview(
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string,
     submissionUploadReviewId: string,
     data: UpdateSubmissionUploadReview
   ): Promise<SubmissionUploadReview> {
     return this.submissionUploadReviewRepository.updateSubmissionUploadReview(
-      submissionUuid,
+      submissionId,
       submissionUploadId,
       submissionUploadReviewId,
       data
@@ -169,19 +113,19 @@ export class SubmissionUploadReviewService extends DBService {
    * Deletes are historical: the row remains in the database with
    * `record_end_date` set, and active queries no longer return it.
    *
-   * @param {string} submissionUuid - The submission UUID.
+   * @param {number} submissionId - The submission ID.
    * @param {string} submissionUploadId - The submission upload ID.
    * @param {string} submissionUploadReviewId - The submission upload review ID.
    * @return {Promise<SubmissionUploadReview>} The soft-deleted review row.
    * @memberof SubmissionUploadReviewService
    */
   async deleteSubmissionUploadReview(
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string,
     submissionUploadReviewId: string
   ): Promise<SubmissionUploadReview> {
     return this.submissionUploadReviewRepository.deleteSubmissionUploadReview(
-      submissionUuid,
+      submissionId,
       submissionUploadId,
       submissionUploadReviewId
     );

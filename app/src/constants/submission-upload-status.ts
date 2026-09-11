@@ -1,9 +1,5 @@
-import { mdiBlockHelper, mdiCancel, mdiCheck, mdiCircleMedium, mdiClose, mdiProgressClock, mdiSkipNext } from '@mdi/js';
-import {
-  SubmissionUploadJobStatus,
-  SubmissionUploadReviewStatus,
-  SubmissionUploadReviewTaskStatus
-} from 'interfaces/useTicketsApi.interface';
+import { mdiCheck, mdiClose } from '@mdi/js';
+import { SubmissionUploadJobStatus, SubmissionUploadReviewStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 
 export const SUBMISSION_UPLOAD_JOB_STATUS_LABELS: Record<SubmissionUploadJobStatus, string> = {
@@ -50,59 +46,4 @@ export const SUBMISSION_UPLOAD_REVIEW_STATUS_BUTTON_COLORS: Partial<
 > = {
   approved: 'success',
   denied: 'error'
-};
-
-export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_OPTIONS: {
-  value: SubmissionUploadReviewTaskStatus;
-  label: string;
-  iconPath: string;
-}[] = [
-  {
-    value: 'pending',
-    label: 'Pending',
-    iconPath: mdiCircleMedium
-  },
-  {
-    value: 'requested',
-    label: 'Requested',
-    iconPath: mdiCircleMedium
-  },
-  {
-    value: 'in_progress',
-    label: 'In progress',
-    iconPath: mdiProgressClock
-  },
-  {
-    value: 'completed',
-    label: 'Completed',
-    iconPath: mdiCheck
-  },
-  {
-    value: 'blocked',
-    label: 'Blocked',
-    iconPath: mdiBlockHelper
-  },
-  {
-    value: 'skipped',
-    label: 'Skipped',
-    iconPath: mdiSkipNext
-  },
-  {
-    value: 'cancelled',
-    label: 'Cancelled',
-    iconPath: mdiCancel
-  }
-];
-
-export const SUBMISSION_UPLOAD_REVIEW_TASK_STATUS_BUTTON_COLORS: Record<
-  SubmissionUploadReviewTaskStatus,
-  'primary' | 'success' | 'warning' | null
-> = {
-  pending: null,
-  requested: 'primary',
-  in_progress: 'warning',
-  completed: 'success',
-  blocked: null,
-  skipped: null,
-  cancelled: null
 };
