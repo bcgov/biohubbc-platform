@@ -1,15 +1,13 @@
 import { Fragment } from 'react';
 import { JsonValue } from 'types/json';
 import { getPropertyValueKey } from 'utils/property-value-utils';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { PropertyValueDisplay } from './PropertyValueDisplay';
 
-export interface PropertyValueListProps {
-  /** Values of a multi-value property. */
+interface PropertyValueListProps {
   values: JsonValue[];
-  /** Submission the owning feature belongs to (link context for reference values). */
   submissionId: number;
-  /** Submission route base, e.g. `/submission` or `/portal/submission`. */
-  featureRouteBasePath: string;
+  pathResolvers: SubmissionPropertyValuePathResolvers;
 }
 
 /**
@@ -18,7 +16,7 @@ export interface PropertyValueListProps {
  * @param {PropertyValueListProps} props
  * @returns {JSX.Element}
  */
-export const PropertyValueList = ({ values, submissionId, featureRouteBasePath }: PropertyValueListProps) => {
+export const PropertyValueList = ({ values, submissionId, pathResolvers }: PropertyValueListProps) => {
   const items = values.filter((item) => item !== null && item !== undefined);
 
   return (
@@ -26,7 +24,7 @@ export const PropertyValueList = ({ values, submissionId, featureRouteBasePath }
       {items.map((item, index) => (
         <Fragment key={`${getPropertyValueKey(item)}:${index}`}>
           {index > 0 && ', '}
-          <PropertyValueDisplay value={item} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
+          <PropertyValueDisplay value={item} submissionId={submissionId} pathResolvers={pathResolvers} />
         </Fragment>
       ))}
     </>

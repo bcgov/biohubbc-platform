@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { createMockSearchFeature } from 'test-helpers/search-result-helpers';
 import { render } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { SearchResultTableLayout } from './SearchResultTableLayout';
 
 interface MockDataGridProps {
@@ -54,6 +55,8 @@ vi.mock('components/data-grid/CustomDataGrid', () => ({
 }));
 
 describe('SearchResultTableLayout', () => {
+  const pathResolvers = buildSubmissionPropertyValuePathResolvers('/submission');
+
   const featureTypeProperties: FeatureTypeProperty[] = [
     {
       feature_type_property_id: 1,
@@ -97,7 +100,7 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[securedResult]} featureTypeProperties={[]} />
+        <SearchResultTableLayout results={[securedResult]} featureTypeProperties={[]} pathResolvers={pathResolvers} />
       </MemoryRouter>
     );
 
@@ -111,7 +114,7 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[unsecuredResult]} featureTypeProperties={[]} />
+        <SearchResultTableLayout results={[unsecuredResult]} featureTypeProperties={[]} pathResolvers={pathResolvers} />
       </MemoryRouter>
     );
 
@@ -127,7 +130,11 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[securedResult, unsecuredResult]} featureTypeProperties={[]} />
+        <SearchResultTableLayout
+          results={[securedResult, unsecuredResult]}
+          featureTypeProperties={[]}
+          pathResolvers={pathResolvers}
+        />
       </MemoryRouter>
     );
 
@@ -146,7 +153,12 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[result]} featureTypeProperties={[]} onClick={onClick} />
+        <SearchResultTableLayout
+          results={[result]}
+          featureTypeProperties={[]}
+          pathResolvers={pathResolvers}
+          onClick={onClick}
+        />
       </MemoryRouter>
     );
 
@@ -167,7 +179,11 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[result]} featureTypeProperties={featureTypeProperties} />
+        <SearchResultTableLayout
+          results={[result]}
+          featureTypeProperties={featureTypeProperties}
+          pathResolvers={pathResolvers}
+        />
       </MemoryRouter>
     );
 
@@ -204,7 +220,11 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter initialEntries={['/search/survey?view=table']}>
-        <SearchResultTableLayout results={[result]} featureTypeProperties={[taxonProperty]} />
+        <SearchResultTableLayout
+          results={[result]}
+          featureTypeProperties={[taxonProperty]}
+          pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission', '?view=table')}
+        />
       </MemoryRouter>
     );
 
@@ -237,7 +257,11 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[result]} featureTypeProperties={[codeProperty]} />
+        <SearchResultTableLayout
+          results={[result]}
+          featureTypeProperties={[codeProperty]}
+          pathResolvers={pathResolvers}
+        />
       </MemoryRouter>
     );
 
@@ -269,7 +293,11 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[result]} featureTypeProperties={[featureProperty]} />
+        <SearchResultTableLayout
+          results={[result]}
+          featureTypeProperties={[featureProperty]}
+          pathResolvers={pathResolvers}
+        />
       </MemoryRouter>
     );
 
@@ -303,7 +331,11 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={[result]} featureTypeProperties={[taxonProperty]} />
+        <SearchResultTableLayout
+          results={[result]}
+          featureTypeProperties={[taxonProperty]}
+          pathResolvers={pathResolvers}
+        />
       </MemoryRouter>
     );
 
@@ -319,7 +351,7 @@ describe('SearchResultTableLayout', () => {
 
     const { getByTestId } = render(
       <MemoryRouter>
-        <SearchResultTableLayout results={results} featureTypeProperties={[]} />
+        <SearchResultTableLayout results={results} featureTypeProperties={[]} pathResolvers={pathResolvers} />
       </MemoryRouter>
     );
 

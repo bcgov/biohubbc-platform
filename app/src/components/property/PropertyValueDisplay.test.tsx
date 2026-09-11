@@ -1,6 +1,7 @@
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { JsonValue } from 'types/json';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { PropertyValueDisplay } from './PropertyValueDisplay';
 
 const taxon = { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' };
@@ -8,7 +9,11 @@ const taxon = { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus am
 const renderValue = (value: JsonValue | undefined) =>
   render(
     <MemoryRouter>
-      <PropertyValueDisplay value={value} submissionId={3} featureRouteBasePath="/submission" />
+      <PropertyValueDisplay
+        value={value}
+        submissionId={3}
+        pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission')}
+      />
     </MemoryRouter>
   );
 

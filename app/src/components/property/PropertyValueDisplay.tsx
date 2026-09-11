@@ -1,18 +1,16 @@
 import { JsonValue } from 'types/json';
 import { isCodePropertyValue, isFeatureReferencePropertyValue, isTaxonPropertyValue } from 'utils/property-value-utils';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { safeJSONStringify } from 'utils/Utils';
 import { CodePropertyValueLink } from './CodePropertyValueLink';
 import { FeaturePropertyValueLink } from './FeaturePropertyValueLink';
 import { PropertyValueList } from './PropertyValueList';
 import { TaxonPropertyValueLink } from './TaxonPropertyValueLink';
 
-export interface PropertyValueDisplayProps {
-  /** Raw property value: a scalar, a structured reference value, GeoJSON, or an array of these. */
+interface PropertyValueDisplayProps {
   value: JsonValue | undefined;
-  /** Submission the owning feature belongs to (link context for reference values). */
   submissionId: number;
-  /** Submission route base, e.g. `/submission` or `/portal/submission`. */
-  featureRouteBasePath: string;
+  pathResolvers: SubmissionPropertyValuePathResolvers;
 }
 
 /**
@@ -24,29 +22,37 @@ export interface PropertyValueDisplayProps {
  * @param {PropertyValueDisplayProps} props
  * @returns {JSX.Element | null}
  */
-export const PropertyValueDisplay = ({ value, submissionId, featureRouteBasePath }: PropertyValueDisplayProps) => {
+export const PropertyValueDisplay = ({ value, submissionId, pathResolvers }: PropertyValueDisplayProps) => {
   if (value === null || value === undefined) {
     return null;
   }
 
   if (Array.isArray(value)) {
-    return <PropertyValueList values={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />;
+    return <PropertyValueList values={value} submissionId={submissionId} pathResolvers={pathResolvers} />;
   }
 
   if (isTaxonPropertyValue(value)) {
     return (
-      <TaxonPropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
+      <TaxonPropertyValueLink
+        value={value}
+        submissionId={submissionId}
+        getSubmissionTaxonPath={pathResolvers.getSubmissionTaxonPath}
+      />
     );
   }
 
   if (isCodePropertyValue(value)) {
     return (
-      <CodePropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
+      <CodePropertyValueLink
+        value={value}
+        submissionId={submissionId}
+        getSubmissionCodePath={pathResolvers.getSubmissionCodePath}
+      />
     );
   }
 
   if (isFeatureReferencePropertyValue(value)) {
-    return <FeaturePropertyValueLink value={value} featureRouteBasePath={featureRouteBasePath} />;
+    return <FeaturePropertyValueLink value={value} getSubmissionFeaturePath={pathResolvers.getSubmissionFeaturePath} />;
   }
 
   if (typeof value === 'object') {
