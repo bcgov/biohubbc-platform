@@ -1,13 +1,13 @@
 // System integration test: end-to-end download → export → CSV.
 //
 // Mirrors `scripts/test_telemetry_export.py` end-to-end, against a real DB +
-// MinIO. The pipeline reads telemetry from `submission_feature` + the typed
+// local S3 (RustFS). The pipeline reads telemetry from `submission_feature` + the typed
 // `submission_feature_property_*` tables (populated upstream by 963's indexing
 // job), runs the Parquet pipeline, then the CSV export pipeline, and writes a
 // part-zip to S3. We then unzip and assert the CSV contents.
 //
 // Run: make test-sys
-// Requires: make web (database + MinIO must be running)
+// Requires: make web (database + RustFS must be running)
 
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';

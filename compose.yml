@@ -233,53 +233,55 @@ services:
       retries: 10
       start_period: 120s  # ClamAV takes ~2 min to load virus definitions
 
-  ## MinIO - S3-compatible object storage for local development
-  minio:
-    image: minio/minio:latest
-    container_name: ${DOCKER_PROJECT_NAME}-minio-${DOCKER_NAMESPACE}-container
+  ## RustFS - S3-compatible object storage for local development
+  rustfs:
+    image: rustfs/rustfs:1.0.0-rc.6
+    container_name: ${DOCKER_PROJECT_NAME}-rustfs-${DOCKER_NAMESPACE}-container
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
     environment:
-      - MINIO_ROOT_USER=${OBJECT_STORE_ACCESS_KEY_ID}
-      - MINIO_ROOT_PASSWORD=${OBJECT_STORE_SECRET_KEY_ID}
+      - RUSTFS_ACCESS_KEY=${OBJECT_STORE_ACCESS_KEY_ID}
+      - RUSTFS_SECRET_KEY=${OBJECT_STORE_SECRET_KEY_ID}
+      - RUSTFS_CONSOLE_ENABLE=true
+      # The browser uploads and downloads through presigned URLs, so the S3 API must answer CORS
+      # preflights and expose the ETag header (multipart part uploads read it). This server-level
+      # setting applies to every bucket, so no per-bucket CORS policy is needed.
+      - RUSTFS_CORS_ALLOWED_ORIGINS=*
     volumes:
-      - minio_data:/data
+      - rustfs_data:/data
     networks:
       - biohubbc-network
-    command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
-  ## MinIO bucket initialization
-  minio_setup:
-    image: minio/mc:latest
-    container_name: ${DOCKER_PROJECT_NAME}-minio-setup-${DOCKER_NAMESPACE}-container
+  ## RustFS bucket initialization
+  rustfs_setup:
+    image: amazon/aws-cli:latest
+    container_name: ${DOCKER_PROJECT_NAME}-rustfs-setup-${DOCKER_NAMESPACE}-container
     depends_on:
-      minio:
+      rustfs:
         condition: service_healthy
     networks:
       - biohubbc-network
+    environment:
+      - AWS_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${OBJECT_STORE_SECRET_KEY_ID}
+      - AWS_DEFAULT_REGION=ca-central-1
+      - AWS_EC2_METADATA_DISABLED=true
     entrypoint: >
       /bin/sh -c "
       set -e;
 
-      mc alias set myminio http://minio:9000 ${OBJECT_STORE_ACCESS_KEY_ID} ${OBJECT_STORE_SECRET_KEY_ID};
+      for bucket in ${OBJECT_STORE_BUCKET_NAME} ${QUARANTINE_OBJECT_STORE_BUCKET_NAME}; do
+        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket $$bucket 2>/dev/null || aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket $$bucket;
+      done;
 
-      mc mb --ignore-existing myminio/${OBJECT_STORE_BUCKET_NAME};
-      mc mb --ignore-existing myminio/${QUARANTINE_OBJECT_STORE_BUCKET_NAME};
-
-      mc admin config set myminio api \
-        cors_allow_origin='*' \
-        cors_allow_methods='GET,PUT,POST,DELETE,HEAD' \
-        cors_allow_headers='*' \
-        cors_expose_headers='ETag' \
-        cors_max_age=3000;
-
-      echo 'Buckets created and global CORS configured successfully';
+      echo 'Buckets created successfully';
       "
 
 
@@ -527,8 +529,8 @@ volumes:
     name: ${DOCKER_PROJECT_NAME}-db-${DOCKER_NAMESPACE}-vol
   clamav_db:
     name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-vol
-  minio_data:
-    name: ${DOCKER_PROJECT_NAME}-minio-${DOCKER_NAMESPACE}-vol
+  rustfs_data:
+    name: ${DOCKER_PROJECT_NAME}-rustfs-${DOCKER_NAMESPACE}-vol
   martin_keys_private:
     name: ${DOCKER_PROJECT_NAME}-martin-keys-private-${DOCKER_NAMESPACE}-vol
   martin_keys_public:

@@ -30,11 +30,11 @@ queue: | build-queue run-queue ## Starts the queue worker (run after backend/web
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 
 clamav: | build-clamav run-clamav ## Pulls and runs clamav locally
-minio: | run-minio ## Starts MinIO object storage for local S3
+rustfs: | run-rustfs ## Starts RustFS object storage for local S3
 martin: | build-martin run-martin ## Pulls and runs the Martin vector tile server locally
 martin-gateway: | build-martin-gateway run-martin-gateway ## Runs the full Martin stack (martin + Martin Gateway + signing keys)
 
-all: | web queue clamav minio martin-gateway ## Performs all commands necessary to run the full stack (web, queue, clamav, minio, martin-gateway) in docker
+all: | web queue clamav rustfs martin-gateway ## Performs all commands necessary to run the full stack (web, queue, clamav, rustfs, martin-gateway) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -256,14 +256,14 @@ test-martin-gateway: ## Runs the Martin Gateway integration tests (needs the Mar
 	@docker compose exec martin_gateway npm run test:integration
 
 ## ------------------------------------------------------------------------------
-## MinIO commands (S3-compatible object storage for local development)
+## RustFS commands (S3-compatible object storage for local development)
 ## ------------------------------------------------------------------------------
 
-run-minio: ## Run MinIO and create buckets
+run-rustfs: ## Run RustFS and create buckets
 	@echo "==============================================="
-	@echo "Make: run-minio - running MinIO"
+	@echo "Make: run-rustfs - running RustFS"
 	@echo "==============================================="
-	@docker compose up -d minio minio_setup
+	@docker compose up -d rustfs rustfs_setup
 
 ## ------------------------------------------------------------------------------
 ## Run `npm` commands for all projects
@@ -307,7 +307,7 @@ test-db: ## Runs DB integration tests (transaction/rollback, only needs database
 	@echo "==============================================="
 	@docker compose exec api npm run test:db
 
-test-sys: | run-minio run-clamav run-queue ## Runs system integration tests (needs minio, clamav, queue)
+test-sys: | run-rustfs run-clamav run-queue ## Runs system integration tests (needs rustfs, clamav, queue)
 	@echo "==============================================="
 	@echo "Waiting for ClamAV to be healthy..."
 	@echo "==============================================="

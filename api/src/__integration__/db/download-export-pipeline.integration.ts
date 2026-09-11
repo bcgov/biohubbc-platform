@@ -8,7 +8,7 @@
 //
 // S3 is stubbed everywhere — `ObjectStorageService.uploadStream` resolves
 // without consuming and `ParquetReader.openS3` returns an in-process cursor
-// so the tests never touch MinIO. The real binary-streaming path lives in
+// so the tests never touch S3. The real binary-streaming path lives in
 // the companion system test under `__integration__/system/`.
 
 import * as parquetjs from '@dsnp/parquetjs';

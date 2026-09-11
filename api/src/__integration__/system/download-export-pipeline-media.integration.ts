@@ -1,14 +1,14 @@
 // System integration tests for the CSV download export pipeline — exercises
 // the real binary-streaming path (file-type features, cross-part duplication,
-// missing-binary fallback) against MinIO. Requires MinIO (S3) to be running.
+// missing-binary fallback) against local S3 (RustFS). Requires RustFS to be running.
 //
 // These cases care about the `files{N}/` binary-copy path, which the pure-DB
-// file cannot cover without MinIO. `ParquetReader.openS3` is still stubbed
+// file cannot cover without S3. `ParquetReader.openS3` is still stubbed
 // per-test so we don't need to build a valid Parquet fixture on the fly — the
 // point of these cases is the binary path, not the Parquet reader.
 //
 // Run: make test-sys
-// Requires: make web (database + MinIO must be running)
+// Requires: make web (database + RustFS must be running)
 
 import * as parquetjs from '@dsnp/parquetjs';
 import AdmZip from 'adm-zip';
@@ -45,7 +45,7 @@ async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: st
 }
 
 /**
- * Stream a real Parquet fixture of roughly `targetBytes` directly to MinIO and
+ * Stream a real Parquet fixture of roughly `targetBytes` directly to S3 and
  * return the actual uploaded byte size. Used by the OOM-guard case so the
  * export pipeline has a real Parquet file to read.
  *
@@ -54,7 +54,7 @@ async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: st
  * randomized base64 padding so Parquet's dictionary compression can't collapse
  * them into a tiny footprint.
  */
-async function writeFatParquetToMinIO(
+async function writeFatParquetToS3(
   storageService: ObjectStorageService,
   objectKey: string,
   targetBytes: number
@@ -207,7 +207,7 @@ describe('Download Export pipeline — media (system)', function () {
 
   /**
    * Seed a READY download with one `file`-type submission feature whose
-   * `data.file` points at a real object in MinIO, and insert a corresponding
+   * `data.file` points at a real object in S3, and insert a corresponding
    * per-feature-type Parquet `download_version_artifact` row.
    *
    * The Parquet bytes aren't written — we stub `ParquetReader.openS3` per-test
@@ -225,7 +225,7 @@ describe('Download Export pipeline — media (system)', function () {
     artifactKey: string;
   }> {
     const submissionId = await createTestSubmission(connection);
-    // Unique-per-test key prefix so parallel MinIO state stays isolated, but the
+    // Unique-per-test key prefix so parallel S3 state stays isolated, but the
     // last path segment is exactly `originalFilename` — the pipeline derives the
     // zip entry filename from `filePath.split('/').pop()`, so the key's final
     // segment must match what the assertion expects.
@@ -553,7 +553,7 @@ describe('Download Export pipeline — media (system)', function () {
 
     // Write the fat Parquet fixture at the canonical per-feature-type key.
     const parquetKey = `downloads/${downloadId}/versions/${downloadVersionId}/survey/data.parquet`;
-    const uploadedBytes = await writeFatParquetToMinIO(storageService, parquetKey, fixtureTargetBytes);
+    const uploadedBytes = await writeFatParquetToS3(storageService, parquetKey, fixtureTargetBytes);
     s3KeysToCleanup.push(parquetKey);
 
     // Require at least half the target size so a surprise compression ratio
