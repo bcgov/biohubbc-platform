@@ -1,0 +1,72 @@
+{{- if .Values.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "materialized-view-refresh.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "materialized-view-refresh.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: database-maintenance
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  timeZone: {{ .Values.cronjob.timeZone | quote }}
+  suspend: {{ .Values.cronjob.suspend }}
+  concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.cronjob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.cronjob.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.cronjob.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.cronjob.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "materialized-view-refresh.name" . }}
+            app.kubernetes.io/component: database-maintenance
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: refresh-materialized-views
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: PGHOST
+                  value: {{ .Values.database.host | quote }}
+                - name: PGPORT
+                  value: {{ .Values.database.port | quote }}
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.database.secretName }}
+                      key: {{ .Values.database.secretKeys.database }}
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.database.secretName }}
+                      key: {{ .Values.database.secretKeys.username }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.database.secretName }}
+                      key: {{ .Values.database.secretKeys.password }}
+              command:
+                - /bin/sh
+                - -ec
+              args:
+                - |
+                  echo "Starting materialized-view refresh at $(date -Iseconds)"
+
+                  psql \
+                    --no-psqlrc \
+                    --set=ON_ERROR_STOP=1 \
+                    --command='
+                  {{- range .Values.materializedViews }}
+                    REFRESH MATERIALIZED VIEW{{ if .concurrently }} CONCURRENTLY{{ end }} "{{ .schema }}"."{{ .name }}";
+                  {{- end }}
+                  '
+
+                  echo "Materialized-view refresh completed at $(date -Iseconds)"
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+{{- end }}
