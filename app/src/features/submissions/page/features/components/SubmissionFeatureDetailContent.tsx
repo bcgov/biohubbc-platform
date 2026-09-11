@@ -4,17 +4,14 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { SubmissionFeatureAbout } from 'components/feature/SubmissionFeatureAbout';
 import { AlertBanner } from 'components/notifications/AlertBanner';
-import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
 import { PageSection } from 'components/section/PageSection';
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
-import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
+import { PropsWithChildren } from 'react';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 
 interface SubmissionFeatureDetailContentProps {
   /** Submission feature displayed by the page. */
   feature: ISubmissionFeature;
-  /** Path resolvers for links rendered from feature property values. */
-  pathResolvers: SubmissionPropertyValuePathResolvers;
 }
 
 /**
@@ -24,10 +21,13 @@ interface SubmissionFeatureDetailContentProps {
  * metadata. Loading and missing-data states are handled by the
  * parent page so this component always receives a valid feature.
  *
- * @param {SubmissionFeatureDetailContentProps} props - Feature data and path resolvers for property links.
+ * @param {SubmissionFeatureDetailContentProps} props - Feature data and caller-provided property content.
  * @returns {JSX.Element} The loaded submission feature detail content.
  */
-export const SubmissionFeatureDetailContent = ({ feature, pathResolvers }: SubmissionFeatureDetailContentProps) => {
+export const SubmissionFeatureDetailContent = ({
+  feature,
+  children
+}: PropsWithChildren<SubmissionFeatureDetailContentProps>) => {
   return (
     <Container maxWidth="xl">
       {feature.successor_submission_feature_id && (
@@ -37,11 +37,7 @@ export const SubmissionFeatureDetailContent = ({ feature, pathResolvers }: Submi
         </AlertBanner>
       )}
       <Stack spacing={3} py={4}>
-        <FeaturePropertiesSection
-          submissionId={feature.submission_id}
-          submissionFeatureId={feature.submission_feature_id}
-          pathResolvers={pathResolvers}
-        />
+        {children}
         <PageSection id="submission-feature-map" label="Map">
           <SubmissionFeatureMap
             submissionId={feature.submission_id}

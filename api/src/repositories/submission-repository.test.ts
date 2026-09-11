@@ -1297,6 +1297,49 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('submission upload features', () => {
+    const submissionUploadId = '11111111-1111-4111-8111-111111111111';
+
+    it('gets every feature matching only the submission upload ID', async () => {
+      const knexStub = sinon.stub().callsFake(async (query: Knex.QueryBuilder) => {
+        const { sql, bindings } = query.toSQL();
+
+        expect(sql).to.include('"submission_feature"."submission_upload_id" = ?');
+        expect(sql).to.not.include('submission_feature.record_effective_date');
+        expect(sql).to.not.include('submission_feature.record_end_date');
+        expect(sql).to.not.include('submission_feature.successor_submission_feature_id');
+        expect(sql).to.not.include('join "submission_upload"');
+        expect(bindings).to.include(submissionUploadId);
+
+        return { rows: [], rowCount: 0 } as any;
+      });
+      const repository = new SubmissionRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repository.getSubmissionUploadFeatures(submissionUploadId, { page: 1, limit: 10 });
+
+      expect(knexStub).to.have.been.calledOnce;
+    });
+
+    it('counts every feature matching only the submission upload ID', async () => {
+      const knexStub = sinon.stub().callsFake(async (query: Knex.QueryBuilder) => {
+        const { sql, bindings } = query.toSQL();
+
+        expect(sql).to.include('"submission_feature"."submission_upload_id" = ?');
+        expect(sql).to.not.include('submission_feature.record_effective_date');
+        expect(sql).to.not.include('submission_feature.record_end_date');
+        expect(sql).to.not.include('submission_feature.successor_submission_feature_id');
+        expect(sql).to.not.include('join "submission_upload"');
+        expect(bindings).to.include(submissionUploadId);
+
+        return { rows: [{ count: 2 }], rowCount: 1 } as any;
+      });
+      const repository = new SubmissionRepository(getMockDBConnection({ knex: knexStub }));
+
+      expect(await repository.getSubmissionUploadFeaturesCount(submissionUploadId)).to.equal(2);
+      expect(knexStub).to.have.been.calledOnce;
+    });
+  });
+
   describe('updateSubmissionFeatureParent', () => {
     it('should update the parent submission feature id successfully', async () => {
       const mockQueryResponse: QueryResult<never> = {

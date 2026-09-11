@@ -200,6 +200,32 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
   }
 
   /**
+   * Count persisted reconciliation outcomes for an upload across the complete feature lifecycle.
+   *
+   * Unlike activation counts, this deliberately includes published and ended rows. A feature's
+   * reconciliation classification is immutable, so this result remains stable after publication.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<ReconciliationCounts>} Stored new, modified, and unmodified counts.
+   * @memberof SubmissionFeatureReconciliationRepository
+   */
+  async getSubmissionFeatureReconciliationOverviewCounts(submissionUploadId: string): Promise<ReconciliationCounts> {
+    const sql = SQL`
+      SELECT reconciliation, COUNT(*)::integer AS count
+      FROM submission_feature
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
+        AND reconciliation IS NOT NULL
+      GROUP BY reconciliation;
+    `;
+    const response = await this.connection.sql(sql, ReconciliationCountRow);
+    const counts: ReconciliationCounts = { new: 0, modified: 0, unmodified: 0 };
+    for (const row of response.rows) {
+      counts[row.reconciliation] = row.count;
+    }
+    return counts;
+  }
+
+  /**
    * End pending feature occurrences owned by a superseded upload.
    *
    * @param {string} submissionUploadId Superseded submission upload identifier.

@@ -1,7 +1,6 @@
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ComponentProps } from 'react';
 import { render } from 'test-helpers/test-utils';
-import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 
 // The map owns its own data loading and is covered by its own suite; this one is about the page layout.
@@ -9,13 +8,6 @@ vi.mock('./map/SubmissionFeatureMap', () => ({
   SubmissionFeatureMap: (props: { submissionId: number; submissionFeatureId: number }) => (
     <div data-testid="submission-feature-map-stub" data-props={JSON.stringify(props)} />
   )
-}));
-
-// The Properties section fetches indexed properties through `useApi`; stub it so these tests stay focused on
-// the detail content's own rendering (banners and section layout). The section owns its own
-// heading, so the stub renders one to keep it visible to the section-ordering assertion below.
-vi.mock('components/property/FeaturePropertiesSection', () => ({
-  FeaturePropertiesSection: () => <h2>Properties</h2>
 }));
 
 const mockFeature: ISubmissionFeature = {
@@ -37,7 +29,7 @@ const mockFeature: ISubmissionFeature = {
 
 const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   feature: mockFeature,
-  pathResolvers: buildSubmissionPropertyValuePathResolvers('/submission')
+  children: <h2>Properties</h2>
 };
 
 const renderComponent = (props?: Partial<ComponentProps<typeof SubmissionFeatureDetailContent>>) =>

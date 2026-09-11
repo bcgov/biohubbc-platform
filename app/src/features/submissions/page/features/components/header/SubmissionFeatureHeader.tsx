@@ -28,6 +28,8 @@ interface SubmissionFeatureHeaderProps {
   queryString?: string;
   /** Optional page-level actions displayed in the header. */
   buttons?: ReactNode;
+  /** Optional breadcrumbs for review-scoped navigation. */
+  breadcrumbs?: ReactNode;
   /** Currently selected feature detail tab. */
   activeTab: SubmissionFeatureTab;
   /** Handles feature detail tab changes. */
@@ -51,6 +53,7 @@ export const SubmissionFeatureHeader = ({
   submissionDetailBasePath,
   queryString = '',
   buttons,
+  breadcrumbs,
   activeTab,
   onTabChange
 }: SubmissionFeatureHeaderProps) => {
@@ -59,19 +62,21 @@ export const SubmissionFeatureHeader = ({
     <PageHeader
       buttons={buttons}
       breadcrumbs={
-        <Breadcrumbs aria-label="breadcrumb">
-          <Link component={RouterLink} to={rootBreadcrumbTo} underline="hover" color="inherit">
-            {rootBreadcrumbLabel}
-          </Link>
-          <Link
-            component={RouterLink}
-            to={`${submissionDetailBasePath}/${feature.submission_id}${queryString}`}
-            underline="hover"
-            color="inherit">
-            {feature.submission_name}
-          </Link>
-          <Typography color="text.primary">{featureTypeLabel}</Typography>
-        </Breadcrumbs>
+        breadcrumbs ?? (
+          <Breadcrumbs aria-label="breadcrumb">
+            <Link component={RouterLink} to={rootBreadcrumbTo} underline="hover" color="inherit">
+              {rootBreadcrumbLabel}
+            </Link>
+            <Link
+              component={RouterLink}
+              to={`${submissionDetailBasePath}/${feature.submission_id}${queryString}`}
+              underline="hover"
+              color="inherit">
+              {feature.submission_name}
+            </Link>
+            <Typography color="text.primary">{featureTypeLabel}</Typography>
+          </Breadcrumbs>
+        )
       }
       label={
         <Box display="flex" alignItems="center" gap={1.5}>
