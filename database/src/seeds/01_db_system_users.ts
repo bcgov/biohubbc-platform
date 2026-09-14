@@ -68,6 +68,19 @@ const systemUsers: SystemUserSeed[] = [
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '6936047233B94EA0B8C0698F6349E027'
+  },
+  {
+    // No display_name: exercises the user_identifier fallback in user selectors.
+    identifier: 'tnandars',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: '30fc57700b674533a85561a75db820fb'
+  },
+  {
+    identifier: 'spopov',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: 'A9A27B7B267847AAB44B327F81692AE5'
   }
 ];
 
