@@ -10,6 +10,7 @@ import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useState } from 'react';
 import { CursorPagination } from 'types/pagination';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { SearchResultOptions } from './option/SearchResultOptions';
 import { SearchResultSortOption, SearchResultToolbar } from './toolbar/SearchResultToolbar';
 
@@ -18,6 +19,8 @@ interface SearchResultPanelProps {
   rows: SearchFeatureResultWithRelevancy[];
   /** Feature type property metadata used to build table columns. */
   featureTypeProperties: FeatureTypeProperty[];
+  /** Path resolvers for handling redirects when clicking hyperlinked feature values. */
+  pathResolvers: SubmissionPropertyValuePathResolvers;
   /** Whether the result request is currently loading. */
   isLoading: boolean;
   /** Cursor pagination state for the current result page. */
@@ -71,6 +74,7 @@ interface SearchResultPanelProps {
 export const SearchResultPanel = ({
   rows,
   featureTypeProperties,
+  pathResolvers,
   isLoading,
   cursor,
   totalCount,
@@ -162,6 +166,7 @@ export const SearchResultPanel = ({
             <SearchResultOptions
               rows={rows}
               featureTypeProperties={featureTypeProperties}
+              pathResolvers={pathResolvers}
               isLoading={isLoading}
               view={view}
               onClick={onResultClick}

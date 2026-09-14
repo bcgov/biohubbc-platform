@@ -11,16 +11,14 @@ import { useApi } from 'hooks/useApi';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse } from 'interfaces/useFeaturesApi.interface';
 import { useMemo } from 'react';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 import { PropertyValueDisplay } from './PropertyValueDisplay';
 
-export interface FeaturePropertiesSectionProps {
-  /** Submission the feature belongs to; with `submissionFeatureId`, selects the properties to load. */
+interface FeaturePropertiesSectionProps {
   submissionId: number;
-  /** Feature whose indexed properties are listed. */
   submissionFeatureId: number;
-  /** Submission route base for reference-value links, e.g. `/submission` or `/portal/submission`. */
-  featureRouteBasePath: string;
+  pathResolvers: SubmissionPropertyValuePathResolvers;
 }
 
 /**
@@ -36,7 +34,7 @@ export interface FeaturePropertiesSectionProps {
 export const FeaturePropertiesSection = ({
   submissionId,
   submissionFeatureId,
-  featureRouteBasePath
+  pathResolvers
 }: FeaturePropertiesSectionProps) => {
   const api = useApi();
 
@@ -58,16 +56,12 @@ export const FeaturePropertiesSection = ({
             noWrap
             title={formatSubmissionPropertyValue(params.row.value)}
             sx={{ width: '100%' }}>
-            <PropertyValueDisplay
-              value={params.row.value}
-              submissionId={submissionId}
-              featureRouteBasePath={featureRouteBasePath}
-            />
+            <PropertyValueDisplay value={params.row.value} submissionId={submissionId} pathResolvers={pathResolvers} />
           </Typography>
         )
       }
     ],
-    [submissionId, featureRouteBasePath]
+    [submissionId, pathResolvers]
   );
 
   const propertyGrid = useServerPaginatedDataGrid<IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse>({

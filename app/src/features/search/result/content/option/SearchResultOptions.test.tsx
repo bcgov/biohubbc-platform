@@ -1,5 +1,6 @@
 import { SEARCH_RESULT_VIEW } from 'constants/search';
 import { render, screen } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { SearchResultOptions } from './SearchResultOptions';
 
 describe('SearchResultOptions', () => {
@@ -8,6 +9,7 @@ describe('SearchResultOptions', () => {
       <SearchResultOptions
         rows={[]}
         featureTypeProperties={[]}
+        pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission')}
         isLoading
         view={SEARCH_RESULT_VIEW.TABLE}
         onClick={vi.fn()}

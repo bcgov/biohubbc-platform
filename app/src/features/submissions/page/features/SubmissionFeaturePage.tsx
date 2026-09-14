@@ -5,9 +5,9 @@ import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { parseRouteId } from 'utils/routes';
+import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 import { SubmissionFeatureDetailContent } from './components/SubmissionFeatureDetailContent';
 import { SubmissionFeatureHeader, SubmissionFeatureTab } from './components/header/SubmissionFeatureHeader';
 import { SubmissionFeatureSkeleton } from './components/skeleton/SubmissionFeatureSkeleton';
@@ -50,6 +50,10 @@ export const SubmissionFeaturePage = () => {
   }, [submissionId, submissionFeatureId]);
 
   const feature = featureDataLoader.data?.feature;
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
+    [location.search]
+  );
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
@@ -80,7 +84,7 @@ export const SubmissionFeaturePage = () => {
           <ComponentSwitch<SubmissionFeatureTab>
             switch={activeTab}
             components={{
-              details: <SubmissionFeatureDetailContent feature={feature} featureRouteBasePath="/submission" />
+              details: <SubmissionFeatureDetailContent feature={feature} pathResolvers={pathResolvers} />
             }}
           />
         </>

@@ -1,14 +1,11 @@
 import { FeatureReferencePropertyValue } from 'interfaces/property-value.interface';
-import { useLocation } from 'react-router-dom';
-import { buildSubmissionFeaturePath } from 'utils/routes';
+import { type SubmissionFeaturePathResolver } from 'utils/routes.interface';
 import { parseFeatureUrn } from 'utils/urn-utils';
 import { PropertyValueLink } from './PropertyValueLink';
 
-export interface FeaturePropertyValueLinkProps {
-  /** Structured feature reference value from the indexed-property read model. */
+interface FeaturePropertyValueLinkProps {
   value: FeatureReferencePropertyValue;
-  /** Submission route base, e.g. `/submission` or `/portal/submission`. */
-  featureRouteBasePath: string;
+  getSubmissionFeaturePath: SubmissionFeaturePathResolver;
 }
 
 /**
@@ -20,8 +17,7 @@ export interface FeaturePropertyValueLinkProps {
  * @param {FeaturePropertyValueLinkProps} props
  * @returns {JSX.Element}
  */
-export const FeaturePropertyValueLink = ({ value, featureRouteBasePath }: FeaturePropertyValueLinkProps) => {
-  const location = useLocation();
+export const FeaturePropertyValueLink = ({ value, getSubmissionFeaturePath }: FeaturePropertyValueLinkProps) => {
   const parsed = parseFeatureUrn(value.urn);
 
   if (!parsed) {
@@ -30,12 +26,7 @@ export const FeaturePropertyValueLink = ({ value, featureRouteBasePath }: Featur
 
   return (
     <PropertyValueLink
-      to={buildSubmissionFeaturePath(
-        featureRouteBasePath,
-        parsed.submissionId,
-        parsed.submissionFeatureId,
-        location.search
-      )}
+      to={getSubmissionFeaturePath(parsed.submissionId, parsed.submissionFeatureId)}
       label={value.label}
       title={value.urn}
     />

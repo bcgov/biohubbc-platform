@@ -7,14 +7,13 @@ import { PropertyValueDisplay } from 'components/property/PropertyValueDisplay';
 import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
+import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 
 interface SearchResultTableLayoutProps {
-  /** Result rows rendered in the data grid. */
   results: SearchFeatureResultWithRelevancy[];
-  /** Feature type properties rendered as one column each. */
   featureTypeProperties: FeatureTypeProperty[];
-  /** Opens the selected result's feature detail page. */
+  pathResolvers: SubmissionPropertyValuePathResolvers;
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
 }
 
@@ -29,7 +28,12 @@ interface SearchResultTableLayoutProps {
  * @param {SearchResultTableLayoutProps} props - Results, feature type properties, and optional row click callback.
  * @returns {JSX.Element} Search result data grid.
  */
-export const SearchResultTableLayout = ({ results, featureTypeProperties, onClick }: SearchResultTableLayoutProps) => {
+export const SearchResultTableLayout = ({
+  results,
+  featureTypeProperties,
+  pathResolvers,
+  onClick
+}: SearchResultTableLayoutProps) => {
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
     const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map((property) => ({
       field: String(property.feature_type_property_id),
@@ -47,7 +51,7 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
           <PropertyValueDisplay
             value={params.row.properties?.[property.name]}
             submissionId={params.row.submission_id}
-            featureRouteBasePath="/submission"
+            pathResolvers={pathResolvers}
           />
         </Typography>
       )
@@ -77,7 +81,7 @@ export const SearchResultTableLayout = ({ results, featureTypeProperties, onClic
       },
       ...propertyColumns
     ];
-  }, [featureTypeProperties]);
+  }, [featureTypeProperties, pathResolvers]);
 
   return (
     <CustomDataGrid

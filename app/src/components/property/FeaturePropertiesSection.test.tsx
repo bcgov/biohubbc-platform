@@ -2,6 +2,7 @@ import { waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { Mock } from 'vitest';
 import { FeaturePropertiesSection } from './FeaturePropertiesSection';
 
@@ -16,7 +17,7 @@ const renderSection = (props: Partial<Parameters<typeof FeaturePropertiesSection
       <FeaturePropertiesSection
         submissionId={1}
         submissionFeatureId={10}
-        featureRouteBasePath="/submission"
+        pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission')}
         {...props}
       />
     </MemoryRouter>
@@ -69,7 +70,9 @@ describe('FeaturePropertiesSection', () => {
   });
 
   it('renders scalar values as text and reference values as links under the given route base', async () => {
-    const { findByText, findByRole } = renderSection({ featureRouteBasePath: '/portal/submission' });
+    const { findByText, findByRole } = renderSection({
+      pathResolvers: buildSubmissionPropertyValuePathResolvers('/portal/submission')
+    });
 
     expect(await findByText('Wolf')).toBeVisible();
     expect(await findByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(

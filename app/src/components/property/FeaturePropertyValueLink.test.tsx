@@ -2,28 +2,37 @@ import { fireEvent } from '@testing-library/react';
 import { FeatureReferencePropertyValue } from 'interfaces/property-value.interface';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { FeaturePropertyValueLink } from './FeaturePropertyValueLink';
 
 const feature: FeatureReferencePropertyValue = { urn: 'urn:18:sample_site:3339', label: 'urn:18:sample_site:3339' };
 
-const renderLink = (value: FeatureReferencePropertyValue, featureRouteBasePath = '/submission', initialEntry = '/x') =>
+const renderLink = (
+  value: FeatureReferencePropertyValue,
+  getSubmissionFeaturePath = buildSubmissionPropertyValuePathResolvers('/submission').getSubmissionFeaturePath
+) =>
   render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <FeaturePropertyValueLink value={value} featureRouteBasePath={featureRouteBasePath} />
+    <MemoryRouter>
+      <FeaturePropertyValueLink value={value} getSubmissionFeaturePath={getSubmissionFeaturePath} />
     </MemoryRouter>
   );
 
 describe('FeaturePropertyValueLink', () => {
-  it('links the label to the referenced feature detail page, keeping the query string', () => {
-    const { getByRole } = renderLink(feature, '/submission', '/x?view=table');
+  it('links the label to the referenced feature path provided by the caller', () => {
+    const getSubmissionFeaturePath = vi.fn(() => '/submission/18/feature/3339?view=table');
+    const { getByRole } = renderLink(feature, getSubmissionFeaturePath);
 
     const link = getByRole('link', { name: 'urn:18:sample_site:3339' });
     expect(link).toHaveAttribute('href', '/submission/18/feature/3339?view=table');
     expect(link).toHaveAttribute('title', 'urn:18:sample_site:3339');
+    expect(getSubmissionFeaturePath).toHaveBeenCalledWith(18, 3339);
   });
 
   it('uses the portal route base when given', () => {
-    const { getByRole } = renderLink(feature, '/portal/submission');
+    const { getByRole } = renderLink(
+      feature,
+      buildSubmissionPropertyValuePathResolvers('/portal/submission').getSubmissionFeaturePath
+    );
 
     expect(getByRole('link')).toHaveAttribute('href', '/portal/submission/18/feature/3339');
   });
@@ -40,7 +49,10 @@ describe('FeaturePropertyValueLink', () => {
     const { getByRole } = render(
       <MemoryRouter>
         <div onClick={onRowClick}>
-          <FeaturePropertyValueLink value={feature} featureRouteBasePath="/submission" />
+          <FeaturePropertyValueLink
+            value={feature}
+            getSubmissionFeaturePath={buildSubmissionPropertyValuePathResolvers('/submission').getSubmissionFeaturePath}
+          />
         </div>
       </MemoryRouter>
     );
