@@ -180,3 +180,75 @@ export function deleteSubmissionUploadReview(): RequestHandler {
     }
   };
 }
+
+export const GET: Operation = [
+  authorizeRequestHandler(() => ({
+    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+  })),
+  getSubmissionUploadReview()
+];
+
+GET.apiDoc = {
+  description: 'Get an active human review for a submission upload.',
+  tags: ['admin'],
+  security: [{ Bearer: [] }],
+  parameters: [
+    {
+      description: 'Submission ID',
+      in: 'path',
+      name: 'submissionId',
+      schema: { type: 'integer', minimum: 1 },
+      required: true
+    },
+    {
+      description: 'Submission Upload ID',
+      in: 'path',
+      name: 'submissionUploadId',
+      schema: { type: 'string', format: 'uuid' },
+      required: true
+    },
+    {
+      description: 'Submission upload review ID',
+      in: 'path',
+      name: 'submissionUploadReviewId',
+      schema: { type: 'string', format: 'uuid' },
+      required: true
+    }
+  ],
+  responses: {
+    200: {
+      description: 'Submission upload review.',
+      content: { 'application/json': { schema: SubmissionUploadReviewResponseSchema } }
+    },
+    ...defaultErrorResponses
+  }
+};
+
+/**
+ * Get an active review belonging to a submission upload.
+ *
+ * @returns {RequestHandler} Express request handler.
+ */
+export function getSubmissionUploadReview(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req.keycloak_token);
+
+    try {
+      await connection.open();
+      const service = new SubmissionUploadReviewService(connection);
+      const review = await service.getSubmissionUploadReview(
+        Number(req.params.submissionId),
+        req.params.submissionUploadId,
+        req.params.submissionUploadReviewId
+      );
+      await connection.commit();
+      return res.status(200).json(review);
+    } catch (error) {
+      defaultLog.error({ label: 'getSubmissionUploadReview', message: 'error getting review', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+}

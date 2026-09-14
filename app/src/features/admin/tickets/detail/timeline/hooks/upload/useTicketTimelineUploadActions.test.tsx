@@ -96,9 +96,7 @@ describe('useTicketTimelineUploadActions', () => {
     });
     await act(async () => request);
 
-    expect(mocks.navigate).toHaveBeenCalledWith(
-      `/admin/submission/17/upload/${submissionUploadId}/review/security/${reviewId}`
-    );
+    expect(mocks.navigate).toHaveBeenCalledWith(`/admin/submission/17/upload/${submissionUploadId}/review/${reviewId}`);
   });
 
   it('reports a validation review failure without navigating and allows a retry', async () => {
@@ -124,7 +122,7 @@ describe('useTicketTimelineUploadActions', () => {
 
     await waitFor(() =>
       expect(mocks.navigate).toHaveBeenCalledWith(
-        `/admin/submission/17/upload/${submissionUploadId}/review/validation/${reviewId}`
+        `/admin/submission/17/upload/${submissionUploadId}/review/${reviewId}`
       )
     );
     expect(insertSubmissionUploadReview).toHaveBeenCalledTimes(2);
@@ -133,11 +131,9 @@ describe('useTicketTimelineUploadActions', () => {
   it('opens an existing review without creating another review', () => {
     const { result } = renderHook(() => useTicketTimelineUploadActions());
 
-    act(() => result.current.handleOpenSubmissionUploadReview(upload, 'validation', reviewId));
+    act(() => result.current.handleOpenSubmissionUploadReview(upload, reviewId));
 
-    expect(mocks.navigate).toHaveBeenCalledWith(
-      `/admin/submission/17/upload/${submissionUploadId}/review/validation/${reviewId}`
-    );
+    expect(mocks.navigate).toHaveBeenCalledWith(`/admin/submission/17/upload/${submissionUploadId}/review/${reviewId}`);
     expect(insertSubmissionUploadReview).not.toHaveBeenCalled();
   });
 });

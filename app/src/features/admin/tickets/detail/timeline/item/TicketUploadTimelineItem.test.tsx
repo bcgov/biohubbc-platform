@@ -81,11 +81,7 @@ describe('TicketUploadTimelineItem', () => {
     const completedReview = screen.getByRole('menuitem', { name: 'Malware findings' });
 
     await user.click(completedReview);
-    expect(baseProps.onOpenReview).toHaveBeenCalledWith(
-      upload,
-      'security',
-      upload.reviews.security[1].submission_upload_review_id
-    );
+    expect(baseProps.onOpenReview).toHaveBeenCalledWith(upload, upload.reviews.security[1].submission_upload_review_id);
     expect(baseProps.onCreateReview).not.toHaveBeenCalled();
   });
 

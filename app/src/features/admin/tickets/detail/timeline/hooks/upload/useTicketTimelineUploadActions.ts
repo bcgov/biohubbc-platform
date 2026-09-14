@@ -123,7 +123,7 @@ export const useTicketTimelineUploadActions = () => {
       );
 
       navigate(
-        `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${scope}/${insertedReview.submission_upload_review_id}`
+        `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${insertedReview.submission_upload_review_id}`
       );
     } catch (error) {
       showUploadActionError(error);
@@ -134,17 +134,15 @@ export const useTicketTimelineUploadActions = () => {
    * Opens an existing scoped review workflow.
    *
    * @param {TicketSubmissionUploadResponse} upload Upload that owns the existing review.
-   * @param {SubmissionUploadReviewScope} scope Existing review scope.
    * @param {string} submissionUploadReviewId Existing review identifier.
    * @returns {void}
    */
   const handleOpenSubmissionUploadReview = (
     upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
     submissionUploadReviewId: string
   ): void => {
     navigate(
-      `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${scope}/${submissionUploadReviewId}`
+      `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${submissionUploadReviewId}`
     );
   };
 

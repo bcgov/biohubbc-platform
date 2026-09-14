@@ -193,10 +193,6 @@ export interface ISubmissionUploadReviewStatusResponse {
   status: SubmissionUploadReviewStatus;
 }
 
-export interface IUpdateSubmissionUploadReviewRequest {
-  status: SubmissionUploadReviewTaskStatus;
-}
-
 export interface ICreateSubmissionUploadReviewRequest {
   name: string;
   description: string | null;

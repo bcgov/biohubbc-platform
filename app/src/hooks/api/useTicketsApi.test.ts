@@ -242,38 +242,6 @@ describe('useTicketsApi', () => {
     ).resolves.toEqual(response);
   });
 
-  it('updateSubmissionUploadReview patches a scoped upload review task', async () => {
-    const submissionId = 17;
-    const submissionUploadId = '22222222-2222-4222-8222-222222222222';
-    const submissionUploadReviewId = '11111111-1111-4111-8111-111111111111';
-    const payload = { status: 'completed' as const };
-    const response: TicketSubmissionUploadReviewResponse = {
-      submission_upload_review_id: submissionUploadReviewId,
-      submission_upload_id: submissionUploadId,
-      name: 'Access rules',
-      description: 'Review access rules',
-      scope: 'security',
-      status: 'completed',
-      requested_by: 7
-    };
-
-    mock
-      .onPatch(
-        `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
-        payload
-      )
-      .reply(200, response);
-
-    const result = await useTicketsApi(axios).updateSubmissionUploadReview(
-      submissionId,
-      submissionUploadId,
-      submissionUploadReviewId,
-      payload
-    );
-
-    expect(result).toEqual(response);
-  });
-
   it('insertSubmissionUploadReview posts a scoped upload review', async () => {
     const submissionId = 17;
     const submissionUploadId = '22222222-2222-4222-8222-222222222222';

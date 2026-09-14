@@ -74,4 +74,26 @@ describe('SubmissionFeatureReconciliationRepository', () => {
     const activateText = sql.firstCall.args[0].text as string;
     expect(activateText).to.include('reconciliation IS NOT NULL');
   });
+
+  it('counts reconciliation outcomes across the complete feature lifecycle', async () => {
+    const sql = sinon.stub().resolves(
+      mockQueryResult(
+        [
+          { reconciliation: 'new', count: 4 },
+          { reconciliation: 'unmodified', count: 7 }
+        ],
+        2
+      )
+    );
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.getSubmissionFeatureReconciliationOverviewCounts('upload-id')).to.eql({
+      new: 4,
+      modified: 0,
+      unmodified: 7
+    });
+    const text = sql.firstCall.args[0].text as string;
+    expect(text).to.not.include('record_effective_date');
+    expect(text).to.not.include('record_end_date');
+  });
 });

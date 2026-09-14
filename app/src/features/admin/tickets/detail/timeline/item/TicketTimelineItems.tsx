@@ -37,11 +37,7 @@ interface ITicketTimelineItemsProps {
     scope: SubmissionUploadReviewScope,
     review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
   ) => void;
-  onOpenSubmissionUploadReview: (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope,
-    submissionUploadReviewId: string
-  ) => void;
+  onOpenSubmissionUploadReview: (upload: TicketSubmissionUploadResponse, submissionUploadReviewId: string) => void;
   onConfirmSubmissionUploadReviewStatusUpdate: (
     upload: TicketSubmissionUploadResponse,
     status: 'approved' | 'denied'
