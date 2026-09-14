@@ -459,25 +459,25 @@ export class SubmissionUploadService extends DBService {
    * has no processing history yet. Rows are returned earliest first, in the order the statuses were
    * entered. Superseded rows (end-dated by reprocessing) are excluded.
    *
-   * @param {string} submissionUuid Submission UUID from the request path.
+   * @param {number} submissionId Submission ID from the request path.
    * @param {string} submissionUploadId Submission upload UUID from the request path.
    * @returns {Promise<SubmissionUploadProcessingStatusHistoryItem[]>} Active processing status rows, earliest first.
    * @throws {ApiNotFoundError} If the upload does not exist or does not belong to the submission.
    * @memberof SubmissionUploadService
    */
   async findSubmissionUploadProcessingStatusHistory(
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string
   ): Promise<SubmissionUploadProcessingStatusHistoryItem[]> {
     const rows = await this.submissionUploadProcessingStatusRepository.findSubmissionUploadProcessingStatusHistory(
-      submissionUuid,
+      submissionId,
       submissionUploadId
     );
 
     if (!rows.length) {
       throw new ApiNotFoundError('Submission upload not found', [
         'SubmissionUploadService->findSubmissionUploadProcessingStatusHistory',
-        { submissionUuid, submissionUploadId }
+        { submissionId, submissionUploadId }
       ]);
     }
 

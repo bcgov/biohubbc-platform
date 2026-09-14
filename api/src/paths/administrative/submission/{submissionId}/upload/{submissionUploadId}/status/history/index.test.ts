@@ -12,10 +12,10 @@ import { GET, getSubmissionUploadProcessingStatusHistory } from './index';
 
 chai.use(sinonChai);
 
-const SUBMISSION_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const SUBMISSION_ID = 17;
 const SUBMISSION_UPLOAD_ID = '550e8400-e29b-41d4-a716-446655440000';
 
-describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/status/history', () => {
+describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status/history', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -31,11 +31,11 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
       .resolves(history);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionUuid: SUBMISSION_UUID, submissionUploadId: SUBMISSION_UPLOAD_ID };
+    mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
 
     await getSubmissionUploadProcessingStatusHistory()(mockReq, mockRes, mockNext);
 
-    expect(findStub).to.have.been.calledOnceWith(SUBMISSION_UUID, SUBMISSION_UPLOAD_ID);
+    expect(findStub).to.have.been.calledOnceWith(SUBMISSION_ID, SUBMISSION_UPLOAD_ID);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(history);
     expect(commit).to.have.been.calledOnce;
@@ -49,7 +49,7 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
       .resolves([buildHistoryItem(1, 'uploaded'), buildHistoryItem(2, 'failed')]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionUuid: SUBMISSION_UUID, submissionUploadId: SUBMISSION_UPLOAD_ID };
+    mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
 
     await getSubmissionUploadProcessingStatusHistory()(mockReq, mockRes, mockNext);
 
@@ -63,7 +63,7 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
     sinon.stub(SubmissionUploadService.prototype, 'findSubmissionUploadProcessingStatusHistory').rejects(notFound);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionUuid: SUBMISSION_UUID, submissionUploadId: SUBMISSION_UPLOAD_ID };
+    mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
 
     try {
       await getSubmissionUploadProcessingStatusHistory()(mockReq, mockRes, mockNext);

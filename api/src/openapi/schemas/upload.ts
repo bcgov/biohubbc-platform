@@ -252,7 +252,7 @@ export const SubmissionUploadStatusHistoryResponseSchema: OpenAPIV3.SchemaObject
 
 /**
  * One entry of an upload's processing status history
- * (GET /administrative/submission/{submissionUuid}/upload/{submissionUploadId}/status/history).
+ * (GET /administrative/submission/{submissionId}/upload/{submissionUploadId}/status/history).
  */
 export const SubmissionUploadProcessingStatusHistoryItemSchema: OpenAPIV3.SchemaObject = {
   type: 'object',

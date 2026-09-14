@@ -55,7 +55,7 @@ const ticketArtifact: ITicketArtifact = {
 
 const makeSubmissionUpload = (): TicketSubmissionUploadResponse => ({
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-  submission_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  submission_id: 17,
   upload_id: '77777777-7777-4777-8777-777777777777',
   create_date: '2026-02-26T00:00:00.000Z',
   submission_name: 'Moose survey',
@@ -65,7 +65,7 @@ const makeSubmissionUpload = (): TicketSubmissionUploadResponse => ({
   upload_status: 'ingested',
   decision: 'pending',
   validation: null,
-  reviews: { validation: null, security: null }
+  reviews: { validation: [], security: [] }
 });
 
 const makeTicket = (): ITicketExtended => ({
@@ -349,7 +349,7 @@ describe('TicketTimeline', () => {
 
     await waitFor(() => expect(screen.getByText('Uploaded')).toBeVisible());
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledWith(
-      upload.submission_uuid,
+      upload.submission_id,
       upload.submission_upload_id
     );
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);

@@ -17,7 +17,7 @@ const makeUpload = (
   uploadStatus: SubmissionUploadJobStatus = 'ingested'
 ): TicketSubmissionUploadResponse => ({
   submission_upload_id: submissionUploadId,
-  submission_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  submission_id: 17,
   upload_id: '44444444-4444-4444-8444-444444444444',
   create_date: '2026-09-03T00:00:00.000Z',
   submission_name: 'Submission',
@@ -27,7 +27,7 @@ const makeUpload = (
   upload_status: uploadStatus,
   decision: 'pending',
   validation: null,
-  reviews: { validation: null, security: null }
+  reviews: { validation: [], security: [] }
 });
 
 const history: ISubmissionUploadProcessingStatusHistoryItem[] = [
@@ -66,10 +66,7 @@ describe('useSubmissionUploadStatusHistory', () => {
     });
 
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
-    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledWith(
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      'upload-1'
-    );
+    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledWith(17, 'upload-1');
     expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({
       status: 'loaded',
       history,

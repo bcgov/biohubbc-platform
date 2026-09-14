@@ -229,16 +229,16 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Get the active processing status history of a submission upload, earliest first.
    *
-   * @param {string} submissionUuid
+   * @param {number} submissionId
    * @param {string} submissionUploadId
    * @return {Promise<ISubmissionUploadProcessingStatusHistoryItem[]>}
    */
   const getSubmissionUploadProcessingStatusHistory = async (
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string
   ): Promise<ISubmissionUploadProcessingStatusHistoryItem[]> => {
     const { data } = await axios.get<ISubmissionUploadProcessingStatusHistoryItem[]>(
-      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status/history`
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status/history`
     );
 
     return data;

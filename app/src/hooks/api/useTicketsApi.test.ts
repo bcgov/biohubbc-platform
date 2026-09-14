@@ -37,7 +37,7 @@ describe('useTicketsApi', () => {
   });
 
   it('getSubmissionUploadProcessingStatusHistory fetches the history for the upload', async () => {
-    const submissionUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const submissionId = 17;
     const submissionUploadId = '550e8400-e29b-41d4-a716-446655440000';
     const response: ISubmissionUploadProcessingStatusHistoryItem[] = [
       {
@@ -49,11 +49,11 @@ describe('useTicketsApi', () => {
     ];
 
     mock
-      .onGet(`/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status/history`)
+      .onGet(`/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status/history`)
       .reply(200, response);
 
     const result = await useTicketsApi(axios).getSubmissionUploadProcessingStatusHistory(
-      submissionUuid,
+      submissionId,
       submissionUploadId
     );
 

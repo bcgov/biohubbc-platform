@@ -9,7 +9,7 @@ import { SubmissionUploadService } from '../../../../../../../../services/upload
 import { getLogger } from '../../../../../../../../utils/logger';
 
 const defaultLog = getLogger(
-  'paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/status/history'
+  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status/history'
 );
 
 export const GET: Operation = [
@@ -26,10 +26,10 @@ GET.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission UUID',
+      description: 'Submission ID',
       in: 'path',
-      name: 'submissionUuid',
-      schema: { type: 'string', format: 'uuid' },
+      name: 'submissionId',
+      schema: { type: 'integer', minimum: 1 },
       required: true
     },
     {
@@ -73,11 +73,11 @@ export function getSubmissionUploadProcessingStatusHistory(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUuid, submissionUploadId } = req.params;
+      const { submissionId, submissionUploadId } = req.params;
       const submissionUploadService = new SubmissionUploadService(connection);
 
       const result = await submissionUploadService.findSubmissionUploadProcessingStatusHistory(
-        submissionUuid,
+        Number(submissionId),
         submissionUploadId
       );
 

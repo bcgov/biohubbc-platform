@@ -72,7 +72,7 @@ export const useSubmissionUploadStatusHistory = () => {
 
       try {
         const history = await api.tickets.getSubmissionUploadProcessingStatusHistory(
-          upload.submission_uuid,
+          upload.submission_id,
           upload.submission_upload_id
         );
 

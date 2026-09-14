@@ -95,13 +95,13 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
    * Returns exactly one row with null status columns when the upload exists but has no processing
    * history rows. Otherwise returns one row per active processing status.
    *
-   * @param {string} submissionUuid - Submission the upload must belong to.
+   * @param {number} submissionId - Submission the upload must belong to.
    * @param {string} submissionUploadId - Submission upload whose history is requested.
    * @returns {Promise<SubmissionUploadProcessingStatusHistoryRow[]>} - Rows ordered by create_date, then id.
    * @memberof SubmissionUploadProcessingStatusRepository
    */
   async findSubmissionUploadProcessingStatusHistory(
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string
   ): Promise<SubmissionUploadProcessingStatusHistoryRow[]> {
     const sqlStatement = SQL`
@@ -112,12 +112,11 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
         sus.create_date
       FROM
         submission_upload su
-      INNER JOIN submission s ON s.submission_id = su.submission_id
       LEFT JOIN submission_upload_status sus
         ON sus.submission_upload_id = su.submission_upload_id
         AND sus.record_end_date IS NULL
       WHERE
-        s.uuid = ${submissionUuid}
+        su.submission_id = ${submissionId}
         AND su.submission_upload_id = ${submissionUploadId}
         AND su.record_end_date IS NULL
       ORDER BY

@@ -563,9 +563,9 @@ describe('SubmissionUploadService', () => {
           }
         ]);
 
-      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+      const result = await service.findSubmissionUploadProcessingStatusHistory(17, 'artifact-1');
 
-      expect(findStub).to.have.been.calledOnceWith('submission-uuid', 'artifact-1');
+      expect(findStub).to.have.been.calledOnceWith(17, 'artifact-1');
       expect(result).to.eql([
         {
           submission_upload_status_id: 1,
@@ -589,7 +589,7 @@ describe('SubmissionUploadService', () => {
           { submission_upload_id: 'artifact-1', submission_upload_status_id: null, status: null, create_date: null }
         ]);
 
-      const result = await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+      const result = await service.findSubmissionUploadProcessingStatusHistory(17, 'artifact-1');
 
       expect(result).to.eql([]);
     });
@@ -600,7 +600,7 @@ describe('SubmissionUploadService', () => {
         .resolves([]);
 
       try {
-        await service.findSubmissionUploadProcessingStatusHistory('submission-uuid', 'artifact-1');
+        await service.findSubmissionUploadProcessingStatusHistory(17, 'artifact-1');
         expect.fail('Expected ApiNotFoundError not thrown');
       } catch (err) {
         expect(err).to.be.instanceOf(ApiNotFoundError);

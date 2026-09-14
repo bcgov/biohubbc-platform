@@ -14,7 +14,7 @@ import { TicketUploadStatusRow } from './TicketUploadStatusRow';
 
 const makeUpload = (uploadStatus: SubmissionUploadJobStatus): TicketSubmissionUploadResponse => ({
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
-  submission_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  submission_id: 17,
   upload_id: '44444444-4444-4444-8444-444444444444',
   create_date: '2026-09-03T00:00:00.000Z',
   submission_name: 'Submission',
@@ -24,7 +24,7 @@ const makeUpload = (uploadStatus: SubmissionUploadJobStatus): TicketSubmissionUp
   upload_status: uploadStatus,
   decision: 'pending',
   validation: null,
-  reviews: { validation: null, security: null }
+  reviews: { validation: [], security: [] }
 });
 
 const makeHistoryItem = (
