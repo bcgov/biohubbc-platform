@@ -26,9 +26,10 @@ export interface IMartinSession {
 }
 
 /**
- * A tile session for a single submission feature's spatial properties.
+ * A tile session for a subject with a fixed extent: a single submission feature's spatial properties, or the spatial
+ * properties of every active feature of a submission upload.
  */
-export interface ISubmissionFeatureTileSession {
+export interface ITileExtentSession {
   has_spatial_properties: true;
   /**
    * Short lived tile token. Held in memory and attached as a Bearer token on tile requests; it must never appear in
@@ -44,7 +45,7 @@ export interface ISubmissionFeatureTileSession {
   source_layer: string;
   /** Tile URL template for MapLibre, e.g. `/martin/feature/{z}/{x}/{y}`. */
   martin_url_template: string;
-  /** Combined extent of the feature's spatial properties as `[minX, minY, maxX, maxY]` in WGS84. */
+  /** Combined extent of the mapped spatial properties as `[minX, minY, maxX, maxY]` in WGS84. */
   bbox: [number, number, number, number];
   /** Lowest zoom the tile source serves. */
   min_zoom: number;
@@ -53,12 +54,26 @@ export interface ISubmissionFeatureTileSession {
 }
 
 /**
- * A feature with nothing to map. No token is issued, so no tiles can be requested.
+ * A subject with nothing to map. No token is issued, so no tiles can be requested.
  */
-export interface ISubmissionFeatureTileSessionEmpty {
+export interface ITileExtentSessionEmpty {
   has_spatial_properties: false;
 }
 
-export type CreateSubmissionFeatureTileSessionResponse =
-  | ISubmissionFeatureTileSession
-  | ISubmissionFeatureTileSessionEmpty;
+export type CreateTileExtentSessionResponse = ITileExtentSession | ITileExtentSessionEmpty;
+
+/** A tile session for a single submission feature's spatial properties. */
+export type ISubmissionFeatureTileSession = ITileExtentSession;
+
+/** A feature with nothing to map. */
+export type ISubmissionFeatureTileSessionEmpty = ITileExtentSessionEmpty;
+
+export type CreateSubmissionFeatureTileSessionResponse = CreateTileExtentSessionResponse;
+
+/** A tile session for the spatial properties of every active feature of a submission upload. */
+export type ISubmissionUploadTileSession = ITileExtentSession;
+
+/** An upload with nothing to map. */
+export type ISubmissionUploadTileSessionEmpty = ITileExtentSessionEmpty;
+
+export type CreateSubmissionUploadTileSessionResponse = CreateTileExtentSessionResponse;

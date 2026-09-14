@@ -8,7 +8,7 @@ import {
   FEATURE_LINE_LAYER_ID,
   FEATURE_OUTLINE_LAYER_ID,
   FEATURE_POINT_LAYER_ID
-} from './feature-map-layers';
+} from 'components/map/geometry-tile-layers';
 import { SubmissionFeatureMap } from './SubmissionFeatureMap';
 
 const mocks = vi.hoisted(() => ({
