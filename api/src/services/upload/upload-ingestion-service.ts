@@ -17,7 +17,6 @@ import { TicketService } from '../ticket-service';
 import { UserService } from '../user-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
-import { SubmissionUploadReviewService } from './submission-upload-review-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
@@ -40,7 +39,6 @@ export class UploadIngestionService extends DBService {
   artifactService = new ArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
-  submissionUploadReviewService = new SubmissionUploadReviewService(this.connection);
   submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
@@ -199,20 +197,13 @@ export class UploadIngestionService extends DBService {
       submitterSystemUserIds
     );
 
-    // 4. Create pending validation/security review tasks for this upload
-    await this.submissionUploadReviewService.createDefaultReviewsForUpload(
-      submissionId,
-      submission_upload_id,
-      this.connection.systemUserId()
-    );
-
-    // 5. Create initial review status (submitted = unreviewed)
+    // 4. Create initial review status (submitted = unreviewed)
     await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
       submission_upload_id,
       status: 'submitted'
     });
 
-    // 6. Create placeholder artifact for archive
+    // 5. Create placeholder artifact for archive
     const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
@@ -224,7 +215,7 @@ export class UploadIngestionService extends DBService {
       format: 'tar'
     });
 
-    // 7. Create upload_archive metadata
+    // 6. Create upload_archive metadata
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,

@@ -9,11 +9,10 @@ import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import {
   ITicketArtifact,
+  ICreateSubmissionUploadReviewRequest,
   ITicketExtended,
   SubmissionUploadReviewScope,
-  SubmissionUploadReviewTaskStatus,
-  TicketSubmissionUploadResponse,
-  TicketSubmissionUploadReviewResponse
+  TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
 import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
@@ -33,11 +32,15 @@ interface ITicketTimelineItemsProps {
   onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
-  onRequestSubmissionUploadReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
-  onUpdateSubmissionUploadReview: (
+  onCreateSubmissionUploadReview: (
     upload: TicketSubmissionUploadResponse,
-    review: TicketSubmissionUploadReviewResponse,
-    status: SubmissionUploadReviewTaskStatus
+    scope: SubmissionUploadReviewScope,
+    review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
+  ) => void;
+  onOpenSubmissionUploadReview: (
+    upload: TicketSubmissionUploadResponse,
+    scope: SubmissionUploadReviewScope,
+    submissionUploadReviewId: string
   ) => void;
   onConfirmSubmissionUploadReviewStatusUpdate: (
     upload: TicketSubmissionUploadResponse,
@@ -64,8 +67,8 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onViewFinalizedPolicy,
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
-    onRequestSubmissionUploadReview,
-    onUpdateSubmissionUploadReview,
+    onCreateSubmissionUploadReview,
+    onOpenSubmissionUploadReview,
     onConfirmSubmissionUploadReviewStatusUpdate,
     onConfirmSubmissionUploadReviewStatusReset
   } = props;
@@ -101,7 +104,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     ...ticket.submission_uploads.map(
       (upload): UploadEvent => ({
         kind: 'upload',
-        id: `${upload.submission_uuid}-${upload.submission_upload_id}`,
+        id: `${upload.submission_id}-${upload.submission_upload_id}`,
         create_date: upload.create_date,
         upload
       })
@@ -159,8 +162,8 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                   absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
                 }) ?? ''
               }
-              onRequestReview={onRequestSubmissionUploadReview}
-              onUpdateReview={onUpdateSubmissionUploadReview}
+              onCreateReview={onCreateSubmissionUploadReview}
+              onOpenReview={onOpenSubmissionUploadReview}
               onAccept={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'approved')}
               onReject={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'denied')}
               onResetDecision={onConfirmSubmissionUploadReviewStatusReset}

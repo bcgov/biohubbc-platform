@@ -72,14 +72,14 @@ export interface SubmissionUploadFilters {
 }
 
 export const TicketSubmissionUploadReviews = z.object({
-  validation: SubmissionUploadReview.nullable(),
-  security: SubmissionUploadReview.nullable()
+  validation: z.array(SubmissionUploadReview),
+  security: z.array(SubmissionUploadReview)
 });
 export type TicketSubmissionUploadReviews = z.infer<typeof TicketSubmissionUploadReviews>;
 
 export const TicketSubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
-  submission_uuid: z.string().uuid(),
+  submission_id: z.number().int().positive(),
   upload_id: z.string().uuid(),
   create_date: z.string(),
   submission_name: z.string().nullable(),

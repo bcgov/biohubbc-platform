@@ -13,7 +13,7 @@ import { deleteSubmissionUploadReview, updateSubmissionUploadReview } from './in
 
 chai.use(sinonChai);
 
-describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review/{submissionUploadReviewId}', () => {
+describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review/{submissionUploadReviewId}', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -31,7 +31,7 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionId: '17',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
       submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
@@ -40,7 +40,7 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
     await updateSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
     expect(updateStub).to.have.been.calledOnceWith(
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      17,
       '550e8400-e29b-41d4-a716-446655440000',
       '11111111-1111-4111-8111-111111111111',
       { status: SubmissionUploadReviewStatus.IN_PROGRESS }
@@ -60,7 +60,7 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionId: '17',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
       submissionUploadReviewId: '11111111-1111-4111-8111-111111111111'
     };
@@ -68,7 +68,7 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
     await deleteSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
     expect(deleteStub).to.have.been.calledOnceWith(
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      17,
       '550e8400-e29b-41d4-a716-446655440000',
       '11111111-1111-4111-8111-111111111111'
     );
@@ -92,6 +92,8 @@ const buildReview = (params: {
 }): SubmissionUploadReview => ({
   submission_upload_review_id: params.submission_upload_review_id,
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+  name: 'Access rules',
+  description: 'Review access rules',
   scope: params.scope,
   status: params.status ?? SubmissionUploadReviewStatus.REQUESTED,
   requested_by: 7

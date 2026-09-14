@@ -2,10 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../database/db';
-import {
-  SubmissionUploadReviewScope,
-  SubmissionUploadReviewStatus
-} from '../../../../../../../models/submission-upload-review';
 import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import {
   RequestSubmissionUploadReviewRequestSchema,
@@ -15,7 +11,7 @@ import { authorizeRequestHandler } from '../../../../../../../request-handlers/s
 import { SubmissionUploadReviewService } from '../../../../../../../services/upload/submission-upload-review-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review');
+const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
@@ -30,10 +26,10 @@ GET.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission UUID',
+      description: 'Submission ID',
       in: 'path',
-      name: 'submissionUuid',
-      schema: { type: 'string', format: 'uuid' },
+      name: 'submissionId',
+      schema: { type: 'integer', minimum: 1 },
       required: true
     },
     {
@@ -68,15 +64,15 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Create a scoped human review task for a submission upload.',
+  description: 'Create a scoped human review task for a submission upload without changing existing reviews.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission UUID',
+      description: 'Submission ID',
       in: 'path',
-      name: 'submissionUuid',
-      schema: { type: 'string', format: 'uuid' },
+      name: 'submissionId',
+      schema: { type: 'integer', minimum: 1 },
       required: true
     },
     {
@@ -115,11 +111,11 @@ export function getSubmissionUploadReviews(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUuid, submissionUploadId } = req.params;
+      const { submissionId, submissionUploadId } = req.params;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
       const result = await submissionUploadReviewService.findReviewsBySubmissionUploadId(
-        submissionUuid,
+        Number(submissionId),
         submissionUploadId
       );
 
@@ -147,12 +143,14 @@ export function insertSubmissionUploadReview(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUuid, submissionUploadId } = req.params;
-      const { scope, status }: { scope: SubmissionUploadReviewScope; status: SubmissionUploadReviewStatus } = req.body;
+      const { submissionId, submissionUploadId } = req.params;
+      const { name, description, scope, status } = req.body;
 
       const submissionUploadReviewService = new SubmissionUploadReviewService(connection);
-      const result = await submissionUploadReviewService.insertSubmissionUploadReview(submissionUuid, {
+      const result = await submissionUploadReviewService.insertSubmissionUploadReview(Number(submissionId), {
         submission_upload_id: submissionUploadId,
+        name,
+        description,
         scope,
         status,
         requested_by: connection.systemUserId()

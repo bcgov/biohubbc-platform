@@ -395,6 +395,13 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          borderRadius: '4px'
+        }
+      }
+    },
     MuiAutocomplete: {
       styleOverrides: {
         root: ({ theme }) => {

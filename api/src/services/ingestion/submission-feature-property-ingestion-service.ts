@@ -5,7 +5,6 @@ import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import { TaxonomyService } from '../taxonomy-service';
-import { SubmissionUploadReviewService } from '../upload/submission-upload-review-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
@@ -24,7 +23,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionRepository: SubmissionRepository;
   submissionFeatureIngestionService: SubmissionFeatureIngestionService;
   contributorService: ContributorService;
-  submissionUploadReviewService: SubmissionUploadReviewService;
   submissionUploadService: SubmissionUploadService;
   taxonomyService: TaxonomyService;
 
@@ -41,7 +39,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     this.submissionRepository = new SubmissionRepository(connection);
     this.submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
     this.contributorService = new ContributorService(connection);
-    this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
     this.taxonomyService = new TaxonomyService(connection);
   }
@@ -357,12 +354,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
         submissionUploadId,
         submissionId
-      );
-
-      await this.submissionUploadReviewService.requestDefaultReviewsForUpload(
-        submissionId,
-        submissionUploadId,
-        this.connection.systemUserId()
       );
 
       defaultLog.debug({

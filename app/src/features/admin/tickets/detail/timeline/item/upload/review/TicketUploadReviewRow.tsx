@@ -1,28 +1,56 @@
+import { mdiPlus } from '@mdi/js';
+import Button from '@mui/material/Button';
+import { DropdownButton } from 'components/DropdownButton';
 import { ITicketUploadReviewRowProps } from '../TicketUploadTimelineItem.interface';
-import { TicketUploadReviewDropdown } from './TicketUploadReviewDropdown';
 import { TicketUploadReviewRowLayout } from './TicketUploadReviewRowLayout';
 
 /**
- * Displays and updates one scoped human review task on the upload timeline card.
+ * Starts new scoped reviews and opens any existing review for the upload timeline card.
  *
- * @param {ITicketUploadReviewRowProps} props
- * @return {*}
+ * @param {ITicketUploadReviewRowProps} props - Component props.
+ * @returns {JSX.Element} Submission upload review action row.
  */
 export const TicketUploadReviewRow = (props: ITicketUploadReviewRowProps) => {
-  const { label, upload, review, onUpdateReview } = props;
+  const { label, scope, reviews, onCreateReview, onOpenReview } = props;
+  const isCompleted = reviews.every((review) => review.status === 'completed');
 
   return (
     <TicketUploadReviewRowLayout label={label}>
-      <TicketUploadReviewDropdown
-        value={review.status}
-        onPending={() => onUpdateReview(upload, review, 'pending')}
-        onRequested={() => onUpdateReview(upload, review, 'requested')}
-        onInProgress={() => onUpdateReview(upload, review, 'in_progress')}
-        onCompleted={() => onUpdateReview(upload, review, 'completed')}
-        onBlocked={() => onUpdateReview(upload, review, 'blocked')}
-        onSkipped={() => onUpdateReview(upload, review, 'skipped')}
-        onCancelled={() => onUpdateReview(upload, review, 'cancelled')}
-      />
+      {reviews.length ? (
+        <DropdownButton
+          value={null}
+          itemGroups={[
+            {
+              groupId: `${scope}-new-review`,
+              items: [
+                {
+                  value: `${scope}-new-review`,
+                  label: 'New Review',
+                  iconPath: mdiPlus,
+                  sx: { bgcolor: 'grey.50' },
+                  onClick: () => onCreateReview(scope)
+                }
+              ]
+            },
+            {
+              groupId: `${scope}-reviews`,
+              items: reviews.map((review) => ({
+                value: review.submission_upload_review_id,
+                label: review.name
+              }))
+            }
+          ]}
+          size="small"
+          variant="contained"
+          color={isCompleted ? 'success' : 'primary'}
+          onSelect={(reviewId) => onOpenReview(scope, reviewId)}>
+          {isCompleted ? 'Completed' : 'Continue'}
+        </DropdownButton>
+      ) : (
+        <Button size="small" variant="contained" color="primary" onClick={() => onCreateReview(scope)}>
+          Review
+        </Button>
+      )}
     </TicketUploadReviewRowLayout>
   );
 };

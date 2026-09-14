@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
@@ -61,6 +61,40 @@ describe('SubmissionUploadService', () => {
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('DB Error');
+      }
+    });
+  });
+
+  describe('getSubmissionUploadBySubmissionId', () => {
+    const submissionUpload: SubmissionUpload = {
+      submission_upload_id: 'artifact-1',
+      submission_id: 17,
+      upload_id: 'upload-1',
+      team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      status: 'uploaded',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
+    };
+
+    it('returns an upload belonging to the submission ID', async () => {
+      const getSubmissionUploadStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId')
+        .resolves(submissionUpload);
+
+      expect(await service.getSubmissionUploadBySubmissionId(17, 'artifact-1')).to.eql(submissionUpload);
+      expect(getSubmissionUploadStub).to.have.been.calledOnceWith(17, 'artifact-1');
+    });
+
+    it('throws when the repository cannot find a matching submission upload', async () => {
+      sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId')
+        .rejects(new ApiNotFoundError('Submission upload not found'));
+
+      try {
+        await service.getSubmissionUploadBySubmissionId(18, 'artifact-1');
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
       }
     });
   });

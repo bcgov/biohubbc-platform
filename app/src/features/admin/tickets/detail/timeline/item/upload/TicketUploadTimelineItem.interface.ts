@@ -1,6 +1,6 @@
 import {
+  ICreateSubmissionUploadReviewRequest,
   SubmissionUploadReviewScope,
-  SubmissionUploadReviewTaskStatus,
   TicketSubmissionUploadResponse,
   TicketSubmissionUploadReviewResponse
 } from 'interfaces/useTicketsApi.interface';
@@ -8,11 +8,15 @@ import {
 export interface ITicketUploadTimelineItemProps {
   upload: TicketSubmissionUploadResponse;
   dateLabel: string;
-  onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
-  onUpdateReview: (
+  onCreateReview: (
     upload: TicketSubmissionUploadResponse,
-    review: TicketSubmissionUploadReviewResponse,
-    status: SubmissionUploadReviewTaskStatus
+    scope: SubmissionUploadReviewScope,
+    review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
+  ) => void;
+  onOpenReview: (
+    upload: TicketSubmissionUploadResponse,
+    scope: SubmissionUploadReviewScope,
+    submissionUploadReviewId: string
   ) => void;
   onAccept: (upload: TicketSubmissionUploadResponse) => void;
   onReject: (upload: TicketSubmissionUploadResponse) => void;
@@ -21,20 +25,10 @@ export interface ITicketUploadTimelineItemProps {
 
 export interface ITicketUploadReviewRowProps {
   label: string;
-  upload: TicketSubmissionUploadResponse;
-  review: TicketSubmissionUploadReviewResponse;
-  onUpdateReview: (
-    upload: TicketSubmissionUploadResponse,
-    review: TicketSubmissionUploadReviewResponse,
-    status: SubmissionUploadReviewTaskStatus
-  ) => void;
-}
-
-export interface ITicketUploadReviewRequestRowProps {
-  label: string;
   scope: SubmissionUploadReviewScope;
-  upload: TicketSubmissionUploadResponse;
-  onRequestReview: (upload: TicketSubmissionUploadResponse, scope: SubmissionUploadReviewScope) => void;
+  reviews: TicketSubmissionUploadReviewResponse[];
+  onCreateReview: (scope: SubmissionUploadReviewScope) => void;
+  onOpenReview: (scope: SubmissionUploadReviewScope, submissionUploadReviewId: string) => void;
 }
 
 export interface ITicketUploadStatusRowProps {

@@ -13,7 +13,7 @@ import { getSubmissionUploadReviews, insertSubmissionUploadReview } from './inde
 
 chai.use(sinonChai);
 
-describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/review', () => {
+describe('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/review', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -30,16 +30,13 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionId: '17',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
     };
 
     await getSubmissionUploadReviews()(mockReq, mockRes, mockNext);
 
-    expect(findStub).to.have.been.calledOnceWith(
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      '550e8400-e29b-41d4-a716-446655440000'
-    );
+    expect(findStub).to.have.been.calledOnceWith(17, '550e8400-e29b-41d4-a716-446655440000');
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql([review]);
   });
@@ -56,17 +53,24 @@ describe('paths/administrative/submission/{submissionUuid}/upload/{submissionUpl
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
-      submissionUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      submissionId: '17',
       submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
     };
-    mockReq.body = { scope: 'security', status: 'requested' };
+    mockReq.body = {
+      name: 'Access rules',
+      description: 'Review access rules',
+      scope: 'security',
+      status: 'in_progress'
+    };
 
     await insertSubmissionUploadReview()(mockReq, mockRes, mockNext);
 
-    expect(insertStub).to.have.been.calledOnceWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+    expect(insertStub).to.have.been.calledOnceWith(17, {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+      name: 'Access rules',
+      description: 'Review access rules',
       scope: SubmissionUploadReviewScope.SECURITY,
-      status: SubmissionUploadReviewStatus.REQUESTED,
+      status: SubmissionUploadReviewStatus.IN_PROGRESS,
       requested_by: 7
     });
     expect(mockRes.statusValue).to.equal(201);
@@ -90,6 +94,8 @@ const buildReview = (params: {
 }): SubmissionUploadReview => ({
   submission_upload_review_id: params.submission_upload_review_id,
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+  name: 'Access rules',
+  description: 'Review access rules',
   scope: params.scope,
   status: SubmissionUploadReviewStatus.REQUESTED,
   requested_by: 7

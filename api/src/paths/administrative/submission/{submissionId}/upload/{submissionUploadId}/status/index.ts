@@ -11,7 +11,7 @@ import { authorizeRequestHandler } from '../../../../../../../request-handlers/s
 import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/{submissionUuid}/upload/{submissionUploadId}/status');
+const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status');
 
 export const PATCH: Operation = [
   authorizeRequestHandler(() => ({
@@ -32,12 +32,12 @@ PATCH.apiDoc = {
   security: [{ Bearer: [] }],
   parameters: [
     {
-      description: 'Submission UUID.',
+      description: 'Submission ID.',
       in: 'path',
-      name: 'submissionUuid',
+      name: 'submissionId',
       schema: {
-        type: 'string',
-        format: 'uuid'
+        type: 'integer',
+        minimum: 1
       },
       required: true
     },
@@ -76,7 +76,7 @@ PATCH.apiDoc = {
     },
     404: {
       description:
-        'Submission not found (invalid submissionUuid) or submission upload not found (submissionUploadId does not belong to this submission).'
+        'Submission not found (invalid submission ID) or submission upload not found (submissionUploadId does not belong to this submission).'
     },
     409: {
       description: 'The review decision conflicts with the upload lifecycle or would reverse published feature state.'
@@ -97,11 +97,11 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUuid, submissionUploadId } = req.params;
+      const { submissionId, submissionUploadId } = req.params;
       const { status } = req.body;
 
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+      await submissionUploadService.getSubmissionUploadBySubmissionId(Number(submissionId), submissionUploadId);
 
       const result = await submissionUploadService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });
 

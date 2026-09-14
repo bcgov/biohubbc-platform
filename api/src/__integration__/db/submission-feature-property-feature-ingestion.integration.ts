@@ -29,7 +29,6 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
-import { SubmissionUploadReviewService } from '../../services/upload/submission-upload-review-service';
 import {
   createFeatureTypeProperty,
   createTestUpload,
@@ -52,10 +51,6 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     await connection.open();
     service = new SubmissionFeaturePropertyIngestionService(connection);
     repo = new SubmissionFeaturePropertyIngestionRepository(connection);
-
-    // The default-review request is the last step of a successful index run and is unrelated to the
-    // feature-property engine under test. Stub it so the assertions target the engine's outputs.
-    sinon.stub(SubmissionUploadReviewService.prototype, 'requestDefaultReviewsForUpload').resolves();
   });
 
   afterEach(async () => {

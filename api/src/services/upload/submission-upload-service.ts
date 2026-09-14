@@ -147,6 +147,19 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Get an active upload only when it belongs to the numeric submission ID.
+   *
+   * @param {number} submissionId ID of the submission that owns the upload.
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @returns {Promise<SubmissionUpload>} The requested submission upload.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadBySubmissionId(submissionId: number, submissionUploadId: string): Promise<SubmissionUpload> {
+    return this.submissionUploadRepository.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
+  }
+
+  /**
    * Retrieves all submission_upload records for the given submission, with filters and pagination.
    *
    * @param {number} submissionId
