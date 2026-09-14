@@ -1,10 +1,6 @@
 import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import {
-  CreateSubmissionFeatureTileSessionResponse,
-  CreateSubmissionUploadTileSessionResponse,
-  IMartinSession
-} from 'interfaces/useMartinApi.interface';
+import { CreateTileExtentSessionResponse, IMartinSession } from 'interfaces/useMartinApi.interface';
 
 /**
  * Returns API methods for map Martin sessions.
@@ -55,14 +51,14 @@ export const useMartinApi = (axios: AxiosInstance) => {
    * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
-   * @return {Promise<CreateSubmissionFeatureTileSessionResponse>}
+   * @return {Promise<CreateTileExtentSessionResponse>}
    */
   const createSubmissionFeatureTileSession = async (
     submissionId: number,
     submissionFeatureId: number,
     options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<CreateSubmissionFeatureTileSessionResponse> => {
-    const { data } = await axios.post<CreateSubmissionFeatureTileSessionResponse>(
+  ): Promise<CreateTileExtentSessionResponse> => {
+    const { data } = await axios.post<CreateTileExtentSessionResponse>(
       `/api/submission/${submissionId}/features/${submissionFeatureId}/tile`,
       undefined,
       { signal: options?.signal }
@@ -83,14 +79,14 @@ export const useMartinApi = (axios: AxiosInstance) => {
    * @param {number} submissionId
    * @param {string} submissionUploadId
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
-   * @return {Promise<CreateSubmissionUploadTileSessionResponse>}
+   * @return {Promise<CreateTileExtentSessionResponse>}
    */
   const createSubmissionUploadTileSession = async (
     submissionId: number,
     submissionUploadId: string,
     options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<CreateSubmissionUploadTileSessionResponse> => {
-    const { data } = await axios.post<CreateSubmissionUploadTileSessionResponse>(
+  ): Promise<CreateTileExtentSessionResponse> => {
+    const { data } = await axios.post<CreateTileExtentSessionResponse>(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/tile`,
       undefined,
       { signal: options?.signal }

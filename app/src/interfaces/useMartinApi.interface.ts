@@ -61,19 +61,3 @@ export interface ITileExtentSessionEmpty {
 }
 
 export type CreateTileExtentSessionResponse = ITileExtentSession | ITileExtentSessionEmpty;
-
-/** A tile session for a single submission feature's spatial properties. */
-export type ISubmissionFeatureTileSession = ITileExtentSession;
-
-/** A feature with nothing to map. */
-export type ISubmissionFeatureTileSessionEmpty = ITileExtentSessionEmpty;
-
-export type CreateSubmissionFeatureTileSessionResponse = CreateTileExtentSessionResponse;
-
-/** A tile session for the spatial properties of every active feature of a submission upload. */
-export type ISubmissionUploadTileSession = ITileExtentSession;
-
-/** An upload with nothing to map. */
-export type ISubmissionUploadTileSessionEmpty = ITileExtentSessionEmpty;
-
-export type CreateSubmissionUploadTileSessionResponse = CreateTileExtentSessionResponse;

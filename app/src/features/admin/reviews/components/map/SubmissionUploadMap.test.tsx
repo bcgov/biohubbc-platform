@@ -1,7 +1,7 @@
 import { BC_BASEMAP_LAYER_ID, BC_BASEMAP_SOURCE_ID } from 'components/map/bc-basemap-layers';
 import { FEATURE_GEOMETRIES_SOURCE_ID } from 'components/map/geometry-tile-layers';
 import { MAP_FIT_MAX_ZOOM, MAP_SECTION_HEIGHT } from 'constants/spatial';
-import type { ISubmissionUploadTileSession } from 'interfaces/useMartinApi.interface';
+import type { ITileExtentSession } from 'interfaces/useMartinApi.interface';
 import { act, cleanup, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
 import { SubmissionUploadMap } from './SubmissionUploadMap';
 
@@ -50,7 +50,7 @@ vi.mock('components/map/SlippyMap', () => ({
 const SUBMISSION_ID = 16;
 const SUBMISSION_UPLOAD_ID = '11111111-1111-4111-8111-111111111111';
 
-const buildSession = (overrides: Partial<ISubmissionUploadTileSession> = {}): ISubmissionUploadTileSession => ({
+const buildSession = (overrides: Partial<ITileExtentSession> = {}): ITileExtentSession => ({
   has_spatial_properties: true,
   token: 'token-1',
   token_type: 'Bearer',

@@ -1,6 +1,6 @@
 import { BC_BASEMAP_LAYER_ID, BC_BASEMAP_SOURCE_ID } from 'components/map/bc-basemap-layers';
 import { MAP_FIT_MAX_ZOOM } from 'constants/spatial';
-import type { ISubmissionFeatureTileSession } from 'interfaces/useMartinApi.interface';
+import type { ITileExtentSession } from 'interfaces/useMartinApi.interface';
 import { act, cleanup, render, screen, waitFor } from 'test-helpers/test-utils';
 import {
   FEATURE_FILL_LAYER_ID,
@@ -64,7 +64,7 @@ vi.mock('components/map/SlippyMap', async () => {
 
 const DEFAULT_BC_BASEMAP = { ...mocks.bcBasemap };
 
-const buildSession = (overrides: Partial<ISubmissionFeatureTileSession> = {}): ISubmissionFeatureTileSession => ({
+const buildSession = (overrides: Partial<ITileExtentSession> = {}): ITileExtentSession => ({
   has_spatial_properties: true,
   token: 'token-1',
   token_type: 'Bearer',
@@ -325,9 +325,9 @@ describe('SubmissionFeatureMap', () => {
       // requests MapLibre never retries, leaving a silently blank map.
       await renderReadyMap(buildSession({ token: 'token-1' }));
 
-      let resolveMint: (session: ISubmissionFeatureTileSession) => void = () => undefined;
+      let resolveMint: (session: ITileExtentSession) => void = () => undefined;
       mocks.createSubmissionFeatureTileSession.mockImplementationOnce(
-        () => new Promise((resolve) => (resolveMint = resolve as (session: ISubmissionFeatureTileSession) => void))
+        () => new Promise((resolve) => (resolveMint = resolve as (session: ITileExtentSession) => void))
       );
 
       const mountsBeforeFailure = mocks.slippyMapMounts.count;
