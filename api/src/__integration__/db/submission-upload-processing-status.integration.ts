@@ -3,6 +3,7 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
@@ -193,5 +194,32 @@ describe('submission upload processing status (integration)', function () {
     expect(history.history.map((row) => [row.submissionUploadId, row.status])).to.eql([
       [submissionUploadId, 'submitted']
     ]);
+  });
+
+  it('rejects a second active row for the same status until the first is end-dated', async () => {
+    const submissionUploadId = await createUploadedUpload();
+
+    // The rejected insert aborts the test transaction, so isolate it in a savepoint.
+    await connection.sql(SQL`SAVEPOINT duplicate_active_row;`);
+    try {
+      await processingStatusRepository.insertSubmissionUploadProcessingStatus(submissionUploadId, 'uploaded');
+      expect.fail('Expected the unique active-status index to reject the duplicate');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiExecuteSQLError);
+      expect(JSON.stringify((error as ApiExecuteSQLError).errors)).to.contain('submission_upload_status_active_idx');
+    }
+    await connection.sql(SQL`ROLLBACK TO SAVEPOINT duplicate_active_row;`);
+
+    const ended = await processingStatusRepository.endActiveSubmissionUploadProcessingStatuses(submissionUploadId, [
+      'uploaded'
+    ]);
+    expect(ended).to.equal(1);
+
+    const reinserted = await processingStatusRepository.insertSubmissionUploadProcessingStatus(
+      submissionUploadId,
+      'uploaded'
+    );
+    expect(reinserted.record_end_date).to.be.null;
+    expect((await allStatusRows(submissionUploadId)).map((row) => row.record_end_date === null)).to.eql([false, true]);
   });
 });

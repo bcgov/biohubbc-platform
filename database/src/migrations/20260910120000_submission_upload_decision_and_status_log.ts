@@ -16,7 +16,7 @@ import type { Knex } from 'knex';
  * 3) replace `submission_upload_job_status`: drop `reconciling` (never committed, reconciliation runs
  *    in one transaction) and add `promoted`
  * 4) type `submission_upload_status.status` with `submission_upload_job_status`, drop the review
- *    enum, add `record_end_date` and an active-row index
+ *    enum, add `record_end_date` and a unique active-row index
  *
  * Every new enum is created with CREATE TYPE (usable in this transaction); the swap pattern follows
  * 20260427120000_submission_feature_indexing.
@@ -120,7 +120,9 @@ export async function up(knex: Knex): Promise<void> {
     ALTER TABLE submission_upload_status
       ADD COLUMN record_end_date timestamptz(6);
 
-    CREATE INDEX submission_upload_status_active_idx
+    -- Unique: a transition end-dates every active row of the status it enters before inserting the
+    -- new row, so at most one active row per upload and status can exist.
+    CREATE UNIQUE INDEX submission_upload_status_active_idx
       ON submission_upload_status(submission_upload_id, status)
       WHERE record_end_date IS NULL;
 

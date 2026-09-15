@@ -16,7 +16,9 @@ export class SubmissionUploadProcessingStatusRepository extends BaseRepository {
   /**
    * Insert an active processing status row.
    *
-   * `create_date` is populated by the audit trigger.
+   * `create_date` is populated by the audit trigger. The unique partial index
+   * `submission_upload_status_active_idx` rejects a second active row for the same upload and status,
+   * so callers end-date the superseded rows first (the service transition flow does).
    *
    * @param {string} submissionUploadId - Submission upload the status belongs to.
    * @param {SubmissionUploadJobStatus} status - Processing status entered.
