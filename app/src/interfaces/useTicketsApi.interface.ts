@@ -192,6 +192,13 @@ export interface ISubmissionUploadDecisionResponse {
   decision: SubmissionUploadDecision;
 }
 
+export interface ISubmissionUploadProcessingStatusHistoryItem {
+  submission_upload_status_id: number;
+  submission_upload_id: string;
+  status: SubmissionUploadJobStatus;
+  create_date: string;
+}
+
 export interface ICreateSubmissionUploadReviewRequest {
   name: string;
   description: string | null;

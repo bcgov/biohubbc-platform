@@ -54,6 +54,9 @@ const upload: TicketSubmissionUploadResponse = {
 const baseProps = {
   upload,
   dateLabel: 'Today',
+  canViewStatusHistory: false,
+  statusHistory: undefined,
+  onLoadStatusHistory: vi.fn(),
   onCreateReview: vi.fn(),
   onOpenReview: vi.fn(),
   onAccept: vi.fn(),

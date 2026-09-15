@@ -12,6 +12,7 @@ import {
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ISubmissionUploadDecisionResponse,
+  ISubmissionUploadProcessingStatusHistoryItem,
   ITicketSystemUser,
   ITicket,
   ITicketArtifact,
@@ -226,6 +227,24 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get the active processing status history of a submission upload, earliest first.
+   *
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @return {Promise<ISubmissionUploadProcessingStatusHistoryItem[]>}
+   */
+  const getSubmissionUploadProcessingStatusHistory = async (
+    submissionId: number,
+    submissionUploadId: string
+  ): Promise<ISubmissionUploadProcessingStatusHistoryItem[]> => {
+    const { data } = await axios.get<ISubmissionUploadProcessingStatusHistoryItem[]>(
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status/history`
+    );
+
+    return data;
+  };
+
+  /**
    * Record the human review decision for a submission upload.
    *
    * @param {number} submissionId
@@ -382,6 +401,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     completeTicketUpload,
     getTicketArtifacts,
     getTicketArtifactDownloadUrl,
+    getSubmissionUploadProcessingStatusHistory,
     updateSubmissionUploadDecision,
     insertSubmissionUploadReview,
     createTicketReference,

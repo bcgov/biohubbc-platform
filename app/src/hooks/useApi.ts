@@ -1,4 +1,5 @@
 import { useConfigContext } from 'hooks/useContext';
+import { useMemo } from 'react';
 import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
@@ -74,7 +75,7 @@ export const useApi = () => {
 
   const objectStorage = useObjectStorageApi();
 
-  return {
+  const apis = {
     user,
     admin,
     submissions,
@@ -97,4 +98,10 @@ export const useApi = () => {
     apiKeys,
     objectStorage
   };
+
+  // Every sub-api is a set of closures over `apiAxios` (or, for object storage, over nothing), so
+  // the object only needs to change when the axios instance does. Returning a stable object keeps
+  // `api` usable as an effect or callback dependency without re-triggering on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => apis, [apiAxios]);
 };

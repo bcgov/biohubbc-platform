@@ -10,7 +10,7 @@ import {
 import { SubmissionUploadProcessingStatusRepository } from './submission-upload-processing-status-repository';
 
 const SUBMISSION_UPLOAD_ID = '550e8400-e29b-41d4-a716-446655440000';
-const SUBMISSION_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const SUBMISSION_ID = 17;
 
 describe('SubmissionUploadProcessingStatusRepository', () => {
   afterEach(() => {
@@ -81,10 +81,7 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
         .resolves({ rowCount: 2, rows } as QueryResult<SubmissionUploadProcessingStatusHistoryRow>);
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.findSubmissionUploadProcessingStatusHistory(
-        SUBMISSION_UUID,
-        SUBMISSION_UPLOAD_ID
-      );
+      const result = await repository.findSubmissionUploadProcessingStatusHistory(SUBMISSION_ID, SUBMISSION_UPLOAD_ID);
 
       expect(result).to.eql(rows);
       expect(sqlStub).to.have.been.calledOnce;
@@ -92,10 +89,11 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
       expect(statement.text).to.contain('LEFT JOIN submission_upload_status sus');
       expect(statement.text).to.contain('sus.record_end_date IS NULL');
       expect(statement.text).to.contain('su.record_end_date IS NULL');
+      expect(statement.text).to.contain('su.submission_id = $1');
       expect(statement.text).to.contain(
         'ORDER BY\n        sus.create_date ASC,\n        sus.submission_upload_status_id ASC'
       );
-      expect(statement.values).to.eql([SUBMISSION_UUID, SUBMISSION_UPLOAD_ID]);
+      expect(statement.values).to.eql([SUBMISSION_ID, SUBMISSION_UPLOAD_ID]);
     });
 
     it('returns the rows as delivered, including the null row for an upload with no history', async () => {
@@ -112,10 +110,7 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
         .resolves({ rowCount: 1, rows } as QueryResult<SubmissionUploadProcessingStatusHistoryRow>);
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.findSubmissionUploadProcessingStatusHistory(
-        SUBMISSION_UUID,
-        SUBMISSION_UPLOAD_ID
-      );
+      const result = await repository.findSubmissionUploadProcessingStatusHistory(SUBMISSION_ID, SUBMISSION_UPLOAD_ID);
 
       expect(result).to.eql(rows);
     });

@@ -50,14 +50,13 @@ describe('submission upload processing status (integration)', function () {
     return result.rows as { status: string; record_end_date: Date | null }[];
   }
 
-  async function submissionUuid(submissionUploadId: string): Promise<string> {
+  async function owningSubmissionId(submissionUploadId: string): Promise<number> {
     const result = await connection.sql(SQL`
-      SELECT s.uuid
-      FROM submission_upload su
-      INNER JOIN submission s ON s.submission_id = su.submission_id
-      WHERE su.submission_upload_id = ${submissionUploadId}::uuid;
+      SELECT submission_id
+      FROM submission_upload
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `);
-    return result.rows[0].uuid;
+    return result.rows[0].submission_id;
   }
 
   /**
@@ -65,7 +64,7 @@ describe('submission upload processing status (integration)', function () {
    */
   async function activeHistory(submissionUploadId: string) {
     return processingStatusRepository.findSubmissionUploadProcessingStatusHistory(
-      await submissionUuid(submissionUploadId),
+      await owningSubmissionId(submissionUploadId),
       submissionUploadId
     );
   }
@@ -164,7 +163,7 @@ describe('submission upload processing status (integration)', function () {
     ]);
 
     const wrongSubmission = await processingStatusRepository.findSubmissionUploadProcessingStatusHistory(
-      await submissionUuid(submissionUploadId),
+      await owningSubmissionId(submissionUploadId),
       otherSubmissionUploadId
     );
     expect(wrongSubmission).to.eql([]);

@@ -544,6 +544,70 @@ describe('SubmissionUploadService', () => {
     });
   });
 
+  describe('findSubmissionUploadProcessingStatusHistory', () => {
+    it('resolves ownership and history in one query and returns the history items', async () => {
+      const findStub = sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 1,
+            status: 'uploaded',
+            create_date: '2026-09-03T00:00:00.000Z'
+          },
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 2,
+            status: 'ingesting',
+            create_date: '2026-09-03T00:01:00.000Z'
+          }
+        ]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory(17, 'artifact-1');
+
+      expect(findStub).to.have.been.calledOnceWith(17, 'artifact-1');
+      expect(result).to.eql([
+        {
+          submission_upload_status_id: 1,
+          submission_upload_id: 'artifact-1',
+          status: 'uploaded',
+          create_date: '2026-09-03T00:00:00.000Z'
+        },
+        {
+          submission_upload_status_id: 2,
+          submission_upload_id: 'artifact-1',
+          status: 'ingesting',
+          create_date: '2026-09-03T00:01:00.000Z'
+        }
+      ]);
+    });
+
+    it('returns an empty history for an upload in the submission that has no processing rows', async () => {
+      sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          { submission_upload_id: 'artifact-1', submission_upload_status_id: null, status: null, create_date: null }
+        ]);
+
+      const result = await service.findSubmissionUploadProcessingStatusHistory(17, 'artifact-1');
+
+      expect(result).to.eql([]);
+    });
+
+    it('throws ApiNotFoundError when the upload is not in the submission', async () => {
+      sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([]);
+
+      try {
+        await service.findSubmissionUploadProcessingStatusHistory(17, 'artifact-1');
+        expect.fail('Expected ApiNotFoundError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+      }
+    });
+  });
+
   describe('transitionSubmissionUploadStatus', () => {
     it('ends superseded rows, updates the current status and inserts the history row in that order', async () => {
       sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('reconciled'));
