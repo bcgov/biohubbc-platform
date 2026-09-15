@@ -37,7 +37,7 @@ const upload: TicketSubmissionUploadResponse = {
   submission_comment: null,
   submitted_by_identifier: 'admin@example.com',
   upload_status: 'indexed',
-  review_status: 'submitted',
+  decision: 'pending',
   validation: null,
   reviews: {
     security: [],

@@ -1,13 +1,13 @@
 import { mdiCheck, mdiClose } from '@mdi/js';
-import { SubmissionUploadJobStatus, SubmissionUploadReviewStatus } from 'interfaces/useTicketsApi.interface';
+import { SubmissionUploadDecision, SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 
 export const SUBMISSION_UPLOAD_JOB_STATUS_LABELS: Record<SubmissionUploadJobStatus, string> = {
   uploaded: 'Uploaded',
   ingesting: 'Ingesting',
   ingested: 'Ingested',
-  reconciling: 'Reconciling',
   reconciled: 'Reconciled',
+  promoted: 'Promoted',
   indexing: 'Indexing',
   indexed: 'Indexed',
   invalid: 'Invalid',
@@ -34,16 +34,14 @@ export const SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICON_COLORS: Partial<Record<S
   failed: appTheme.palette.error.main
 };
 
-export const SUBMISSION_UPLOAD_REVIEW_STATUS_LABELS: Record<SubmissionUploadReviewStatus, string> = {
-  submitted: 'Submitted',
+export const SUBMISSION_UPLOAD_DECISION_LABELS: Record<SubmissionUploadDecision, string> = {
+  pending: 'Pending',
   approved: 'Accepted',
-  denied: 'Rejected',
-  deleted: 'Deleted'
+  denied: 'Rejected'
 };
 
-export const SUBMISSION_UPLOAD_REVIEW_STATUS_BUTTON_COLORS: Partial<
-  Record<SubmissionUploadReviewStatus, 'success' | 'error'>
-> = {
-  approved: 'success',
-  denied: 'error'
-};
+export const SUBMISSION_UPLOAD_DECISION_BUTTON_COLORS: Partial<Record<SubmissionUploadDecision, 'success' | 'error'>> =
+  {
+    approved: 'success',
+    denied: 'error'
+  };

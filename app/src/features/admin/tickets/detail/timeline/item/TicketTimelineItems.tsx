@@ -38,11 +38,11 @@ interface ITicketTimelineItemsProps {
     review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
   ) => void;
   onOpenSubmissionUploadReview: (upload: TicketSubmissionUploadResponse, submissionUploadReviewId: string) => void;
-  onConfirmSubmissionUploadReviewStatusUpdate: (
+  onConfirmSubmissionUploadDecisionUpdate: (
     upload: TicketSubmissionUploadResponse,
     status: 'approved' | 'denied'
   ) => void;
-  onConfirmSubmissionUploadReviewStatusReset: (upload: TicketSubmissionUploadResponse) => void;
+  onConfirmSubmissionUploadDecisionReset: (upload: TicketSubmissionUploadResponse) => void;
 }
 
 /**
@@ -65,8 +65,8 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onConfirmResetToReviewed,
     onCreateSubmissionUploadReview,
     onOpenSubmissionUploadReview,
-    onConfirmSubmissionUploadReviewStatusUpdate,
-    onConfirmSubmissionUploadReviewStatusReset
+    onConfirmSubmissionUploadDecisionUpdate,
+    onConfirmSubmissionUploadDecisionReset
   } = props;
 
   const timelineEvents: TimelineEvent[] = [
@@ -160,9 +160,9 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
               }
               onCreateReview={onCreateSubmissionUploadReview}
               onOpenReview={onOpenSubmissionUploadReview}
-              onAccept={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'approved')}
-              onReject={(upload) => onConfirmSubmissionUploadReviewStatusUpdate(upload, 'denied')}
-              onResetDecision={onConfirmSubmissionUploadReviewStatusReset}
+              onAccept={(upload) => onConfirmSubmissionUploadDecisionUpdate(upload, 'approved')}
+              onReject={(upload) => onConfirmSubmissionUploadDecisionUpdate(upload, 'denied')}
+              onResetDecision={onConfirmSubmissionUploadDecisionReset}
             />
           )
         };

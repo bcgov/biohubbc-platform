@@ -129,7 +129,7 @@ export class SecurityScopeRepository extends BaseRepository {
    *
    * An anchor becomes stale when its feature is no longer effectively secured
    * (neither it nor any ancestor has active security rules), unapproved (upload
-   * status changed), soft-deleted, or its URN no longer matches the scope's
+   * decision changed), soft-deleted, or its URN no longer matches the scope's
    * policy statement. This is the inverse of the candidate criteria used by
    * `computeAnchorBatch` — any feature that wouldn't be selected as a new
    * candidate should not remain as an existing anchor.
@@ -303,7 +303,7 @@ export class SecurityScopeRepository extends BaseRepository {
    * security rule.
    *
    * Only features from approved uploads are eligible — features still under
-   * review (status = 'submitted') must not affect security scope anchors.
+   * review (decision = 'pending') must not affect security scope anchors.
    *
    * **Why keyset pagination:** Even though `*:*:*` scopes are not supported,
    * a single submission-scoped URN (`urn:{subId}:*:*`) can still match 1M+

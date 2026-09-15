@@ -5,7 +5,7 @@ import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { SubmissionUploadStatusHistoryResponseSchema } from '../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SubmissionUploadReviewStatusService } from '../../../../services/upload/submission-upload-review-status-service';
+import { SubmissionUploadService } from '../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionUuid}/history');
@@ -58,7 +58,7 @@ GET.apiDoc = {
 };
 
 /**
- * Returns publish history (submission_upload_status records) for the submission, newest first.
+ * Returns the publish history of the submission: every upload with its review state, newest first.
  *
  * @returns {RequestHandler}
  */
@@ -70,8 +70,8 @@ export function getSubmissionHistory(): RequestHandler {
       await connection.open();
 
       const submissionUuid = req.params.submissionUuid;
-      const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
-      const result = await reviewStatusService.getSubmissionHistoryByUuid(submissionUuid);
+      const submissionUploadService = new SubmissionUploadService(connection);
+      const result = await submissionUploadService.findSubmissionDecisionHistoryByUuid(submissionUuid);
 
       await connection.commit();
 
