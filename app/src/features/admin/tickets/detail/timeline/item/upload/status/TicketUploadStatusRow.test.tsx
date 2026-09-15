@@ -127,6 +127,28 @@ describe('TicketUploadStatusRow', () => {
     expect(onLoadStatusHistory).toHaveBeenCalledTimes(2);
   });
 
+  it('does not request again when the parent re-renders after an error', async () => {
+    const user = userEvent.setup();
+    const upload = makeUpload('failed');
+    const onLoadStatusHistory = vi.fn();
+    const { rerender } = renderRow(upload, { status: 'error', message: 'Forbidden' }, onLoadStatusHistory);
+
+    await user.click(screen.getByRole('button', { name: 'Failed' }));
+    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <TicketUploadStatusRow
+        upload={upload}
+        canViewStatusHistory={true}
+        statusHistory={{ status: 'error', message: 'Forbidden' }}
+        onLoadStatusHistory={onLoadStatusHistory}
+      />
+    );
+
+    expect(screen.getByText('Failed to load processing history')).toBeVisible();
+    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the current status visible while the history loads', async () => {
     const user = userEvent.setup();
     renderRow(makeUpload('indexing'), { status: 'loading' });

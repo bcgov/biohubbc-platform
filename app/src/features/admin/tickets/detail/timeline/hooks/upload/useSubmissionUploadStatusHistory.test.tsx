@@ -44,7 +44,8 @@ describe('useSubmissionUploadStatusHistory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useApi as Mock).mockReturnValue({ tickets: { getSubmissionUploadProcessingStatusHistory } });
+    // A fresh object on every render, as the real hook behaved before it was memoised.
+    (useApi as Mock).mockImplementation(() => ({ tickets: { getSubmissionUploadProcessingStatusHistory } }));
   });
 
   it('starts with no history and requests nothing until asked', () => {
@@ -107,6 +108,24 @@ describe('useSubmissionUploadStatusHistory', () => {
       history,
       uploadStatus: 'ingested'
     });
+  });
+
+  it('keeps loadStatusHistory stable across renders, including after an error', async () => {
+    getSubmissionUploadProcessingStatusHistory.mockRejectedValue(new Error('Forbidden'));
+    const { result, rerender } = renderHook(() => useSubmissionUploadStatusHistory());
+    const initialLoad = result.current.loadStatusHistory;
+
+    rerender();
+    expect(result.current.loadStatusHistory).toBe(initialLoad);
+
+    await act(async () => {
+      await result.current.loadStatusHistory(makeUpload('upload-1'));
+    });
+    rerender();
+
+    expect(result.current.statusHistoryByUploadId['upload-1']).toEqual({ status: 'error', message: 'Forbidden' });
+    expect(result.current.loadStatusHistory).toBe(initialLoad);
+    expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
   });
 
   it('fetches again when the upload has moved to a new status since the cached load', async () => {

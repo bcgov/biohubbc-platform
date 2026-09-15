@@ -24,12 +24,16 @@ export type SubmissionUploadStatusHistoryState =
  *
  * A successful response is reused by later requests for the same upload until the upload's current
  * status changes, at which point the history is fetched again; a failed request is retried the next
- * time the upload's history is requested.
+ * time the upload's history is requested (the row is expanded again, or the upload changes), never
+ * merely because the error state rendered. `loadStatusHistory` keeps one identity for the life of
+ * the hook, so effects that depend on it do not re-fire; the API client is read through a ref.
  *
  * @returns The cached history state per upload and the loader that populates it.
  */
 export const useSubmissionUploadStatusHistory = () => {
   const api = useApi();
+  const apiRef = useRef(api);
+  apiRef.current = api;
   const isMounted = useIsMounted();
   const statusHistoryRef = useRef<Record<string, SubmissionUploadStatusHistoryState>>({});
   const [statusHistoryByUploadId, setStatusHistoryByUploadId] = useState<
@@ -71,7 +75,7 @@ export const useSubmissionUploadStatusHistory = () => {
       setStatusHistory(upload.submission_upload_id, { status: 'loading' });
 
       try {
-        const history = await api.tickets.getSubmissionUploadProcessingStatusHistory(
+        const history = await apiRef.current.tickets.getSubmissionUploadProcessingStatusHistory(
           upload.submission_id,
           upload.submission_upload_id
         );
@@ -93,7 +97,7 @@ export const useSubmissionUploadStatusHistory = () => {
         setStatusHistory(upload.submission_upload_id, { status: 'error', message: (error as APIError).message });
       }
     },
-    [api, isMounted, setStatusHistory]
+    [isMounted, setStatusHistory]
   );
 
   return { statusHistoryByUploadId, loadStatusHistory };
