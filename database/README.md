@@ -93,3 +93,19 @@ The `Knexfile.ts` defines the settings that Knex will use when running migration
 
 - Double check that your environment variables have been set (`.env`)
   - See makefile command: `Make env`
+
+## BCGW materialised views
+
+BCGW setup is owned by three normal Knex migrations: schema/reader-role setup,
+observations and telemetry. Each domain migration defines its complete query once
+as an ordinary view in the private `bcgw_internal` schema, followed by explicit
+materialized exports in `bcgw`. The six exports retain their column contracts and
+can be refreshed independently. Only the export schema grants reader access.
+
+Feature/property mappings, SQL generation and domain SQL stay inside their owning migration. Change deployed definitions through
+new migrations. Rollback removes exports before their source views. These
+migrations do not schedule refreshes.
+
+Run `npm run test:bcgw` for direct typed-property regression checks, `-- --plans`
+for query plans, or `-- --legacy` for optional historical comparisons. See
+[BCGW verification](tests/bcgw/README.md) for prerequisites and query semantics.
