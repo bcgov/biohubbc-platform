@@ -1,4 +1,4 @@
-import SQL from 'sql-template-strings';
+import SQL, { SQLStatement } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyGeometry,
@@ -134,24 +134,14 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     submissionId: number,
     submissionFeatureId: number
   ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
-    const sqlStatement = SQL`
-      SELECT
-        public.ST_XMin(extent.bounds) AS min_x,
-        public.ST_YMin(extent.bounds) AS min_y,
-        public.ST_XMax(extent.bounds) AS max_x,
-        public.ST_YMax(extent.bounds) AS max_y,
-        extent.geometry_count
-      FROM (
-        SELECT
-          public.ST_Extent(g.value)::public.geometry AS bounds,
-          count(*)::integer AS geometry_count
+    const scope = SQL`
         FROM submission_feature_property_geometry g
         JOIN submission_feature sf
           ON sf.submission_feature_id = g.submission_feature_id
          AND sf.submission_id = ${submissionId}
     `;
 
-    sqlStatement.append(`
+    scope.append(`
          AND ${isSubmissionFeaturePublished('sf')}
         JOIN feature_type_property ftp
           ON ftp.feature_type_property_id = g.feature_type_property_id
@@ -162,31 +152,11 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
          AND fp.record_end_date IS NULL
     `);
 
-    sqlStatement.append(SQL`
+    scope.append(SQL`
         WHERE g.submission_feature_id = ${submissionFeatureId}
-      ) extent;
     `);
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeatureGeometryExtentSchema);
-
-    const row = response.rows[0];
-
-    // The aggregate always returns a row, with null bounds and a zero count when nothing matched.
-    if (
-      !row ||
-      row.geometry_count === 0 ||
-      row.min_x === null ||
-      row.min_y === null ||
-      row.max_x === null ||
-      row.max_y === null
-    ) {
-      return { bbox: null, geometry_count: 0 };
-    }
-
-    return {
-      bbox: [row.min_x, row.min_y, row.max_x, row.max_y],
-      geometry_count: row.geometry_count
-    };
+    return this.queryGeometryExtent(scope);
   }
 
   /**
@@ -215,17 +185,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     submissionId: number,
     submissionUploadId: string
   ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
-    const sqlStatement = SQL`
-      SELECT
-        public.ST_XMin(extent.bounds) AS min_x,
-        public.ST_YMin(extent.bounds) AS min_y,
-        public.ST_XMax(extent.bounds) AS max_x,
-        public.ST_YMax(extent.bounds) AS max_y,
-        extent.geometry_count
-      FROM (
-        SELECT
-          public.ST_Extent(g.value)::public.geometry AS bounds,
-          count(*)::integer AS geometry_count
+    const scope = SQL`
         FROM submission_feature sf
         JOIN submission_feature_property_geometry g
           ON g.submission_feature_id = sf.submission_feature_id
@@ -240,8 +200,42 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
           AND sf.submission_id = ${submissionId}
     `;
 
-    sqlStatement.append(`
+    scope.append(`
           AND ${isSubmissionFeatureActive('sf')}
+    `);
+
+    return this.queryGeometryExtent(scope);
+  }
+
+  /**
+   * Run an extent query over a set of geometry rows and normalise the result.
+   *
+   * The scope supplies everything from `FROM` onward, with the geometry table aliased `g`; this wraps it in the
+   * aggregate and projects the bounds as four coordinates.
+   *
+   * @private
+   * @param {SQLStatement} scope - `FROM ... JOIN ... WHERE ...` selecting the geometry rows to aggregate.
+   * @return {Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }>}
+   * @memberof SubmissionFeaturePropertyGeometryRepository
+   */
+  private async queryGeometryExtent(
+    scope: SQLStatement
+  ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
+    const sqlStatement = SQL`
+      SELECT
+        public.ST_XMin(extent.bounds) AS min_x,
+        public.ST_YMin(extent.bounds) AS min_y,
+        public.ST_XMax(extent.bounds) AS max_x,
+        public.ST_YMax(extent.bounds) AS max_y,
+        extent.geometry_count
+      FROM (
+        SELECT
+          public.ST_Extent(g.value)::public.geometry AS bounds,
+          count(*)::integer AS geometry_count
+    `;
+
+    sqlStatement.append(scope);
+    sqlStatement.append(`
       ) extent;
     `);
 

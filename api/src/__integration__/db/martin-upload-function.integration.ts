@@ -15,62 +15,28 @@
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
 
-import { VectorTile } from '@mapbox/vector-tile';
 import { expect } from 'chai';
-import Protobuf from 'pbf';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
-import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import {
+  addTestGeometry,
+  buildWktGeometries,
+  decodeGeometriesLayer,
+  renderTile,
+  TILE_TEST_POINT,
+  useTileFunctionFixture
+} from '../helpers/test-martin-tile-helpers';
 import { createTestSubmission, createTestUploadWithFeatures } from '../helpers/test-submission-helpers';
 
 /** Feature type used for the fixtures. Any type with a geometry property would do. */
 const FEATURE_TYPE = 'species_observation';
 
-/** A point in BC, and a tile that contains it. */
-const TEST_LNG = -123.36;
-const TEST_LAT = 48.43;
+const { lng: TEST_LNG, lat: TEST_LAT } = TILE_TEST_POINT;
 
 describe('Martin upload function (integration)', function () {
   this.timeout(20000);
 
-  let connection: IDBConnection;
-  let featureTypeId: number;
-  let geometryPropertyId: number;
-
-  before(() => {
-    initDBPool(defaultPoolConfig);
-  });
-
-  beforeEach(async () => {
-    connection = getAPIUserDBConnection();
-    await connection.open();
-
-    const featureType = await connection.sql(
-      SQL`SELECT feature_type_id FROM feature_type WHERE name = ${FEATURE_TYPE};`,
-      z.object({ feature_type_id: z.number() })
-    );
-    featureTypeId = featureType.rows[0].feature_type_id;
-
-    // Geometry-valued properties are typed 'spatial' in the property catalog.
-    const property = await connection.sql(
-      SQL`
-        SELECT ftp.feature_type_property_id
-        FROM feature_type_property ftp
-        JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
-        JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
-        WHERE ftp.feature_type_id = ${featureTypeId}
-          AND fpt.name = 'spatial'
-        LIMIT 1;
-      `,
-      z.object({ feature_type_property_id: z.number() })
-    );
-    geometryPropertyId = property.rows[0].feature_type_property_id;
-  });
-
-  afterEach(async () => {
-    await connection.rollback();
-    connection.release();
-  });
+  const fixture = useTileFunctionFixture(FEATURE_TYPE);
 
   /**
    * Insert a feature into an upload directly, so the lifecycle dates are controlled by the test.
@@ -85,7 +51,7 @@ describe('Martin upload function (integration)', function () {
     submissionUploadId: string,
     lifecycle: { effective?: boolean; ended?: boolean } = {}
   ): Promise<number> => {
-    const result = await connection.sql(
+    const result = await fixture.connection.sql(
       SQL`
         INSERT INTO submission_feature (
           submission_id, submission_upload_id, feature_type_id, data, data_byte_size,
@@ -94,12 +60,12 @@ describe('Martin upload function (integration)', function () {
         VALUES (
           ${submissionId},
           ${submissionUploadId}::uuid,
-          ${featureTypeId},
+          ${fixture.featureTypeId},
           '{"name":"upload tile test"}'::jsonb,
           600,
           ${lifecycle.effective ? 'now()' : null}::timestamptz,
           ${lifecycle.ended ? 'now()' : null}::timestamptz,
-          ${connection.systemUserId()}
+          ${fixture.connection.systemUserId()}
         )
         RETURNING submission_feature_id;
       `,
@@ -109,26 +75,9 @@ describe('Martin upload function (integration)', function () {
     return result.rows[0].submission_feature_id;
   };
 
-  /**
-   * Attach a geometry (as WKT) to a feature, returning the new row's id.
-   */
-  const addGeometry = async (featureId: number, wkt: string, propertyId?: number): Promise<number> => {
-    const result = await connection.sql(
-      SQL`
-        INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
-        VALUES (
-          ${featureId},
-          ${propertyId ?? geometryPropertyId},
-          public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326),
-          ${connection.systemUserId()}
-        )
-        RETURNING submission_feature_property_geometry_id;
-      `,
-      z.object({ submission_feature_property_geometry_id: z.number() })
-    );
-
-    return result.rows[0].submission_feature_property_geometry_id;
-  };
+  /** Attach a geometry (as WKT) to a feature under the fixture's spatial property, returning the new row's id. */
+  const addGeometry = (featureId: number, wkt: string) =>
+    addTestGeometry(fixture.connection, featureId, fixture.geometryPropertyId, wkt);
 
   /**
    * Create a submission with one upload containing one pending feature carrying a point geometry at
@@ -139,8 +88,8 @@ describe('Martin upload function (integration)', function () {
     lng = TEST_LNG,
     lat = TEST_LAT
   ): Promise<{ submissionId: number; uploadId: string; featureId: number; geometryId: number }> => {
-    const resolvedSubmissionId = submissionId ?? (await createTestSubmission(connection));
-    const uploadId = await createTestUploadWithFeatures(connection, resolvedSubmissionId, FEATURE_TYPE, []);
+    const resolvedSubmissionId = submissionId ?? (await createTestSubmission(fixture.connection));
+    const uploadId = await createTestUploadWithFeatures(fixture.connection, resolvedSubmissionId, FEATURE_TYPE, []);
     const featureId = await insertFeature(resolvedSubmissionId, uploadId);
     const geometryId = await addGeometry(featureId, `POINT(${lng} ${lat})`);
 
@@ -150,64 +99,17 @@ describe('Martin upload function (integration)', function () {
   /** Build the context string the gateway takes from the verified token. */
   const contextFor = (submissionId: number | string, uploadId: string) => `su:${submissionId}:${uploadId}`;
 
-  /**
-   * Ask the tile function for the tile containing the test point, and return the raw MVT bytes.
-   */
-  const renderTileBuffer = async (context: string, zoom = 12): Promise<Buffer | null> => {
-    const result = await connection.sql(
-      SQL`
-        WITH t AS (
-          SELECT
-            ${zoom}::integer AS z,
-            floor((${TEST_LNG}::double precision + 180.0) / 360.0 * (2 ^ ${zoom}))::integer AS x,
-            floor(
-              (1.0 - ln(tan(radians(${TEST_LAT}::double precision)) + 1.0 / cos(radians(${TEST_LAT}::double precision))) / pi())
-              / 2.0 * (2 ^ ${zoom})
-            )::integer AS y
-        )
-        SELECT biohub.martin_upload(t.z, t.x, t.y, ${JSON.stringify({ context })}::json) AS tile FROM t;
-      `,
-      z.object({ tile: z.instanceof(Buffer).nullable() })
-    );
+  /** The raw MVT bytes of the tile containing the test point. */
+  const renderTileBuffer = (context: string, zoom = 12) =>
+    renderTile(fixture.connection, 'martin_upload', context, { zoom });
 
-    return result.rows[0].tile;
-  };
-
-  /**
-   * Decode an MVT into its layers: each feature as its MVT feature id plus decoded properties.
-   */
-  const decodeTile = (
-    tile: Buffer
-  ): Record<string, { id: number | undefined; properties: Record<string, unknown> }[]> => {
-    const vectorTile = new VectorTile(new Protobuf(tile));
-    const layers: Record<string, { id: number | undefined; properties: Record<string, unknown> }[]> = {};
-
-    for (const [name, layer] of Object.entries(vectorTile.layers)) {
-      layers[name] = [];
-
-      for (let index = 0; index < layer.length; index++) {
-        const feature = layer.feature(index);
-        layers[name].push({ id: feature.id, properties: feature.properties });
-      }
-    }
-
-    return layers;
-  };
-
-  /** Decode a tile and return the geometries layer, asserting the tile is not empty. */
-  const decodeGeometries = async (context: string, zoom = 12) => {
-    const tile = await renderTileBuffer(context, zoom);
-    expect(tile, 'expected a non-empty tile').to.not.be.null;
-
-    const layers = decodeTile(tile as Buffer);
-    expect(Object.keys(layers)).to.deep.equal(['geometries']);
-
-    return layers.geometries;
-  };
+  /** The decoded geometries layer of the tile containing the test point, asserting the tile is not empty. */
+  const decodeGeometries = (context: string, zoom = 12) =>
+    decodeGeometriesLayer(fixture.connection, 'martin_upload', context, zoom);
 
   describe('context parsing', () => {
     it('returns an empty tile when the context is missing', async () => {
-      const result = await connection.sql(
+      const result = await fixture.connection.sql(
         SQL`SELECT biohub.martin_upload(12, 1, 1, '{}'::json) AS tile;`,
         z.object({ tile: z.any() })
       );
@@ -234,7 +136,7 @@ describe('Martin upload function (integration)', function () {
       ];
 
       for (const context of malformed) {
-        const result = await connection.sql(
+        const result = await fixture.connection.sql(
           SQL`SELECT biohub.martin_upload(12, 1, 1, ${JSON.stringify({ context })}::json) AS tile;`,
           z.object({ tile: z.any() })
         );
@@ -245,7 +147,7 @@ describe('Martin upload function (integration)', function () {
 
     it('returns an empty tile when the submission id overflows integer', async () => {
       // The pattern bounds the digit count, not the magnitude, so this reaches the cast.
-      const result = await connection.sql(
+      const result = await fixture.connection.sql(
         SQL`SELECT biohub.martin_upload(12, 1, 1, '{"context":"su:9999999999:11111111-1111-4111-8111-111111111111"}'::json) AS tile;`,
         z.object({ tile: z.any() })
       );
@@ -294,7 +196,7 @@ describe('Martin upload function (integration)', function () {
 
     it('returns an empty tile when the upload belongs to a different submission', async () => {
       const { uploadId } = await createUploadWithPoint();
-      const otherSubmissionId = await createTestSubmission(connection);
+      const otherSubmissionId = await createTestSubmission(fixture.connection);
 
       // The submission id is part of the signed token, so a mismatched pair is not a valid request.
       expect(await renderTileBuffer(contextFor(otherSubmissionId, uploadId))).to.be.null;
@@ -313,7 +215,7 @@ describe('Martin upload function (integration)', function () {
       // published predicate would render every review map empty.
       const { submissionId, uploadId, featureId } = await createUploadWithPoint();
 
-      const pending = await connection.sql(
+      const pending = await fixture.connection.sql(
         SQL`SELECT record_effective_date FROM submission_feature WHERE submission_feature_id = ${featureId};`,
         z.object({ record_effective_date: z.any() })
       );
@@ -351,7 +253,7 @@ describe('Martin upload function (integration)', function () {
     it('returns an empty tile once every feature of the upload has ended', async () => {
       const { submissionId, uploadId, featureId } = await createUploadWithPoint();
 
-      await connection.sql(SQL`
+      await fixture.connection.sql(SQL`
         UPDATE submission_feature SET record_end_date = now() - interval '1 day'
         WHERE submission_feature_id = ${featureId};
       `);
@@ -379,7 +281,7 @@ describe('Martin upload function (integration)', function () {
 
       expect(geometry.properties.submission_feature_property_geometry_id).to.equal(geometryId);
       expect(geometry.properties.submission_feature_id).to.equal(featureId);
-      expect(geometry.properties.feature_type_property_id).to.equal(geometryPropertyId);
+      expect(geometry.properties.feature_type_property_id).to.equal(fixture.geometryPropertyId);
       expect(geometry.properties.property_display_name).to.be.a('string').and.not.empty;
       expect(geometry.properties.property_name).to.be.a('string').and.not.empty;
       // The MVT feature id keys each geometry, so fragments split across tiles share an identity.
@@ -393,18 +295,8 @@ describe('Martin upload function (integration)', function () {
     it('encodes points, lines, polygons and multi-geometries', async () => {
       const { submissionId, uploadId, featureId } = await createUploadWithPoint();
 
-      // WKT, so each geometry type is passed as a bound parameter rather than interpolated SQL.
-      const wktGeometries = [
-        `LINESTRING(${TEST_LNG} ${TEST_LAT}, ${TEST_LNG + 0.001} ${TEST_LAT + 0.001})`,
-        `POLYGON((${TEST_LNG} ${TEST_LAT}, ${TEST_LNG + 0.001} ${TEST_LAT}, ${TEST_LNG + 0.001} ${
-          TEST_LAT + 0.001
-        }, ${TEST_LNG} ${TEST_LAT}))`,
-        `MULTIPOINT((${TEST_LNG} ${TEST_LAT}), (${TEST_LNG + 0.0005} ${TEST_LAT + 0.0005}))`,
-        `MULTILINESTRING((${TEST_LNG} ${TEST_LAT}, ${TEST_LNG + 0.001} ${TEST_LAT + 0.001}))`,
-        `MULTIPOLYGON(((${TEST_LNG} ${TEST_LAT}, ${TEST_LNG + 0.001} ${TEST_LAT}, ${TEST_LNG + 0.001} ${
-          TEST_LAT + 0.001
-        }, ${TEST_LNG} ${TEST_LAT})))`
-      ];
+      // Every geometry type, on top of the fixture's own point.
+      const wktGeometries = buildWktGeometries();
 
       for (const wkt of wktGeometries) {
         await addGeometry(featureId, wkt);
@@ -412,7 +304,7 @@ describe('Martin upload function (integration)', function () {
 
       const geometries = await decodeGeometries(contextFor(submissionId, uploadId));
 
-      // Every geometry type survives clipping and MVT encoding (plus the fixture's point).
+      // Every geometry type survives clipping and MVT encoding.
       expect(geometries).to.have.length(wktGeometries.length + 1);
     });
 
@@ -420,16 +312,12 @@ describe('Martin upload function (integration)', function () {
       const { submissionId, uploadId } = await createUploadWithPoint();
 
       // Mid ocean, far from the fixture.
-      const result = await connection.sql(
-        SQL`
-          SELECT biohub.martin_upload(12, 0, 0, ${JSON.stringify({
-            context: contextFor(submissionId, uploadId)
-          })}::json) AS tile;
-        `,
-        z.object({ tile: z.any() })
-      );
-
-      expect(result.rows[0].tile).to.be.null;
+      expect(
+        await renderTile(fixture.connection, 'martin_upload', contextFor(submissionId, uploadId), {
+          lng: -179.9,
+          lat: 0
+        })
+      ).to.be.null;
     });
 
     it('excludes geometry of the same upload that lies outside the requested tile', async () => {
@@ -447,7 +335,7 @@ describe('Martin upload function (integration)', function () {
     it('finds the upload through its partial index rather than scanning either table', async () => {
       // The candidate set must be bounded by the upload whatever the zoom: a low zoom tile driven
       // from the geometry GIST index would scan every geometry in the province.
-      const plan = await connection.sql(
+      const plan = await fixture.connection.sql(
         SQL`
           EXPLAIN (COSTS OFF)
           SELECT g.submission_feature_property_geometry_id

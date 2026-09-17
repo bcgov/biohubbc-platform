@@ -1,59 +1,24 @@
-import {
-  MARTIN_AUTO_RECOVERY_BACKOFF_BASE_MS,
-  MARTIN_MAX_AUTO_RECOVERIES,
-  MARTIN_REFRESH_LEAD_SECONDS
-} from 'constants/martin';
+import { TileSessionStatus, UseTileSessionResult, useTileSession } from 'components/map/useTileSession';
 import { CreateTileExtentSessionResponse, ITileExtentSession } from 'interfaces/useMartinApi.interface';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { isAbortError } from 'utils/request';
+import { useCallback } from 'react';
 
-export type TileExtentSessionStatus = 'loading' | 'ready' | 'empty' | 'error';
+export type TileExtentSessionStatus = TileSessionStatus;
 
 /**
  * Mint a tile session for the mapped subject. Receives an abort signal that fires when the request is superseded.
  */
 export type CreateTileExtentSession = (signal: AbortSignal) => Promise<CreateTileExtentSessionResponse>;
 
-export interface UseTileExtentSessionResult {
-  status: TileExtentSessionStatus;
-  /** The active session. Present whenever status is 'ready'. */
-  session: ITileExtentSession | null;
-  /**
-   * Current tile token, read at request time.
-   *
-   * A ref rather than state on purpose: the token rotates on refresh, and re-rendering the map for that would tear
-   * down and rebuild it mid-session.
-   */
-  tokenRef: React.MutableRefObject<string | null>;
-  /**
-   * Bumped whenever the rendered tiles must be re-requested from scratch (manual retry or automatic
-   * recovery). Fold it into the map's React key so recovery forces a clean remount; a token-only refresh
-   * before expiry leaves it untouched and never remounts.
-   */
-  reloadNonce: number;
-  /** Manually re-request the session from a clean slate, eg: the user clicking "Try again". */
-  retry: () => void;
-  /** Report that a tile request failed, triggering one bounded automatic recovery attempt. */
-  onTileError: () => void;
-}
+export type UseTileExtentSessionResult = UseTileSessionResult<ITileExtentSession>;
 
 /**
- * Owns the tile session for a map of one subject with a fixed extent (a submission feature, a submission upload):
- * creation, refresh before expiry, and recovery from a rejected tile request.
+ * Owns the tile session for a map of one subject with a fixed extent (a submission feature, a submission upload).
  *
- * The session is re-created whenever `sessionKey` changes, so navigating between subjects replaces the token and the
- * tiles rather than layering the new subject's geometry over the old. The token is short lived and kept in memory
- * only. `createSession` is read through a ref at call time, so callers need not memoise it; only the key decides when
- * a fresh session is minted.
- *
- * Recovery is split by intent. A tile error (`onTileError`) triggers at most `MAX_AUTO_RECOVERIES` background
- * re-mints before giving up, so a persistent failure cannot storm the mint endpoint. A manual `retry` always starts
- * from a clean slate, so the "Try again" button works even from the error state, where automatic recovery has already
- * given up. Both bump `reloadNonce` to force the tiles to be re-requested; the pre-expiry token refresh does not, so it
- * rotates the token without disturbing the rendered map.
- *
- * A failure is reported through `status` alone rather than a snackbar: the map is one section of a page whose other
- * sections stay usable, so it must not raise an app-level notification.
+ * A binding of {@link useTileSession} to the extent session shape: a response without spatial properties carries no
+ * token and becomes the `empty` status. The session is re-created whenever `sessionKey` changes, refreshed before its
+ * token expires, and recovered from a rejected tile request within a bounded budget; see the generic hook for the full
+ * behaviour. A failure is reported through `status` alone, never a snackbar: the map is one section of a page whose
+ * other sections stay usable.
  *
  * @param {string} sessionKey - Identity of the mapped subject. Changing it drops the session and mints a new one.
  * @param {CreateTileExtentSession} createSession - Mints a session for the subject.
@@ -63,213 +28,14 @@ export const useTileExtentSession = (
   sessionKey: string,
   createSession: CreateTileExtentSession
 ): UseTileExtentSessionResult => {
-  const [status, setStatus] = useState<TileExtentSessionStatus>('loading');
-  const [session, setSession] = useState<ITileExtentSession | null>(null);
-  const [reloadNonce, setReloadNonce] = useState(0);
+  const mint = useCallback(
+    async (signal: AbortSignal): Promise<ITileExtentSession | null> => {
+      const response = await createSession(signal);
 
-  const tokenRef = useRef<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // True while a mint is in flight, so a burst of tile errors triggers a single recovery, not a storm.
-  const mintInFlightRef = useRef(false);
-  // Consecutive automatic recoveries not yet cleared by a fresh attempt (new subject, manual retry, or pre-expiry
-  // refresh). It deliberately survives a successful re-mint: a persistent non-token failure keeps erroring after each
-  // successful mint, and this counter is what eventually stops it.
-  const autoRecoveryCountRef = useRef(0);
-  // Set by onTileError so the mint effect knows the next mint is a recovery and must not clear the counter.
-  const pendingRecoveryRef = useRef(false);
-  // Pending backoff delay before an automatic recovery re-mint fires.
-  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [mintCount, setMintCount] = useState(0);
+      return response.has_spatial_properties ? response : null;
+    },
+    [createSession]
+  );
 
-  // Declared before the mint effect so that, on a key change, the mint effect below always sees the fetcher that
-  // belongs to the new key rather than the previous render's closure.
-  const createSessionRef = useRef(createSession);
-
-  useEffect(() => {
-    createSessionRef.current = createSession;
-  });
-
-  /** Run the mint effect again. */
-  const triggerMint = useCallback(() => {
-    setMintCount((count) => count + 1);
-  }, []);
-
-  /** Cancel a scheduled automatic recovery, if one is waiting out its backoff. */
-  const clearRecoveryTimer = useCallback(() => {
-    if (recoveryTimerRef.current) {
-      clearTimeout(recoveryTimerRef.current);
-      recoveryTimerRef.current = null;
-    }
-  }, []);
-
-  /**
-   * Report that a tile request failed. `transformRequest` cannot see responses, so an expired token surfaces as a
-   * source error rather than a 401 the caller can inspect. Re-mint to recover a likely-expired token, but only up to
-   * `MARTIN_MAX_AUTO_RECOVERIES` times, each attempt delayed with exponential backoff so a service that is down sees
-   * spaced-out attempts rather than an immediate burst.
-   *
-   * Deliberately does NOT bump the reload nonce here: the nonce remounts the map, and remounting before the re-mint
-   * resolves would issue a fresh round of tile requests with the same rejected token still in the ref. Those failures
-   * would be swallowed by the in-flight guard and nothing would re-request the tiles when the new token finally
-   * arrived, leaving a permanently blank map. The nonce is bumped by the mint effect once the new token is in place.
-   */
-  const onTileError = useCallback(() => {
-    if (mintInFlightRef.current) {
-      // A mint is already addressing this; further errors from the same burst are the same problem.
-      return;
-    }
-
-    if (autoRecoveryCountRef.current >= MARTIN_MAX_AUTO_RECOVERIES) {
-      // Give up visibly. Dropping the session is what routes rendering to the error state and its
-      // "Try again"; a stale session would keep a dead-token map on screen instead.
-      tokenRef.current = null;
-      setSession(null);
-      setStatus('error');
-      return;
-    }
-
-    const backoffMs = MARTIN_AUTO_RECOVERY_BACKOFF_BASE_MS * 2 ** autoRecoveryCountRef.current;
-
-    autoRecoveryCountRef.current += 1;
-    pendingRecoveryRef.current = true;
-    // Claimed now, not when the timer fires, so tile errors arriving during the backoff are absorbed.
-    mintInFlightRef.current = true;
-
-    recoveryTimerRef.current = setTimeout(() => {
-      recoveryTimerRef.current = null;
-      triggerMint();
-    }, backoffMs);
-  }, [triggerMint]);
-
-  /**
-   * Re-request the session from a clean slate, immediately. Resets the recovery budget and forces the tiles to be
-   * re-requested, so it recovers even from the error state, where automatic recovery has given up.
-   */
-  const retry = useCallback(() => {
-    clearRecoveryTimer();
-    pendingRecoveryRef.current = false;
-    autoRecoveryCountRef.current = 0;
-    mintInFlightRef.current = true;
-    setStatus('loading');
-    setReloadNonce((nonce) => nonce + 1);
-    triggerMint();
-  }, [clearRecoveryTimer, triggerMint]);
-
-  // Drop the previous subject's session as soon as the key changes, rather than when its replacement arrives.
-  // Without this the old subject's tiles stay on screen for the length of the mint request, which reads as the new
-  // subject having the old one's geometry. Declared before the mint effect so it runs first on a key change; it does
-  // not run for a refresh or a recovery, which reuse the same key and must leave the rendered map alone.
-  useEffect(() => {
-    clearRecoveryTimer();
-    pendingRecoveryRef.current = false;
-    tokenRef.current = null;
-    setSession(null);
-    setStatus('loading');
-  }, [sessionKey, clearRecoveryTimer]);
-
-  useEffect(() => {
-    // Cancel any request still in flight for a previous subject, so a slow response cannot overwrite a newer one.
-    abortControllerRef.current?.abort();
-
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    // A mint not flagged as a recovery is a fresh attempt (new subject, manual retry, or pre-expiry refresh), which
-    // clears the recovery budget.
-    const isRecovery = pendingRecoveryRef.current;
-    pendingRecoveryRef.current = false;
-
-    if (!isRecovery) {
-      autoRecoveryCountRef.current = 0;
-    }
-
-    mintInFlightRef.current = true;
-
-    let isCurrent = true;
-
-    const mintSession = async () => {
-      try {
-        const response = await createSessionRef.current(abortController.signal);
-
-        if (!isCurrent) {
-          return;
-        }
-
-        if (!response.has_spatial_properties) {
-          tokenRef.current = null;
-          setSession(null);
-          setStatus('empty');
-          return;
-        }
-
-        tokenRef.current = response.token;
-        setSession(response);
-        setStatus('ready');
-
-        if (isRecovery) {
-          // Only NOW is it safe to re-request the rendered tiles: the new token is in the ref, so
-          // the remounted map's first requests carry it. MapLibre never retries a tile it has
-          // marked errored, so without this bump nothing would ever re-request the failed tiles.
-          setReloadNonce((nonce) => nonce + 1);
-        }
-      } catch (error) {
-        if (isAbortError(error) || !isCurrent) {
-          return;
-        }
-
-        tokenRef.current = null;
-        setSession(null);
-        setStatus('error');
-      } finally {
-        // Only the current mint owns the flag; a superseded one leaves it for its replacement to manage.
-        if (isCurrent) {
-          mintInFlightRef.current = false;
-        }
-      }
-    };
-
-    mintSession();
-
-    return () => {
-      isCurrent = false;
-      abortController.abort();
-    };
-  }, [sessionKey, mintCount]);
-
-  // Refresh shortly before the token expires, so a map left open on a page keeps working.
-  useEffect(() => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
-
-    if (!session) {
-      return;
-    }
-
-    const delaySeconds = Math.max(session.token_expires_in - MARTIN_REFRESH_LEAD_SECONDS, 1);
-
-    refreshTimerRef.current = setTimeout(() => {
-      // A pre-expiry refresh is not a recovery: rotate the token without bumping the reload nonce, so the rendered
-      // tiles are left in place.
-      triggerMint();
-    }, delaySeconds * 1000);
-
-    return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-    };
-  }, [session, triggerMint]);
-
-  // Unmounting must leave no timer behind to fire into an unmounted component.
-  useEffect(() => {
-    return () => {
-      clearRecoveryTimer();
-    };
-  }, [clearRecoveryTimer]);
-
-  return { status, session, tokenRef, reloadNonce, retry, onTileError };
+  return useTileSession<ITileExtentSession>({ sessionKey, mint });
 };
