@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import fs from 'node:fs';
 import path from 'node:path';
+import { seedSnapshotTaxa } from './snapshot/taxonomy';
 
 /**
  * Replay committed golden-snapshot fixtures into the real feature tables (pure knex, no `api` import).
@@ -157,6 +158,10 @@ interface FkChain {
 
 export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`SET SCHEMA 'biohub'; SET SEARCH_PATH = 'biohub','public';`);
+
+  // Taxa are cached by the application during normal ingestion. Snapshot replay bypasses that API path,
+  // so seed the referenced cache records explicitly before replaying (or skipping) the submissions.
+  await seedSnapshotTaxa(knex);
 
   for (const fixtureName of loadFixtureIndex()) {
     const fixture = loadFixture(fixtureName);
