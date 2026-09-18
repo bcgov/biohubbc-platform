@@ -152,6 +152,15 @@ describe('useSearchApi', () => {
       );
     });
 
+    it('includes submission IDs in both result and count requests', async () => {
+      mock.onPost('/api/search/feature/survey').reply(200, {});
+      mock.onPost('/api/search/feature/survey/count').reply(200, { total: 0 });
+      await api.searchFeatures('survey', null, { limit: 10 }, { submissionIds: [42] });
+      await api.countFeatures('survey', null, { signal: new AbortController().signal, submissionIds: [42] });
+      expect(JSON.parse(mock.history.post[0].data)).toEqual({ pagination: { limit: 10 }, submissionIds: [42] });
+      expect(JSON.parse(mock.history.post[1].data)).toEqual({ submissionIds: [42] });
+    });
+
     it('should return empty array when no results', async () => {
       const mockResponse: SearchFeatureResponse = {
         features: [],

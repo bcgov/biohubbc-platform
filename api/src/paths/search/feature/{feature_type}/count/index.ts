@@ -64,7 +64,8 @@ export function countFeatures(): RequestHandler {
       const total = await new SearchFeatureService(connection).countSearchFeaturesByExpressionTree(
         featureType,
         expressionTree,
-        systemUserId
+        systemUserId,
+        req.body.submissionIds
       );
 
       await connection.commit();

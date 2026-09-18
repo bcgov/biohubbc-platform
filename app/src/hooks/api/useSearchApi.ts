@@ -36,9 +36,13 @@ export const useSearchApi = (axios: AxiosInstance) => {
       featureType: string,
       expressionTree?: ExpressionTreeExpression | null,
       pagination?: ApiCursorPaginationRequestOptions,
-      options?: Pick<AxiosRequestConfig, 'signal'>
+      options?: Pick<AxiosRequestConfig, 'signal'> & { submissionIds?: number[] }
     ): Promise<SearchFeatureResponse> => {
-      const body = expressionTree ? { expression: expressionTree, pagination } : { pagination };
+      const body = {
+        ...(expressionTree ? { expression: expressionTree } : {}),
+        pagination,
+        ...(options?.submissionIds?.length ? { submissionIds: options.submissionIds } : {})
+      };
       const { data } = await axios.post<SearchFeatureResponse>(`/api/search/feature/${featureType}`, body, {
         signal: options?.signal
       });
@@ -60,9 +64,12 @@ export const useSearchApi = (axios: AxiosInstance) => {
     async (
       featureType: string,
       expressionTree: ExpressionTreeExpression | null,
-      options: { signal: AbortSignal }
+      options: { signal: AbortSignal; submissionIds?: number[] }
     ): Promise<SearchFeatureCountResponse> => {
-      const body = expressionTree ? { expression: expressionTree } : {};
+      const body = {
+        ...(expressionTree ? { expression: expressionTree } : {}),
+        ...(options.submissionIds?.length ? { submissionIds: options.submissionIds } : {})
+      };
       const { data } = await axios.post<SearchFeatureCountResponse>(`/api/search/feature/${featureType}/count`, body, {
         signal: options.signal
       });

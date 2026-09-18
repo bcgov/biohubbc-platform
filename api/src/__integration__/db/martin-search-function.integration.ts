@@ -25,6 +25,7 @@ import { ExpressionTree } from '../../models/expression-tree';
 import { buildExpressionTreeFeatureIdsSubquery } from '../../repositories/expression-evaluation';
 import { ExpressionTreeNormalizationService } from '../../services/expression-tree-normalization-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
+import { SearchFeatureService } from '../../services/search-feature-service';
 import { addTeamMember, createTeam, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -147,16 +148,18 @@ describe('Tile search function (integration)', function () {
     systemUserId?: number | null;
     expressionId?: string | null;
     expiresInSeconds?: number;
+    submissionIds?: number[];
   }): Promise<string> => {
     const result = await connection.sql(
       SQL`
         INSERT INTO martin_context (
-          context_hash, expression_id, feature_type_id, system_user_id, record_end_date, create_user
+          context_hash, expression_id, feature_type_id, system_user_id, submission_ids, record_end_date, create_user
         ) VALUES (
           'integration-test',
           ${options.expressionId ?? null},
           ${featureTypeId},
           ${options.systemUserId ?? null},
+          ${options.submissionIds ?? null},
           now() + make_interval(secs => ${options.expiresInSeconds ?? 1800}),
           ${connection.systemUserId()}
         )
@@ -247,6 +250,7 @@ describe('Tile search function (integration)', function () {
           ctx.feature_type_id,
           ctx.system_user_id,
           ctx.expression_id,
+          ctx.submission_ids,
           public.ST_Transform(public.ST_TileEnvelope(t.z, t.x, t.y), 4326)
         ) v
         WHERE v.submission_feature_id = ${featureId};
@@ -339,6 +343,120 @@ describe('Tile search function (integration)', function () {
 
     return createContext({ expressionId: expression_id });
   };
+
+  describe('submission scope', () => {
+    const search = async (submissionIds: number[], expression?: ExpressionTree, systemUserId: number | null = null) => {
+      const service = new SearchFeatureService(connection);
+      const result = await service.searchFeaturesByExpressionTreeWithMetadata(
+        FEATURE_TYPE,
+        expression,
+        undefined,
+        systemUserId,
+        submissionIds
+      );
+      const count = await service.countSearchFeaturesByExpressionTree(
+        FEATURE_TYPE,
+        expression,
+        systemUserId,
+        submissionIds
+      );
+      return { ...result, count };
+    };
+
+    const submissionOf = async (featureId: number): Promise<number> => {
+      const result = await connection.sql(SQL`
+        SELECT submission_id FROM submission_feature WHERE submission_feature_id = ${featureId};
+      `);
+      return result.rows[0].submission_id;
+    };
+
+    it('keeps rows, counts, secured indicators and tiles within the submission scope', async () => {
+      const included = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const outside = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const hiddenOutside = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      await secureFeature(connection, hiddenOutside);
+      const submissionIds = [await submissionOf(included)];
+      const result = await search(submissionIds);
+      const limited = await new SearchFeatureService(connection).searchFeaturesByExpressionTreeWithMetadata(
+        FEATURE_TYPE,
+        undefined,
+        { limit: 1, sort: 'create_date', order: 'desc' },
+        null,
+        submissionIds
+      );
+      expect(limited.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
+      expect(result.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
+      expect(result.count).to.equal(1);
+      expect(result.properties.map((property) => property.feature_type_property_id)).to.include(
+        geometryProperty.feature_type_property_id
+      );
+      expect(result.has_inaccessible_secured_features).to.equal(false);
+      const context = await createContext({ submissionIds });
+      expect(await canSee(context, included)).to.equal(true);
+      expect(await canSee(context, outside)).to.equal(false);
+      expect(await canSee(context, hiddenOutside)).to.equal(false);
+      const tile = await renderTileBytes(context);
+      expect(tile).to.not.equal(null);
+      expect(Object.values(decodeTile(tile!)).flat()).to.have.length(1);
+    });
+
+    it('combines multiple submissions with expressions and live authorization', async () => {
+      const first = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const secured = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const outside = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const nonMatching = await createTestFeature(connection, await submissionOf(first), FEATURE_TYPE, {
+        name: 'non-matching'
+      });
+      await addPointToFeature(nonMatching, TEST_LNG, TEST_LAT);
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_closure (source_submission_feature_id, target_submission_feature_id, is_ancestor)
+        VALUES (${nonMatching}, ${nonMatching}, true);
+      `);
+      const numberProperty = await resolvePropertyByType('number');
+      expect(numberProperty, 'seeded number property').to.not.equal(null);
+      for (const feature of [first, secured, outside]) {
+        await setNumberValue(feature, numberProperty!, 17);
+      }
+      await setNumberValue(nonMatching, numberProperty!, 99);
+      await secureFeature(connection, secured);
+      const systemUserId = connection.systemUserId();
+      await grantFeatureToUser(secured, systemUserId);
+      const submissionIds = [await submissionOf(first), await submissionOf(secured)];
+      const expression = tree('AND', [predicate(numberProperty!, 'Equals', 17)]);
+      const normalized = await new ExpressionTreeNormalizationService(connection).normalize(expression);
+      const { expression_id } = await new ExpressionTreeService(connection).writeNormalizedExpressionTree(normalized);
+      for (const caller of [null, systemUserId]) {
+        const result = await search(submissionIds, expression, caller);
+        expect(result.features.map((feature) => feature.submission_feature_id)).to.have.members(
+          caller === null ? [first] : [first, secured]
+        );
+        expect(result.count).to.equal(caller === null ? 1 : 2);
+        expect(result.has_inaccessible_secured_features).to.equal(caller === null);
+        const context = await createContext({ submissionIds, systemUserId: caller, expressionId: expression_id });
+        expect(await canSee(context, first)).to.equal(true);
+        expect(await canSee(context, secured)).to.equal(caller !== null);
+        expect(await canSee(context, outside)).to.equal(false);
+        expect(await canSee(context, nonMatching)).to.equal(false);
+        const tile = await renderTileBytes(context);
+        expect(tile).to.not.equal(null);
+        expect(Object.values(decodeTile(tile!)).flat()).to.have.length(caller === null ? 1 : 2);
+      }
+    });
+
+    it('returns no scoped results when the submission closure is missing', async () => {
+      const feature = await createFeatureWithPoint(TEST_LNG, TEST_LAT, false);
+      const submissionIds = [await submissionOf(feature)];
+      const result = await search(submissionIds);
+      expect(result.features).to.eql([]);
+      expect(result.count).to.equal(0);
+      // Property definitions are type metadata, independent of the scoped results.
+      expect(result.properties).not.to.be.empty;
+      expect(result.has_inaccessible_secured_features).to.equal(false);
+      const context = await createContext({ submissionIds });
+      expect(await canSee(context, feature)).to.equal(false);
+      expect(await renderTile(context)).to.satisfy((size: number | null) => size === null || size === 0);
+    });
+  });
 
   describe('context resolution', () => {
     it('returns nothing when the context id is missing', async () => {
@@ -1042,7 +1160,7 @@ describe('Tile search function (integration)', function () {
         SQL`
           EXPLAIN (COSTS OFF)
           SELECT * FROM biohub.martin_search_visible_geometries(
-            ${featureTypeId}, NULL, NULL,
+            ${featureTypeId}, NULL, NULL, NULL,
             public.ST_Transform(public.ST_TileEnvelope(12, 654, 1400), 4326)
           );
         `,
