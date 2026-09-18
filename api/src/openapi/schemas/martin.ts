@@ -83,12 +83,13 @@ export const martinSessionResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Response returned when a tile session is created for a single submission feature.
+ * Response returned when a tile session is created for a subject with a fixed extent (a single
+ * submission feature, or every active feature of a submission upload).
  *
- * Two shapes: a session with a token, or a statement that the feature has no spatial properties to
+ * Two shapes: a session with a token, or a statement that the subject has no spatial properties to
  * map. The empty shape carries no token, because there is nothing to authorize a request for.
  */
-export const martinFeatureSessionResponseSchema: OpenAPIV3.SchemaObject = {
+export const martinExtentSessionResponseSchema: OpenAPIV3.SchemaObject = {
   oneOf: [
     {
       type: 'object',
@@ -122,11 +123,12 @@ export const martinFeatureSessionResponseSchema: OpenAPIV3.SchemaObject = {
         },
         martin_url_template: {
           type: 'string',
-          description: 'Tile URL template for MapLibre, e.g. "/martin/feature/{z}/{x}/{y}".'
+          description:
+            'Tile URL template for MapLibre, e.g. "/martin/feature/{z}/{x}/{y}" or "/martin/upload/{z}/{x}/{y}".'
         },
         bbox: {
           type: 'array',
-          description: "Combined extent of the feature's spatial properties as [minX, minY, maxX, maxY] in WGS84.",
+          description: 'Combined extent of the mapped spatial properties as [minX, minY, maxX, maxY] in WGS84.',
           items: { type: 'number' },
           minItems: 4,
           maxItems: 4

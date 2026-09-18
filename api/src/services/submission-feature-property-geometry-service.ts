@@ -78,6 +78,30 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
   }
 
   /**
+   * Get the combined extent and count of the spatial properties of every active submission feature
+   * belonging to one submission upload.
+   *
+   * Answers whether an upload can be mapped at all, and where the map should open. Active means not
+   * ended rather than published, because an upload under review has never been approved. The
+   * geometry values themselves are deliberately not returned: they reach the browser as vector
+   * tiles from the gateway, never through this API.
+   *
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @return {*}  {Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }>}
+   * @memberof SubmissionFeaturePropertyGeometryService
+   */
+  getSubmissionUploadGeometryExtent(
+    submissionId: number,
+    submissionUploadId: string
+  ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
+    return this.submissionFeaturePropertyGeometryRepository.getSubmissionUploadGeometryExtent(
+      submissionId,
+      submissionUploadId
+    );
+  }
+
+  /**
    * Get every stored spatial property value recorded against one feature type property.
    *
    * @param {number} featureTypePropertyId

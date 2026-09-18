@@ -1,6 +1,6 @@
 import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { CreateSubmissionFeatureTileSessionResponse, IMartinSession } from 'interfaces/useMartinApi.interface';
+import { CreateTileExtentSessionResponse, IMartinSession } from 'interfaces/useMartinApi.interface';
 
 /**
  * Returns API methods for map Martin sessions.
@@ -51,15 +51,43 @@ export const useMartinApi = (axios: AxiosInstance) => {
    * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
-   * @return {Promise<CreateSubmissionFeatureTileSessionResponse>}
+   * @return {Promise<CreateTileExtentSessionResponse>}
    */
   const createSubmissionFeatureTileSession = async (
     submissionId: number,
     submissionFeatureId: number,
     options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<CreateSubmissionFeatureTileSessionResponse> => {
-    const { data } = await axios.post<CreateSubmissionFeatureTileSessionResponse>(
+  ): Promise<CreateTileExtentSessionResponse> => {
+    const { data } = await axios.post<CreateTileExtentSessionResponse>(
       `/api/submission/${submissionId}/features/${submissionFeatureId}/tile`,
+      undefined,
+      { signal: options?.signal }
+    );
+
+    return data;
+  };
+
+  /**
+   * Create a tile session for the spatial properties of every active feature of a submission upload.
+   *
+   * Restricted to system administrators, for the upload review page. The API verifies that the upload belongs to the
+   * submission before issuing a token scoped to that upload alone; the identifiers travel inside the token, so
+   * requesting a different upload means requesting a different session.
+   *
+   * Returns a result with no token when the upload has no spatial properties to map.
+   *
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
+   * @return {Promise<CreateTileExtentSessionResponse>}
+   */
+  const createSubmissionUploadTileSession = async (
+    submissionId: number,
+    submissionUploadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<CreateTileExtentSessionResponse> => {
+    const { data } = await axios.post<CreateTileExtentSessionResponse>(
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/tile`,
       undefined,
       { signal: options?.signal }
     );
@@ -69,6 +97,7 @@ export const useMartinApi = (axios: AxiosInstance) => {
 
   return {
     createMartinSession,
-    createSubmissionFeatureTileSession
+    createSubmissionFeatureTileSession,
+    createSubmissionUploadTileSession
   };
 };

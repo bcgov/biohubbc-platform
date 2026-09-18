@@ -11,7 +11,9 @@ export enum MARTIN_SOURCE {
   /** Authorized search-result tiles: `biohub.martin_search`. */
   SEARCH = 'search',
   /** One submission feature's spatial properties: `biohub.martin_feature`. */
-  FEATURE = 'feature'
+  FEATURE = 'feature',
+  /** Every active feature's spatial properties for one submission upload: `biohub.martin_upload`. */
+  UPLOAD = 'upload'
 }
 
 /** Layer name `biohub.martin_feature` encodes into its tiles. */
@@ -20,3 +22,10 @@ export const MARTIN_FEATURE_SOURCE_LAYER = 'geometries';
 /** Zoom range the `feature` source is published at. Keep in sync with the Martin function source config. */
 export const MARTIN_FEATURE_MIN_ZOOM = 0;
 export const MARTIN_FEATURE_MAX_ZOOM = 15;
+
+/** Layer name `biohub.martin_upload` encodes into its tiles. */
+export const MARTIN_UPLOAD_SOURCE_LAYER = 'geometries';
+
+/** Zoom range the `upload` source is published at. Keep in sync with the Martin function source config. */
+export const MARTIN_UPLOAD_MIN_ZOOM = 0;
+export const MARTIN_UPLOAD_MAX_ZOOM = 15;

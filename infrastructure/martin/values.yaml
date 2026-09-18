@@ -63,6 +63,19 @@ app:
         # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
         maxzoom: 15
 
+      # Spatial properties of every active feature of a single submission upload, for the
+      # administrative upload review map. The submission and upload ids are carried by the token
+      # the gateway verifies, so this source needs no context lookup either.
+      # See database/src/procedures/05_martin_upload.ts
+      #
+      # No bounds: the client frames the map from the bbox the tile session returns.
+      upload:
+        schema: biohub
+        function: martin_upload
+        minzoom: 0
+        # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+        maxzoom: 15
+
   database:
     port: 5432
     # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments
@@ -124,7 +137,7 @@ gateway:
 
   # Sources the gateway will serve. Comma separated. Anything else is rejected regardless of what
   # Martin publishes, so an accidentally published source is still not publicly reachable.
-  allowedSources: search,feature
+  allowedSources: search,feature,upload
 
   # Zoom range the gateway will proxy. Deliberately WIDER than the client floor
   # (MAP_MIN_ZOOM in app/src/constants/spatial.ts): this is a bound on what a token holder may
