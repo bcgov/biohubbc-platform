@@ -520,6 +520,19 @@ configs:
             # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
             maxzoom: 15
 
+          # Spatial properties of every active feature of a single submission upload, for the
+          # administrative upload review map. The submission and upload ids are carried by the
+          # token the gateway verifies, so this source needs no context lookup either.
+          # See database/src/procedures/05_martin_upload.ts
+          #
+          # No bounds: the client frames the map from the bbox the tile session returns.
+          upload:
+            schema: biohub
+            function: martin_upload
+            minzoom: 0
+            # Matches MAP_MAX_ZOOM in app/src/constants/spatial.ts
+            maxzoom: 15
+
 networks:
   biohubbc-network:
     driver: bridge

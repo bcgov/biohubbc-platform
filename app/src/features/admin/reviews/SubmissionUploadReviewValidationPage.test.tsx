@@ -26,6 +26,13 @@ vi.mock('./components/SubmissionUploadReviewHeader', () => ({
     </div>
   )
 }));
+// The map owns its own session and is exercised by its own suite; here we only care that the page mounts it for the
+// reviewed upload. Without the stub it would reach for `useApi().martin`, which this page's api mock does not provide.
+vi.mock('./components/map/SubmissionUploadMap', () => ({
+  SubmissionUploadMap: ({ submissionId, submissionUploadId }: { submissionId: number; submissionUploadId: string }) => (
+    <div data-testid="upload-map" data-submission-id={submissionId} data-upload-id={submissionUploadId} />
+  )
+}));
 vi.mock('features/submissions/components/SubmissionFeatureTable', () => ({
   SubmissionFeatureTable: ({
     rows,
@@ -120,6 +127,31 @@ describe('SubmissionUploadReviewValidationPage', () => {
     expect(screen.getByText('Modified')).toBeVisible();
     expect(screen.getByTestId('feature-table')).toHaveAttribute('data-row-count', '1');
     expect(screen.getByTestId('feature-table')).toHaveTextContent('animal');
+  });
+
+  it('maps the reviewed upload in its own section between the overview and the feature list', () => {
+    render(
+      <MemoryRouter initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`]}>
+        <Routes>
+          <Route
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
+            element={<SubmissionUploadReviewValidationPage />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const map = screen.getByTestId('upload-map');
+
+    expect(map).toHaveAttribute('data-submission-id', '16');
+    expect(map).toHaveAttribute('data-upload-id', submissionUploadId);
+    expect(screen.getByText('Map')).toBeVisible();
+
+    // Section order: Overview, Map, Features.
+    const overview = screen.getByText('Overview');
+    const features = screen.getByTestId('feature-table');
+    expect(overview.compareDocumentPosition(map) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(map.compareDocumentPosition(features) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('confirms and completes the review without changing the upload disposition', async () => {

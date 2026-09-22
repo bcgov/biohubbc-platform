@@ -76,6 +76,16 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
     expect(stub).to.have.been.calledOnceWith(20);
     expect(result).to.eql([mockRow]);
   });
+  it('delegates getSubmissionUploadGeometryExtent', async () => {
+    const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());
+    const extent = { bbox: [-125.1, 49.1, -125.0, 49.2] as [number, number, number, number], geometry_count: 3 };
+    const stub = sinon
+      .stub(SubmissionFeaturePropertyGeometryRepository.prototype, 'getSubmissionUploadGeometryExtent')
+      .resolves(extent);
+    const result = await service.getSubmissionUploadGeometryExtent(12, '11111111-1111-4111-8111-111111111111');
+    expect(stub).to.have.been.calledOnceWith(12, '11111111-1111-4111-8111-111111111111');
+    expect(result).to.eql(extent);
+  });
   it('propagates repository errors', async () => {
     const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());
     sinon

@@ -12,7 +12,8 @@ export const FEATURE_OUTLINE_LAYER_ID = 'feature-outlines';
 const GEOMETRY_COLOR = '#1f6fb2';
 
 /**
- * Build the vector tile source for a feature's spatial properties.
+ * Build the vector tile source for the spatial properties of a mapped subject (a feature, or every feature of an
+ * upload).
  *
  * The tile URL template is returned by the API and is relative; see {@link resolveMartinTileUrlTemplate} for how it
  * becomes absolute.
@@ -22,7 +23,7 @@ const GEOMETRY_COLOR = '#1f6fb2';
  * it the URL would be identical across features and the browser would serve the previous feature's tiles from cache.
  *
  * @param {string} martinUrlTemplate - Template from the tile session, e.g. `/martin/feature/{z}/{x}/{y}`.
- * @param {string} cacheKey - Identifies the feature being mapped, used only to vary the URL.
+ * @param {string} cacheKey - Identifies the subject being mapped, used only to vary the URL.
  * @param {number} minZoom - Lowest zoom the source serves.
  * @param {number} maxZoom - Highest zoom the source serves.
  * @return {*}  {SourceSpecification}
@@ -46,9 +47,9 @@ export const buildFeatureTileSource = (
 };
 
 /**
- * Build the layers rendering a feature's spatial properties.
+ * Build the layers rendering a subject's spatial properties.
  *
- * A feature's spatial properties can be of mixed geometry types, and they all arrive in one source layer, so each
+ * The spatial properties can be of mixed geometry types, and they all arrive in one source layer, so each
  * layer filters by geometry type: a layer type only renders the geometries it can draw, and without the filters a
  * point among polygons would silently not appear. `geometry-type` reports multi-geometries under their singular name,
  * so these four layers also cover MultiPoint, MultiLineString and MultiPolygon.

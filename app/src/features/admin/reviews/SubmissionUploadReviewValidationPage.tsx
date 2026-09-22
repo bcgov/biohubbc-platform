@@ -4,6 +4,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
+import { PageSection } from 'components/section/PageSection';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -12,14 +13,16 @@ import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { SubmissionFeatureTable } from 'features/submissions/components/SubmissionFeatureTable';
+import { SubmissionUploadMap } from './components/map/SubmissionUploadMap';
 import { SubmissionUploadReconciliationTable } from './components/SubmissionUploadReconciliationTable';
 import { SubmissionUploadReviewHeader, SubmissionUploadReviewTab } from './components/SubmissionUploadReviewHeader';
 
 /**
  * Validation review workspace for a single submission upload.
  *
- * Displays the review metadata, reconciliation overview, and a server-paginated
- * table containing the active features belonging to the reviewed submission upload.
+ * Displays the review metadata, reconciliation overview, a map of the upload's active
+ * spatial features, and a server-paginated table containing the features belonging to
+ * the reviewed submission upload.
  *
  * @returns {JSX.Element} The submission upload validation review page.
  */
@@ -171,6 +174,12 @@ export const SubmissionUploadReviewValidationPage = () => {
                 features: (
                   <Stack spacing={4}>
                     <SubmissionUploadReconciliationTable counts={reconciliationCounts} />
+                    <PageSection id="review-map" label="Map">
+                      <SubmissionUploadMap
+                        submissionId={Number(submissionId)}
+                        submissionUploadId={submissionUploadId!}
+                      />
+                    </PageSection>
                     <SubmissionFeatureTable
                       rows={featureGrid.rows}
                       rowCount={featureGrid.rowCount}
