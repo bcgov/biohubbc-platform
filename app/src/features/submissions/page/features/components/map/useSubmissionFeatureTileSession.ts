@@ -1,15 +1,8 @@
-import {
-  CreateTileExtentSession,
-  TileExtentSessionStatus,
-  UseTileExtentSessionResult,
-  useTileExtentSession
-} from 'components/map/useTileExtentSession';
+import { CreateTileExtentSession, useTileExtentSession } from 'components/map/useTileExtentSession';
+import { UseTileSessionResult } from 'components/map/useTileSession';
 import { useApi } from 'hooks/useApi';
+import { ITileExtentSession } from 'interfaces/useMartinApi.interface';
 import { useCallback } from 'react';
-
-export type SubmissionFeatureTileSessionStatus = TileExtentSessionStatus;
-
-export type UseSubmissionFeatureTileSessionResult = UseTileExtentSessionResult;
 
 /**
  * Owns the tile session for one submission feature's map.
@@ -20,12 +13,12 @@ export type UseSubmissionFeatureTileSessionResult = UseTileExtentSessionResult;
  *
  * @param {number} submissionId
  * @param {number} submissionFeatureId
- * @return {UseSubmissionFeatureTileSessionResult}
+ * @return {UseTileSessionResult<ITileExtentSession>}
  */
 export const useSubmissionFeatureTileSession = (
   submissionId: number,
   submissionFeatureId: number
-): UseSubmissionFeatureTileSessionResult => {
+): UseTileSessionResult<ITileExtentSession> => {
   const api = useApi();
 
   const createSession = useCallback<CreateTileExtentSession>(

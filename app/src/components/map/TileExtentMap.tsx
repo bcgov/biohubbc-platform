@@ -8,9 +8,10 @@ import { SlippyMap } from 'components/map/SlippyMap';
 import { TileSessionFrame } from 'components/map/TileSessionFrame';
 import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
 import { useBcBasemap } from 'components/map/useBcBasemap';
-import type { UseTileExtentSessionResult } from 'components/map/useTileExtentSession';
+import type { UseTileSessionResult } from 'components/map/useTileSession';
 import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import { useConfigContext } from 'hooks/useContext';
+import type { ITileExtentSession } from 'interfaces/useMartinApi.interface';
 import type { SourceSpecification } from 'maplibre-gl';
 import { useCallback, useMemo } from 'react';
 
@@ -21,7 +22,7 @@ export interface ITileExtentMapProps {
    */
   subjectKey: string;
   /** The tile session for the subject, from {@link useTileExtentSession}. */
-  tileSession: UseTileExtentSessionResult;
+  tileSession: UseTileSessionResult<ITileExtentSession>;
   /** Message shown when the subject has no spatial properties to map. */
   emptyMessage: string;
   /** Test id of the ready frame. The other states use `${testId}-loading`, `${testId}-empty` and `${testId}-error`. */

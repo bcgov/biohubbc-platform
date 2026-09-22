@@ -1,9 +1,7 @@
-import {
-  CreateTileExtentSession,
-  UseTileExtentSessionResult,
-  useTileExtentSession
-} from 'components/map/useTileExtentSession';
+import { CreateTileExtentSession, useTileExtentSession } from 'components/map/useTileExtentSession';
+import { UseTileSessionResult } from 'components/map/useTileSession';
 import { useApi } from 'hooks/useApi';
+import { ITileExtentSession } from 'interfaces/useMartinApi.interface';
 import { useCallback } from 'react';
 
 /**
@@ -15,12 +13,12 @@ import { useCallback } from 'react';
  *
  * @param {number} submissionId
  * @param {string} submissionUploadId
- * @return {UseTileExtentSessionResult}
+ * @return {UseTileSessionResult<ITileExtentSession>}
  */
 export const useSubmissionUploadTileSession = (
   submissionId: number,
   submissionUploadId: string
-): UseTileExtentSessionResult => {
+): UseTileSessionResult<ITileExtentSession> => {
   const api = useApi();
 
   const createSession = useCallback<CreateTileExtentSession>(

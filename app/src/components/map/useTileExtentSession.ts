@@ -1,15 +1,11 @@
-import { TileSessionStatus, UseTileSessionResult, useTileSession } from 'components/map/useTileSession';
+import { UseTileSessionResult, useTileSession } from 'components/map/useTileSession';
 import { CreateTileExtentSessionResponse, ITileExtentSession } from 'interfaces/useMartinApi.interface';
 import { useCallback } from 'react';
-
-export type TileExtentSessionStatus = TileSessionStatus;
 
 /**
  * Mint a tile session for the mapped subject. Receives an abort signal that fires when the request is superseded.
  */
 export type CreateTileExtentSession = (signal: AbortSignal) => Promise<CreateTileExtentSessionResponse>;
-
-export type UseTileExtentSessionResult = UseTileSessionResult<ITileExtentSession>;
 
 /**
  * Owns the tile session for a map of one subject with a fixed extent (a submission feature, a submission upload).
@@ -22,12 +18,12 @@ export type UseTileExtentSessionResult = UseTileSessionResult<ITileExtentSession
  *
  * @param {string} sessionKey - Identity of the mapped subject. Changing it drops the session and mints a new one.
  * @param {CreateTileExtentSession} createSession - Mints a session for the subject.
- * @return {UseTileExtentSessionResult}
+ * @return {UseTileSessionResult<ITileExtentSession>}
  */
 export const useTileExtentSession = (
   sessionKey: string,
   createSession: CreateTileExtentSession
-): UseTileExtentSessionResult => {
+): UseTileSessionResult<ITileExtentSession> => {
   const mint = useCallback(
     async (signal: AbortSignal): Promise<ITileExtentSession | null> => {
       const response = await createSession(signal);

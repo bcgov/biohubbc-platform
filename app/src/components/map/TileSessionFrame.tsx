@@ -3,10 +3,10 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { MapFrame } from 'components/map/MapFrame';
-import type { TileSessionLike, TileSessionStatus } from 'components/map/useTileSession';
+import type { TileSessionCredentials, TileSessionStatus } from 'components/map/useTileSession';
 import { ReactNode } from 'react';
 
-export interface ITileSessionFrameProps<TSession extends TileSessionLike> {
+export interface ITileSessionFrameProps<TSession extends TileSessionCredentials> {
   /**
    * Test selector of the ready frame. The other states derive theirs from it: `${testId}-loading`, `${testId}-empty`
    * and `${testId}-error`.
@@ -43,7 +43,7 @@ export interface ITileSessionFrameProps<TSession extends TileSessionLike> {
  * @param {ITileSessionFrameProps<TSession>} props - Session state, frame options and the map to render when ready.
  * @returns {JSX.Element} The frame with whichever state applies.
  */
-export const TileSessionFrame = <TSession extends TileSessionLike>(props: ITileSessionFrameProps<TSession>) => {
+export const TileSessionFrame = <TSession extends TileSessionCredentials>(props: ITileSessionFrameProps<TSession>) => {
   const { testId, height, minHeight, status, session, onRetry, emptyMessage, children } = props;
 
   if (status === 'loading' && !session) {

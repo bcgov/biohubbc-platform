@@ -8,14 +8,17 @@ import { isAbortError } from 'utils/request';
 
 export type TileSessionStatus = 'loading' | 'ready' | 'empty' | 'error';
 
-/** The part of a minted tile session the lifecycle needs: the token to attach, and when to rotate it. */
-export interface TileSessionLike {
+/**
+ * The credential part of a minted tile session: the token to attach to tile requests, and when to rotate it. This is
+ * all the lifecycle needs; each session type adds whatever its map uses to draw.
+ */
+export interface TileSessionCredentials {
   token: string;
   /** Token lifetime in seconds. The session is refreshed before this elapses. */
   token_expires_in: number;
 }
 
-export interface UseTileSessionOptions<TSession extends TileSessionLike> {
+export interface UseTileSessionOptions<TSession extends TileSessionCredentials> {
   /**
    * Identity of the mapped subject, compared with `Object.is`. A change drops the session in hand and mints a new one;
    * a refresh or a recovery reuses the same key and leaves the rendered map alone.
@@ -39,7 +42,7 @@ export interface UseTileSessionOptions<TSession extends TileSessionLike> {
   onMintError?: (error: unknown, context: { isRecovery: boolean }) => void;
 }
 
-export interface UseTileSessionResult<TSession extends TileSessionLike> {
+export interface UseTileSessionResult<TSession extends TileSessionCredentials> {
   status: TileSessionStatus;
   /** The active session. Present whenever status is 'ready'. */
   session: TSession | null;
@@ -84,7 +87,7 @@ export interface UseTileSessionResult<TSession extends TileSessionLike> {
  * @param {UseTileSessionOptions<TSession>} options
  * @return {UseTileSessionResult<TSession>}
  */
-export const useTileSession = <TSession extends TileSessionLike>(
+export const useTileSession = <TSession extends TileSessionCredentials>(
   options: UseTileSessionOptions<TSession>
 ): UseTileSessionResult<TSession> => {
   const { sessionKey, enabled = true, mint, onMintError } = options;

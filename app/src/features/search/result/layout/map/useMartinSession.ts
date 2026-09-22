@@ -1,13 +1,9 @@
-import { TileSessionStatus, UseTileSessionResult, useTileSession } from 'components/map/useTileSession';
+import { UseTileSessionResult, useTileSession } from 'components/map/useTileSession';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { IMartinSession } from 'interfaces/useMartinApi.interface';
 import { useCallback, useMemo } from 'react';
-
-export type MartinSessionStatus = TileSessionStatus;
-
-export type UseMartinSessionResult = UseTileSessionResult<IMartinSession>;
 
 /**
  * Owns the Martin session for the map view: creation, refresh before expiry, and recovery from a rejected tile request.
@@ -23,14 +19,14 @@ export type UseMartinSessionResult = UseTileSessionResult<IMartinSession>;
  * but the session already in hand is kept: the map stays mounted behind the table view and has to come back with its
  * viewport and tiles intact.
  * @param {number[]} submissionIds - Optional scope. Memoize derived arrays at the caller to preserve the session.
- * @return {UseMartinSessionResult}
+ * @return {UseTileSessionResult<IMartinSession>}
  */
 export const useMartinSession = (
   featureTypeName: string,
   expressionTree: ExpressionTreeExpression | null,
   enabled: boolean,
   submissionIds?: number[]
-): UseMartinSessionResult => {
+): UseTileSessionResult<IMartinSession> => {
   const api = useApi();
   const dialogContext = useDialogContext();
 
