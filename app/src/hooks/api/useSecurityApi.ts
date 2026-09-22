@@ -3,7 +3,6 @@ import {
   ICreateSecurityCategoryRequest,
   ICreateSecurityReasonRequest,
   IListPersecutionHarmResponse,
-  IPatchFeatureSecurityRules,
   ISecureDataAccessRequestForm,
   ISecurityCategoriesResponse,
   ISecurityCategory,
@@ -104,43 +103,6 @@ const useSecurityApi = (axios: AxiosInstance) => {
     const { data } = await axios.get('api/administrative/security/rules');
 
     return data;
-  };
-
-  /**
-   * Patches security rules that are applied or removed to the given set of submission features.
-   * If a particular rule belongs to both `stagedForApply` and `stagedForRemove`, it will always be added.
-   *
-   * @param {number} submissionId
-   * @param {IPatchFeatureSecurityRules} featureSecurityRulesPatch
-   * @return {Promise<void>}
-   */
-  const patchSecurityRulesOnSubmissionFeatures = async (
-    submissionId: number,
-    featureSecurityRulesPatch: IPatchFeatureSecurityRules
-  ): Promise<void> => {
-    await axios.patch(`api/administrative/security/submission/${submissionId}/feature`, {
-      applyRuleIds: featureSecurityRulesPatch.stagedForApply.map((rule) => rule.security_rule_id),
-      removeRuleIds: featureSecurityRulesPatch.stagedForRemove.map((rule) => rule.security_rule_id),
-      submissionFeatureIds: featureSecurityRulesPatch.submissionFeatureIds
-    });
-  };
-
-  /**
-   * Patches security rules for all features of a submission.
-   * If a rule exists in both `stagedForApply` and `stagedForRemove`, it will always be applied.
-   *
-   * @param {number} submissionId
-   * @param {IPatchFeatureSecurityRules} submissionSecurityPatch
-   * @return {Promise<void>}
-   */
-  const patchSecurityRulesOnSubmission = async (
-    submissionId: number,
-    submissionSecurityPatch: IPatchFeatureSecurityRules
-  ): Promise<void> => {
-    await axios.patch(`api/administrative/security/submission/${submissionId}`, {
-      applyRuleIds: submissionSecurityPatch.stagedForApply.map((rule) => rule.security_rule_id),
-      removeRuleIds: submissionSecurityPatch.stagedForRemove.map((rule) => rule.security_rule_id)
-    });
   };
 
   /**
@@ -271,11 +233,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   return {
-    patchSecurityRulesOnSubmission,
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
-    patchSecurityRulesOnSubmissionFeatures,
     getSubmissionFeatureSecuritySummary,
     getActiveSecurityRulesWithCategories,
     getSecurityCategories,

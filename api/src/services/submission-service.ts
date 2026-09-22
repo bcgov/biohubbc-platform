@@ -3,7 +3,6 @@ import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from
 import {
   ICreateSubmission,
   ISubmissionModel,
-  PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
@@ -430,18 +429,6 @@ export class SubmissionService extends DBService {
     const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
 
     return this.submissionRepository.createMessages(messagesToInsert);
-  }
-
-  /**
-   * Patch a submission record.
-   *
-   * @param {number} submissionId
-   * @param {PatchSubmissionRecord} patch
-   * @returns {Promise<SubmissionRecord>}
-   * @memberof SubmissionServiceF
-   */
-  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
-    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
   }
 
   /**

@@ -313,47 +313,6 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Applies all given security rules to all features of a submission.
-   *
-   * @param {number} submissionId
-   * @param {number[]} securityRuleIds
-   * @return {Promise<SubmissionFeatureSecurityRecord[]>}
-   * @memberof SecurityRepository
-   */
-  async applySecurityToSubmission(
-    submissionId: number,
-    securityRuleIds: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    // Dedupe — ON CONFLICT DO UPDATE errors if the same (feature, rule) pair appears
-    // twice in one INSERT ("cannot affect row a second time")
-    const uniqueSecurityRuleIds = [...new Set(securityRuleIds)];
-
-    if (!uniqueSecurityRuleIds.length) {
-      return [];
-    }
-
-    const placeholders = uniqueSecurityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
-    const submissionIdPlaceholder = `$${uniqueSecurityRuleIds.length + 1}`;
-
-    const sql = `
-      INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
-      SELECT sf.submission_feature_id, r.security_rule_id, NOW()
-      FROM submission_feature sf
-      CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
-      WHERE sf.submission_id = ${submissionIdPlaceholder}
-      ON CONFLICT (submission_feature_id, security_rule_id)
-      DO UPDATE SET status = 'active'
-      WHERE submission_feature_security.status IS DISTINCT FROM 'active'
-      RETURNING *;
-    `;
-
-    const insertSQL = SQL([sql], ...uniqueSecurityRuleIds, submissionId);
-
-    const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
-    return response.rows;
-  }
-
-  /**
    * Insert draft `submission_feature_security` rows for every feature in `submissionUploadId`
    * that is related to one of the trigger features through `submission_feature_closure`.
    *
@@ -418,39 +377,6 @@ export class SecurityRepository extends BaseRepository {
     );
 
     return result.rowCount ?? 0;
-  }
-
-  /**
-   * Removes security rules from all features of a submission.
-   * If no rule IDs are provided, all security rules will be removed.
-   *
-   * @param {number} submissionId
-   * @param {number[]} [removeRuleIds]
-   * @return {Promise<SubmissionFeatureSecurityRecord[]>}
-   * @memberof SecurityRepository
-   */
-  async removeSecurityFromSubmission(
-    submissionId: number,
-    removeRuleIds?: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    const knex = getKnex();
-
-    const queryBuilder = knex
-      .queryBuilder()
-      .delete()
-      .from('submission_feature_security as sfs')
-      .whereIn(
-        'sfs.submission_feature_id',
-        knex.select('sf.submission_feature_id').from('submission_feature as sf').where('sf.submission_id', submissionId)
-      )
-      .returning('*');
-
-    if (removeRuleIds?.length) {
-      queryBuilder.whereIn('sfs.security_rule_id', removeRuleIds);
-    }
-
-    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
-    return response.rows;
   }
 
   /**

@@ -13,10 +13,10 @@ import * as tar from 'tar-stream';
 import { IDBConnection } from '../database/db';
 import { withConnection } from '../queue/with-connection';
 import { SecurityScopeRepository } from '../repositories/authorization/security-scope-repository';
+import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeaturePropertyIngestionService } from '../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionIngestionService } from '../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { SecurityService } from '../services/security-service';
 import { SubmissionFeatureClosureService } from '../services/submission-feature-closure-service';
 import { getLogger } from '../utils/logger';
 
@@ -595,12 +595,9 @@ async function createSnapshotTicket(
 /**
  * Secure the demo deployment subset and compute their security-scope anchors synchronously.
  *
- * `patchSecurityRulesOnSubmissionFeatures` writes the security rows and only *enqueues* a pg-boss
- * anchor-compute job — it does not compute anchors inline. In run-once mode there is no worker
- * draining the queue, so those enqueued jobs sit inert and harmless; the synchronous anchor loop
- * below is the authoritative compute. Telemetry is never secured directly: it has no security row
- * and is hidden only because its ancestor deployment is secured and security cascades down the
- * closure ancestry path.
+ * Seed assignments are inserted directly for explicit feature IDs, and anchors are computed
+ * synchronously because run-once mode has no worker draining queued computation jobs.
+ * Telemetry inherits security from its secured deployment through closure ancestry.
  *
  * @param {number} submissionId The submission whose deployments are secured.
  * @param {string[]} identifiers The animal_identifier values of the deployments to secure.
@@ -617,11 +614,10 @@ async function secureDeploymentsAndComputeAnchors(submissionId: number, identifi
     // Never secure the dataset root — securing the root cascades through the closure (self-or-ancestor)
     // and locks every feature in the submission, defeating the partial-secure demo. Only the deployment
     // subset is secured here.
-    await new SecurityService(connection).patchSecurityRulesOnSubmissionFeatures(
+    await new SecurityRepository(connection).applySecurityRulesToSubmissionFeatures(
       submissionId,
       deploymentFeatureIds,
-      [ruleId],
-      []
+      [ruleId]
     );
 
     // Also secure the study_area, which activates the seed's otherwise-dormant Sampling Sites policy as a
@@ -630,11 +626,10 @@ async function secureDeploymentsAndComputeAnchors(submissionId: number, identifi
     const studyAreaRuleId = await getSecurityRuleIdByName(connection, STUDY_AREA_SECURITY_RULE_NAME);
     const studyAreaFeatureIds = await getStudyAreaFeatureIds(connection, submissionId);
     if (studyAreaFeatureIds.length > 0) {
-      await new SecurityService(connection).patchSecurityRulesOnSubmissionFeatures(
+      await new SecurityRepository(connection).applySecurityRulesToSubmissionFeatures(
         submissionId,
         studyAreaFeatureIds,
-        [studyAreaRuleId],
-        []
+        [studyAreaRuleId]
       );
     }
 
