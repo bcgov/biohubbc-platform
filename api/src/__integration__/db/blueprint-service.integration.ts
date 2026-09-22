@@ -14,8 +14,8 @@
 // Requires: database container running with seed data.
 
 import { expect } from 'chai';
-import { randomUUID } from 'crypto';
 import { describe } from 'mocha';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError, ApiExecuteSQLError } from '../../errors/api-error';
@@ -31,14 +31,22 @@ const FEATURE_TYPE_NAME = 'capture';
  * Extract the Postgres error message from a failed statement.
  *
  * The connection wraps every database error as `ApiExecuteSQLError('Failed to execute SQL')` and keeps
- * the original error in `errors[0]`.
+ * the original error in `errors[0]`. `BaseError` flattens that entry, so it arrives as a plain object
+ * carrying `message` rather than as an `Error` instance.
+ *
+ * @param {unknown} error - The error thrown by the connection.
+ * @return {string} The underlying database message, or the wrapper's own message when none is carried.
  */
 function databaseErrorMessage(error: unknown): string {
-  const wrapped = (error as ApiExecuteSQLError).errors?.[0] as { message?: string } | string | undefined;
-  if (wrapped && typeof wrapped === 'object' && typeof wrapped.message === 'string') {
-    return wrapped.message;
+  const wrapped = (error as ApiExecuteSQLError).errors?.[0];
+
+  if (typeof wrapped === 'string') {
+    return wrapped;
   }
-  return String(wrapped ?? (error as Error).message);
+
+  const message = (wrapped as { message?: unknown } | undefined)?.message;
+
+  return typeof message === 'string' ? message : (error as Error).message;
 }
 
 describe('BlueprintService — blueprint-owned property assignments (integration)', function () {
