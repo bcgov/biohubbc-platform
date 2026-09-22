@@ -187,10 +187,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * The selected Blueprint is the one pinned to the upload (`submission_upload.blueprint_id`), passed
    * in by the caller — it is not re-selected here. Property assignment, requiredness, and multiplicity
-   * come from the Blueprint; the logical type is still read from `feature_property_type`.
-   * `feature_type_property` supplies only the shared `feature_type_property_id` surrogate, and only
-   * for properties the Blueprint assigns — since that id gates downstream parsing, unassigned
-   * properties are kept with a null id for later reporting.
+   * come from the Blueprint, which references the property directly; the logical type is still read
+   * from `feature_property_type`. The global `feature_type_property` pairing is not consulted: the
+   * assignment carries the shared `feature_type_property_id` surrogate the durable tables still store.
+   * Since that id gates downstream parsing, unassigned properties are kept with a null id for later
+   * reporting.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} blueprintId The Blueprint pinned to the upload.
@@ -223,13 +224,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         s.feature_type_id,
         s.property_name,
         s.value,
-        -- Surrogate id only when the Blueprint includes the feature type and assigns the property;
-        -- this gates downstream parsing.
-        CASE
-          WHEN bft.blueprint_feature_type_id IS NOT NULL
-           AND bftp.blueprint_feature_type_property_id IS NOT NULL
-          THEN ftp.feature_type_property_id
-        END AS feature_type_property_id,
+        -- Surrogate id carried by the assignment; null unless the Blueprint includes the feature type
+        -- and assigns the property. This gates downstream parsing.
+        bftp.feature_type_property_id AS feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         COALESCE(bftp.allow_multiple, false) AS allow_multiple,
         COALESCE(bftp.required_value, false) AS required_value,
@@ -247,16 +244,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         ON bft.blueprint_id = sb.blueprint_id
        AND bft.feature_type_id = s.feature_type_id
        AND bft.record_end_date IS NULL
-      -- Shared feature-type/property pool entry; supplies the surrogate id and bridges to the
-      -- Blueprint assignment. Not a source of assignment, requiredness, or multiplicity.
-      LEFT JOIN feature_type_property ftp
-        ON ftp.feature_type_id = s.feature_type_id
-       AND ftp.feature_property_id = fp.feature_property_id
-       AND ftp.record_end_date IS NULL
-      -- Property assigned to the Blueprint feature type; source of requiredness and multiplicity.
+      -- Property assigned to the Blueprint feature type; source of assignment, requiredness and
+      -- multiplicity. At most one active row per property (blueprint_feature_type_property_nuk2).
       LEFT JOIN blueprint_feature_type_property bftp
         ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-       AND bftp.feature_type_property_id = ftp.feature_type_property_id
+       AND bftp.feature_property_id = fp.feature_property_id
        AND bftp.record_end_date IS NULL
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
@@ -1009,8 +1001,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       ),
       required_properties AS (
         SELECT
-          ftp.feature_type_id,
-          ftp.feature_type_property_id,
+          bft.feature_type_id,
+          bftp.feature_type_property_id,
           fp.name AS property_name
         FROM selected_blueprint sb
         -- Feature type included in the Blueprint.
@@ -1022,15 +1014,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
          AND bftp.record_end_date IS NULL
          AND bftp.required_value = TRUE
-        -- Shared pool entry; bridges the assignment to its feature type / property and surrogate id.
-        -- Constrain to the Blueprint feature type: the FK on bftp.feature_type_property_id only proves
-        -- the property exists in the global pool, not that it belongs to bft.feature_type_id.
-        JOIN feature_type_property ftp
-          ON ftp.feature_type_property_id = bftp.feature_type_property_id
-         AND ftp.feature_type_id = bft.feature_type_id
-         AND ftp.record_end_date IS NULL
+        -- The assignment references its property directly. That its surrogate id belongs to
+        -- bft.feature_type_id is enforced on write (tr_validate_blueprint_feature_type_property).
         JOIN feature_property fp
-          ON fp.feature_property_id = ftp.feature_property_id
+          ON fp.feature_property_id = bftp.feature_property_id
          AND fp.record_end_date IS NULL
         JOIN upload_feature_types uft
           ON uft.feature_type_id = bft.feature_type_id

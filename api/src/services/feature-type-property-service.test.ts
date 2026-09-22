@@ -109,4 +109,82 @@ describe('FeatureTypePropertyService', () => {
       }
     });
   });
+
+  describe('updateFeatureTypeProperty', () => {
+    it('updates the record without checking blueprint assignments when it is not being retired', async () => {
+      const mockConnection = getMockDBConnection();
+      const service = new FeatureTypePropertyService(mockConnection);
+
+      const countStub = sinon
+        .stub(service.featureTypePropertyRepository, 'countActiveBlueprintAssignmentsByFeatureTypePropertyId')
+        .resolves(3);
+      const updateStub = sinon.stub(service.featureTypePropertyRepository, 'updateFeatureTypeProperty').resolves();
+      sinon
+        .stub(service.featureTypePropertyRepository, 'getAdminFeatureTypeProperty')
+        .resolves(mockAdminFeatureTypeProperty);
+
+      const result = await service.updateFeatureTypeProperty(1, 10, { required_value: true });
+
+      expect(countStub).to.not.have.been.called;
+      expect(updateStub).to.have.been.calledOnceWith(1, 10, { required_value: true });
+      expect(result).to.eql(mockAdminFeatureTypeProperty);
+    });
+
+    it('throws ApiConflictError when retiring a pairing an active blueprint assignment references', async () => {
+      const mockConnection = getMockDBConnection();
+      const service = new FeatureTypePropertyService(mockConnection);
+
+      sinon
+        .stub(service.featureTypePropertyRepository, 'countActiveBlueprintAssignmentsByFeatureTypePropertyId')
+        .resolves(1);
+      const updateStub = sinon.stub(service.featureTypePropertyRepository, 'updateFeatureTypeProperty').resolves();
+
+      try {
+        await service.updateFeatureTypeProperty(1, 10, { record_end_date: '2026-09-21' });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+
+      expect(updateStub).to.not.have.been.called;
+    });
+  });
+
+  describe('deleteFeatureTypeProperty', () => {
+    it('deletes the record when no active blueprint assignment references it', async () => {
+      const mockConnection = getMockDBConnection();
+      const service = new FeatureTypePropertyService(mockConnection);
+
+      sinon
+        .stub(service.featureTypePropertyRepository, 'countActiveBlueprintAssignmentsByFeatureTypePropertyId')
+        .resolves(0);
+      const deleteStub = sinon.stub(service.featureTypePropertyRepository, 'deleteFeatureTypeProperty').resolves();
+
+      await service.deleteFeatureTypeProperty(1, 10);
+
+      expect(deleteStub).to.have.been.calledOnceWith(1, 10);
+    });
+
+    it('throws ApiConflictError when an active blueprint assignment references the pairing', async () => {
+      const mockConnection = getMockDBConnection();
+      const service = new FeatureTypePropertyService(mockConnection);
+
+      sinon
+        .stub(service.featureTypePropertyRepository, 'countActiveBlueprintAssignmentsByFeatureTypePropertyId')
+        .resolves(2);
+      const deleteStub = sinon.stub(service.featureTypePropertyRepository, 'deleteFeatureTypeProperty').resolves();
+
+      try {
+        await service.deleteFeatureTypeProperty(1, 10);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+        expect((error as ApiConflictError).message).to.equal(
+          'Feature type property is assigned by an active blueprint and cannot be retired'
+        );
+      }
+
+      expect(deleteStub).to.not.have.been.called;
+    });
+  });
 });

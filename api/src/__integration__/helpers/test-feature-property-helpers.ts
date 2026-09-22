@@ -145,6 +145,7 @@ export async function createFeatureTypeProperty(
   await connection.sql(SQL`
     INSERT INTO blueprint_feature_type_property (
       blueprint_feature_type_id,
+      feature_property_id,
       feature_type_property_id,
       required_value,
       allow_multiple,
@@ -152,12 +153,13 @@ export async function createFeatureTypeProperty(
     )
     VALUES (
       ${blueprintFeatureTypeId},
+      ${featurePropertyId},
       ${featureTypePropertyId},
       false,
       ${allowMultiple},
       ${systemUserId}
     )
-    ON CONFLICT (blueprint_feature_type_id, feature_type_property_id)
+    ON CONFLICT (blueprint_feature_type_id, feature_property_id)
     WHERE record_end_date IS NULL
     DO NOTHING;
   `);

@@ -340,9 +340,16 @@ describe('Download Parquet pipeline (integration)', function () {
     const blueprintFeatureTypeId = bftResult.rows[0].blueprint_feature_type_id;
 
     await connection.sql(SQL`
-      INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_type_property_id, create_user)
-      VALUES (${blueprintFeatureTypeId}, ${featureTypePropertyId}, ${systemUserId})
-      ON CONFLICT (blueprint_feature_type_id, feature_type_property_id) WHERE record_end_date IS NULL
+      INSERT INTO blueprint_feature_type_property (
+        blueprint_feature_type_id,
+        feature_property_id,
+        feature_type_property_id,
+        create_user
+      )
+      SELECT ${blueprintFeatureTypeId}, ftp.feature_property_id, ftp.feature_type_property_id, ${systemUserId}
+      FROM feature_type_property ftp
+      WHERE ftp.feature_type_property_id = ${featureTypePropertyId}
+      ON CONFLICT (blueprint_feature_type_id, feature_property_id) WHERE record_end_date IS NULL
       DO NOTHING;
     `);
   }

@@ -116,4 +116,23 @@ describe('FeatureTypePropertyRepository admin CRUD', () => {
       }
     });
   });
+
+  describe('countActiveBlueprintAssignmentsByFeatureTypePropertyId', () => {
+    it('counts only assignments whose blueprint feature type and blueprint are also active', async () => {
+      const knexStub = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 4 }] } as unknown as QueryResult<any>);
+      const mockConnection = getMockDBConnection({ knex: knexStub });
+      const repository = new FeatureTypePropertyRepository(mockConnection);
+
+      const result = await repository.countActiveBlueprintAssignmentsByFeatureTypePropertyId(7);
+
+      expect(result).to.equal(4);
+
+      const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"bftp"."record_end_date" is null');
+      expect(sql).to.include('"bft"."record_end_date" is null');
+      expect(sql).to.include('"b"."record_end_date" is null');
+      expect(sql).to.include('"bftp"."feature_type_property_id" =');
+      expect(bindings).to.include(7);
+    });
+  });
 });
