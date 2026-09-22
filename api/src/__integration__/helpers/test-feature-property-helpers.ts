@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { IDBConnection } from '../../database/db';
 import {
