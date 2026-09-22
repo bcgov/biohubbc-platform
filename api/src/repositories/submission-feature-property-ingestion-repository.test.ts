@@ -457,15 +457,18 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('blueprint_feature_type bft');
       expect(sqlText).to.include('blueprint_feature_type_property bftp');
 
-      // The Blueprint assignment is joined through its new foreign keys: blueprint_feature_type_id
-      // (to the included feature type) and feature_type_property_id (to the pool entry).
+      // The Blueprint assignment is joined through its foreign keys: blueprint_feature_type_id (to the
+      // included feature type) and feature_property_id (directly to the property).
       expect(sqlText).to.include('bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id');
-      expect(sqlText).to.include('bftp.feature_type_property_id = ftp.feature_type_property_id');
+      expect(sqlText).to.include('bftp.feature_property_id = fp.feature_property_id');
+
+      // The global pairing is not consulted; the assignment carries the surrogate id itself.
+      expect(sqlText).to.not.include('feature_type_property ftp');
+      expect(sqlText).to.include('bftp.feature_type_property_id AS feature_type_property_id');
 
       // The columns removed from blueprint_feature_type_property must not be referenced.
       expect(sqlText).to.not.include('bftp.blueprint_id');
       expect(sqlText).to.not.include('bftp.feature_type_id');
-      expect(sqlText).to.not.include('bftp.feature_property_id');
 
       // Requiredness and multiplicity are sourced from the Blueprint assignment.
       expect(sqlText).to.include('COALESCE(bftp.allow_multiple, false)');
@@ -474,10 +477,6 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       // Primitive property type still read from feature_property_type.
       expect(sqlText).to.include('feature_property_type fpt');
       expect(sqlText).to.include('fpt.name AS property_type_name');
-
-      // feature_type_property is not the source of requiredness or multiplicity.
-      expect(sqlText).to.not.include('COALESCE(ftp.allow_multiple');
-      expect(sqlText).to.not.include('COALESCE(ftp.required_value');
     });
   });
 
@@ -502,21 +501,20 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('blueprint_feature_type_property bftp');
       expect(sqlText).to.include('bftp.required_value = TRUE');
 
-      // The Blueprint assignment is joined through its new foreign keys.
+      // The Blueprint assignment is joined through its foreign keys, directly to the property.
       expect(sqlText).to.include('bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id');
-      expect(sqlText).to.include('ftp.feature_type_property_id = bftp.feature_type_property_id');
+      expect(sqlText).to.include('fp.feature_property_id = bftp.feature_property_id');
 
-      // The pool-entry bridge is constrained to the Blueprint feature type, so a property assigned
-      // under a different feature type cannot satisfy a requiredness check.
-      expect(sqlText).to.include('ftp.feature_type_id = bft.feature_type_id');
+      // The global pairing is not consulted. The feature type comes from the Blueprint feature type,
+      // so a required property only applies to features of the type it is assigned under.
+      expect(sqlText).to.not.include('feature_type_property ftp');
+      expect(sqlText).to.match(
+        /required_properties AS \(\s*SELECT\s+bft\.feature_type_id,\s+bftp\.feature_type_property_id,/
+      );
 
       // The columns removed from blueprint_feature_type_property must not be referenced.
       expect(sqlText).to.not.include('bftp.blueprint_id');
       expect(sqlText).to.not.include('bftp.feature_type_id');
-      expect(sqlText).to.not.include('bftp.feature_property_id');
-
-      // Requiredness no longer derived from feature_type_property.
-      expect(sqlText).to.not.include('COALESCE(ftp.required_value, false) = TRUE');
     });
 
     it('uses an indexable raw-property anti-lookup for present required properties', async () => {

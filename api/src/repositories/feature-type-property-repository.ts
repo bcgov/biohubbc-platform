@@ -408,6 +408,34 @@ export class FeatureTypePropertyRepository extends BaseRepository {
   }
 
   /**
+   * Count the active blueprint assignments that reference a feature type property.
+   *
+   * An assignment counts when it, its blueprint feature type and its blueprint are all active. While
+   * any exist the pairing must stay active: ingestion resolves through the blueprint assignment, but
+   * search, downloads and codes still read values through the active global pairing.
+   *
+   * @param {number} featureTypePropertyId - Feature type property identifier.
+   * @return {Promise<number>}
+   * @memberof FeatureTypePropertyRepository
+   */
+  async countActiveBlueprintAssignmentsByFeatureTypePropertyId(featureTypePropertyId: number): Promise<number> {
+    const knex = getKnex();
+    const countQuery = knex
+      .from('blueprint_feature_type_property as bftp')
+      .join('blueprint_feature_type as bft', 'bft.blueprint_feature_type_id', 'bftp.blueprint_feature_type_id')
+      .join('blueprint as b', 'b.blueprint_id', 'bft.blueprint_id')
+      .whereNull('bftp.record_end_date')
+      .whereNull('bft.record_end_date')
+      .whereNull('b.record_end_date')
+      .where('bftp.feature_type_property_id', featureTypePropertyId)
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .first();
+
+    const countResult = await this.connection.knex(countQuery, CountResult);
+    return countResult.rows[0].count;
+  }
+
+  /**
    * Soft delete a feature type property record scoped to a parent feature type.
    *
    * @param {number} featureTypePropertyId - Feature type property identifier.
