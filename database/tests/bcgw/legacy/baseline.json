@@ -1,0 +1,149 @@
+{
+  "sourceCommit": "aaa21bb8f945843783f85184d5ece8e476618bc2",
+  "views": [
+    {
+      "name": "wld_observations_public",
+      "querySha256": "1c4128744cfb0b74771c715220ac8d103d6270397444cc48a201c7a82f2a9ae1",
+      "comments": {
+        "Feature_ID": "System generated surrogate primary key identifier",
+        "taxon_id": "Taxonomic identifier of the observed species",
+        "scientific_name": "Scientific name of the observed species",
+        "common_name": "Common name of the observed species",
+        "sign": "Sign used to make the observation",
+        "group_id": "Group identifier shared by species observations collected together",
+        "sex": "Sex label from contributor codeset",
+        "life_stage": "Life stage label from contributor codeset",
+        "count": "Count value for the observation",
+        "date": "The date portion of the observation timestamp",
+        "time": "The time portion of the observation timestamp",
+        "YEAR": "The year of the observation",
+        "Latitude": "The latitude of the observation location",
+        "Longitude": "The longitude of the observation location",
+        "submission_id": "Submission identifier under which the feature was submitted",
+        "submission_name": "Submission name under which the feature was submitted",
+        "SECURED": "The indicator of whether the feature is secured (Y) or not (N)",
+        "source": "A hyperlink to the source feature in the Biodiversity Hub portal"
+      }
+    },
+    {
+      "name": "wld_observations_all",
+      "querySha256": "ecaee914a6f888ae0276b7f17cb30ede8d3f92073af7642a81f7c5e5fc4e4581",
+      "comments": {
+        "Feature_ID": "System generated surrogate primary key identifier",
+        "taxon_id": "Taxonomic identifier of the observed species",
+        "scientific_name": "Scientific name of the observed species",
+        "common_name": "Common name of the observed species",
+        "sign": "Sign used to make the observation",
+        "group_id": "Group identifier shared by species observations collected together",
+        "sex": "Sex label from contributor codeset",
+        "life_stage": "Life stage label from contributor codeset",
+        "count": "Count value for the observation",
+        "date": "The date portion of the observation timestamp",
+        "time": "The time portion of the observation timestamp",
+        "YEAR": "The year of the observation",
+        "Latitude": "The latitude of the observation location",
+        "Longitude": "The longitude of the observation location",
+        "submission_id": "Submission identifier under which the feature was submitted",
+        "submission_name": "Submission name under which the feature was submitted",
+        "SECURED": "The indicator of whether the feature is secured (Y) or not (N)",
+        "source": "A hyperlink to the source feature in the Biodiversity Hub portal"
+      }
+    },
+    {
+      "name": "wld_telemetry_public",
+      "querySha256": "d80b1d84a79e23e42f1fdb64ae3dbca71efb3268ba14ac29971011f0bac650e9",
+      "comments": {
+        "Feature_ID": "System generated surrogate primary key identifier",
+        "taxon_id": "Taxonomic identifier of the observed species",
+        "scientific_name": "Scientific name of the observed species",
+        "common_name": "Common name of the observed species",
+        "animal_id": "The identifier of the animal wearing the telemetry device",
+        "sex": "Sex label from contributor codeset",
+        "eco_unit": "Ecological unit type and value linked to the animal",
+        "device_key": "The vendor and device serial",
+        "date": "The date portion of the GPS location timestamp",
+        "time": "The time portion of the GPS location timestamp",
+        "YEAR": "The year that the GPS location was recorded",
+        "Latitude": "The latitude of the GPS location",
+        "Longitude": "The longitude of the GPS location",
+        "dop": "The dilution of precision of the GPS location",
+        "submission_id": "Submission identifier under which the feature was submitted",
+        "submission_name": "Submission name under which the feature was submitted",
+        "SECURED": "The indicator of whether the feature is secured (Y) or not (N)",
+        "source": "A hyperlink to the source feature in the Biodiversity Hub portal"
+      }
+    },
+    {
+      "name": "wld_telemetry_all",
+      "querySha256": "c9ec76d71cc5ac8430b067384cf1c44cd0553ce2b1823e4aaf864600aff59241",
+      "comments": {
+        "Feature_ID": "System generated surrogate primary key identifier",
+        "taxon_id": "Taxonomic identifier of the observed species",
+        "scientific_name": "Scientific name of the observed species",
+        "common_name": "Common name of the observed species",
+        "animal_id": "The identifier of the animal wearing the telemetry device",
+        "sex": "Sex label from contributor codeset",
+        "eco_unit": "Ecological unit type and value linked to the animal",
+        "device_key": "The vendor and device serial",
+        "date": "The date portion of the GPS location timestamp",
+        "time": "The time portion of the GPS location timestamp",
+        "YEAR": "The year that the GPS location was recorded",
+        "Latitude": "The latitude of the GPS location",
+        "Longitude": "The longitude of the GPS location",
+        "dop": "The dilution of precision of the GPS location",
+        "submission_id": "Submission identifier under which the feature was submitted",
+        "submission_name": "Submission name under which the feature was submitted",
+        "SECURED": "The indicator of whether the feature is secured (Y) or not (N)",
+        "source": "A hyperlink to the source feature in the Biodiversity Hub portal"
+      }
+    },
+    {
+      "name": "wld_incidental_public",
+      "querySha256": "6c6aafabb8c08feb07add95740e297490bf90167dd545eef2911e91c46b774db",
+      "comments": {
+        "Feature_ID": "System generated surrogate primary key identifier",
+        "taxon_id": "Taxonomic identifier of the observed species",
+        "scientific_name": "Scientific name of the observed species",
+        "common_name": "Common name of the observed species",
+        "sign": "Sign used to make the observation",
+        "group_id": "Group identifier shared by species observations collected together",
+        "sex": "Sex label from contributor codeset",
+        "life_stage": "Life stage label from contributor codeset",
+        "count": "Count value for the observation",
+        "date": "The date portion of the observation timestamp",
+        "time": "The time portion of the observation timestamp",
+        "YEAR": "The year of the observation",
+        "Latitude": "The latitude of the observation location",
+        "Longitude": "The longitude of the observation location",
+        "submission_id": "Submission identifier under which the feature was submitted",
+        "submission_name": "Submission name under which the feature was submitted",
+        "SECURED": "The indicator of whether the feature is secured (Y) or not (N)",
+        "source": "A hyperlink to the source feature in the Biodiversity Hub portal"
+      }
+    },
+    {
+      "name": "wld_incidental_all",
+      "querySha256": "20671dd0498e3f569142be69744316d0e2e39d7eddd285d27bbcb82d5e8d0ab3",
+      "comments": {
+        "Feature_ID": "System generated surrogate primary key identifier",
+        "taxon_id": "Taxonomic identifier of the observed species",
+        "scientific_name": "Scientific name of the observed species",
+        "common_name": "Common name of the observed species",
+        "sign": "Sign used to make the observation",
+        "group_id": "Group identifier shared by species observations collected together",
+        "sex": "Sex label from contributor codeset",
+        "life_stage": "Life stage label from contributor codeset",
+        "count": "Count value for the observation",
+        "date": "The date portion of the observation timestamp",
+        "time": "The time portion of the observation timestamp",
+        "YEAR": "The year of the observation",
+        "Latitude": "The latitude of the observation location",
+        "Longitude": "The longitude of the observation location",
+        "submission_id": "Submission identifier under which the feature was submitted",
+        "submission_name": "Submission name under which the feature was submitted",
+        "SECURED": "The indicator of whether the feature is secured (Y) or not (N)",
+        "source": "A hyperlink to the source feature in the Biodiversity Hub portal"
+      }
+    }
+  ]
+}
