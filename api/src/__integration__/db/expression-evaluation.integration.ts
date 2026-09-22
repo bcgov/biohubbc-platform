@@ -302,6 +302,7 @@ describe('expression-evaluation (integration)', function () {
     await connection.sql(SQL`
       INSERT INTO blueprint_feature_type_property (
         blueprint_feature_type_id,
+        feature_property_id,
         feature_type_property_id,
         required_value,
         allow_multiple,
@@ -309,6 +310,7 @@ describe('expression-evaluation (integration)', function () {
       )
       SELECT
         bft.blueprint_feature_type_id,
+        ${property.featurePropertyId},
         ${property.featureTypePropertyId},
         false,
         true,
