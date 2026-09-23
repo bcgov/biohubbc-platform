@@ -3,6 +3,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -51,10 +52,17 @@ vi.mock('features/submissions/components/SubmissionFeatureTable', () => ({
 }));
 
 const submissionUploadId = '11111111-1111-4111-8111-111111111111';
-const reviewId = '22222222-2222-4222-8222-222222222222';
-const loadReview = vi.fn();
+const submissionUploadReviewId = '22222222-2222-4222-8222-222222222222';
+const validationReview: ISubmissionUploadReviewDetail = {
+  submission_upload_review_id: submissionUploadReviewId,
+  submission_upload_id: submissionUploadId,
+  name: 'Validation pass',
+  description: 'Check the features',
+  scope: 'validation',
+  status: 'in_progress',
+  requested_by: 1
+};
 const loadReconciliationCounts = vi.fn();
-const setReviewData = vi.fn();
 const setYesNoDialog = vi.fn();
 const setSnackbar = vi.fn();
 const updateSubmissionUploadReview = vi.fn();
@@ -66,36 +74,16 @@ describe('SubmissionUploadReviewValidationPage', () => {
     (useApi as Mock).mockReturnValue({
       admin: {
         getSubmissionUploadReconciliationCounts: vi.fn(),
-        getSubmissionUploadReview: vi.fn(),
         getSubmissionUploadFeatures: vi.fn(),
         updateSubmissionUploadReview
       }
     });
-    const reviewLoader = {
-      data: {
-        submission_upload_review_id: reviewId,
-        submission_upload_id: submissionUploadId,
-        name: 'Validation pass',
-        description: 'Check the features',
-        scope: 'validation',
-        status: 'in_progress',
-        requested_by: 1
-      },
-      isLoading: false,
-      load: loadReview,
-      setData: setReviewData
-    };
     const reconciliationLoader = {
       data: { new: 4, modified: 2, unmodified: 7 },
       isLoading: false,
       load: loadReconciliationCounts
     };
-    let dataLoaderCall = 0;
-    (useDataLoader as Mock).mockImplementation(() => {
-      const dataLoader = dataLoaderCall % 2 === 0 ? reviewLoader : reconciliationLoader;
-      dataLoaderCall += 1;
-      return dataLoader;
-    });
+    (useDataLoader as Mock).mockReturnValue(reconciliationLoader);
     (useServerPaginatedDataGrid as Mock).mockReturnValue({
       rows: [{ submission_feature_id: 12, feature_type_name: 'animal' }],
       rowCount: 1,
@@ -107,19 +95,19 @@ describe('SubmissionUploadReviewValidationPage', () => {
     });
   });
 
-  it('loads the review and renders its paginated feature list', () => {
+  it('renders the loaded review and its paginated feature list', () => {
     render(
-      <MemoryRouter initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`]}>
+      <MemoryRouter
+        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
         <Routes>
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
-            element={<SubmissionUploadReviewValidationPage />}
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={validationReview} />}
           />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(loadReview).toHaveBeenCalledWith(16, submissionUploadId, reviewId);
     expect(loadReconciliationCounts).toHaveBeenCalledWith(16, submissionUploadId);
     expect(screen.getByTestId('review-header')).toHaveTextContent('Validation pass');
     expect(screen.getByText('New')).toBeVisible();
@@ -131,11 +119,12 @@ describe('SubmissionUploadReviewValidationPage', () => {
 
   it('maps the reviewed upload in its own section between the overview and the feature list', () => {
     render(
-      <MemoryRouter initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`]}>
+      <MemoryRouter
+        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
         <Routes>
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
-            element={<SubmissionUploadReviewValidationPage />}
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={validationReview} />}
           />
         </Routes>
       </MemoryRouter>
@@ -156,7 +145,7 @@ describe('SubmissionUploadReviewValidationPage', () => {
 
   it('confirms and completes the review without changing the upload disposition', async () => {
     updateSubmissionUploadReview.mockResolvedValue({
-      submission_upload_review_id: reviewId,
+      submission_upload_review_id: submissionUploadReviewId,
       submission_upload_id: submissionUploadId,
       name: 'Validation pass',
       description: 'Check the features',
@@ -166,11 +155,12 @@ describe('SubmissionUploadReviewValidationPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`]}>
+      <MemoryRouter
+        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
         <Routes>
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
-            element={<SubmissionUploadReviewValidationPage />}
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={validationReview} />}
           />
         </Routes>
       </MemoryRouter>
@@ -189,21 +179,26 @@ describe('SubmissionUploadReviewValidationPage', () => {
     await act(async () => confirmation.onYes());
 
     await waitFor(() =>
-      expect(updateSubmissionUploadReview).toHaveBeenCalledWith(16, submissionUploadId, reviewId, 'completed')
+      expect(updateSubmissionUploadReview).toHaveBeenCalledWith(
+        16,
+        submissionUploadId,
+        submissionUploadReviewId,
+        'completed'
+      )
     );
-    expect(setReviewData).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
   });
 
   it('opens a feature within the current review route', () => {
     render(
-      <MemoryRouter initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`]}>
+      <MemoryRouter
+        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
         <Routes>
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
-            element={<SubmissionUploadReviewValidationPage />}
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={validationReview} />}
           />
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId/feature/:submissionFeatureId"
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/feature/:submissionFeatureId"
             element={<div>Feature detail route</div>}
           />
         </Routes>
@@ -216,38 +211,20 @@ describe('SubmissionUploadReviewValidationPage', () => {
   });
 
   it('redirects to not found when the loaded review is not a validation review', async () => {
-    const securityReviewLoader = {
-      data: {
-        submission_upload_review_id: reviewId,
-        submission_upload_id: submissionUploadId,
-        name: 'Security pass',
-        description: 'Check access rules',
-        scope: 'security',
-        status: 'in_progress',
-        requested_by: 1
-      },
-      isLoading: false,
-      load: loadReview,
-      setData: setReviewData
+    const securityReview: ISubmissionUploadReviewDetail = {
+      ...validationReview,
+      name: 'Security pass',
+      description: 'Check access rules',
+      scope: 'security'
     };
-    const reconciliationLoader = {
-      data: { new: 4, modified: 2, unmodified: 7 },
-      isLoading: false,
-      load: loadReconciliationCounts
-    };
-    let dataLoaderCall = 0;
-    (useDataLoader as Mock).mockImplementation(() => {
-      const dataLoader = dataLoaderCall % 2 === 0 ? securityReviewLoader : reconciliationLoader;
-      dataLoaderCall += 1;
-      return dataLoader;
-    });
 
     render(
-      <MemoryRouter initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`]}>
+      <MemoryRouter
+        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
         <Routes>
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
-            element={<SubmissionUploadReviewValidationPage />}
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={securityReview} />}
           />
           <Route path="/page-not-found" element={<div>Page Not Found</div>} />
         </Routes>

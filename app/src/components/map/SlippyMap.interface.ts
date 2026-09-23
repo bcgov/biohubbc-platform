@@ -1,6 +1,5 @@
 import type { SxProps, Theme } from '@mui/material/styles';
 import type { Feature } from 'geojson';
-import type { ReactNode, Ref } from 'react';
 import type {
   LayerSpecification,
   MapGeoJSONFeature,
@@ -9,6 +8,7 @@ import type {
   SourceSpecification,
   StyleSpecification
 } from 'maplibre-gl';
+import type { ReactNode, Ref } from 'react';
 
 /**
  * Draw modes supported by the `SlippyMap` drawing toolbar, one per supported GeoJSON geometry type.
@@ -60,6 +60,13 @@ export interface SlippyMapHandle {
    * Smoothly move the camera. `zoom` is absolute and left unchanged when omitted.
    */
   easeTo: (options: { center: [number, number]; zoom?: number }) => void;
+  /**
+   * Fit the camera to bounds without exposing the underlying map instance.
+   */
+  fitBounds: (
+    bounds: [[number, number], [number, number]],
+    options: { maxZoom: number; padding: number; duration?: number }
+  ) => void;
   /**
    * Current zoom level, or undefined before the map exists.
    */
@@ -224,6 +231,8 @@ export interface ISlippyMapProps {
    * Fired once the map has loaded and again after every camera movement or resize settles.
    */
   onViewportChange?: (viewport: ISlippyMapViewport) => void;
+  // Fired when a user gesture begins changing the zoom level.
+  onUserZoom?: () => void;
   /**
    * Fired when one of the applied sources fails to load, e.g. because a tile request was rejected. Lets the consumer
    * react to an expired credential, which `transformRequest` cannot observe because it never sees responses.

@@ -20,7 +20,7 @@ vi.mock('features/submissions/page/features/components/SubmissionFeatureLayout',
 }));
 
 const submissionUploadId = '11111111-1111-4111-8111-111111111111';
-const reviewId = '22222222-2222-4222-8222-222222222222';
+const submissionUploadReviewId = '22222222-2222-4222-8222-222222222222';
 const refreshFeature = vi.fn();
 const refreshReview = vi.fn();
 const handleSearch = vi.fn();
@@ -36,7 +36,7 @@ describe('SubmissionReviewFeaturePage', () => {
     };
     const reviewDataLoader = {
       data: {
-        submission_upload_review_id: reviewId,
+        submission_upload_review_id: submissionUploadReviewId,
         submission_upload_id: submissionUploadId,
         name: 'Validation pass',
         description: 'Check features',
@@ -80,10 +80,12 @@ describe('SubmissionReviewFeaturePage', () => {
   it('loads the upload feature and renders review-scoped breadcrumbs', () => {
     render(
       <MemoryRouter
-        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}/feature/12`]}>
+        initialEntries={[
+          `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}/feature/12`
+        ]}>
         <Routes>
           <Route
-            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:reviewId/feature/:submissionFeatureId"
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/feature/:submissionFeatureId"
             element={<SubmissionReviewFeaturePage />}
           />
         </Routes>
@@ -91,7 +93,7 @@ describe('SubmissionReviewFeaturePage', () => {
     );
 
     expect(refreshFeature).toHaveBeenCalledWith(16, submissionUploadId, 12);
-    expect(refreshReview).toHaveBeenCalledWith(16, submissionUploadId, reviewId);
+    expect(refreshReview).toHaveBeenCalledWith(16, submissionUploadId, submissionUploadReviewId);
     const breadcrumbs = screen.getByLabelText('review feature breadcrumb');
     expect(breadcrumbs).toHaveTextContent('Submission/Upload/Review/Validation/Animal');
     expect(within(breadcrumbs).getByRole('link', { name: 'Submission' })).toHaveAttribute(
@@ -100,11 +102,11 @@ describe('SubmissionReviewFeaturePage', () => {
     );
     expect(within(breadcrumbs).getByRole('link', { name: 'Validation' })).toHaveAttribute(
       'href',
-      `/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}`
+      `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`
     );
     expect(screen.getByRole('link', { name: 'urn:16:sample_site:14' })).toHaveAttribute(
       'href',
-      `/admin/submission/16/upload/${submissionUploadId}/review/${reviewId}/feature/14`
+      `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}/feature/14`
     );
     expect(screen.getByRole('link', { name: 'urn:18:sample_site:99' })).toHaveAttribute(
       'href',

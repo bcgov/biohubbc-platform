@@ -34,10 +34,8 @@ vi.mock('./ticket/TicketsRouter', () => ({
   TicketsRouter: () => <div data-testid="tickets-router">Tickets Router</div>
 }));
 
-vi.mock('features/admin/reviews/SubmissionUploadReviewValidationPage', () => ({
-  SubmissionUploadReviewValidationPage: () => (
-    <div data-testid="submission-upload-review-validation-page">Validation Review</div>
-  )
+vi.mock('features/admin/reviews/SubmissionUploadReviewPage', () => ({
+  SubmissionUploadReviewPage: () => <div data-testid="submission-upload-review-page">Upload Review</div>
 }));
 
 vi.mock('features/admin/reviews/SubmissionReviewFeaturePage', () => ({
@@ -103,7 +101,7 @@ describe('AdminRouter ticket route guard', () => {
     });
   });
 
-  it('renders the validation review route for system admin', async () => {
+  it('renders the upload review route for system admin', async () => {
     const authState = getMockAuthState({ base: SystemAdminAuthState });
 
     const { getByTestId } = renderAdminRouter(
@@ -112,7 +110,7 @@ describe('AdminRouter ticket route guard', () => {
     );
 
     await waitFor(() => {
-      expect(getByTestId('submission-upload-review-validation-page')).toBeVisible();
+      expect(getByTestId('submission-upload-review-page')).toBeVisible();
     });
   });
 

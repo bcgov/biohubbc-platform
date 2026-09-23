@@ -55,6 +55,11 @@ const mocks = vi.hoisted(() => {
       this.operations.push(`removeSource:${sourceId}`);
     });
 
+    getFilter = vi.fn((id: string) => (this.layers.get(id) as any)?.filter);
+    setFilter = vi.fn((id: string, filter: unknown) => {
+      this.layers.set(id, { ...(this.layers.get(id) as object), filter: filter ?? undefined });
+    });
+
     getSource = vi.fn((sourceId: string) => this.sources.get(sourceId));
 
     addLayer = vi.fn((layer: { id: string }, beforeId?: string) => {
@@ -303,6 +308,43 @@ describe('SlippyMap', () => {
     mocks.MockTerraDraw.instances.length = 0;
     mocks.MockTerraDrawAdapter.instances.length = 0;
     MockResizeObserver.instances.length = 0;
+  });
+
+  it('updates and clears selection filters without replacing sources or the map', () => {
+    const sources = { review: { type: 'vector' as const, tiles: ['https://tiles.test/{z}/{x}/{y}'] } };
+    const layer: ISlippyMapLayer = {
+      specification: {
+        id: 'review-points',
+        type: 'circle',
+        source: 'review',
+        'source-layer': 'geometries',
+        filter: ['==', ['get', 'submission_feature_id'], 1]
+      }
+    };
+    const { rerender } = render(<SlippyMap tileSources={sources} layers={[layer]} />);
+    const map = mocks.MockMaplibreMap.instances.at(-1)!;
+    act(() => map.handlers.load[0]());
+    map.removeSource.mockClear();
+    map.removeLayer.mockClear();
+    map.setFilter.mockClear();
+    const changed = {
+      ...layer,
+      specification: { ...layer.specification, filter: ['==', ['get', 'submission_feature_id'], 2] }
+    } as ISlippyMapLayer;
+    rerender(<SlippyMap tileSources={sources} layers={[changed]} />);
+    expect(map.setFilter).toHaveBeenCalledWith('review-points', ['==', ['get', 'submission_feature_id'], 2]);
+    rerender(
+      <SlippyMap
+        tileSources={sources}
+        layers={[
+          { specification: { id: 'review-points', type: 'circle', source: 'review', 'source-layer': 'geometries' } }
+        ]}
+      />
+    );
+    expect(map.setFilter).toHaveBeenCalledWith('review-points', null);
+    expect(map.removeSource).not.toHaveBeenCalled();
+    expect(map.removeLayer).not.toHaveBeenCalled();
+    expect(map.remove).not.toHaveBeenCalled();
   });
 
   describe('map initialization', () => {
