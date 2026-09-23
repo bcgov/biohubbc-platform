@@ -37,7 +37,7 @@ export const SearchResultTableLayout = ({
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
     const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map(
       (property, index) => ({
-        field: String(property.feature_type_property_id),
+        field: String(property.blueprint_feature_type_property_id),
         headerName: property.display_name,
         minWidth: 160,
         flex: 1,

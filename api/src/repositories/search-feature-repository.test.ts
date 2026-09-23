@@ -11,12 +11,12 @@ import { codePropertyValueJson, featureReferencePropertyValueJson, taxonProperty
 
 const normalizedPredicate = (
   feature_property_id: number,
-  feature_type_property_id: number | null,
+  blueprint_feature_type_property_id: number | null,
   internal_predicate: any
 ) => ({
   type: 'predicate' as const,
   feature_property_id,
-  feature_type_property_id,
+  blueprint_feature_type_property_id,
   operator: internal_predicate.operator,
   ...(internal_predicate.value !== undefined ? { value: internal_predicate.value } : {}),
   feature_property_type_id: internal_predicate.type === 'number' ? 2 : 1,
@@ -476,10 +476,10 @@ describe('SearchFeatureRepository', () => {
       await repository.getFeatureTypeProperties('survey');
 
       const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('from "feature_type_property" as "ftp"');
+      expect(sql).to.include('from "blueprint" as "b"');
       expect(sql).to.include('"ft"."name" = \'survey\'');
       expect(sql).to.include('"fpt"."name" as "type_name"');
-      expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
+      expect(sql).to.include('order by bftp.sort ASC NULLS LAST');
       expect(sql).to.not.include('submission_feature_property_');
       expect(sql).to.not.include('expression_match');
       expect(sql).to.not.include('exists');

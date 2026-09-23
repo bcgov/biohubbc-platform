@@ -14,7 +14,6 @@ const mockBlueprintFeatureTypeProperty: AdminBlueprintFeatureTypeProperty = {
   blueprint_feature_type_property_id: 3,
   blueprint_feature_type_id: 5,
   feature_property_id: 20,
-  feature_type_property_id: 99,
   property_name: 'latitude',
   property_display_name: 'Latitude',
   property_type_name: 'number',

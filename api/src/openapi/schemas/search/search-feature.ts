@@ -19,11 +19,11 @@ export const featureSearchExpressionTreeSchema: OpenAPIV3.SchemaObject = {
         oneOf: [
           {
             type: 'object',
-            required: ['type', 'feature_property_id', 'feature_type_property_id', 'operator'],
+            required: ['type', 'feature_property_id', 'blueprint_feature_type_property_id', 'operator'],
             properties: {
               type: { type: 'string', enum: ['predicate'] },
               feature_property_id: { type: 'integer', minimum: 1 },
-              feature_type_property_id: { type: 'integer', nullable: true },
+              blueprint_feature_type_property_id: { type: 'integer', nullable: true },
               operator: { type: 'string', enum: PredicateOperator.options },
               value: {
                 description:
@@ -84,7 +84,8 @@ export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
   title: 'featureSearchProperty',
   type: 'object',
   required: [
-    'feature_type_property_id',
+    'blueprint_feature_type_property_id',
+    'feature_property_id',
     'name',
     'display_name',
     'description',
@@ -94,7 +95,10 @@ export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
     'allow_multiple'
   ],
   properties: {
-    feature_type_property_id: { type: 'integer' },
+    blueprint_feature_type_property_id: {
+      type: 'integer',
+      description: 'The Blueprint assignment this property is configured under.'
+    },
     feature_property_id: { type: 'integer' },
     feature_property_type_id: { type: 'integer' },
     name: { type: 'string' },

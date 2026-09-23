@@ -7,20 +7,20 @@ import { hasCompatiblePredicates, optimizeExpression } from './expression-optimi
  * Builds a normalized numeric predicate for optimizer tests.
  *
  * @param {number} featurePropertyId - Semantic property identifier.
- * @param {number | null} featureTypePropertyId - Concrete assignment identifier, or null for all assignments.
+ * @param {number | null} blueprintFeatureTypePropertyId - Concrete assignment identifier, or null for all assignments.
  * @param {PredicateOperator} operator - Numeric predicate operator.
  * @param {number} [value] - Optional numeric predicate value.
  * @return {NormalizedExpressionTreePredicate} Normalized numeric predicate.
  */
 const numberPredicate = (
   featurePropertyId: number,
-  featureTypePropertyId: number | null,
+  blueprintFeatureTypePropertyId: number | null,
   operator: PredicateOperator,
   value?: number
 ): NormalizedExpressionTreePredicate => ({
   type: 'predicate',
   feature_property_id: featurePropertyId,
-  feature_type_property_id: featureTypePropertyId,
+  blueprint_feature_type_property_id: blueprintFeatureTypePropertyId,
   feature_property_type_id: 5,
   feature_property_type_name: 'number',
   operator,

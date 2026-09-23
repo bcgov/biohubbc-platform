@@ -36,8 +36,8 @@ describe('featureSearchRequestBodySchema', () => {
     expect(schemaProperties).to.have.property('expression');
     expect(expressionProperties).to.include.keys(['type', 'operator', 'clauses']);
     expect(schemaProperties).to.not.include.keys(['type', 'operator', 'clauses']);
-    expect(predicateSchema.required).to.include.members(['feature_property_id', 'feature_type_property_id']);
-    expect(predicateProperties.feature_type_property_id).to.include({ nullable: true });
+    expect(predicateSchema.required).to.include.members(['feature_property_id', 'blueprint_feature_type_property_id']);
+    expect(predicateProperties.blueprint_feature_type_property_id).to.include({ nullable: true });
   });
 
   it('rejects the old filters wrapper body', () => {
@@ -79,7 +79,7 @@ describe('featureSearchRequestBodySchema', () => {
       items: featureSearchPropertySchema
     });
     expect(featureSearchPropertySchema.required).to.include.members([
-      'feature_type_property_id',
+      'blueprint_feature_type_property_id',
       'name',
       'display_name',
       'type_name',

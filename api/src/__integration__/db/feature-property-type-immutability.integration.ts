@@ -58,10 +58,10 @@ describe('feature property type immutability (integration)', function () {
         (
           SELECT count(*)::integer
           FROM submission_feature_property_taxon taxon_value
-          JOIN feature_type_property ftp
-            ON ftp.feature_type_property_id = taxon_value.feature_type_property_id
+          JOIN blueprint_feature_type_property bftp
+            ON bftp.blueprint_feature_type_property_id = taxon_value.blueprint_feature_type_property_id
           JOIN feature_property stored_property
-            ON stored_property.feature_property_id = ftp.feature_property_id
+            ON stored_property.feature_property_id = bftp.feature_property_id
           WHERE stored_property.name = 'taxon_id'
         ) AS taxon_row_count
       FROM feature_property property

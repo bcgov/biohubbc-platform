@@ -45,7 +45,6 @@ const ADMIN_BLUEPRINT_FEATURE_TYPE_PROPERTY_COLUMNS = [
   'bftp.blueprint_feature_type_property_id',
   'bftp.blueprint_feature_type_id',
   'bftp.feature_property_id',
-  'bftp.feature_type_property_id',
   'fp.name as property_name',
   'fp.display_name as property_display_name',
   'fpt.name as property_type_name',
@@ -185,10 +184,10 @@ export class BlueprintRepository extends BaseRepository {
   /**
    * Create a new draft blueprint version from an existing blueprint.
    *
-   * The source blueprint's active feature types and active property assignments are copied into new
-   * rows, so the new version receives its own `blueprint_feature_type_id` and
-   * `blueprint_feature_type_property_id` values and can be edited without affecting the source.
-   * Retired feature types and assignments are not carried forward.
+   * The source blueprint's active feature types, active property assignments and the allowed reference
+   * targets of those assignments are copied into new rows, so the new version receives its own
+   * `blueprint_feature_type_id` and `blueprint_feature_type_property_id` values and can be edited without
+   * affecting the source. Retired feature types and assignments are not carried forward.
    *
    * The new version is a draft (`record_effective_date` null, not the default) whose parent is the
    * source blueprint. `version_number` follows the highest ever issued, including retired blueprints,
@@ -253,7 +252,6 @@ export class BlueprintRepository extends BaseRepository {
         INSERT INTO blueprint_feature_type_property (
           blueprint_feature_type_id,
           feature_property_id,
-          feature_type_property_id,
           required_value,
           allow_multiple,
           sort
@@ -261,7 +259,6 @@ export class BlueprintRepository extends BaseRepository {
         SELECT
           new_bft.blueprint_feature_type_id,
           source_bftp.feature_property_id,
-          source_bftp.feature_type_property_id,
           source_bftp.required_value,
           source_bftp.allow_multiple,
           source_bftp.sort
@@ -275,7 +272,33 @@ export class BlueprintRepository extends BaseRepository {
         JOIN blueprint_feature_type_property source_bftp
           ON source_bftp.blueprint_feature_type_id = source_bft.blueprint_feature_type_id
          AND source_bftp.record_end_date IS NULL
-        RETURNING blueprint_feature_type_property_id
+        RETURNING blueprint_feature_type_property_id, blueprint_feature_type_id, feature_property_id
+      ),
+      new_feature_type_property_feature AS (
+        INSERT INTO feature_type_property_feature (
+          blueprint_feature_type_property_id,
+          target_feature_type_id
+        )
+        SELECT
+          new_bftp.blueprint_feature_type_property_id,
+          ftpf.target_feature_type_id
+        FROM new_blueprint_feature_type_property new_bftp
+        JOIN new_blueprint_feature_type new_bft
+          ON new_bft.blueprint_feature_type_id = new_bftp.blueprint_feature_type_id
+        -- Map each new assignment back to its source by feature type and property; a property is
+        -- active at most once per Blueprint feature type.
+        JOIN blueprint_feature_type source_bft
+          ON source_bft.blueprint_id = ${sourceBlueprintId}
+         AND source_bft.feature_type_id = new_bft.feature_type_id
+         AND source_bft.record_end_date IS NULL
+        JOIN blueprint_feature_type_property source_bftp
+          ON source_bftp.blueprint_feature_type_id = source_bft.blueprint_feature_type_id
+         AND source_bftp.feature_property_id = new_bftp.feature_property_id
+         AND source_bftp.record_end_date IS NULL
+        JOIN feature_type_property_feature ftpf
+          ON ftpf.blueprint_feature_type_property_id = source_bftp.blueprint_feature_type_property_id
+         AND ftpf.record_end_date IS NULL
+        RETURNING feature_type_property_feature_id
       )
       SELECT
         blueprint_id
@@ -575,7 +598,6 @@ export class BlueprintRepository extends BaseRepository {
       .insert({
         blueprint_feature_type_id: data.blueprint_feature_type_id,
         feature_property_id: data.feature_property_id,
-        feature_type_property_id: data.feature_type_property_id,
         required_value: data.required_value ?? false,
         allow_multiple: data.allow_multiple ?? false,
         sort: data.sort ?? null

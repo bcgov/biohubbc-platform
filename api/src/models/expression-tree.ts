@@ -5,7 +5,7 @@ import { LogicalOperator } from './logical-operator';
 export type ExpressionTreePredicate = {
   type: 'predicate';
   feature_property_id: number;
-  feature_type_property_id: number | null;
+  blueprint_feature_type_property_id: number | null;
   operator: PredicateOperator;
   value?: unknown;
 };
@@ -28,7 +28,7 @@ export const ExpressionTreePredicate: z.ZodType<ExpressionTreePredicate> = z
   .object({
     type: z.literal('predicate'),
     feature_property_id: z.number().int().positive(),
-    feature_type_property_id: z.number().int().positive().nullable(),
+    blueprint_feature_type_property_id: z.number().int().positive().nullable(),
     operator: PredicateOperator,
     value: z.unknown().optional()
   })

@@ -214,8 +214,8 @@ const isNumericComparison = (predicate: NormalizedExpressionTreePredicate): bool
  * Builds the stable identity for a predicate's resolved property evidence domain.
  *
  * @example
- * A predicate with `feature_type_property_id: 108` returns `assignment:108`.
- * A predicate with `feature_type_property_id: null` and `feature_property_id: 14` returns `property:14`.
+ * A predicate with `blueprint_feature_type_property_id: 108` returns `assignment:108`.
+ * A predicate with `blueprint_feature_type_property_id: null` and `feature_property_id: 14` returns `property:14`.
  *
  * A concrete assignment takes precedence because it identifies one exact evidence domain. A null assignment means the
  * predicate intentionally applies to every active assignment of the shared semantic property.
@@ -224,9 +224,9 @@ const isNumericComparison = (predicate: NormalizedExpressionTreePredicate): bool
  * @return {string} Assignment-specific key, or a shared-property key when no assignment is specified.
  */
 const getPredicatePropertyIdentity = (predicate: NormalizedExpressionTreePredicate): string =>
-  predicate.feature_type_property_id === null
+  predicate.blueprint_feature_type_property_id === null
     ? `property:${predicate.feature_property_id}`
-    : `assignment:${predicate.feature_type_property_id}`;
+    : `assignment:${predicate.blueprint_feature_type_property_id}`;
 
 /**
  * Determines whether an expression represents predicates that the evaluator can coalesce.
@@ -266,7 +266,7 @@ export const hasCompatiblePredicates = (expression: NormalizedExpressionTree): b
  * const predicate = {
  *   type: 'predicate',
  *   feature_property_id: 14,
- *   feature_type_property_id: 108,
+ *   blueprint_feature_type_property_id: 108,
  *   feature_property_type_id: 5,
  *   feature_property_type_name: 'number',
  *   operator: 'GreaterThan',

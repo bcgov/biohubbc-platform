@@ -3,7 +3,7 @@
  *
  * Used by the download pipeline to convert typed feature properties into
  * GeoParquet-compliant files. Each feature type produces its own Parquet file
- * with a schema derived from `feature_type_property` definitions.
+ * with a schema derived from the feature type's Blueprint property assignments.
  *
  * Companion to csv-utils.ts — shares `CsvPropertyDefinition` for schema metadata.
  */
@@ -150,7 +150,7 @@ export function timeStringToMillis(s: string): number {
  * so a raw array on a non-REPEATED JSON cell throws at write time. `artifact_key` is a
  * file path string and stays UTF8. `spatial` maps to `BYTE_ARRAY` for WKB encoding.
  *
- * @param typeName - The feature property type name from `feature_type_property`.
+ * @param typeName - The feature property type name of a Blueprint property assignment.
  * @returns The Parquet type string.
  */
 export function propertyTypeToParquetType(typeName: string): FieldDefinition['type'] {
@@ -217,7 +217,7 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  * property's actual name. This supports feature types with multiple spatial properties
  * (e.g. `geometry` + `centroid`) without data loss.
  *
- * @param properties - Schema property definitions from `feature_type_property`.
+ * @param properties - Schema property definitions from the Blueprint property assignments.
  * @returns A ParquetSchema instance ready for writer construction.
  */
 export function buildParquetSchema(properties: CsvPropertyDefinition[]): ParquetSchema {

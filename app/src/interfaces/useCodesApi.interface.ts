@@ -11,7 +11,8 @@ export type FeatureTypeWithProperties = {
 };
 
 export type FeatureTypeProperty = {
-  feature_type_property_id: number;
+  blueprint_feature_type_property_id: number;
+  feature_property_id: number;
   name: string;
   display_name: string;
   description: string | null;

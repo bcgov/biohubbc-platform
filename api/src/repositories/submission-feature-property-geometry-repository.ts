@@ -24,17 +24,17 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     const sqlStatement = SQL`
       INSERT INTO submission_feature_property_geometry (
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         value
       ) VALUES (
         ${payload.submission_feature_id},
-        ${payload.feature_type_property_id},
+        ${payload.blueprint_feature_type_property_id},
         ST_GeomFromGeoJSON(${JSON.stringify(payload.value)})
       )
       RETURNING
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value;
     `;
 
@@ -64,7 +64,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       SELECT
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value
       FROM submission_feature_property_geometry
       WHERE submission_feature_property_geometry_id = ${submissionFeaturePropertyGeometryId};
@@ -103,7 +103,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       SELECT
         submission_feature_property_geometry_id,
         submission_feature_id,
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         ST_AsGeoJSON(value)::json AS value
       FROM submission_feature_property_geometry
       WHERE submission_feature_id = ${submissionFeatureId};
@@ -143,12 +143,10 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
 
     scope.append(`
          AND ${isSubmissionFeaturePublished('sf')}
-        JOIN feature_type_property ftp
-          ON ftp.feature_type_property_id = g.feature_type_property_id
-         AND ftp.feature_type_id = sf.feature_type_id
-         AND ftp.record_end_date IS NULL
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_property_id = g.blueprint_feature_type_property_id
         JOIN feature_property fp
-          ON fp.feature_property_id = ftp.feature_property_id
+          ON fp.feature_property_id = bftp.feature_property_id
          AND fp.record_end_date IS NULL
     `);
 
@@ -189,12 +187,10 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
         FROM submission_feature sf
         JOIN submission_feature_property_geometry g
           ON g.submission_feature_id = sf.submission_feature_id
-        JOIN feature_type_property ftp
-          ON ftp.feature_type_property_id = g.feature_type_property_id
-         AND ftp.feature_type_id = sf.feature_type_id
-         AND ftp.record_end_date IS NULL
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_property_id = g.blueprint_feature_type_property_id
         JOIN feature_property fp
-          ON fp.feature_property_id = ftp.feature_property_id
+          ON fp.feature_property_id = bftp.feature_property_id
          AND fp.record_end_date IS NULL
         WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
           AND sf.submission_id = ${submissionId}
@@ -259,30 +255,5 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       bbox: [row.min_x, row.min_y, row.max_x, row.max_y],
       geometry_count: row.geometry_count
     };
-  }
-
-  /**
-   * Get submission_feature_property_geometry rows by feature type property id.
-   *
-   * @param {number} featureTypePropertyId
-   * @return {Promise<SubmissionFeaturePropertyGeometry[]>}
-   * @memberof SubmissionFeaturePropertyGeometryRepository
-   */
-  async getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(
-    featureTypePropertyId: number
-  ): Promise<SubmissionFeaturePropertyGeometry[]> {
-    const sqlStatement = SQL`
-      SELECT
-        submission_feature_property_geometry_id,
-        submission_feature_id,
-        feature_type_property_id,
-        ST_AsGeoJSON(value)::json AS value
-      FROM submission_feature_property_geometry
-      WHERE feature_type_property_id = ${featureTypePropertyId};
-    `;
-
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
-
-    return response.rows;
   }
 }

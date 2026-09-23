@@ -699,18 +699,18 @@ async function getTelemetryDeployments(connection: IDBConnection, submissionId: 
     JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id AND ft.name = 'telemetry_deployment'
     LEFT JOIN submission_feature_property_string animal
       ON animal.submission_feature_id = sf.submission_feature_id
-      AND animal.feature_type_property_id IN (
-        SELECT ftp.feature_type_property_id
-        FROM feature_type_property ftp
-        JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+      AND animal.blueprint_feature_type_property_id IN (
+        SELECT bftp.blueprint_feature_type_property_id
+        FROM blueprint_feature_type_property bftp
+        JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
         WHERE fp.name = 'animal_identifier'
       )
     LEFT JOIN submission_feature_property_string device
       ON device.submission_feature_id = sf.submission_feature_id
-      AND device.feature_type_property_id IN (
-        SELECT ftp.feature_type_property_id
-        FROM feature_type_property ftp
-        JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+      AND device.blueprint_feature_type_property_id IN (
+        SELECT bftp.blueprint_feature_type_property_id
+        FROM blueprint_feature_type_property bftp
+        JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
         WHERE fp.name = 'device_key'
       )
     WHERE sf.submission_id = ${submissionId}

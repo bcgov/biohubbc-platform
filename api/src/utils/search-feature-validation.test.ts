@@ -27,7 +27,7 @@ describe('search feature validation', () => {
           {
             type: 'predicate',
             feature_property_id: 1,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Exists'
           }
         ]

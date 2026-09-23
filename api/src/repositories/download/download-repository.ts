@@ -483,18 +483,18 @@ export class DownloadRepository extends BaseRepository {
     const TYPED_TABLE_QUERIES: Record<string, string> = {
       string: `SELECT p.submission_feature_id, fp.name, p.value
                FROM submission_feature_property_string p
-               INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-               INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+               INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+               INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                WHERE p.submission_feature_id = ANY($1)`,
       number: `SELECT p.submission_feature_id, fp.name, p.value
                FROM submission_feature_property_number p
-               INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-               INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+               INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+               INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                WHERE p.submission_feature_id = ANY($1)`,
       boolean: `SELECT p.submission_feature_id, fp.name, p.value
                 FROM submission_feature_property_boolean p
-                INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-                INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+                INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                 WHERE p.submission_feature_id = ANY($1)`,
       // `datetime` emits up to two synthetic rows per source row, with the
       // property name suffixed `_date` / `_time`. A row with both components
@@ -516,31 +516,31 @@ export class DownloadRepository extends BaseRepository {
       // names — drift silently nulls cells.
       datetime: `SELECT p.submission_feature_id, fp.name || '${DATETIME_DATE_SUFFIX}' AS name, to_char(p.date_value, 'YYYY-MM-DD') AS value
                  FROM submission_feature_property_timestamp p
-                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                 INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+                 INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                  WHERE p.submission_feature_id = ANY($1) AND p.date_value IS NOT NULL
                  UNION ALL
                  SELECT p.submission_feature_id, fp.name || '${DATETIME_TIME_SUFFIX}' AS name, to_char(p.time_value, 'HH24:MI:SS') AS value
                  FROM submission_feature_property_timestamp p
-                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                 INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+                 INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                  WHERE p.submission_feature_id = ANY($1) AND p.time_value IS NOT NULL`,
       code: `SELECT p.submission_feature_id, fp.name, ccc.label AS value
              FROM submission_feature_property_code p
-             INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-             INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+             INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+             INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
              INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
              WHERE p.submission_feature_id = ANY($1)`,
       taxon: `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
               FROM submission_feature_property_taxon p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+              INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
               INNER JOIN taxon t ON p.taxon_id = t.taxon_id
               WHERE p.submission_feature_id = ANY($1)`,
       spatial: `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
                 FROM submission_feature_property_geometry p
-                INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-                INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+                INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                 WHERE p.submission_feature_id = ANY($1)`,
       /**
        * - `jsonb_agg` (not `array_agg`) so pg's JSONB deserializer yields a native `string[]`,
@@ -556,8 +556,8 @@ export class DownloadRepository extends BaseRepository {
         fp.name,
         jsonb_agg(sf.urn ORDER BY sf.submission_feature_id) AS value
       FROM submission_feature_property_feature p
-      INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-      INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+      INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+      INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
       INNER JOIN submission_feature sf
         ON sf.submission_feature_id = p.referenced_submission_feature_id
         AND ${isSubmissionFeatureCurrent('sf')}
@@ -572,26 +572,31 @@ export class DownloadRepository extends BaseRepository {
       INNER JOIN artifact a
         ON a.artifact_id = sfa.artifact_id
         AND a.artifact_status = 'uploaded'
+      INNER JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
       INNER JOIN (
         SELECT
-          ftp.feature_type_id,
-          MIN(ftp.feature_type_property_id) AS feature_type_property_id
-        FROM feature_type_property ftp
+          bft.blueprint_id,
+          bft.feature_type_id,
+          MIN(bftp.blueprint_feature_type_property_id) AS blueprint_feature_type_property_id
+        FROM blueprint_feature_type_property bftp
+        INNER JOIN blueprint_feature_type bft
+          ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
         INNER JOIN feature_property fp
-          ON fp.feature_property_id = ftp.feature_property_id
+          ON fp.feature_property_id = bftp.feature_property_id
           AND fp.record_end_date IS NULL
         INNER JOIN feature_property_type fpt
           ON fpt.feature_property_type_id = fp.feature_property_type_id
           AND fpt.name = 'artifact_key'
           AND fpt.record_end_date IS NULL
-        WHERE ftp.record_end_date IS NULL
-        GROUP BY ftp.feature_type_id
+        WHERE bftp.record_end_date IS NULL
+        GROUP BY bft.blueprint_id, bft.feature_type_id
         HAVING COUNT(*) = 1
-      ) artifact_ftp
-        ON artifact_ftp.feature_type_id = sf.feature_type_id
-      INNER JOIN feature_type_property ftp
-        ON ftp.feature_type_property_id = artifact_ftp.feature_type_property_id
-      INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+      ) artifact_bftp
+        ON artifact_bftp.blueprint_id = su.blueprint_id
+        AND artifact_bftp.feature_type_id = sf.feature_type_id
+      INNER JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_property_id = artifact_bftp.blueprint_feature_type_property_id
+      INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
       WHERE sfa.submission_feature_id = ANY($1)
         AND ${isSubmissionFeatureCurrent('sf')}
       GROUP BY sfa.submission_feature_id, fp.name`

@@ -120,3 +120,48 @@ export interface UpdateFeatureProperty {
   calculated_value?: boolean;
   record_end_date?: string;
 }
+
+/**
+ * A property as configured for a feature type by a Blueprint assignment, with the property's own
+ * definition joined in. This is the shape search, codes and downloads describe a feature type's
+ * properties with.
+ *
+ * `blueprint_feature_type_property_id` identifies the assignment; `feature_property_id` identifies the
+ * reusable property definition. Requiredness and multiplicity are the assignment's.
+ */
+export const FeatureTypeProperty = z.object({
+  blueprint_feature_type_property_id: z.number(),
+  feature_property_id: z.number(),
+  feature_property_type_id: z.number().optional(),
+  name: z.string(),
+  display_name: z.string(),
+  description: z.string().nullable(),
+  type_name: z.string(),
+  required_value: z.boolean(),
+  calculated_value: z.boolean(),
+  allow_multiple: z.boolean()
+});
+
+export type FeatureTypeProperty = z.infer<typeof FeatureTypeProperty>;
+
+/**
+ * The property metadata a predicate is validated and typed against: the property definition, its
+ * declared type, and the Blueprint assignment the predicate narrows to, when it does.
+ */
+export const ExpressionPredicatePropertyMetadata = z.object({
+  feature_property_id: z.number().int().positive(),
+  blueprint_feature_type_property_id: z.number().int().positive().nullable(),
+  feature_property_type_id: z.number().int().positive(),
+  feature_property_type_name: z.union([
+    z.literal(FEATURE_PROPERTY_TYPE.STRING),
+    z.literal(FEATURE_PROPERTY_TYPE.NUMBER),
+    z.literal(FEATURE_PROPERTY_TYPE.BOOLEAN),
+    z.literal(FEATURE_PROPERTY_TYPE.SPATIAL),
+    z.literal(FEATURE_PROPERTY_TYPE.DATETIME),
+    z.literal(FEATURE_PROPERTY_TYPE.CODE),
+    z.literal(FEATURE_PROPERTY_TYPE.TAXON)
+  ]),
+  display_name: z.string()
+});
+
+export type ExpressionPredicatePropertyMetadata = z.infer<typeof ExpressionPredicatePropertyMetadata>;

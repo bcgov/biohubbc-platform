@@ -49,7 +49,7 @@ function buildExpression(value?: string): ExpressionTree {
       {
         type: 'predicate',
         feature_property_id: 31,
-        feature_type_property_id: 70,
+        blueprint_feature_type_property_id: 70,
         operator: 'Equals',
         value: value ?? `dr-int-${randomUUID()}`
       }

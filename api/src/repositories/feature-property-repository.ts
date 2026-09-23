@@ -1,8 +1,14 @@
 import { Knex } from 'knex';
+import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CountResult } from '../models/count';
-import { CreateFeatureProperty, FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
+import {
+  CreateFeatureProperty,
+  ExpressionPredicatePropertyMetadata,
+  FeatureProperty,
+  UpdateFeatureProperty
+} from '../models/feature-property';
 import { FeaturePropertyFilters } from '../services/feature-property-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -260,5 +266,76 @@ export class FeaturePropertyRepository extends BaseRepository {
     }
 
     return query;
+  }
+
+  /**
+   * Get the property metadata a predicate is validated and typed against.
+   *
+   * Without an assignment, the property is resolved on its own. With one, the assignment must carry the
+   * property; it is accepted at any lifecycle, since a predicate may target values stored under a
+   * Blueprint version that has since been superseded.
+   *
+   * @param {number} featurePropertyId - Shared feature property identifier.
+   * @param {number | null} blueprintFeatureTypePropertyId - Optional Blueprint assignment the predicate narrows to.
+   * @return {Promise<ExpressionPredicatePropertyMetadata>} Resolved metadata.
+   * @throws {ApiNotFoundError} If no matching active property, or no such assignment of it, exists.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeaturePropertyRepository
+   */
+  async getExpressionPredicatePropertyMetadata(
+    featurePropertyId: number,
+    blueprintFeatureTypePropertyId: number | null
+  ): Promise<ExpressionPredicatePropertyMetadata> {
+    const sqlStatement =
+      blueprintFeatureTypePropertyId === null
+        ? SQL`
+            SELECT
+              fp.feature_property_id,
+              NULL::integer as blueprint_feature_type_property_id,
+              fpt.feature_property_type_id,
+              fpt.name as feature_property_type_name,
+              fp.display_name
+            FROM feature_property fp
+            INNER JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+              AND fpt.record_end_date IS NULL
+            WHERE fp.feature_property_id = ${featurePropertyId}
+              AND fp.record_end_date IS NULL;
+          `
+        : SQL`
+            SELECT
+              fp.feature_property_id,
+              bftp.blueprint_feature_type_property_id,
+              fpt.feature_property_type_id,
+              fpt.name as feature_property_type_name,
+              fp.display_name
+            FROM blueprint_feature_type_property bftp
+            INNER JOIN feature_property fp
+              ON fp.feature_property_id = bftp.feature_property_id
+              AND fp.record_end_date IS NULL
+            INNER JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+              AND fpt.record_end_date IS NULL
+            WHERE fp.feature_property_id = ${featurePropertyId}
+              AND bftp.blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
+          `;
+
+    const response = await this.connection.sql(sqlStatement, ExpressionPredicatePropertyMetadata);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property metadata not found', [
+        'FeaturePropertyRepository->getExpressionPredicatePropertyMetadata',
+        { featurePropertyId, blueprintFeatureTypePropertyId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeaturePropertyRepository->getExpressionPredicatePropertyMetadata',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 }

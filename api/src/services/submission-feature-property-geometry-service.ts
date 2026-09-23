@@ -100,19 +100,4 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
       submissionUploadId
     );
   }
-
-  /**
-   * Get every stored spatial property value recorded against one feature type property.
-   *
-   * @param {number} featureTypePropertyId
-   * @return {*}  {Promise<SubmissionFeaturePropertyGeometry[]>}
-   * @memberof SubmissionFeaturePropertyGeometryService
-   */
-  getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(
-    featureTypePropertyId: number
-  ): Promise<SubmissionFeaturePropertyGeometry[]> {
-    return this.submissionFeaturePropertyGeometryRepository.getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(
-      featureTypePropertyId
-    );
-  }
 }

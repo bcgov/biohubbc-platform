@@ -1,7 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-type-property';
+import { FeatureTypeProperty } from '../models/feature-property';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { optimizeExpression } from '../utils/expression-optimization';

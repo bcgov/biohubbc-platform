@@ -149,12 +149,18 @@ describe('BlueprintRepository', () => {
       // New feature types are mapped back to the source rows by feature type.
       expect(sqlText).to.include('source_bft.feature_type_id = new_bft.feature_type_id');
 
-      // Both the owned property and the compatibility pairing are carried onto the copy.
+      // The owned property and its configuration are carried onto the copy; the assignment identifier is
+      // never copied, so the new rows receive their own.
       expect(sqlText).to.include('source_bftp.feature_property_id');
-      expect(sqlText).to.include('source_bftp.feature_type_property_id');
+      expect(sqlText).to.match(
+        /INSERT INTO blueprint_feature_type_property \(\s*blueprint_feature_type_id,\s*feature_property_id,\s*required_value,\s*allow_multiple,\s*sort\s*\)/
+      );
 
-      // The assignment identifier is never copied; the new rows receive their own.
-      expect(sqlText).to.not.match(/SELECT[\s\S]*source_bftp\.blueprint_feature_type_property_id/);
+      // Allowed reference targets follow their assignment onto the copy.
+      expect(sqlText).to.include('INSERT INTO feature_type_property_feature (');
+      expect(sqlText).to.include(
+        'ftpf.blueprint_feature_type_property_id = source_bftp.blueprint_feature_type_property_id'
+      );
     });
 
     it('throws ApiNotFoundError when no active source blueprint exists', async () => {
@@ -299,25 +305,22 @@ describe('BlueprintRepository', () => {
       const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
       expect(sql).to.include('"record_end_date" is null');
       expect(sql).to.include('"feature_property_id" =');
-      expect(sql).to.not.include('"feature_type_property_id"');
       expect(bindings).to.include.members([5, 20]);
     });
 
-    it('insertBlueprintFeatureTypeProperty stores both references and defaults the flags', async () => {
+    it('insertBlueprintFeatureTypeProperty stores the assignment and defaults the flags', async () => {
       const knexStub = sinon.stub().resolves(mockKnexResult([{ blueprint_feature_type_property_id: 3 }]));
       const repo = new BlueprintRepository(getMockDBConnection({ knex: knexStub }));
 
       const result = await repo.insertBlueprintFeatureTypeProperty({
         blueprint_feature_type_id: 5,
-        feature_property_id: 20,
-        feature_type_property_id: 99
+        feature_property_id: 20
       });
 
       expect(result).to.equal(3);
       const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
       expect(sql).to.include('"feature_property_id"');
-      expect(sql).to.include('"feature_type_property_id"');
-      expect(bindings).to.include.members([5, 20, 99, false]);
+      expect(bindings).to.include.members([5, 20, false]);
     });
 
     it('getAdminBlueprintFeatureTypeProperty joins the property through the owned reference', async () => {

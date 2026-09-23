@@ -298,7 +298,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_feature_property_code');
       expect(sqlText).to.include('submission_feature_id');
-      expect(sqlText).to.include('feature_type_property_id');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
       // Provenance column is carried from candidate staging.
       expect(sqlText).to.include('blueprint_feature_type_property_id');
       expect(sqlText).to.include('c.blueprint_feature_type_property_id');
@@ -322,7 +322,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('INSERT INTO submission_feature_property_taxon');
       expect(sqlText).to.include('submission_feature_id');
-      expect(sqlText).to.include('feature_type_property_id');
+      expect(sqlText).to.include('blueprint_feature_type_property_id');
       // Provenance column is carried from candidate staging.
       expect(sqlText).to.include('blueprint_feature_type_property_id');
       expect(sqlText).to.include('c.blueprint_feature_type_property_id');
@@ -346,14 +346,14 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('INSERT INTO submission_feature_property_artifact');
       expect(sqlText).to.include('SELECT DISTINCT');
       expect(sqlText).to.include('n.submission_feature_id');
-      expect(sqlText).to.include('n.feature_type_property_id');
+      expect(sqlText).to.include('n.blueprint_feature_type_property_id');
       expect(sqlText).to.include('n.blueprint_feature_type_property_id');
       expect(sqlText).to.include('n.artifact_id');
       expect(sqlText).to.include('FROM submission_upload_staging_artifact_candidate n');
       expect(sqlText).to.include("AND COALESCE(n.normalized_reference, '') <> ''");
       expect(sqlText).to.include('AND n.artifact_id IS NOT NULL');
       expect(sqlText).to.match(
-        /ON CONFLICT \(\s*submission_feature_id,\s*feature_type_property_id,\s*artifact_id\s*\)/
+        /ON CONFLICT \(\s*submission_feature_id,\s*blueprint_feature_type_property_id,\s*artifact_id\s*\)/
       );
       expect(sqlText).to.not.include('INSERT INTO submission_feature_artifact');
     });
@@ -396,7 +396,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const rows = [
         {
           property_name: 'count',
-          feature_type_property_id: 22,
+          blueprint_feature_type_property_id: 22,
           error_code: 'TYPE_MISMATCH',
           error_message: 'Property value type mismatch',
           count: 3,
@@ -464,7 +464,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
 
       // The global pairing is not consulted; the assignment carries the surrogate id itself.
       expect(sqlText).to.not.include('feature_type_property ftp');
-      expect(sqlText).to.include('bftp.feature_type_property_id AS feature_type_property_id');
+      expect(sqlText).to.include('bftp.blueprint_feature_type_property_id,');
 
       // The columns removed from blueprint_feature_type_property must not be referenced.
       expect(sqlText).to.not.include('bftp.blueprint_id');
@@ -509,7 +509,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       // so a required property only applies to features of the type it is assigned under.
       expect(sqlText).to.not.include('feature_type_property ftp');
       expect(sqlText).to.match(
-        /required_properties AS \(\s*SELECT\s+bft\.feature_type_id,\s+bftp\.feature_type_property_id,/
+        /required_properties AS \(\s*SELECT\s+bft\.feature_type_id,\s+bftp\.blueprint_feature_type_property_id,/
       );
 
       // The columns removed from blueprint_feature_type_property must not be referenced.
