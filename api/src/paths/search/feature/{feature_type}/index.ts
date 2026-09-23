@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import type { SearchFeatureSecurityContext } from '../../../../models/search';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   featureSearchRequestBodySchema,
@@ -65,10 +66,12 @@ export function searchFeatures(): RequestHandler {
       await connection.open();
 
       const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
+      const securityContext: SearchFeatureSecurityContext =
+        systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId };
       const featureType = validateSearchFeatureType(req.params.feature_type);
       const cursorPagination = makeCursorPaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);
-      const expressionTree = validateSearchExpressionTree(req.body.expression);
+      const expressionTree = validateSearchExpressionTree(req.body.expression) ?? null;
 
       const {
         features,
@@ -79,8 +82,8 @@ export function searchFeatures(): RequestHandler {
         featureType,
         expressionTree,
         cursorPagination,
-        systemUserId,
-        req.body.submissionIds
+        securityContext,
+        { submissionIds: req.body.submissionIds }
       );
 
       await connection.commit();

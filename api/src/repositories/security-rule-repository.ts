@@ -5,6 +5,7 @@ import { CountResult } from '../models/count';
 import {
   CreateSecurityRule,
   SecurityRule,
+  SecurityRuleAndCategory,
   SecurityRuleRecord,
   SecurityRuleWithFeatureCount,
   SecuritySearchFilters,
@@ -52,6 +53,35 @@ export class SecurityRuleRepository extends BaseRepository {
   }
 
   /**
+   * Fetch one rule and its category lifecycle fields for assignment validation.
+   * @param {number} securityRuleId Rule identifier.
+   * @returns {Promise<SecurityRuleAndCategory | undefined>} Rule and category, if they exist.
+   */
+  async getSecurityRuleWithCategory(securityRuleId: number): Promise<SecurityRuleAndCategory | undefined> {
+    const knex = getKnex();
+
+    const query = knex('security_rule as sr')
+      .join('security_category as sc', 'sc.security_category_id', 'sr.security_category_id')
+      .select(
+        'sr.security_rule_id',
+        'sr.policy_id',
+        'sr.name',
+        'sr.description',
+        'sr.is_active',
+        'sr.record_effective_date',
+        'sr.record_end_date',
+        'sc.security_category_id',
+        'sc.name as category_name',
+        'sc.description as category_description',
+        'sc.record_effective_date as category_record_effective_date',
+        'sc.record_end_date as category_record_end_date'
+      )
+      .where('sr.security_rule_id', securityRuleId);
+    const response = await this.connection.knex(query, SecurityRuleAndCategory);
+    return response.rows[0];
+  }
+
+  /**
    * Get paginated security rules with a count of associated active submission features.
    * Only active (non-soft-deleted) applications are counted.
    *
@@ -81,10 +111,7 @@ export class SecurityRuleRepository extends BaseRepository {
         this.on('sr.security_category_id', '=', 'sc.security_category_id').andOnNull('sc.record_end_date');
       })
       .leftJoin('submission_feature_security as sfs', function () {
-        // Draft rows (automatic screening output pending review) are not applied security
-        this.on('sfs.security_rule_id', '=', 'sr.security_rule_id')
-          .andOnNull('sfs.record_end_date')
-          .andOnVal('sfs.status', '=', 'active');
+        this.on('sfs.security_rule_id', '=', 'sr.security_rule_id').andOnNull('sfs.record_end_date');
       })
       .whereNull('sr.record_end_date')
       .groupBy(
@@ -266,13 +293,10 @@ export class SecurityRuleRepository extends BaseRepository {
   }
 
   /**
-   * Count how many active (non-soft-deleted, `status = 'active'`) `submission_feature_security`
+   * Count how many current (non-soft-deleted) `submission_feature_security`
    * records reference the given rule.
    *
    * Used by the rule-delete guard to prevent deleting rules that are still applied to features.
-   * `draft` rows (automatic screening output pending review) are excluded — they are not applied
-   * security, so they must not block deleting an otherwise unused rule.
-   *
    * @param {number} securityRuleId
    * @return {Promise<number>}
    * @throws {ApiExecuteSQLError} If the count query returns an unexpected row count.
@@ -284,7 +308,6 @@ export class SecurityRuleRepository extends BaseRepository {
       .select(knex.raw('count(*)::integer as count'))
       .from('submission_feature_security')
       .where('security_rule_id', securityRuleId)
-      .where('status', 'active')
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, CountResult);

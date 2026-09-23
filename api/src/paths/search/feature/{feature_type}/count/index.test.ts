@@ -47,7 +47,12 @@ describe('countFeatures', () => {
 
     await count.countFeatures()(mockReq, mockRes, mockNext);
 
-    expect(countStub.firstCall.args).to.deep.equal(['species_observation', expressionTree, null, [42]]);
+    expect(countStub.firstCall.args).to.deep.equal([
+      'species_observation',
+      expressionTree,
+      { type: 'anonymous' },
+      { submissionIds: [42] }
+    ]);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.deep.equal({ total: 3_400_000 });
     expect(dbConnectionObj.commit).to.have.been.calledOnce;
@@ -73,7 +78,12 @@ describe('countFeatures', () => {
 
     await count.countFeatures()(mockReq, mockRes, mockNext);
 
-    expect(countStub.firstCall.args).to.deep.equal(['species_observation', undefined, null, undefined]);
+    expect(countStub.firstCall.args).to.deep.equal([
+      'species_observation',
+      null,
+      { type: 'anonymous' },
+      { submissionIds: undefined }
+    ]);
     expect(mockRes.jsonValue).to.deep.equal({ total: 5_000_000 });
   });
 

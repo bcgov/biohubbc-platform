@@ -3,6 +3,8 @@ import { z } from 'zod';
 // Search result schema
 export const SearchFeatureResultWithRelevancy = z.object({
   submission_feature_id: z.number(),
+  parent_submission_feature_id: z.number().nullable(),
+  provenance: z.enum(['direct', 'inherited']).nullable(),
   submission_id: z.number(),
   uuid: z.string(),
   feature_type_id: z.number(),
