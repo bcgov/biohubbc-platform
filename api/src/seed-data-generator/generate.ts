@@ -636,8 +636,7 @@ async function secureDeploymentsAndComputeAnchors(
           AND sf.submission_upload_id = ${submissionUploadId}::uuid
           AND sf.record_end_date IS NULL
           AND sf.submission_feature_id = ANY(${assignment.submissionFeatureIds}::integer[])
-        ON CONFLICT (submission_feature_id, security_rule_id) DO UPDATE SET status = 'active'
-        WHERE submission_feature_security.status IS DISTINCT FROM 'active'`);
+        ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING`);
     }
 
     await computeAnchorsForSubmission(connection, submissionId);

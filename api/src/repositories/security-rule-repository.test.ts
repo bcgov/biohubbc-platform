@@ -153,7 +153,7 @@ describe('SecurityRuleRepository', () => {
       expect(count).to.equal(4);
     });
 
-    it("filters on status = 'active' so draft screening rows do not block deletion", async () => {
+    it('counts every current assignment, including automatic screening', async () => {
       let capturedSql = '';
       let capturedBindings: readonly unknown[] = [];
       const mockDBConnection = getMockDBConnection({
@@ -168,8 +168,8 @@ describe('SecurityRuleRepository', () => {
       const repo = new SecurityRuleRepository(mockDBConnection);
       await repo.getActiveAppliedFeatureCount(1);
 
-      expect(capturedSql).to.contain('status');
-      expect(capturedBindings).to.include('active');
+      expect(capturedSql).not.to.contain('status');
+      expect(capturedBindings).not.to.include('active');
     });
 
     it('returns 0 when no active applications exist', async () => {

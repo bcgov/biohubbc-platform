@@ -1,5 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
+import type { SearchFeatureSecurityContext } from '../models/search';
 import { MartinContextRepository } from '../repositories/martin-context-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
@@ -95,12 +96,14 @@ export class MartinContextService extends DBService {
 
     // Recomputed even for a reused context: features may have been secured since it was created, and
     // this drives the "some results are hidden" notice.
+    const securityContext: SearchFeatureSecurityContext =
+      systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId };
     const hasInaccessibleSecuredFeatures =
       await this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         featureTypeName,
-        optimizedExpression,
-        systemUserId,
-        normalizedSubmissionIds ?? undefined
+        optimizedExpression ?? null,
+        securityContext,
+        { submissionIds: normalizedSubmissionIds ?? undefined }
       );
 
     // Reuse and creation are one statement, serialized per context hash: two identical mints racing

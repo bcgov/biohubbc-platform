@@ -404,7 +404,12 @@ describe('Security scope search (integration)', function () {
   ): Promise<{ submission_feature_id: number; is_secured: boolean }[]> {
     const all: { submission_id: number; submission_feature_id: number; is_secured: boolean }[] = [];
     for (const featureType of featureTypes) {
-      const results = await searchRepo.searchFeaturesByExpressionTree(featureType, undefined, undefined, systemUserId);
+      const results = await searchRepo.searchFeaturesByExpressionTree(
+        featureType,
+        null,
+        undefined,
+        systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId: systemUserId }
+      );
       all.push(...results);
     }
     return all
@@ -904,7 +909,10 @@ describe('Security scope search (integration)', function () {
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, userId);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+        type: 'user',
+        systemUserId: userId
+      });
 
       // The caller can access every secured match via the wildcard grant — nothing left to request.
       expect(hasHidden).to.be.false;
@@ -928,11 +936,10 @@ describe('Security scope search (integration)', function () {
       // Now secure it — effectively secured on the read path, but with no scope anchor.
       await secureFeature(connection, feature);
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree(
-        'dataset',
-        undefined,
-        wildcardUser
-      );
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+        type: 'user',
+        systemUserId: wildcardUser
+      });
 
       expect(hasHidden).to.be.true;
     });
@@ -949,7 +956,10 @@ describe('Security scope search (integration)', function () {
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, otherUser, 'Other Team');
 
       const caller = await createOtherUser(); // authenticated, but in no team
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+        type: 'user',
+        systemUserId: caller
+      });
 
       expect(hasHidden).to.be.true;
     });
@@ -965,7 +975,9 @@ describe('Security scope search (integration)', function () {
       await secureFeature(connection, feature);
       await rebuildClosure(uploadId);
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, null);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+        type: 'anonymous'
+      });
 
       expect(hasHidden).to.be.true;
     });
@@ -978,7 +990,10 @@ describe('Security scope search (integration)', function () {
 
       // Authenticated, but holds no team/policy/scope at all.
       const caller = await createOtherUser();
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+        type: 'user',
+        systemUserId: caller
+      });
 
       expect(hasHidden).to.be.true;
     });
@@ -2462,12 +2477,9 @@ describe('Security scope search (integration)', function () {
 
       expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
 
-      // Remove the fixture assignment to verify that authorization reflects the current security state.
-      await connection.sql(SQL`
-        DELETE FROM submission_feature_security
-        WHERE submission_feature_id = ${historicalParentId}
-          AND security_rule_id = 1;
-      `);
+      await connection.sql(
+        SQL`DELETE FROM submission_feature_security WHERE submission_feature_id = ${historicalParentId} AND security_rule_id = 1`
+      );
       expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
 
       await secureFeature(connection, historicalParentId);

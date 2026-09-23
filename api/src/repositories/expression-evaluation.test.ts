@@ -5,13 +5,14 @@ import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { optimizeExpression } from '../utils/expression-optimization';
 import { parseTimestamp } from '../utils/timestamp';
 import {
-  applyTaxonExpressionOperator,
   buildBroadFeatureTypeCountSubquery,
   buildBroadFeatureTypeSubquery,
   buildExpressionTreeCountFeatureIdsSubquery,
   buildExpressionTreeFeatureIdsSubquery,
   buildUnfilteredExpressionTreeFeatureIdsSubquery
 } from './expression-evaluation';
+import { applyTaxonExpressionOperator } from './expression-predicate-sql';
+import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-feature-search';
 
 const normalizedPredicate = (
   feature_property_id: number,
@@ -50,6 +51,53 @@ const timestampPredicateSql = (operator: string, value?: string): string => {
 describe('expression-evaluation', () => {
   afterEach(() => {
     Sinon.restore();
+  });
+
+  describe('published and upload-review evidence boundaries', () => {
+    const equality = (value: string) => normalizedPredicate(46, null, { type: 'string', operator: 'Equals', value });
+    const multiValue: NormalizedExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [equality('elk'), equality('deer')]
+    };
+    const expressions: NormalizedExpressionTree[] = [
+      { type: 'expression', operator: 'OR', clauses: [equality('elk'), equality('deer')] },
+      multiValue,
+      {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          multiValue,
+          {
+            type: 'expression',
+            operator: 'OR',
+            clauses: [
+              normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 }),
+              equality('moose')
+            ]
+          }
+        ]
+      }
+    ];
+    for (const [index, expression] of expressions.entries()) {
+      it(`keeps visibility and relationships separate for expression shape ${index + 1}`, () => {
+        const published = buildExpressionTreeFeatureIdsSubquery('survey', expression, null).toString();
+        const upload = buildSubmissionUploadFeatureIdsSubquery(
+          1,
+          '00000000-0000-0000-0000-000000000001',
+          expression
+        ).toString();
+        expect(published).to.include('submission_feature_closure');
+        expect(published).to.include('submission_feature_security');
+        expect(published).not.to.include('upload_relationships');
+        expect(upload).to.include('upload_relationships');
+        expect(upload).not.to.include('submission_feature_closure');
+        expect(upload).not.to.include('submission_feature_security');
+        if (index > 0) {
+          expect(upload).to.include('count(DISTINCT grouped_search_evidence.matched_value) = 2');
+        }
+      });
+    }
   });
 
   describe('buildExpressionTreeFeatureIdsSubquery', () => {

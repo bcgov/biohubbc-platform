@@ -44,11 +44,11 @@ import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, init
 import { NormalizedExpressionTree, NormalizedExpressionTreePredicate } from '../../models/expression-tree-internal';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import {
-  applyTaxonExpressionOperator,
   buildBroadFeatureTypeSubquery,
   buildExpressionTreeCountFeatureIdsSubquery,
   buildExpressionTreeFeatureIdsSubquery
 } from '../../repositories/expression-evaluation';
+import { applyTaxonExpressionOperator } from '../../repositories/expression-predicate-sql';
 import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { optimizeExpression } from '../../utils/expression-optimization';
