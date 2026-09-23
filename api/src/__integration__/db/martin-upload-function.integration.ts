@@ -18,6 +18,7 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { SubmissionFeaturePropertyGeometryService } from '../../services/submission-feature-property-geometry-service';
 import {
   addTestGeometry,
   buildWktGeometries,
@@ -328,6 +329,47 @@ describe('Martin upload function (integration)', function () {
       const geometries = await decodeGeometries(contextFor(submissionId, uploadId));
 
       expect(geometries).to.have.length(1);
+    });
+  });
+
+  describe('review feature extent', () => {
+    it('frames one pending feature while the upload session maps every upload feature', async () => {
+      const target = await createUploadWithPoint();
+      const siblingId = await insertFeature(target.submissionId, target.uploadId);
+      await addGeometry(siblingId, `POINT(${TEST_LNG + 0.001} ${TEST_LAT})`);
+      const geometries = await decodeGeometries(contextFor(target.submissionId, target.uploadId));
+      expect(geometries).to.have.length(2);
+      const service = new SubmissionFeaturePropertyGeometryService(fixture.connection);
+      expect(
+        await service.getSubmissionUploadFeatureGeometryExtent(target.submissionId, target.uploadId, target.featureId)
+      ).to.eql({ bbox: [TEST_LNG, TEST_LAT, TEST_LNG, TEST_LAT], geometry_count: 1 });
+      expect(await service.getActiveGeometryExtent(target.submissionId, target.featureId)).to.eql({
+        bbox: null,
+        geometry_count: 0
+      });
+    });
+
+    it('returns no extent for missing, cross-upload, cross-submission or ended features', async () => {
+      const target = await createUploadWithPoint();
+      const other = await createUploadWithPoint(target.submissionId);
+      const service = new SubmissionFeaturePropertyGeometryService(fixture.connection);
+      for (const featureId of [0, other.featureId]) {
+        expect(
+          await service.getSubmissionUploadFeatureGeometryExtent(target.submissionId, target.uploadId, featureId)
+        ).to.eql({ bbox: null, geometry_count: 0 });
+      }
+      expect(
+        await service.getSubmissionUploadFeatureGeometryExtent(
+          target.submissionId + 1000000,
+          target.uploadId,
+          target.featureId
+        )
+      ).to.eql({ bbox: null, geometry_count: 0 });
+      await fixture.connection.sql(SQL`UPDATE submission_feature SET record_end_date = now()
+        WHERE submission_feature_id = ${target.featureId}`);
+      expect(
+        await service.getSubmissionUploadFeatureGeometryExtent(target.submissionId, target.uploadId, target.featureId)
+      ).to.eql({ bbox: null, geometry_count: 0 });
     });
   });
 
