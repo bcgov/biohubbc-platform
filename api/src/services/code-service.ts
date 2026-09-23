@@ -1,7 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { IAllCodeSets } from '../models/codes';
 import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
-import { FeatureTypeProperty } from '../models/feature-type-property';
 import { CodeRepository } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -51,18 +50,5 @@ export class CodeService extends DBService {
     defaultLog.debug({ message: 'getFeatureTypePropertyCodes' });
 
     return this.codeRepository.getFeatureTypePropertyCodes();
-  }
-
-  /**
-   * Get a feature property record by name.
-   *
-   * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureTypeProperty>}
-   * @memberof CodeService
-   */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
-    defaultLog.debug({ message: 'getFeaturePropertyByName' });
-
-    return this.codeRepository.getFeaturePropertyByName(featurePropertyName);
   }
 }

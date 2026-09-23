@@ -30,7 +30,7 @@ export class PredicateRepository extends BaseRepository {
       .returning([
         'predicate_id',
         'feature_property_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'feature_property_type_id',
         'predicate_hash',
         knex.raw('true AS inserted')
@@ -67,7 +67,7 @@ export class PredicateRepository extends BaseRepository {
       .select([
         'predicate_id',
         'feature_property_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'feature_property_type_id',
         'predicate_hash'
       ])
@@ -106,7 +106,7 @@ export class PredicateRepository extends BaseRepository {
       .select([
         'predicate_id',
         'feature_property_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'feature_property_type_id',
         'predicate_hash'
       ])
@@ -215,7 +215,7 @@ export class PredicateRepository extends BaseRepository {
       .select([
         'p.predicate_id',
         'p.feature_property_id',
-        'p.feature_type_property_id',
+        'p.blueprint_feature_type_property_id',
         knex.raw(`${this.readPayloadCountExpression} AS payload_count`),
         knex.raw(`${this.readTypedPredicateExpression} AS typed_predicate_json`)
       ])
@@ -253,7 +253,7 @@ export class PredicateRepository extends BaseRepository {
                 jsonb_build_object(
                   'type', 'predicate',
                   'feature_property_id', base.feature_property_id,
-                  'feature_type_property_id', base.feature_type_property_id,
+                  'blueprint_feature_type_property_id', base.blueprint_feature_type_property_id,
                   'operator', base.typed_predicate_json->>'operator'
                 ) || (base.typed_predicate_json - 'operator')
               ELSE NULL

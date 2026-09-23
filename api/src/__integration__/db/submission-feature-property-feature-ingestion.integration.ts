@@ -10,7 +10,7 @@
 // for the whole upload.
 //
 // Scope C — no production catalog is touched. Each test mints a SYNTHETIC `feature`-typed
-// feature_property + feature_type_property (with allowed targets in feature_type_property_feature)
+// feature_property + Blueprint assignment (with allowed targets in feature_type_property_feature)
 // and uses pre-seeded feature types for the source/target features. The chosen types (mortality,
 // observation_subcount, species_observation) carry NO required catalog properties, so the full
 // pipeline reaches the property-insert phase without unrelated MISSING_REQUIRED_PROPERTY errors
@@ -30,7 +30,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import {
-  createFeatureTypeProperty,
+  createBlueprintFeatureTypeProperty,
   createTestUpload,
   getPropertyFeatureRows as fetchPropertyFeatureRows,
   getSubmissionFeatureErrors
@@ -105,19 +105,19 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     return result.rows[0].submission_feature_id;
   }
 
-  /** A submission + upload + one feature_type_property config, plus an upload-bound feature inserter. */
+  /** A submission + upload + one Blueprint assignment, plus an upload-bound feature inserter. */
   interface FeatureScenario {
     submissionId: number;
     uploadId: string;
-    featureTypePropertyId: number;
+    blueprintFeatureTypePropertyId: number;
     propertyName: string;
     /** Insert a submission_feature into this scenario's submission + upload. */
     insertFeature: (featureTypeName: string, sourceId: string, data?: Record<string, unknown>) => Promise<number>;
   }
 
   /**
-   * Stand up the common arrange block: a submission, a real upload, and one synthetic feature_type_property
-   * config (defaulting to mortality → observation_subcount). The returned `insertFeature` is bound to the
+   * Stand up the common arrange block: a submission, a real upload, and one synthetic Blueprint assignment
+   * (defaulting to mortality → observation_subcount). The returned `insertFeature` is bound to the
    * scenario's submission + upload so tests only state the feature type, source_id, and data that vary.
    */
   async function seedFeatureScenario(config?: {
@@ -127,7 +127,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   }): Promise<FeatureScenario> {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUpload(connection, submissionId);
-    const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+    const { blueprintFeatureTypePropertyId, propertyName } = await createBlueprintFeatureTypeProperty(
       connection,
       config?.sourceFeatureTypeName ?? 'mortality',
       config?.allowedTargetFeatureTypeName === undefined ? 'observation_subcount' : config.allowedTargetFeatureTypeName,
@@ -137,7 +137,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     return {
       submissionId,
       uploadId,
-      featureTypePropertyId,
+      blueprintFeatureTypePropertyId,
       propertyName,
       insertFeature: (featureTypeName, sourceId, data = {}) =>
         insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName, sourceId, data })
@@ -152,7 +152,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   /** Persisted property-feature rows for a source feature. */
   function getPropertyFeatureRows(
     sourceFeatureId: number
-  ): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
+  ): Promise<{ referenced_submission_feature_id: number; blueprint_feature_type_property_id: number }[]> {
     return fetchPropertyFeatureRows(connection, sourceFeatureId);
   }
 
@@ -170,7 +170,8 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   // --- scenarios -----------------------------------------------------------
 
   it('1: happy path — one property-feature row, no errors', async () => {
-    const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
+    const { submissionId, uploadId, blueprintFeatureTypePropertyId, propertyName, insertFeature } =
+      await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
     const sourceFeatureId = await insertFeature('mortality', 'period-1', {
@@ -184,11 +185,12 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     const rows = await getPropertyFeatureRows(sourceFeatureId);
     expect(rows).to.have.lengthOf(1);
     expect(rows[0].referenced_submission_feature_id).to.equal(targetFeatureId);
-    expect(rows[0].feature_type_property_id).to.equal(featureTypePropertyId);
+    expect(rows[0].blueprint_feature_type_property_id).to.equal(blueprintFeatureTypePropertyId);
   });
 
   it('2: idempotent rerun — identical property-feature row set, no duplicates/orphans', async () => {
-    const { submissionId, uploadId, featureTypePropertyId, propertyName, insertFeature } = await seedFeatureScenario();
+    const { submissionId, uploadId, blueprintFeatureTypePropertyId, propertyName, insertFeature } =
+      await seedFeatureScenario();
 
     const targetFeatureId = await insertFeature('observation_subcount', 'area1');
     const sourceFeatureId = await insertFeature('mortality', 'period-1', {
@@ -204,7 +206,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     expect(firstRun).to.have.lengthOf(1);
     expect(secondRun).to.deep.equal(firstRun);
     expect(secondRun[0].referenced_submission_feature_id).to.equal(targetFeatureId);
-    expect(secondRun[0].feature_type_property_id).to.equal(featureTypePropertyId);
+    expect(secondRun[0].blueprint_feature_type_property_id).to.equal(blueprintFeatureTypePropertyId);
   });
 
   it('3: unresolved reference (feature::nope) — one UNRESOLVED_FEATURE_REFERENCE, zero property rows', async () => {
@@ -400,7 +402,11 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
   it('13: circular reference (A.prop -> B, B.prop -> A) — CIRCULAR_FEATURE_REFERENCE, zero property rows', async () => {
     // A (mortality) -> B (observation_subcount); B (observation_subcount) -> A (mortality). Both types allowed.
     const { submissionId, uploadId, propertyName: propAtoB, insertFeature } = await seedFeatureScenario();
-    const { propertyName: propBtoA } = await createFeatureTypeProperty(connection, 'observation_subcount', 'mortality');
+    const { propertyName: propBtoA } = await createBlueprintFeatureTypeProperty(
+      connection,
+      'observation_subcount',
+      'mortality'
+    );
 
     await insertFeature('mortality', 'a', { properties: { [propAtoB]: 'feature::b' } });
     await insertFeature('observation_subcount', 'b', { properties: { [propBtoA]: 'feature::a' } });

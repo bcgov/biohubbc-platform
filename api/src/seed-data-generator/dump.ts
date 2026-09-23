@@ -338,9 +338,10 @@ async function dumpScalarProperty(
   statement.append(` FROM ${table} prop `);
   statement.append(SQL`
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
-    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
-    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = prop.blueprint_feature_type_property_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+    JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
     WHERE sf.submission_id = ${submissionId};
   `);
 
@@ -369,9 +370,10 @@ async function dumpTimestampProperty(
       prop.time_value
     FROM submission_feature_property_timestamp prop
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
-    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
-    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = prop.blueprint_feature_type_property_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+    JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
     WHERE sf.submission_id = ${submissionId};
   `);
 
@@ -397,9 +399,10 @@ async function dumpGeometryProperty(
       ST_AsGeoJSON(prop.value)::json AS geojson
     FROM submission_feature_property_geometry prop
     JOIN submission_feature sf ON sf.submission_feature_id = prop.submission_feature_id
-    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
-    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = prop.blueprint_feature_type_property_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+    JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
     WHERE sf.submission_id = ${submissionId};
   `);
 
@@ -425,9 +428,10 @@ async function dumpFeatureProperty(
       referenced.uuid AS referenced_feature_uuid
     FROM submission_feature_property_feature prop
     JOIN submission_feature owner ON owner.submission_feature_id = prop.submission_feature_id
-    JOIN feature_type_property ftp ON ftp.feature_type_property_id = prop.feature_type_property_id
-    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = prop.blueprint_feature_type_property_id
+    JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+    JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
     JOIN submission_feature referenced ON referenced.submission_feature_id = prop.referenced_submission_feature_id
     WHERE owner.submission_id = ${submissionId};
   `);

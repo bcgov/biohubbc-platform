@@ -59,7 +59,8 @@ GET.apiDoc = {
                       items: {
                         type: 'object',
                         required: [
-                          'feature_type_property_id',
+                          'blueprint_feature_type_property_id',
+                          'feature_property_id',
                           'name',
                           'display_name',
                           'type_name',
@@ -68,9 +69,14 @@ GET.apiDoc = {
                           'allow_multiple'
                         ],
                         properties: {
-                          feature_type_property_id: {
+                          blueprint_feature_type_property_id: {
                             type: 'integer',
-                            description: 'The feature type property id.',
+                            description: 'The Blueprint assignment configuring this property for the feature type.',
+                            minimum: 1
+                          },
+                          feature_property_id: {
+                            type: 'integer',
+                            description: 'The feature property id.',
                             minimum: 1
                           },
                           name: {

@@ -29,7 +29,7 @@ describe('codeService', () => {
           },
           properties: [
             {
-              feature_type_property_id: 1,
+              blueprint_feature_type_property_id: 1,
               name: 'name',
               display_name: 'Name',
               description: 'Name',
@@ -102,7 +102,7 @@ describe('codeService', () => {
           },
           properties: [
             {
-              feature_type_property_id: 1,
+              blueprint_feature_type_property_id: 1,
               name: 'name',
               display_name: 'Name',
               description: 'Name',
@@ -112,7 +112,7 @@ describe('codeService', () => {
               allow_multiple: false
             },
             {
-              feature_type_property_id: 2,
+              blueprint_feature_type_property_id: 2,
               name: 'age',
               display_name: 'Age',
               description: 'Age',
@@ -132,7 +132,7 @@ describe('codeService', () => {
           },
           properties: [
             {
-              feature_type_property_id: 3,
+              blueprint_feature_type_property_id: 3,
               name: 'filename',
               display_name: 'Filename',
               description: 'Filename',

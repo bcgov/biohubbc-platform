@@ -2,7 +2,7 @@ import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-type-property';
+import { FeatureTypeProperty } from '../models/feature-property';
 import {
   SearchFeatureFilters,
   SearchFeaturePage,

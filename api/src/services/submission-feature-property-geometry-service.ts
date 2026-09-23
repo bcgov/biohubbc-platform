@@ -127,19 +127,4 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
       geometry_count: extent.geometry_count
     };
   }
-
-  /**
-   * Get every stored spatial property value recorded against one feature type property.
-   *
-   * @param {number} featureTypePropertyId
-   * @return {*}  {Promise<SubmissionFeaturePropertyGeometry[]>}
-   * @memberof SubmissionFeaturePropertyGeometryService
-   */
-  getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(
-    featureTypePropertyId: number
-  ): Promise<SubmissionFeaturePropertyGeometry[]> {
-    return this.submissionFeaturePropertyGeometryRepository.getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(
-      featureTypePropertyId
-    );
-  }
 }

@@ -17,8 +17,8 @@ import { SubmissionFeaturePropertyRepository } from '../../repositories/submissi
 import {
   addCodeProperty,
   addTaxonProperty,
+  createBlueprintFeatureTypeProperty,
   createCodesetCode,
-  createFeatureTypeProperty,
   createTaxon,
   insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
@@ -85,7 +85,7 @@ describe('Indexed property value read paths (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
       const taxonId = await createTaxon(connection, `Canis ${TOKEN}`, 'Gray Wolf', null, null, 'Species');
-      await addTaxonProperty(connection, featureId, featureTypeName, propertyName, taxonId);
+      await addTaxonProperty(connection, featureId, propertyName, taxonId);
 
       const expected = { taxon_id: taxonId, tsn: await getTaxonTsn(taxonId), rank: 'Species', label: `Canis ${TOKEN}` };
 
@@ -103,7 +103,7 @@ describe('Indexed property value read paths (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
       const taxonId = await createTaxon(connection, `Ursus ${TOKEN}`, 'Black Bear');
-      await addTaxonProperty(connection, featureId, featureTypeName, propertyName, taxonId);
+      await addTaxonProperty(connection, featureId, propertyName, taxonId);
 
       const rows = await propertyRepository.getSubmissionFeatureProperties(featureId, { page: 1, limit: 25 });
       const taxonRow = rows.find((row) => row.id.startsWith('taxon:'));
@@ -115,7 +115,7 @@ describe('Indexed property value read paths (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
       const taxonId = await createTaxon(connection, `Alces ${TOKEN}`, 'Moose', null, null, 'Species');
-      await addTaxonProperty(connection, featureId, featureTypeName, propertyName, taxonId);
+      await addTaxonProperty(connection, featureId, propertyName, taxonId);
 
       const byLabel = await propertyRepository.getSubmissionFeatureProperties(
         featureId,
@@ -137,7 +137,7 @@ describe('Indexed property value read paths (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
       const taxonId = await createTaxon(connection, `Vulpes ${TOKEN}`, 'Red Fox', null, null, 'Species');
-      await addTaxonProperty(connection, featureId, featureTypeName, propertyName, taxonId);
+      await addTaxonProperty(connection, featureId, propertyName, taxonId);
       await connection.sql(SQL`
         UPDATE taxon SET record_end_date = now() - interval '1 day' WHERE taxon_id = ${taxonId};
       `);
@@ -154,8 +154,8 @@ describe('Indexed property value read paths (integration)', function () {
       const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
       const lateTaxonId = await createTaxon(connection, `Zapus ${TOKEN}`, 'Jumping Mouse');
       const earlyTaxonId = await createTaxon(connection, `Alces ${TOKEN}`, 'Moose');
-      await addTaxonProperty(connection, featureId, featureTypeName, propertyName, lateTaxonId);
-      await addTaxonProperty(connection, featureId, featureTypeName, propertyName, earlyTaxonId);
+      await addTaxonProperty(connection, featureId, propertyName, lateTaxonId);
+      await addTaxonProperty(connection, featureId, propertyName, earlyTaxonId);
 
       const ascending = await propertyRepository.getSubmissionFeatureProperties(featureId, {
         page: 1,
@@ -182,7 +182,7 @@ describe('Indexed property value read paths (integration)', function () {
         key: `site_select_strategies_${TOKEN}`,
         label: 'Site Selection Strategies'
       });
-      await addCodeProperty(connection, featureId, featureTypeName, propertyName, codeId);
+      await addCodeProperty(connection, featureId, propertyName, codeId);
 
       const expected = {
         codeset_key: `site_select_strategies_${TOKEN}`,
@@ -208,7 +208,7 @@ describe('Indexed property value read paths (integration)', function () {
       const codeId = await createCodesetCode(connection, 'stratified', `Stratified ${TOKEN}`, null, {
         key: `strategies_ended_${TOKEN}`
       });
-      await addCodeProperty(connection, featureId, featureTypeName, propertyName, codeId);
+      await addCodeProperty(connection, featureId, propertyName, codeId);
       await connection.sql(SQL`
         UPDATE contributor_codeset_code SET record_end_date = now() - interval '1 day'
         WHERE contributor_codeset_code_id = ${codeId};
@@ -227,7 +227,7 @@ describe('Indexed property value read paths (integration)', function () {
       const codeId = await createCodesetCode(connection, 'systematic', `Systematic ${TOKEN}`, null, {
         key: `strategies_${TOKEN}`
       });
-      await addCodeProperty(connection, featureId, featureTypeName, propertyName, codeId);
+      await addCodeProperty(connection, featureId, propertyName, codeId);
 
       const byLabel = await propertyRepository.getSubmissionFeatureProperties(
         featureId,
@@ -251,14 +251,14 @@ describe('Indexed property value read paths (integration)', function () {
 
     it('returns the same structured feature reference value from the search row and the properties list', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { featureTypePropertyId, propertyName } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId, propertyName } = await createBlueprintFeatureTypeProperty(
         connection,
         sourceFeatureTypeName,
         targetFeatureTypeName
       );
       const targetId = await createTestFeature(connection, submissionId, targetFeatureTypeName, {});
       const sourceId = await createTestFeature(connection, submissionId, sourceFeatureTypeName, {});
-      await insertSubmissionFeaturePropertyFeature(connection, sourceId, featureTypePropertyId, targetId);
+      await insertSubmissionFeaturePropertyFeature(connection, sourceId, blueprintFeatureTypePropertyId, targetId);
 
       const urn = `urn:${submissionId}:${targetFeatureTypeName}:${targetId}`;
       const expected = { urn, label: urn };
@@ -275,14 +275,14 @@ describe('Indexed property value read paths (integration)', function () {
 
     it('omits references to features that are no longer active', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { featureTypePropertyId } = await createFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId } = await createBlueprintFeatureTypeProperty(
         connection,
         sourceFeatureTypeName,
         targetFeatureTypeName
       );
       const targetId = await createTestFeature(connection, submissionId, targetFeatureTypeName, {});
       const sourceId = await createTestFeature(connection, submissionId, sourceFeatureTypeName, {});
-      await insertSubmissionFeaturePropertyFeature(connection, sourceId, featureTypePropertyId, targetId);
+      await insertSubmissionFeaturePropertyFeature(connection, sourceId, blueprintFeatureTypePropertyId, targetId);
       await connection.sql(SQL`
         UPDATE submission_feature SET record_end_date = now() - interval '1 day' WHERE submission_feature_id = ${targetId};
       `);

@@ -138,8 +138,9 @@ export async function seed(knex: Knex): Promise<void> {
     -- evidence-then-projection semantics (expression-evaluation.ts) as a static EXISTS:
     --
     -- * evidence rows come from the typed property table matching the predicate payload, joined
-    --   through a live feature_type_property on the predicate's shared feature_property_id, with an
-    --   optional feature_type_property narrowing;
+    --   through each value's Blueprint assignment on the predicate's shared feature_property_id, at any
+    --   lifecycle so values stored under a superseded Blueprint stay searchable, with an optional
+    --   narrowing to one assignment;
     -- * same-type evidence must BE the anchor row; different-type evidence may connect to the anchor
     --   through submission_feature_closure in either direction (feature type ids stand in for the
     --   type-name comparison the TypeScript builder makes — live type names are unique);
@@ -168,7 +169,7 @@ export async function seed(knex: Knex): Promise<void> {
       -- A missing or end-dated predicate fails closed: the candidate does not match.
       SELECT
         p.feature_property_id                       AS fp_id,
-        p.feature_type_property_id                  AS ftp_id,
+        p.blueprint_feature_type_property_id        AS bftp_id,
         ps.predicate_string_id                      AS string_id,
         ps.value                                    AS string_value,
         ps.operator::text                           AS string_op,
@@ -214,10 +215,9 @@ export async function seed(knex: Knex): Promise<void> {
             FROM biohub.submission_feature_property_string pv
             JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
             JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-            JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-            WHERE ftp.feature_property_id = v_p.fp_id
-              AND ftp.record_end_date IS NULL
-              AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+            JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+            WHERE bftp.feature_property_id = v_p.fp_id
+              AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
               AND esf.record_effective_date <= now()
               AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
@@ -243,14 +243,13 @@ export async function seed(knex: Knex): Promise<void> {
                 FROM biohub.submission_feature_property_string pne
                 WHERE pne.submission_feature_id = pv.submission_feature_id
                   AND (
-                    (v_p.ftp_id IS NOT NULL AND pne.feature_type_property_id = v_p.ftp_id)
+                    (v_p.bftp_id IS NOT NULL AND pne.blueprint_feature_type_property_id = v_p.bftp_id)
                     OR (
-                      v_p.ftp_id IS NULL
+                      v_p.bftp_id IS NULL
                       AND EXISTS (
-                        SELECT 1 FROM biohub.feature_type_property ftp_ne
-                        WHERE ftp_ne.feature_type_property_id = pne.feature_type_property_id
-                          AND ftp_ne.feature_property_id = v_p.fp_id
-                          AND ftp_ne.record_end_date IS NULL
+                        SELECT 1 FROM biohub.blueprint_feature_type_property bftp_ne
+                        WHERE bftp_ne.blueprint_feature_type_property_id = pne.blueprint_feature_type_property_id
+                          AND bftp_ne.feature_property_id = v_p.fp_id
                       )
                     )
                   )
@@ -265,10 +264,9 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_string pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
@@ -308,10 +306,9 @@ export async function seed(knex: Knex): Promise<void> {
             FROM biohub.submission_feature_property_number pv
             JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
             JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-            JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-            WHERE ftp.feature_property_id = v_p.fp_id
-              AND ftp.record_end_date IS NULL
-              AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+            JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+            WHERE bftp.feature_property_id = v_p.fp_id
+              AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
               AND esf.record_effective_date <= now()
               AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
@@ -337,14 +334,13 @@ export async function seed(knex: Knex): Promise<void> {
                 FROM biohub.submission_feature_property_number pne
                 WHERE pne.submission_feature_id = pv.submission_feature_id
                   AND (
-                    (v_p.ftp_id IS NOT NULL AND pne.feature_type_property_id = v_p.ftp_id)
+                    (v_p.bftp_id IS NOT NULL AND pne.blueprint_feature_type_property_id = v_p.bftp_id)
                     OR (
-                      v_p.ftp_id IS NULL
+                      v_p.bftp_id IS NULL
                       AND EXISTS (
-                        SELECT 1 FROM biohub.feature_type_property ftp_ne
-                        WHERE ftp_ne.feature_type_property_id = pne.feature_type_property_id
-                          AND ftp_ne.feature_property_id = v_p.fp_id
-                          AND ftp_ne.record_end_date IS NULL
+                        SELECT 1 FROM biohub.blueprint_feature_type_property bftp_ne
+                        WHERE bftp_ne.blueprint_feature_type_property_id = pne.blueprint_feature_type_property_id
+                          AND bftp_ne.feature_property_id = v_p.fp_id
                       )
                     )
                   )
@@ -359,10 +355,9 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_number pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
@@ -401,10 +396,9 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_boolean pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
@@ -439,10 +433,9 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_timestamp pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
@@ -500,11 +493,10 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_taxon pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           JOIN biohub.taxon tx ON tx.taxon_id = pv.taxon_id AND tx.record_end_date IS NULL
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
@@ -591,10 +583,9 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_geometry pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
@@ -632,14 +623,13 @@ export async function seed(knex: Knex): Promise<void> {
             FROM biohub.submission_feature_property_code pv
             JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
             JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-            JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
+            JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             JOIN biohub.contributor_codeset_code csc ON csc.contributor_codeset_code_id = pv.contributor_codeset_code_id
               AND csc.record_end_date IS NULL
             JOIN biohub.contributor_codeset cs ON cs.contributor_codeset_id = csc.contributor_codeset_id
               AND cs.record_end_date IS NULL
-            WHERE ftp.feature_property_id = v_p.fp_id
-              AND ftp.record_end_date IS NULL
-              AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+            WHERE bftp.feature_property_id = v_p.fp_id
+              AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
               AND esf.record_effective_date <= now()
               AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
@@ -665,14 +655,13 @@ export async function seed(knex: Knex): Promise<void> {
                 FROM biohub.submission_feature_property_code pne
                 WHERE pne.submission_feature_id = pv.submission_feature_id
                   AND (
-                    (v_p.ftp_id IS NOT NULL AND pne.feature_type_property_id = v_p.ftp_id)
+                    (v_p.bftp_id IS NOT NULL AND pne.blueprint_feature_type_property_id = v_p.bftp_id)
                     OR (
-                      v_p.ftp_id IS NULL
+                      v_p.bftp_id IS NULL
                       AND EXISTS (
-                        SELECT 1 FROM biohub.feature_type_property ftp_ne
-                        WHERE ftp_ne.feature_type_property_id = pne.feature_type_property_id
-                          AND ftp_ne.feature_property_id = v_p.fp_id
-                          AND ftp_ne.record_end_date IS NULL
+                        SELECT 1 FROM biohub.blueprint_feature_type_property bftp_ne
+                        WHERE bftp_ne.blueprint_feature_type_property_id = pne.blueprint_feature_type_property_id
+                          AND bftp_ne.feature_property_id = v_p.fp_id
                       )
                     )
                   )
@@ -687,14 +676,13 @@ export async function seed(knex: Knex): Promise<void> {
           FROM biohub.submission_feature_property_code pv
           JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
           JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
-          JOIN biohub.feature_type_property ftp ON ftp.feature_type_property_id = pv.feature_type_property_id
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           JOIN biohub.contributor_codeset_code csc ON csc.contributor_codeset_code_id = pv.contributor_codeset_code_id
             AND csc.record_end_date IS NULL
           JOIN biohub.contributor_codeset cs ON cs.contributor_codeset_id = csc.contributor_codeset_id
             AND cs.record_end_date IS NULL
-          WHERE ftp.feature_property_id = v_p.fp_id
-            AND ftp.record_end_date IS NULL
-            AND (v_p.ftp_id IS NULL OR pv.feature_type_property_id = v_p.ftp_id)
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
             AND esf.record_effective_date <= now()
             AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (

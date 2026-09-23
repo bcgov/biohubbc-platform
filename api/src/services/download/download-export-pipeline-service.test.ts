@@ -285,7 +285,7 @@ describe('DownloadExportPipelineService', () => {
         },
         properties: [
           {
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             name: 'species',
             display_name: 'Species',
             description: 'Species',
@@ -1220,7 +1220,7 @@ describe('DownloadExportPipelineService', () => {
         },
         properties: [
           {
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             name: 'species',
             display_name: 'Species',
             description: 'Species',

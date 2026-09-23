@@ -6,7 +6,7 @@ import { hasCompatiblePredicates } from '../utils/expression-optimization';
 import {
   applyEvidenceFilters,
   applyPropertyReferenceLifecycleFilters,
-  buildPredicateFeatureTypePropertyIdsQuery,
+  buildPredicateAssignmentIdsQuery,
   getEvidencePredicates,
   getPredicateTableConfig,
   getScalarPredicateValues,
@@ -154,10 +154,8 @@ function buildSubmissionUploadAndEqualityExpression(expression: NormalizedExpres
       .select({ matched_value: valueColumn })
       .whereRaw('p.submission_feature_id = anchor_sf.submission_feature_id')
       .whereIn(
-        'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-          'ftp.feature_type_id = anchor_sf.feature_type_id'
-        )
+        'p.blueprint_feature_type_property_id',
+        buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id = anchor_sf.feature_type_id')
       )
       .whereIn(valueColumn, values),
     property.internal_predicate
@@ -182,10 +180,8 @@ function buildSubmissionUploadAndEqualityExpression(expression: NormalizedExpres
         .join(`${tableName} as p`, 'p.submission_feature_id', `${relationshipAlias}.${evidenceColumn}`)
         .whereRaw(`${relationshipAlias}.${anchorColumn} = anchor_sf.submission_feature_id`)
         .whereIn(
-          'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-            'ftp.feature_type_id <> anchor_sf.feature_type_id'
-          )
+          'p.blueprint_feature_type_property_id',
+          buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id <> anchor_sf.feature_type_id')
         )
         .whereIn(valueColumn, values),
       property.internal_predicate
@@ -237,10 +233,8 @@ function buildSubmissionUploadEvidenceExpression(evidence: NormalizedExpressionT
       .select(knex.raw('true'))
       .whereRaw('p.submission_feature_id = anchor_sf.submission_feature_id')
       .whereIn(
-        'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-          'ftp.feature_type_id = anchor_sf.feature_type_id'
-        )
+        'p.blueprint_feature_type_property_id',
+        buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id = anchor_sf.feature_type_id')
       ),
     predicates,
     knex,
@@ -265,10 +259,8 @@ function buildSubmissionUploadEvidenceExpression(evidence: NormalizedExpressionT
         .join(`${tableName} as p`, 'p.submission_feature_id', `${relationshipAlias}.${evidenceColumn}`)
         .whereRaw(`${relationshipAlias}.${anchorColumn} = anchor_sf.submission_feature_id`)
         .whereIn(
-          'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-            'ftp.feature_type_id <> anchor_sf.feature_type_id'
-          )
+          'p.blueprint_feature_type_property_id',
+          buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id <> anchor_sf.feature_type_id')
         ),
       predicates,
       knex,

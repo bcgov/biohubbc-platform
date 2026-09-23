@@ -6,7 +6,7 @@ import { hasCompatiblePredicates } from '../utils/expression-optimization';
 import {
   applyEvidenceFilters,
   applyPropertyReferenceLifecycleFilters,
-  buildPredicateFeatureTypePropertyIdsQuery,
+  buildPredicateAssignmentIdsQuery,
   getEvidencePredicates,
   getPredicateTableConfig,
   getScalarPredicateValues,
@@ -322,8 +322,8 @@ function buildPredicateAnchorIdsQuery(
         .select(knex.raw('1'))
         .whereRaw(`p.submission_feature_id = ${anchorId}`)
         .where(
-          'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(property, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
+          'p.blueprint_feature_type_property_id',
+          buildPredicateAssignmentIdsQuery(property, knex).where('bft.feature_type_id', anchorFeatureTypeId())
         ),
       predicates,
       knex,
@@ -344,8 +344,8 @@ function buildPredicateAnchorIdsQuery(
         '(count_direct_self.source_submission_feature_id = count_direct_self.target_submission_feature_id) IS TRUE'
       )
       .where(
-        'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
+        'p.blueprint_feature_type_property_id',
+        buildPredicateAssignmentIdsQuery(property, knex).where('bft.feature_type_id', anchorFeatureTypeId())
       )
       .orderBy('p.submission_feature_id'),
     predicates,
@@ -362,16 +362,16 @@ function buildPredicateAnchorIdsQuery(
     const relatedPropertyRows = applyEvidenceFilters(
       knex(`${tableName} as p`)
         .select('p.submission_feature_id')
-        .whereRaw('p.feature_type_property_id = count_related_ftp.feature_type_property_id'),
+        .whereRaw('p.blueprint_feature_type_property_id = count_related_bftp.blueprint_feature_type_property_id'),
       predicates,
       knex,
       operator
     ).offset(knex.raw('0') as unknown as number);
     const relatedEvidence = knex
       .from(
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex)
-          .whereNot('ftp.feature_type_id', anchorFeatureTypeId())
-          .as('count_related_ftp')
+        buildPredicateAssignmentIdsQuery(property, knex)
+          .whereNot('bft.feature_type_id', anchorFeatureTypeId())
+          .as('count_related_bftp')
       )
       .select('count_property_match.submission_feature_id')
       .joinRaw('JOIN LATERAL (?) AS count_property_match ON true', [relatedPropertyRows])
@@ -466,8 +466,8 @@ function buildAndEqualityAnchorIdsQuery(
         );
       })
       .whereIn(
-        'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex).where('ftp.feature_type_id', anchorFeatureTypeId())
+        'p.blueprint_feature_type_property_id',
+        buildPredicateAssignmentIdsQuery(property, knex).where('bft.feature_type_id', anchorFeatureTypeId())
       )
       .whereIn(valueColumn, values),
     property.internal_predicate
@@ -501,11 +501,8 @@ function buildAndEqualityAnchorIdsQuery(
         )
         .where('grouped_anchor.feature_type_id', anchorFeatureTypeId())
         .whereIn(
-          'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereNot(
-            'ftp.feature_type_id',
-            anchorFeatureTypeId()
-          )
+          'p.blueprint_feature_type_property_id',
+          buildPredicateAssignmentIdsQuery(property, knex).whereNot('bft.feature_type_id', anchorFeatureTypeId())
         )
         .whereIn(valueColumn, values)
         .whereExists(
@@ -723,7 +720,7 @@ function buildEvidenceAvailability(evidence: NormalizedExpressionTreeClause, kne
     const values = getScalarPredicateValues(predicates);
     const query = knex(`${tableName} as p`)
       .select(knex.raw('true'))
-      .whereIn('p.feature_type_property_id', buildPredicateFeatureTypePropertyIdsQuery(property, knex))
+      .whereIn('p.blueprint_feature_type_property_id', buildPredicateAssignmentIdsQuery(property, knex))
       .whereIn(valueColumn, values)
       .whereRaw(
         `(
@@ -743,7 +740,7 @@ function buildEvidenceAvailability(evidence: NormalizedExpressionTreeClause, kne
   const query = applyEvidenceFilters(
     knex(`${tableName} as p`)
       .select(knex.raw('true'))
-      .whereIn('p.feature_type_property_id', buildPredicateFeatureTypePropertyIdsQuery(property, knex))
+      .whereIn('p.blueprint_feature_type_property_id', buildPredicateAssignmentIdsQuery(property, knex))
       .whereRaw(
         `(
           SELECT true
@@ -841,10 +838,8 @@ function buildPublishedAndEqualityExpression(
       .select({ matched_value: valueColumn })
       .whereRaw('p.submission_feature_id = anchor_sf.submission_feature_id')
       .whereIn(
-        'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-          'ftp.feature_type_id = anchor_sf.feature_type_id'
-        )
+        'p.blueprint_feature_type_property_id',
+        buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id = anchor_sf.feature_type_id')
       )
       .whereIn(valueColumn, values),
     property.internal_predicate
@@ -869,10 +864,8 @@ function buildPublishedAndEqualityExpression(
         .join(`${tableName} as p`, 'p.submission_feature_id', `${closureAlias}.${evidenceColumn}`)
         .whereRaw(`${closureAlias}.${anchorColumn} = anchor_sf.submission_feature_id`)
         .whereIn(
-          'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-            'ftp.feature_type_id <> anchor_sf.feature_type_id'
-          )
+          'p.blueprint_feature_type_property_id',
+          buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id <> anchor_sf.feature_type_id')
         )
         .whereIn(valueColumn, values)
         .whereExists(
@@ -941,10 +934,8 @@ function buildPublishedEvidenceExpression(
       .select(knex.raw('true'))
       .whereRaw('p.submission_feature_id = anchor_sf.submission_feature_id')
       .whereIn(
-        'p.feature_type_property_id',
-        buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-          'ftp.feature_type_id = anchor_sf.feature_type_id'
-        )
+        'p.blueprint_feature_type_property_id',
+        buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id = anchor_sf.feature_type_id')
       ),
     predicates,
     knex,
@@ -969,10 +960,8 @@ function buildPublishedEvidenceExpression(
         .join(`${tableName} as p`, 'p.submission_feature_id', `${closureAlias}.${evidenceColumn}`)
         .whereRaw(`${closureAlias}.${anchorColumn} = anchor_sf.submission_feature_id`)
         .whereIn(
-          'p.feature_type_property_id',
-          buildPredicateFeatureTypePropertyIdsQuery(property, knex).whereRaw(
-            'ftp.feature_type_id <> anchor_sf.feature_type_id'
-          )
+          'p.blueprint_feature_type_property_id',
+          buildPredicateAssignmentIdsQuery(property, knex).whereRaw('bft.feature_type_id <> anchor_sf.feature_type_id')
         )
         .whereExists(
           knex('submission_feature_closure as evidence_self')

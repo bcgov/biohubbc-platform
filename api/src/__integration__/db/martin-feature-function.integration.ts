@@ -20,7 +20,7 @@ import {
   addTestGeometry,
   buildWktGeometries,
   decodeGeometriesLayer,
-  findSpatialPropertyId,
+  findSpatialAssignmentId,
   renderTile,
   TILE_TEST_POINT,
   tileBounds4326,
@@ -40,7 +40,7 @@ describe('Martin feature function (integration)', function () {
 
   /** Attach a geometry (as WKT) to a feature, returning the new row's id. */
   const addGeometry = (featureId: number, wkt: string, propertyId?: number) =>
-    addTestGeometry(fixture.connection, featureId, propertyId ?? fixture.geometryPropertyId, wkt);
+    addTestGeometry(fixture.connection, featureId, propertyId ?? fixture.geometryAssignmentId, wkt);
 
   /**
    * Create a feature carrying a point geometry at the test location.
@@ -181,10 +181,10 @@ describe('Martin feature function (integration)', function () {
     });
 
     it('encodes values from more than one spatial property', async () => {
-      const otherPropertyId = await findSpatialPropertyId(
+      const otherPropertyId = await findSpatialAssignmentId(
         fixture.connection,
         fixture.featureTypeId,
-        fixture.geometryPropertyId
+        fixture.geometryAssignmentId
       );
 
       if (otherPropertyId === null) {
@@ -198,7 +198,7 @@ describe('Martin feature function (integration)', function () {
 
       const geometries = await decodeGeometries(contextFor(submissionId, featureId));
 
-      const propertyIds = new Set(geometries.map((geometry) => geometry.properties.feature_type_property_id));
+      const propertyIds = new Set(geometries.map((geometry) => geometry.properties.blueprint_feature_type_property_id));
       expect(propertyIds.size).to.equal(2);
     });
 
@@ -208,7 +208,7 @@ describe('Martin feature function (integration)', function () {
       const [geometry] = await decodeGeometries(contextFor(submissionId, featureId));
 
       expect(geometry.properties.submission_feature_property_geometry_id).to.equal(geometryId);
-      expect(geometry.properties.feature_type_property_id).to.equal(fixture.geometryPropertyId);
+      expect(geometry.properties.blueprint_feature_type_property_id).to.equal(fixture.geometryAssignmentId);
       expect(geometry.properties.property_display_name).to.be.a('string').and.not.empty;
       expect(geometry.properties.property_name).to.be.a('string').and.not.empty;
       // The MVT feature id keys each geometry, so fragments split across tiles share an identity.
@@ -223,9 +223,9 @@ describe('Martin feature function (integration)', function () {
       const expected = await fixture.connection.sql(
         SQL`
           SELECT fp.display_name
-          FROM feature_type_property ftp
-          JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
-          WHERE ftp.feature_type_property_id = ${fixture.geometryPropertyId};
+          FROM blueprint_feature_type_property bftp
+          JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
+          WHERE bftp.blueprint_feature_type_property_id = ${fixture.geometryAssignmentId};
         `,
         z.object({ display_name: z.string() })
       );

@@ -145,7 +145,7 @@ describe('ExpressionTreeService', () => {
         .resolves({
           predicate_id: 'pred-1',
           feature_property_id: 10,
-          feature_type_property_id: 1,
+          blueprint_feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1',
           inserted: true
@@ -154,7 +154,7 @@ describe('ExpressionTreeService', () => {
         .resolves({
           predicate_id: 'pred-2',
           feature_property_id: 20,
-          feature_type_property_id: 2,
+          blueprint_feature_type_property_id: 2,
           feature_property_type_id: 2,
           predicate_hash: 'p2',
           inserted: true
@@ -175,7 +175,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Equals',
             value: 'elk'
           },
@@ -186,7 +186,7 @@ describe('ExpressionTreeService', () => {
               {
                 type: 'predicate',
                 feature_property_id: 20,
-                feature_type_property_id: 2,
+                blueprint_feature_type_property_id: 2,
                 operator: 'GreaterThan',
                 value: 3
               }
@@ -226,7 +226,7 @@ describe('ExpressionTreeService', () => {
       const insertPredicateAnchorStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
         predicate_id: 'pred-1',
         feature_property_id: 10,
-        feature_type_property_id: 1,
+        blueprint_feature_type_property_id: 1,
         feature_property_type_id: 1,
         predicate_hash: 'p1',
         inserted: false
@@ -243,7 +243,7 @@ describe('ExpressionTreeService', () => {
             {
               predicate_id: 'pred-1',
               feature_property_id: 10,
-              feature_type_property_id: 1,
+              blueprint_feature_type_property_id: 1,
               feature_property_type_id: 1,
               predicate_hash: predicateHash
             }
@@ -268,7 +268,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Equals',
             value: 'elk'
           }
@@ -282,13 +282,13 @@ describe('ExpressionTreeService', () => {
       expect(insertExpressionClausesStub.notCalled).to.equal(true);
     });
 
-    it('persists predicates with nullable feature_type_property_id', async () => {
+    it('persists predicates with nullable blueprint_feature_type_property_id', async () => {
       const service = new ExpressionTreeService(getMockDBConnection());
 
       const insertPredicateStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
         predicate_id: 'pred-1',
         feature_property_id: 10,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         feature_property_type_id: 1,
         predicate_hash: 'p1',
         inserted: true
@@ -311,7 +311,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Equals',
             value: 'elk'
           }
@@ -320,7 +320,7 @@ describe('ExpressionTreeService', () => {
 
       expect(insertPredicateStub.firstCall.args[0]).to.include({
         feature_property_id: 10,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         feature_property_type_id: 1
       });
     });
@@ -334,7 +334,7 @@ describe('ExpressionTreeService', () => {
         .resolves({
           predicate_id: 'pred-1',
           feature_property_id: 10,
-          feature_type_property_id: 1,
+          blueprint_feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1',
           inserted: true
@@ -343,7 +343,7 @@ describe('ExpressionTreeService', () => {
         .resolves({
           predicate_id: 'pred-2',
           feature_property_id: 10,
-          feature_type_property_id: 1,
+          blueprint_feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p2',
           inserted: true
@@ -367,14 +367,14 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'ILike',
             value: 'Wolf'
           },
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'ILike',
             value: 'wOLF'
           }
@@ -390,7 +390,7 @@ describe('ExpressionTreeService', () => {
       const insertPredicateStub = sinon.stub(PredicateRepository.prototype, 'insertPredicateAnchor').resolves({
         predicate_id: 'pred-1',
         feature_property_id: 10,
-        feature_type_property_id: 1,
+        blueprint_feature_type_property_id: 1,
         feature_property_type_id: 1,
         predicate_hash: 'pred-hash-1',
         inserted: true
@@ -429,7 +429,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate' as const,
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Equals' as const,
             value: 'elk'
           }
@@ -479,7 +479,7 @@ describe('ExpressionTreeService', () => {
         .callsFake(async (payload) => ({
           predicate_id: `pred-${insertPredicateStub.callCount}`,
           feature_property_id: payload.feature_property_id,
-          feature_type_property_id: payload.feature_type_property_id,
+          blueprint_feature_type_property_id: payload.blueprint_feature_type_property_id,
           feature_property_type_id: payload.feature_property_type_id,
           predicate_hash: payload.predicate_hash,
           inserted: true
@@ -503,42 +503,42 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'After',
             value: '2024-01-01'
           },
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'After',
             value: '2024-01-01'
           },
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'After',
             value: '14:30:00-07:00'
           },
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'After',
             value: '14:30:00-07:00'
           },
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'After',
             value: '2024-01-01T14:30:00-07:00'
           },
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'After',
             value: '2024-01-01T14:30:00-07:00'
           }
@@ -574,7 +574,7 @@ describe('ExpressionTreeService', () => {
         .resolves({
           predicate_id: 'pred-1',
           feature_property_id: 10,
-          feature_type_property_id: 1,
+          blueprint_feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p1',
           inserted: true
@@ -583,7 +583,7 @@ describe('ExpressionTreeService', () => {
         .resolves({
           predicate_id: 'pred-2',
           feature_property_id: 10,
-          feature_type_property_id: 1,
+          blueprint_feature_type_property_id: 1,
           feature_property_type_id: 1,
           predicate_hash: 'p2',
           inserted: true
@@ -601,7 +601,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Equals',
             value: 'elk'
           }
@@ -615,7 +615,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 10,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Equals',
             value: 'wolf'
           }
@@ -679,7 +679,7 @@ describe('ExpressionTreeService', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 70,
-            feature_type_property_id: 7,
+            blueprint_feature_type_property_id: 7,
             operator: 'GreaterThan',
             value: 5
           }
@@ -690,7 +690,7 @@ describe('ExpressionTreeService', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 80,
-            feature_type_property_id: 8,
+            blueprint_feature_type_property_id: 8,
             operator: 'Equals',
             value: true
           }
@@ -712,7 +712,7 @@ describe('ExpressionTreeService', () => {
           {
             type: 'predicate',
             feature_property_id: 70,
-            feature_type_property_id: 7,
+            blueprint_feature_type_property_id: 7,
             operator: 'GreaterThan',
             value: 5
           },
@@ -723,7 +723,7 @@ describe('ExpressionTreeService', () => {
               {
                 type: 'predicate',
                 feature_property_id: 80,
-                feature_type_property_id: 8,
+                blueprint_feature_type_property_id: 8,
                 operator: 'Equals',
                 value: true
               }

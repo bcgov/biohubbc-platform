@@ -59,7 +59,7 @@ vi.mock('./header/SearchResultSearch', () => ({
               {
                 type: 'predicate',
                 feature_property_id: 10,
-                feature_type_property_id: null,
+                blueprint_feature_type_property_id: null,
                 operator: 'ILike',
                 value: 'salmon'
               }

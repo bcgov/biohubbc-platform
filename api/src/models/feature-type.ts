@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FeatureTypeProperty } from './feature-type-property';
+import { FeatureTypeProperty } from './feature-property';
 
 /**
  * Schema for feature type basic info.

@@ -1,7 +1,5 @@
 import SQL from 'sql-template-strings';
-import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
-import { FeatureTypeProperty } from '../models/feature-type-property';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -37,13 +35,19 @@ export class CodeRepository extends BaseRepository {
   }
 
   /**
-   * Get all feature type property codes for all feature types.
+   * Get every active feature type with the properties the active default Blueprint assigns to it.
    *
    * @returns {Promise<FeatureTypeWithProperties[]>} Active feature types with property metadata.
    * @memberof CodeRepository
    */
   async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithProperties[]> {
     const sql = SQL`
+      WITH default_blueprint AS (
+        SELECT blueprint_id
+        FROM blueprint
+        WHERE is_default = true
+          AND record_end_date IS NULL
+      )
       SELECT
         JSON_BUILD_OBJECT(
           'feature_type_id', ft.feature_type_id,
@@ -54,26 +58,31 @@ export class CodeRepository extends BaseRepository {
         COALESCE(
           JSON_AGG(
             JSON_BUILD_OBJECT(
-              'feature_type_property_id', ftp.feature_type_property_id,
+              'blueprint_feature_type_property_id', bftp.blueprint_feature_type_property_id,
+              'feature_property_id', fp.feature_property_id,
               'name', fp.name,
               'display_name', fp.display_name,
               'description', fp.description,
               'type_name', fpt.name,
-              'required_value', ftp.required_value,
+              'required_value', bftp.required_value,
               'calculated_value', fp.calculated_value,
-              'allow_multiple', ftp.allow_multiple
+              'allow_multiple', bftp.allow_multiple
             )
-            ORDER BY ftp.sort
-          ) FILTER (WHERE ftp.feature_type_property_id IS NOT NULL),
+            ORDER BY bftp.sort
+          ) FILTER (WHERE bftp.blueprint_feature_type_property_id IS NOT NULL),
           '[]'
         ) AS properties
       FROM
         feature_type ft
       LEFT JOIN
-        feature_type_property ftp on ft.feature_type_id = ftp.feature_type_id
-        AND ftp.record_end_date IS NULL
+        blueprint_feature_type bft ON bft.feature_type_id = ft.feature_type_id
+        AND bft.blueprint_id = (SELECT blueprint_id FROM default_blueprint)
+        AND bft.record_end_date IS NULL
       LEFT JOIN
-        feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+        blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+        AND bftp.record_end_date IS NULL
+      LEFT JOIN
+        feature_property fp ON fp.feature_property_id = bftp.feature_property_id
         AND fp.record_end_date IS NULL
       LEFT JOIN
         feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
@@ -91,58 +100,5 @@ export class CodeRepository extends BaseRepository {
     const response = await this.connection.sql(sql, FeatureTypeWithProperties);
 
     return response.rows;
-  }
-
-  /**
-   * Get a feature property record by name.
-   *
-   * @param {string} featurePropertyName
-   * @returns {Promise<FeatureTypeProperty>} Matching active feature property record.
-   * @memberof CodeRepository
-   */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
-    const sqlStatement = SQL`
-    SELECT
-      ftp.feature_type_property_id,
-      fp.name,
-      fp.display_name,
-      fp.description,
-      fpt.name as type_name,
-      ftp.required_value,
-      fp.calculated_value,
-      ftp.allow_multiple
-    FROM
-      feature_type_property ftp
-    INNER JOIN
-      feature_property fp
-      ON fp.feature_property_id = ftp.feature_property_id
-      AND fp.record_end_date IS NULL
-    INNER JOIN
-      feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
-      AND fpt.record_end_date IS NULL
-    WHERE
-      fp.name = ${featurePropertyName}
-      AND ftp.record_end_date IS NULL
-    ORDER BY
-      ftp.feature_type_property_id;
-  `;
-
-    const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);
-
-    if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Feature property not found', [
-        'CodeRepository->getFeaturePropertyByName',
-        { featurePropertyName }
-      ]);
-    }
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Unexpected row count', [
-        'CodeRepository->getFeaturePropertyByName',
-        `expected rowCount=1, actual rowCount=${response.rowCount}`
-      ]);
-    }
-
-    return response.rows[0];
   }
 }

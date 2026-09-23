@@ -93,7 +93,7 @@ const mockSearchResults = {
   ],
   properties: [
     {
-      feature_type_property_id: 1,
+      blueprint_feature_type_property_id: 1,
       feature_property_id: 1,
       feature_property_type_id: 1,
       name: 'species',

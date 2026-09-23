@@ -72,7 +72,7 @@ const featureTypeCode = (
 ): FeatureTypeWithProperties => ({
   feature_type: { feature_type_id: 1, name, display_name: name, description: null },
   properties: properties.map((property, index) => ({
-    feature_type_property_id: index + 1,
+    blueprint_feature_type_property_id: index + 1,
     name: property.name,
     display_name: property.name,
     description: null,

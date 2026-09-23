@@ -105,6 +105,26 @@ describe('Submission upload security review (integration)', function () {
     return result.rows[0].submission_feature_id;
   }
 
+  /**
+   * Assign a property to the survey feature type in the default Blueprint, which is the Blueprint
+   * the fixture uploads are pinned to, and return the assignment id its values are stored under.
+   *
+   * @param {number} featurePropertyId Property to assign.
+   * @returns {Promise<number>} The new blueprint_feature_type_property_id.
+   */
+  async function assignPropertyToSurvey(featurePropertyId: number): Promise<number> {
+    const result = await connection.sql(SQL`
+      INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_property_id, required_value, allow_multiple)
+      SELECT bft.blueprint_feature_type_id, ${featurePropertyId}, false, false
+      FROM blueprint_feature_type bft
+      JOIN blueprint b ON b.blueprint_id = bft.blueprint_id AND b.is_default = true AND b.record_end_date IS NULL
+      JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id AND ft.name = 'survey'
+      WHERE bft.record_end_date IS NULL
+      RETURNING blueprint_feature_type_property_id;
+    `);
+    return result.rows[0].blueprint_feature_type_property_id;
+  }
+
   /** Publish only fixtures exercising the post-publication screening pathway. */
   async function publishUpload(): Promise<void> {
     await connection.sql(
@@ -121,14 +141,10 @@ describe('Submission upload security review (integration)', function () {
       RETURNING feature_property_id;
     `);
     const propertyId = property.rows[0].feature_property_id;
-    const typeProperty = await connection.sql(SQL`
-      INSERT INTO feature_type_property (feature_type_id, feature_property_id, required_value, allow_multiple)
-      VALUES ((SELECT feature_type_id FROM feature_type WHERE name = 'survey' AND record_end_date IS NULL), ${propertyId}, false, false)
-      RETURNING feature_type_property_id;
-    `);
+    const assignmentId = await assignPropertyToSurvey(propertyId);
     for (const id of [...matches, otherId]) {
-      await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value)
-        VALUES (${id}, ${typeProperty.rows[0].feature_type_property_id}, 'match')`);
+      await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (${id}, ${assignmentId}, 'match')`);
     }
     return {
       type: 'expression',
@@ -137,7 +153,7 @@ describe('Submission upload security review (integration)', function () {
         {
           type: 'predicate',
           feature_property_id: propertyId,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 'match'
         }
@@ -1328,26 +1344,20 @@ describe('Submission upload security review (integration)', function () {
       FROM feature_property_type WHERE name IN ('string', 'feature')
       RETURNING feature_property_id, feature_property_type_id
     `);
-    const mappings = await connection.sql(SQL`
-      INSERT INTO feature_type_property (feature_type_id, feature_property_id, required_value, allow_multiple)
-      SELECT (SELECT feature_type_id FROM feature_type WHERE name = 'survey' AND record_end_date IS NULL), feature_property_id, false, false
-      FROM feature_property WHERE feature_property_id = ANY(${properties.rows.map(
-        (row) => row.feature_property_id
-      )}::integer[])
-      RETURNING feature_type_property_id, feature_property_id
-    `);
-    const typedMappings = await connection.sql(SQL`
-      SELECT ftp.feature_type_property_id, ftp.feature_property_id, fpt.name
-      FROM feature_type_property ftp JOIN feature_property fp USING (feature_property_id)
+    const typedProperties = await connection.sql(SQL`
+      SELECT fp.feature_property_id, fpt.name
+      FROM feature_property fp
       JOIN feature_property_type fpt USING (feature_property_type_id)
-      WHERE ftp.feature_type_property_id = ANY(${mappings.rows.map((row) => row.feature_type_property_id)}::integer[])
+      WHERE fp.feature_property_id = ANY(${properties.rows.map((row) => row.feature_property_id)}::integer[])
     `);
-    const stringProperty = typedMappings.rows.find((row) => row.name === 'string')!;
-    const referenceProperty = typedMappings.rows.find((row) => row.name === 'feature')!;
-    await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value)
-      VALUES (${evidenceId}, ${stringProperty.feature_type_property_id}, 'match')`);
-    await connection.sql(SQL`INSERT INTO submission_feature_property_feature (submission_feature_id, feature_type_property_id, referenced_submission_feature_id)
-      VALUES (${parentId}, ${referenceProperty.feature_type_property_id}, ${bridgeId})`);
+    const stringProperty = typedProperties.rows.find((row) => row.name === 'string')!;
+    const referenceProperty = typedProperties.rows.find((row) => row.name === 'feature')!;
+    const stringAssignmentId = await assignPropertyToSurvey(stringProperty.feature_property_id);
+    const referenceAssignmentId = await assignPropertyToSurvey(referenceProperty.feature_property_id);
+    await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+      VALUES (${evidenceId}, ${stringAssignmentId}, 'match')`);
+    await connection.sql(SQL`INSERT INTO submission_feature_property_feature (submission_feature_id, blueprint_feature_type_property_id, referenced_submission_feature_id)
+      VALUES (${parentId}, ${referenceAssignmentId}, ${bridgeId})`);
     await service.insertSubmissionUploadReviewSecurityRuleAssignments(
       submissionId,
       submissionUploadId,
@@ -1362,7 +1372,7 @@ describe('Submission upload security review (integration)', function () {
         {
           type: 'predicate' as const,
           feature_property_id: stringProperty.feature_property_id,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals' as const,
           value: 'match'
         }
@@ -1401,14 +1411,10 @@ describe('Submission upload security review (integration)', function () {
       RETURNING feature_property_id;
     `);
     const featurePropertyId = property.rows[0].feature_property_id;
-    const typeProperty = await connection.sql(SQL`
-      INSERT INTO feature_type_property (feature_type_id, feature_property_id, required_value, allow_multiple)
-      VALUES ((SELECT feature_type_id FROM feature_type WHERE name = 'survey' AND record_end_date IS NULL), ${featurePropertyId}, false, false)
-      RETURNING feature_type_property_id;
-    `);
+    const assignmentId = await assignPropertyToSurvey(featurePropertyId);
     for (const id of [parentId, otherId]) {
-      await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value)
-        VALUES (${id}, ${typeProperty.rows[0].feature_type_property_id}, 'match')`);
+      await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (${id}, ${assignmentId}, 'match')`);
     }
     const expression = {
       type: 'expression' as const,
@@ -1417,7 +1423,7 @@ describe('Submission upload security review (integration)', function () {
         {
           type: 'predicate' as const,
           feature_property_id: featurePropertyId,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals' as const,
           value: 'match'
         }
@@ -1460,10 +1466,10 @@ describe('Submission upload security review (integration)', function () {
     ).to.equal(2);
 
     await connection.sql(
-      SQL`UPDATE feature_type_property SET allow_multiple = true WHERE feature_type_property_id = ${typeProperty.rows[0].feature_type_property_id}`
+      SQL`UPDATE blueprint_feature_type_property SET allow_multiple = true WHERE blueprint_feature_type_property_id = ${assignmentId}`
     );
-    await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value)
-      VALUES (${parentId}, ${typeProperty.rows[0].feature_type_property_id}, 'second')`);
+    await connection.sql(SQL`INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+      VALUES (${parentId}, ${assignmentId}, 'second')`);
     const multiValueExpression = {
       ...expression,
       clauses: [...expression.clauses, { ...expression.clauses[0], value: 'second' }]

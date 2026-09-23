@@ -88,7 +88,7 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
         INSERT INTO submission_feature_error (
           submission_upload_id,
           property_name,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           error_code,
           error_message,
           count,

@@ -7,7 +7,6 @@ import { ApiConflictError, ApiNotFoundError } from '../errors/api-error';
 import { AdminBlueprint, AdminBlueprintFeatureType, AdminBlueprintFeatureTypeProperty } from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
-import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
 import { FeatureTypeRepository } from '../repositories/feature-type-repository';
 import { BlueprintService } from './blueprint-service';
 
@@ -46,7 +45,6 @@ const mockBlueprintFeatureTypeProperty: AdminBlueprintFeatureTypeProperty = {
   blueprint_feature_type_property_id: 3,
   blueprint_feature_type_id: 5,
   feature_property_id: 20,
-  feature_type_property_id: 99,
   property_name: 'latitude',
   property_display_name: 'Latitude',
   property_type_name: 'number',
@@ -66,7 +64,6 @@ describe('BlueprintService', () => {
     expect(service.blueprintRepository).to.be.instanceof(BlueprintRepository);
     expect(service.featureTypeRepository).to.be.instanceof(FeatureTypeRepository);
     expect(service.featurePropertyRepository).to.be.instanceof(FeaturePropertyRepository);
-    expect(service.featureTypePropertyRepository).to.be.instanceof(FeatureTypePropertyRepository);
   });
 
   describe('createBlueprintVersion', () => {
@@ -233,7 +230,7 @@ describe('BlueprintService', () => {
 
   describe('createBlueprintFeatureTypeProperty', () => {
     /**
-     * Stub the lookups that precede the pairing resolution, for a draft blueprint and an unassigned property.
+     * Stub the lookups that precede the insert, for a draft blueprint and an unassigned property.
      *
      * @param {BlueprintService} service
      */
@@ -247,14 +244,10 @@ describe('BlueprintService', () => {
         .resolves(mockBlueprintFeatureTypeProperty);
     };
 
-    it('reuses the active global pairing when one exists', async () => {
+    it('inserts the assignment with the requested configuration', async () => {
       const service = new BlueprintService(getMockDBConnection());
       stubUnassignedPropertyOnDraft(service);
 
-      const findPairingStub = sinon
-        .stub(service.featureTypePropertyRepository, 'findActiveFeatureTypePropertyByFeatureTypeAndProperty')
-        .resolves({ feature_type_property_id: 99 });
-      const insertPairingStub = sinon.stub(service.featureTypePropertyRepository, 'insertFeatureTypeProperty');
       const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty').resolves(3);
 
       const result = await service.createBlueprintFeatureTypeProperty(8, 5, {
@@ -264,51 +257,15 @@ describe('BlueprintService', () => {
         sort: 1
       });
 
-      // The pairing is resolved for the feature type of the blueprint feature type, not supplied by the caller.
-      expect(findPairingStub).to.have.been.calledOnceWith(10, 20);
-      expect(insertPairingStub).to.not.have.been.called;
+      // Requiredness, multiplicity and ordering live on the assignment; the caller names only the property.
       expect(insertStub).to.have.been.calledOnceWith({
         blueprint_feature_type_id: 5,
         feature_property_id: 20,
-        feature_type_property_id: 99,
         required_value: true,
         allow_multiple: true,
         sort: 1
       });
       expect(result).to.eql(mockBlueprintFeatureTypeProperty);
-    });
-
-    it('creates a neutral global pairing when the property was never paired with the feature type', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-      stubUnassignedPropertyOnDraft(service);
-
-      sinon
-        .stub(service.featureTypePropertyRepository, 'findActiveFeatureTypePropertyByFeatureTypeAndProperty')
-        .resolves(null);
-      const insertPairingStub = sinon
-        .stub(service.featureTypePropertyRepository, 'insertFeatureTypeProperty')
-        .resolves(123);
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty').resolves(3);
-
-      await service.createBlueprintFeatureTypeProperty(8, 5, {
-        feature_property_id: 20,
-        required_value: true,
-        allow_multiple: true,
-        sort: 1
-      });
-
-      // The pairing is shared by every blueprint: this blueprint's configuration is never copied onto it.
-      expect(insertPairingStub).to.have.been.calledOnceWith({ feature_type_id: 10, feature_property_id: 20 });
-
-      // The configuration is stored on the assignment.
-      expect(insertStub).to.have.been.calledOnceWith({
-        blueprint_feature_type_id: 5,
-        feature_property_id: 20,
-        feature_type_property_id: 123,
-        required_value: true,
-        allow_multiple: true,
-        sort: 1
-      });
     });
 
     it('throws ApiConflictError when the property is already assigned to the blueprint feature type', async () => {
@@ -320,7 +277,6 @@ describe('BlueprintService', () => {
       sinon
         .stub(service.blueprintRepository, 'findActiveBlueprintFeatureTypeProperty')
         .resolves({ blueprint_feature_type_property_id: 3 });
-      const insertPairingStub = sinon.stub(service.featureTypePropertyRepository, 'insertFeatureTypeProperty');
       const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty');
 
       try {
@@ -333,7 +289,6 @@ describe('BlueprintService', () => {
         );
       }
 
-      expect(insertPairingStub).to.not.have.been.called;
       expect(insertStub).to.not.have.been.called;
     });
 
@@ -399,13 +354,12 @@ describe('BlueprintService', () => {
   });
 
   describe('updateBlueprintFeatureTypeProperty', () => {
-    it('updates the assignment only, never the shared global pairing', async () => {
+    it('updates the assignment of a draft blueprint', async () => {
       const service = new BlueprintService(getMockDBConnection());
 
       sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
       sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
       const updateStub = sinon.stub(service.blueprintRepository, 'updateBlueprintFeatureTypeProperty').resolves();
-      const updatePairingStub = sinon.stub(service.featureTypePropertyRepository, 'updateFeatureTypeProperty');
       sinon
         .stub(service.blueprintRepository, 'getAdminBlueprintFeatureTypeProperty')
         .resolves(mockBlueprintFeatureTypeProperty);
@@ -413,7 +367,6 @@ describe('BlueprintService', () => {
       const result = await service.updateBlueprintFeatureTypeProperty(8, 5, 3, { required_value: false });
 
       expect(updateStub).to.have.been.calledOnceWith(3, 5, { required_value: false });
-      expect(updatePairingStub).to.not.have.been.called;
       expect(result).to.eql(mockBlueprintFeatureTypeProperty);
     });
 

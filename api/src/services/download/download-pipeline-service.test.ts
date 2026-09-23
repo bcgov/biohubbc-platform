@@ -284,7 +284,7 @@ describe('DownloadPipelineService', () => {
         feature_type: { feature_type_id: 1, name: 'survey', display_name: 'Survey', description: null },
         properties: [
           {
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             name: 'title',
             display_name: 'Title',
             description: 'Title',
@@ -304,7 +304,7 @@ describe('DownloadPipelineService', () => {
         },
         properties: [
           {
-            feature_type_property_id: 2,
+            blueprint_feature_type_property_id: 2,
             name: 'species',
             display_name: 'Species',
             description: 'Species',

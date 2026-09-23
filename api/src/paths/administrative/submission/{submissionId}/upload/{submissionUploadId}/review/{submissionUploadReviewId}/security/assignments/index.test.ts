@@ -14,7 +14,9 @@ describe('review assignment search and reset bodies', () => {
   const expression = {
     type: 'expression',
     operator: 'AND',
-    clauses: [{ type: 'predicate', feature_property_id: 1, feature_type_property_id: null, operator: 'Exists' }]
+    clauses: [
+      { type: 'predicate', feature_property_id: 1, blueprint_feature_type_property_id: null, operator: 'Exists' }
+    ]
   };
 
   it('reads filters and pagination exclusively from the POST body', async () => {

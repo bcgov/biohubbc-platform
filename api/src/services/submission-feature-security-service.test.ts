@@ -11,7 +11,9 @@ describe('SubmissionFeatureSecurityService assignment-state scope', () => {
   const expression: ExpressionTree = {
     type: 'expression',
     operator: 'AND',
-    clauses: [{ type: 'predicate', feature_property_id: 1, feature_type_property_id: null, operator: 'Exists' }]
+    clauses: [
+      { type: 'predicate', feature_property_id: 1, blueprint_feature_type_property_id: null, operator: 'Exists' }
+    ]
   };
   const normalizedExpression: NormalizedExpressionTree = {
     type: 'expression',

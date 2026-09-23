@@ -59,7 +59,8 @@ describe('SearchResultTableLayout', () => {
 
   const featureTypeProperties: FeatureTypeProperty[] = [
     {
-      feature_type_property_id: 1,
+      blueprint_feature_type_property_id: 1,
+      feature_property_id: 101,
       name: 'scientific_name',
       display_name: 'Scientific Name',
       description: null,
@@ -69,7 +70,8 @@ describe('SearchResultTableLayout', () => {
       allow_multiple: false
     },
     {
-      feature_type_property_id: 2,
+      blueprint_feature_type_property_id: 2,
+      feature_property_id: 102,
       name: 'count',
       display_name: 'Count',
       description: null,
@@ -79,7 +81,8 @@ describe('SearchResultTableLayout', () => {
       allow_multiple: false
     },
     {
-      feature_type_property_id: 3,
+      blueprint_feature_type_property_id: 3,
+      feature_property_id: 103,
       name: 'tags',
       display_name: 'Tags',
       description: null,
@@ -202,7 +205,8 @@ describe('SearchResultTableLayout', () => {
 
   it('renders taxon values as links to the taxon page under the row submission', () => {
     const taxonProperty: FeatureTypeProperty = {
-      feature_type_property_id: 4,
+      blueprint_feature_type_property_id: 4,
+      feature_property_id: 104,
       name: 'focal_species',
       display_name: 'Focal Species',
       description: null,
@@ -228,7 +232,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${taxonProperty.feature_type_property_id}`);
+    const cell = getByTestId(`cell-${taxonProperty.blueprint_feature_type_property_id}`);
     expect(cell).toHaveTextContent('Ursus americanus');
     expect(within(cell).getByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
       'href',
@@ -239,7 +243,8 @@ describe('SearchResultTableLayout', () => {
 
   it('renders code values as links to the code page under the row submission', () => {
     const codeProperty: FeatureTypeProperty = {
-      feature_type_property_id: 6,
+      blueprint_feature_type_property_id: 6,
+      feature_property_id: 106,
       name: 'sign',
       display_name: 'Sign',
       description: null,
@@ -265,7 +270,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${codeProperty.feature_type_property_id}`);
+    const cell = getByTestId(`cell-${codeProperty.blueprint_feature_type_property_id}`);
     expect(within(cell).getByRole('link', { name: 'Track' })).toHaveAttribute(
       'href',
       '/submission/101/code/sign/track'
@@ -275,7 +280,8 @@ describe('SearchResultTableLayout', () => {
 
   it('renders feature reference values as links to the referenced feature', () => {
     const featureProperty: FeatureTypeProperty = {
-      feature_type_property_id: 7,
+      blueprint_feature_type_property_id: 7,
+      feature_property_id: 107,
       name: 'sample_site',
       display_name: 'Sample Site',
       description: null,
@@ -301,7 +307,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${featureProperty.feature_type_property_id}`);
+    const cell = getByTestId(`cell-${featureProperty.blueprint_feature_type_property_id}`);
     expect(within(cell).getByRole('link', { name: 'urn:18:sample_site:3339' })).toHaveAttribute(
       'href',
       '/submission/18/feature/3339'
@@ -310,7 +316,8 @@ describe('SearchResultTableLayout', () => {
 
   it('renders multi-value taxon properties as a comma-separated list of links', () => {
     const taxonProperty: FeatureTypeProperty = {
-      feature_type_property_id: 5,
+      blueprint_feature_type_property_id: 5,
+      feature_property_id: 105,
       name: 'associated_species',
       display_name: 'Associated Species',
       description: null,
@@ -339,7 +346,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${taxonProperty.feature_type_property_id}`);
+    const cell = getByTestId(`cell-${taxonProperty.blueprint_feature_type_property_id}`);
     expect(cell).toHaveTextContent('Ursus americanus, Canis lupus');
     expect(within(cell).getAllByRole('link')).toHaveLength(2);
   });
