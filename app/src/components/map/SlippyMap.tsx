@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import type { Feature } from 'geojson';
 import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
 import { isEqual, omit } from 'lodash-es';
-import { Map as MapLibreMap, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl';
+import { Map as MapLibreMap, type MapGeoJSONFeature, type MapLibreEvent, type MapMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -95,6 +95,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     onMapLoad,
     onSourceError,
     onViewportChange,
+    onUserZoom,
     sx
   } = props;
 
@@ -117,7 +118,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     onEmptyMapClick,
     onMapLoad,
     onSourceError,
-    onViewportChange
+    onViewportChange,
+    onUserZoom
   });
   const featuresRef = useRef<Feature[]>(features ?? []);
   const isEditableRef = useRef(isEditable);
@@ -160,11 +162,21 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
   const getZoom = useCallback(() => mapRef.current?.getZoom(), []);
 
+  const fitBounds = useCallback(
+    (
+      bounds: [[number, number], [number, number]],
+      options: { maxZoom: number; padding: number; duration?: number }
+    ) => {
+      mapRef.current?.fitBounds(bounds, options);
+    },
+    []
+  );
+
   const closePopup = useCallback(() => {
     setPopup(null);
   }, []);
 
-  useImperativeHandle(ref, () => ({ easeTo, getZoom }), [easeTo, getZoom]);
+  useImperativeHandle(ref, () => ({ easeTo, fitBounds, getZoom }), [easeTo, fitBounds, getZoom]);
 
   useEffect(() => {
     callbacksRef.current = {
@@ -174,7 +186,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       onEmptyMapClick,
       onMapLoad,
       onSourceError,
-      onViewportChange
+      onViewportChange,
+      onUserZoom
     };
     featuresRef.current = features ?? [];
     isEditableRef.current = isEditable;
@@ -503,6 +516,12 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       });
     };
 
+    const handleZoomStart = (event: MapLibreEvent) => {
+      if (event.originalEvent) {
+        callbacksRef.current.onUserZoom?.();
+      }
+    };
+
     const handleMapLoad = () => {
       const adapter = new TerraDrawMapLibreGLAdapter({ map, prefixId: TERRA_DRAW_LAYER_PREFIX });
 
@@ -540,6 +559,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     map.on('click', handleMapClick);
     map.on('mousemove', handleMapMouseMove);
     map.on('error', handleMapError);
+    map.on('zoomstart', handleZoomStart);
     // Fires after a resize as well, so a map shown after being hidden reports the viewport it now has.
     map.on('moveend', emitViewport);
 
@@ -568,6 +588,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
       map.off('click', handleMapClick);
       map.off('mousemove', handleMapMouseMove);
       map.off('error', handleMapError);
+      map.off('zoomstart', handleZoomStart);
       map.off('moveend', emitViewport);
 
       appliedLayerIdsRef.current = [];
@@ -610,12 +631,35 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     applyMapContent(map);
     // Compared against the layer specifications rather than the layers themselves: the click handlers are read from a
     // ref at event time, and a deep compare tests functions by reference, so an inline handler would re-apply (and
-    // re-request every tile) on every render. Paint is left out too: it is applied in place by the effect below.
+    // re-request every tile) on every render. Paint and filters are left out too: they are applied in place below.
   }, [
     tileSources ?? {},
-    (layers ?? []).map((layer) => omit(layer.specification, 'paint')),
+    (layers ?? []).map((layer) => omit(layer.specification, ['paint', 'filter'])),
     isMapLoaded,
     applyMapContent
+  ]);
+
+  // Feature selection changes only layer filters. Keep sources and their loaded tiles intact.
+  useDeepCompareEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) {
+      return;
+    }
+    for (const layer of layers ?? []) {
+      if ('source' in layer.specification && map.getLayer(layer.specification.id)) {
+        const filter = 'filter' in layer.specification ? layer.specification.filter : undefined;
+        if (!isEqual(map.getFilter(layer.specification.id), filter)) {
+          setPopup(null);
+          map.setFilter(layer.specification.id, filter ?? null);
+        }
+      }
+    }
+  }, [
+    (layers ?? []).map((layer) => [
+      layer.specification.id,
+      'filter' in layer.specification ? layer.specification.filter : undefined
+    ]),
+    isMapLoaded
   ]);
 
   // Paint is the one class of layer property MapLibre updates without laying anything out again or requesting a
@@ -787,6 +831,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
     lngLat: popup!.lngLat,
     close: closePopup,
     easeTo,
+    fitBounds,
     getZoom
   });
 

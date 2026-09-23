@@ -20,7 +20,10 @@ export const useOptimisticDataLoader = <TData>(dataLoader: DataLoaderLike<TData>
 
   const { handleMutation } = useOptimisticMutation<TData>({
     getData: () => dataRef.current as TData,
-    setData: (nextState) => setDataRef.current(nextState)
+    setData: (nextState) => {
+      dataRef.current = nextState;
+      setDataRef.current(nextState);
+    }
   });
 
   const refresh = useCallback(
