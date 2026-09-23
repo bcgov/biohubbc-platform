@@ -1,7 +1,9 @@
 import { IDBConnection } from '../database/db';
+import { SubmissionUploadReviewScope, SubmissionUploadReviewStatus } from '../models/submission-upload-review';
 import { SubmissionUploadSecurityRepository } from '../repositories/submission-upload-security-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
+import { SubmissionUploadReviewService } from './upload/submission-upload-review-service';
 
 const defaultLog = getLogger('services/submission-upload-security-service');
 
@@ -11,7 +13,8 @@ const defaultLog = getLogger('services/submission-upload-security-service');
  * Screening is an independent background workflow that runs after `submission_feature_closure`
  * has been populated. It does NOT change `submission_upload.status`; its lifecycle is recorded as
  * an event row in `submission_upload_security`.
- * Rule fetching, evaluation and assignment creation are deferred to a future screening implementation.
+ * Each run creates a security review and a linked event,
+ * and completes both records in the caller's transaction.
  *
  * @export
  * @class SubmissionUploadSecurityService
@@ -19,20 +22,22 @@ const defaultLog = getLogger('services/submission-upload-security-service');
  */
 export class SubmissionUploadSecurityService extends DBService {
   submissionUploadSecurityRepository: SubmissionUploadSecurityRepository;
+  submissionUploadReviewService: SubmissionUploadReviewService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionUploadSecurityRepository = new SubmissionUploadSecurityRepository(connection);
+    this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
   }
 
   /**
    * Run automatic security screening for a single `submission_upload`.
    *
-   * Creates and completes the screening event in the caller's transaction.
+   * Creates and completes a security review and linked screening event in the caller's transaction.
    * Rule fetching, evaluation and assignment creation are deferred to a future screening implementation.
    *
    * @param {string} submissionUploadId UUID of the upload to screen.
-   * @param {number} submissionId Submission ID (for log context only).
+   * @param {number} submissionId Submission ID that owns the upload.
    * @param {(string | null)} jobId The pg-boss job id (recorded on the scan event for resync).
    * @returns {Promise<void>}
    * @memberof SubmissionUploadSecurityService
@@ -45,15 +50,34 @@ export class SubmissionUploadSecurityService extends DBService {
       submissionId
     });
 
-    const submissionUploadSecurityId = await this.submissionUploadSecurityRepository.insertScanEvent(
+    const review = await this.submissionUploadReviewService.insertSubmissionUploadReview(submissionId, {
+      submission_upload_id: submissionUploadId,
+      name: 'Automatic security screening',
+      description: null,
+      scope: SubmissionUploadReviewScope.SECURITY,
+      status: SubmissionUploadReviewStatus.PENDING,
+      requested_by: this.connection.systemUserId()
+    });
+    const event = await this.submissionUploadSecurityRepository.insertSubmissionUploadSecurity(
       submissionUploadId,
-      jobId
+      jobId,
+      review.submission_upload_review_id
     );
 
-    await this.submissionUploadSecurityRepository.updateScanEventStatus(submissionUploadSecurityId, 'completed', {
-      ruleCount: 0,
-      insertedCount: 0
-    });
+    await this.submissionUploadReviewService.updateSubmissionUploadReview(
+      submissionId,
+      submissionUploadId,
+      review.submission_upload_review_id,
+      { status: SubmissionUploadReviewStatus.COMPLETED }
+    );
+    await this.submissionUploadSecurityRepository.updateSubmissionUploadSecurityStatus(
+      event.submission_upload_security_id,
+      'completed',
+      {
+        ruleCount: 0,
+        insertedCount: 0
+      }
+    );
 
     defaultLog.info({
       label: 'screenSubmissionUpload',
@@ -69,20 +93,37 @@ export class SubmissionUploadSecurityService extends DBService {
    *
    * Called by the dead-letter handler after pg-boss has exhausted retries. Because each screening
    * attempt runs in a single transaction that rolls back on error, no partial `started` row
-   * survives a failure — so this inserts a fresh event row and immediately marks it `failed` for
+   * survives a failure — so this creates a blocked review and a fresh event, then marks the event `failed` for
    * operator visibility.
    *
    * @param {string} submissionUploadId UUID of the upload whose screening failed.
+   * @param {number} submissionId Submission ID that owns the upload.
    * @param {(string | null)} jobId The pg-boss job id, if available.
    * @returns {Promise<void>}
    * @memberof SubmissionUploadSecurityService
    */
-  async recordScreeningFailure(submissionUploadId: string, jobId: string | null): Promise<void> {
-    const submissionUploadSecurityId = await this.submissionUploadSecurityRepository.insertScanEvent(
+  async recordSubmissionUploadSecurityFailure(
+    submissionUploadId: string,
+    submissionId: number,
+    jobId: string | null
+  ): Promise<void> {
+    const review = await this.submissionUploadReviewService.insertSubmissionUploadReview(submissionId, {
+      submission_upload_id: submissionUploadId,
+      name: 'Automatic security screening',
+      description: null,
+      scope: SubmissionUploadReviewScope.SECURITY,
+      status: SubmissionUploadReviewStatus.BLOCKED,
+      requested_by: this.connection.systemUserId()
+    });
+    const event = await this.submissionUploadSecurityRepository.insertSubmissionUploadSecurity(
       submissionUploadId,
-      jobId
+      jobId,
+      review.submission_upload_review_id
     );
 
-    await this.submissionUploadSecurityRepository.updateScanEventStatus(submissionUploadSecurityId, 'failed');
+    await this.submissionUploadSecurityRepository.updateSubmissionUploadSecurityStatus(
+      event.submission_upload_security_id,
+      'failed'
+    );
   }
 }

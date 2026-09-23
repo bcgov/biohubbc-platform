@@ -1,14 +1,17 @@
 import { expect } from 'chai';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
-import { ApiValidationError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiValidationError } from '../../errors/api-error';
 import { ExpressionTree } from '../../models/expression-tree';
 import { SubmissionUploadReviewScope, SubmissionUploadReviewStatus } from '../../models/submission-upload-review';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeatureSecurityRepository } from '../../repositories/submission-feature-security-repository';
+import { SubmissionUploadSecurityRepository } from '../../repositories/submission-upload-security-repository';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SecurityRuleService } from '../../services/security-rule-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { SubmissionUploadSecurityService } from '../../services/submission-upload-security-service';
 import { SubmissionUploadReviewSecurityService } from '../../services/upload/submission-upload-review-security-service';
 import { SubmissionUploadReviewService } from '../../services/upload/submission-upload-review-service';
 import { decodeSearchFeatureCursor } from '../../utils/pagination';
@@ -88,6 +91,7 @@ describe('Submission upload security review (integration)', function () {
     }
   });
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });
@@ -263,8 +267,9 @@ describe('Submission upload security review (integration)', function () {
     for (const lifecycle of ['expired', 'future', 'current'] as const) {
       it(`preserves current provenance and replaces obsolete event provenance for ${scope} ${lifecycle} assignments`, async () => {
         const expression = scope === 'expression' ? await assignmentExpression() : undefined;
-        const event = await connection.sql(SQL`INSERT INTO submission_upload_security (submission_upload_id, status)
-          VALUES (${submissionUploadId}::uuid, 'started') RETURNING submission_upload_security_id`);
+        const event =
+          await connection.sql(SQL`INSERT INTO submission_upload_security (submission_upload_id, submission_upload_review_id, status)
+          VALUES (${submissionUploadId}::uuid, ${reviewB}::uuid, 'started') RETURNING submission_upload_security_id`);
         const eventId = event.rows[0].submission_upload_security_id;
         await connection.sql(SQL`INSERT INTO submission_feature_security
           (submission_feature_id, security_rule_id, submission_upload_security_id, record_effective_date, record_end_date)
@@ -982,6 +987,193 @@ describe('Submission upload security review (integration)', function () {
       expect(caught).to.be.instanceOf(ApiValidationError);
     }
     expect(await repository.getSubmissionFeatureSecurities([parentId])).to.have.length(1);
+  });
+
+  it('creates distinct completed reviews and linked events without changing assignments', async () => {
+    await publishUpload();
+    const screening = new SubmissionUploadSecurityService(connection);
+    await insertSecurityFixture({
+      submissionId,
+      submissionFeatureIds: [parentId],
+      securityRuleIds: [securityRuleId],
+      submissionUploadReviewId: reviewA
+    });
+    const first = await repository.getSubmissionFeatureSecurities([parentId, childId]);
+    await screening.screenSubmissionUpload(submissionUploadId, submissionId, null);
+    expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.deep.equal(first);
+    await screening.screenSubmissionUpload(submissionUploadId, submissionId, null);
+    expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.deep.equal(first);
+    const events = await connection.sql(SQL`
+      SELECT e.submission_upload_review_id, e.status AS event_status, e.metadata,
+        r.submission_upload_id, r.scope, r.status, r.name, r.description, r.requested_by
+      FROM submission_upload_security e JOIN submission_upload_review r USING (submission_upload_review_id)
+      WHERE e.submission_upload_id = ${submissionUploadId}::uuid ORDER BY e.submission_upload_security_id
+    `);
+    expect(events.rows).to.have.length(2);
+    expect(new Set(events.rows.map((row) => row.submission_upload_review_id)).size).to.equal(2);
+    for (const event of events.rows) {
+      expect(event).to.include({
+        submission_upload_id: submissionUploadId,
+        scope: 'security',
+        status: 'completed',
+        event_status: 'completed',
+        name: 'Automatic security screening',
+        description: null,
+        requested_by: connection.systemUserId()
+      });
+    }
+    expect(events.rows.map((row) => row.metadata.insertedCount)).to.eql([0, 0]);
+    for (const assignment of first) {
+      expect(assignment).to.include({
+        submission_upload_review_id: reviewA,
+        submission_upload_security_id: null
+      });
+    }
+  });
+
+  it('completes an automatic review and event without fetching or applying rules', async () => {
+    await publishUpload();
+    const screening = new SubmissionUploadSecurityService(connection);
+    const getRules = sinon
+      .stub(SecurityRuleService.prototype, 'getScreenableSecurityRules')
+      .rejects(new Error('Rule fetching is deferred'));
+    await screening.screenSubmissionUpload(submissionUploadId, submissionId, null);
+    const events = await connection.sql(SQL`
+      SELECT e.status, e.metadata, r.status AS review_status FROM submission_upload_security e
+      JOIN submission_upload_review r USING (submission_upload_review_id)
+      WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+    `);
+    expect(events.rows).to.eql([
+      { status: 'completed', review_status: 'completed', metadata: { ruleCount: 0, insertedCount: 0 } }
+    ]);
+    sinon.assert.notCalled(getRules);
+    expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
+  });
+
+  it('records an exhausted screening attempt with a blocked review and no assignments', async () => {
+    const screening = new SubmissionUploadSecurityService(connection);
+    await screening.recordSubmissionUploadSecurityFailure(submissionUploadId, submissionId, null);
+    const events = await connection.sql(SQL`
+      SELECT e.status, r.status AS review_status, r.scope, r.requested_by FROM submission_upload_security e
+      JOIN submission_upload_review r USING (submission_upload_review_id)
+      WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+    `);
+    expect(events.rows).to.eql([
+      { status: 'failed', review_status: 'blocked', scope: 'security', requested_by: connection.systemUserId() }
+    ]);
+    expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
+  });
+
+  it('rolls back the automatic review and event after completion fails', async () => {
+    await publishUpload();
+    const screening = new SubmissionUploadSecurityService(connection);
+    const failure = new Error('Review completion failed');
+    sinon.stub(SubmissionUploadReviewService.prototype, 'updateSubmissionUploadReview').rejects(failure);
+    await connection.sql(SQL`SAVEPOINT screening_attempt`);
+    let caught: unknown;
+    try {
+      await screening.screenSubmissionUpload(submissionUploadId, submissionId, null);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).to.equal(failure);
+    expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
+    await connection.sql(SQL`ROLLBACK TO SAVEPOINT screening_attempt`);
+    expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
+    const events = await connection.sql(
+      SQL`SELECT * FROM submission_upload_security WHERE submission_upload_id = ${submissionUploadId}::uuid`
+    );
+    expect(events.rows).to.eql([]);
+    const reviews = await connection.sql(
+      SQL`SELECT * FROM submission_upload_review WHERE submission_upload_id = ${submissionUploadId}::uuid AND name = 'Automatic security screening'`
+    );
+    expect(reviews.rows).to.eql([]);
+  });
+
+  it('reactivates legacy assignments with review provenance and clears obsolete event attribution', async () => {
+    await publishUpload();
+    const event =
+      await connection.sql(SQL`INSERT INTO submission_upload_security (submission_upload_id, submission_upload_review_id, status)
+      VALUES (${submissionUploadId}::uuid, ${reviewB}::uuid, 'completed') RETURNING submission_upload_security_id`);
+    await connection.sql(SQL`INSERT INTO submission_feature_security
+      (submission_feature_id, security_rule_id, submission_upload_security_id, record_effective_date, record_end_date)
+      VALUES (${parentId}, ${securityRuleId}, ${event.rows[0].submission_upload_security_id}, now() - interval '2 days', now() - interval '1 day')`);
+    await repository.insertSubmissionFeatureSecurity({
+      submissionId: submissionId,
+      submissionUploadId: submissionUploadId,
+      featureScope: { submissionFeatureIds: [parentId, childId] },
+      securityRuleIds: [securityRuleId],
+      submissionUploadReviewId: reviewA
+    });
+    const assignments = await repository.getSubmissionFeatureSecurities([parentId, childId]);
+    expect(assignments).to.have.length(2);
+    for (const assignment of assignments) {
+      expect(assignment).to.include({
+        submission_upload_review_id: reviewA,
+        submission_upload_security_id: null,
+        record_end_date: null
+      });
+    }
+  });
+
+  it('requires a review for every event and rejects sharing a review between events', async () => {
+    const events = new SubmissionUploadSecurityRepository(connection);
+    await events.insertSubmissionUploadSecurity(submissionUploadId, null, reviewA);
+    await events.insertSubmissionUploadSecurity(submissionUploadId, null, reviewB);
+    for (const [reviewId, expectedMessage] of [
+      [null, 'violates not-null constraint'],
+      [reviewA, 'submission_upload_security_review_uk']
+    ] as const) {
+      await connection.sql(SQL`SAVEPOINT invalid_event_review`);
+      let caught: unknown;
+      try {
+        await connection.sql(SQL`INSERT INTO submission_upload_security (submission_upload_id, submission_upload_review_id)
+          VALUES (${submissionUploadId}::uuid, ${reviewId}::uuid)`);
+      } catch (error_) {
+        caught = error_;
+      }
+      await connection.sql(SQL`ROLLBACK TO SAVEPOINT invalid_event_review`);
+      expect(caught).to.be.instanceOf(ApiExecuteSQLError);
+      expect((caught as ApiExecuteSQLError).errors[0])
+        .to.have.property('message')
+        .that.includes(expectedMessage);
+    }
+    const rows = await connection.sql(
+      SQL`SELECT submission_upload_review_id FROM submission_upload_security WHERE submission_upload_id = ${submissionUploadId}::uuid`
+    );
+    expect(rows.rows.map((row) => row.submission_upload_review_id)).to.have.members([reviewA, reviewB]);
+  });
+
+  it('copies review provenance and expiry to a successor without creating a review', async () => {
+    await publishUpload();
+    await repository.insertSubmissionFeatureSecurity({
+      submissionId: submissionId,
+      submissionUploadId: submissionUploadId,
+      featureScope: { submissionFeatureIds: [parentId, childId] },
+      securityRuleIds: [securityRuleId],
+      submissionUploadReviewId: reviewA
+    });
+    await connection.sql(SQL`UPDATE submission_feature_security SET record_end_date = now() + interval '1 day'
+      WHERE submission_feature_id = ${parentId} AND security_rule_id = ${securityRuleId}`);
+    await connection.sql(
+      SQL`UPDATE submission_feature SET source_id = 'automatic-review-copy' WHERE submission_feature_id = ${parentId}`
+    );
+    await connection.sql(SQL`UPDATE submission_feature SET source_id = 'automatic-review-copy', reconciliation = 'modified', record_effective_date = NULL
+      WHERE submission_feature_id = ${otherId}`);
+    const original =
+      await connection.sql(SQL`SELECT submission_upload_review_id, record_end_date FROM submission_feature_security
+      WHERE submission_feature_id = ${parentId} AND security_rule_id = ${securityRuleId}`);
+    await repository.copySubmissionFeatureSecurityToSuccessors(otherUploadId, submissionUploadId);
+    const copied = await repository.getSubmissionFeatureSecurities([otherId]);
+    expect(copied).to.have.length(1);
+    expect(copied[0].submission_upload_review_id).to.equal(reviewA);
+    expect(new Date(copied[0].record_end_date!).getTime()).to.equal(
+      new Date(original.rows[0].record_end_date).getTime()
+    );
+    const reviews = await connection.sql(
+      SQL`SELECT * FROM submission_upload_review WHERE submission_upload_id = ${otherUploadId}::uuid`
+    );
+    expect(reviews.rows).to.eql([]);
   });
 
   it('updates pending-upload search security immediately without publishing closure', async () => {

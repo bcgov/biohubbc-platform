@@ -80,6 +80,8 @@ describe('submissionUploadSecurityJobHandler', () => {
       expect.fail('Should have thrown');
     } catch (error) {
       expect((error as Error).message).to.equal('Screening failed');
+      expect(mockConn.rollback).to.have.been.calledOnce;
+      expect(mockConn.commit).not.to.have.been.called;
     }
   });
 });
@@ -103,7 +105,7 @@ describe('submissionUploadSecurityFailedHandler', () => {
   it('records a failed scan event without throwing or touching submission_upload.status', async () => {
     stubConnections();
     const recordFailureStub = sinon
-      .stub(SubmissionUploadSecurityService.prototype, 'recordScreeningFailure')
+      .stub(SubmissionUploadSecurityService.prototype, 'recordSubmissionUploadSecurityFailure')
       .resolves();
 
     const job = {
@@ -121,13 +123,13 @@ describe('submissionUploadSecurityFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(recordFailureStub).to.have.been.calledOnceWith('upload-1', 'job-1');
+    expect(recordFailureStub).to.have.been.calledOnceWith('upload-1', 1, 'job-1');
   });
 
   it('records a failed scan event and logs the default message when output is null', async () => {
     stubConnections();
     const recordFailureStub = sinon
-      .stub(SubmissionUploadSecurityService.prototype, 'recordScreeningFailure')
+      .stub(SubmissionUploadSecurityService.prototype, 'recordSubmissionUploadSecurityFailure')
       .resolves();
 
     const job = {
@@ -145,6 +147,6 @@ describe('submissionUploadSecurityFailedHandler', () => {
     }
 
     expect(thrownError).to.be.undefined;
-    expect(recordFailureStub).to.have.been.calledOnceWith('upload-2', 'job-2');
+    expect(recordFailureStub).to.have.been.calledOnceWith('upload-2', 2, 'job-2');
   });
 });
