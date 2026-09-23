@@ -15,6 +15,8 @@ export const FeatureTypeSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: ['feature_type_id', 'name', 'display_name', 'description'],
   properties: {
+    record_effective_date: { type: 'string', format: 'date' },
+    record_end_date: { type: 'string', format: 'date', nullable: true },
     feature_type_id: {
       type: 'integer',
       minimum: 1,
@@ -89,12 +91,8 @@ export const CreateFeatureTypeRequestSchema: OpenAPIV3.SchemaObject = {
 export const UpdateFeatureTypeRequestSchema: OpenAPIV3.SchemaObject = {
   title: 'UpdateFeatureTypeRequest',
   type: 'object',
+  additionalProperties: false,
   properties: {
-    name: {
-      type: 'string',
-      maxLength: 100,
-      description: 'Canonical name of the feature type'
-    },
     display_name: {
       type: 'string',
       maxLength: 100,

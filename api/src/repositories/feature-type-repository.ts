@@ -32,7 +32,14 @@ export class FeatureTypeRepository extends BaseRepository {
         display_name: data.display_name,
         description: data.description ?? null
       })
-      .returning(['feature_type_id', 'name', 'display_name', 'description']);
+      .returning([
+        'feature_type_id',
+        'name',
+        'display_name',
+        'description',
+        'record_effective_date',
+        'record_end_date'
+      ]);
 
     const response = await this.connection.knex(query, FeatureType);
 
@@ -59,7 +66,7 @@ export class FeatureTypeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .from('feature_type')
-      .select(['feature_type_id', 'name', 'display_name', 'description'])
+      .select(['feature_type_id', 'name', 'display_name', 'description', 'record_effective_date', 'record_end_date'])
       .whereNull('record_end_date')
       .where('feature_type_id', featureTypeId);
 
@@ -83,7 +90,7 @@ export class FeatureTypeRepository extends BaseRepository {
   }
 
   /**
-   * Get active feature types with optional search and pagination.
+   * Get active and retired feature types with optional search and pagination.
    *
    * @param {FeatureTypeFilters} [filters] - Optional filter set.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
@@ -95,8 +102,7 @@ export class FeatureTypeRepository extends BaseRepository {
     const baseQuery = this.applyFilters(
       knex
         .from('feature_type')
-        .select(['feature_type_id', 'name', 'display_name', 'description'])
-        .whereNull('record_end_date'),
+        .select(['feature_type_id', 'name', 'display_name', 'description', 'record_effective_date', 'record_end_date']),
       filters
     );
 
@@ -112,7 +118,7 @@ export class FeatureTypeRepository extends BaseRepository {
   }
 
   /**
-   * Get count of active feature types matching optional filters.
+   * Get count of active and retired feature types matching optional filters.
    *
    * @param {FeatureTypeFilters} [filters] - Optional filter set.
    * @return {Promise<number>}
@@ -120,7 +126,7 @@ export class FeatureTypeRepository extends BaseRepository {
    */
   async getFeatureTypesCount(filters?: FeatureTypeFilters): Promise<number> {
     const knex = getKnex();
-    const baseQuery = this.applyFilters(knex.from('feature_type').whereNull('record_end_date'), filters);
+    const baseQuery = this.applyFilters(knex.from('feature_type'), filters);
 
     const countQuery = baseQuery.clone().select(knex.raw('coalesce(count(*), 0)::integer as count')).first();
     const countResult = await this.connection.knex(countQuery, CountResult);
@@ -128,7 +134,7 @@ export class FeatureTypeRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing feature type record.
+   * Update descriptive metadata on an active or retired feature type record.
    *
    * @param {number} featureTypeId - The ID of the feature type to update.
    * @param {UpdateFeatureType} data - The data to update.
@@ -141,12 +147,9 @@ export class FeatureTypeRepository extends BaseRepository {
     const query = knex
       .table('feature_type')
       .update({
-        name: data.name,
         display_name: data.display_name,
-        description: data.description,
-        record_end_date: data.record_end_date
+        description: data.description
       })
-      .whereNull('record_end_date')
       .where('feature_type_id', featureTypeId);
 
     const response = await this.connection.knex(query);
@@ -205,5 +208,40 @@ export class FeatureTypeRepository extends BaseRepository {
     }
 
     return query;
+  }
+
+  /**
+   * Get a single active or retired feature type by ID.
+   *
+   * @param {number} featureTypeId - The ID of the feature type to retrieve.
+   * @return {Promise<FeatureType>} The feature type record.
+   * @throws {ApiNotFoundError} If no feature type exists for the id.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeatureTypeRepository
+   */
+  async getAdminFeatureType(featureTypeId: number): Promise<FeatureType> {
+    const knex = getKnex();
+    const query = knex
+      .from('feature_type')
+      .select(['feature_type_id', 'name', 'display_name', 'description', 'record_effective_date', 'record_end_date'])
+      .where('feature_type_id', featureTypeId);
+
+    const response = await this.connection.knex(query, FeatureType);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature type not found', [
+        'FeatureTypeRepository->getAdminFeatureType',
+        { featureTypeId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeatureTypeRepository->getAdminFeatureType',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 }

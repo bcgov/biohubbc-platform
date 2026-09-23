@@ -1,69 +1,111 @@
-import chai, { expect } from 'chai';
-import { describe } from 'mocha';
+import Ajv from 'ajv';
+import { expect } from 'chai';
+import { RequestHandler } from 'express';
 import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import * as db from '../../../database/db';
-import { AdminBlueprint } from '../../../models/blueprint';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { dbDependencies } from '../../../database/db';
+import { ensureHTTPError } from '../../../errors/http-error';
+import { CreateBlueprintRequestSchema, UpdateBlueprintRequestSchema } from '../../../openapi/schemas/blueprint';
+import { authorizationDependencies } from '../../../request-handlers/security/authorization';
 import { BlueprintService } from '../../../services/blueprint-service';
-import { getBlueprints } from './index';
+import { GET as typesGET } from '../feature-property-types';
+import { createBlueprint, GET, getBlueprints, POST } from './index';
+import { DELETE, GET as detailGET, getBlueprint, PUT, retireBlueprint, updateBlueprint } from './{blueprintId}';
+import { PUT as defaultPUT, setDefaultBlueprint } from './{blueprintId}/default';
 
-chai.use(sinonChai);
+const operations = [GET, POST, detailGET, PUT, DELETE, defaultPUT, typesGET];
 
-const mockBlueprint: AdminBlueprint = {
-  blueprint_id: 8,
-  version_number: 2,
-  name: 'Default Blueprint',
-  description: null,
-  is_default: false,
-  parent_blueprint_id: 7,
-  record_effective_date: null,
-  record_end_date: null
-};
+describe('Configuration API boundaries', () => {
+  afterEach(() => sinon.restore());
 
-describe('getBlueprints', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('re-throws any error that is thrown', async () => {
-    const mockDBConnection = getMockDBConnection({
-      open: () => {
-        throw new Error('test error');
+  operations.forEach((operation, index) => {
+    it(`operation ${index} requires only the system administrator role`, async () => {
+      const authorize = sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      try {
+        await (operation[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        expect.fail('Expected forbidden');
+      } catch (error) {
+        expect(ensureHTTPError(error).status).to.equal(403);
       }
+      expect(authorize.firstCall.args[0].authorization_scheme).to.deep.equal({
+        and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+      });
+      sinon.assert.notCalled(mockNext);
     });
-
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '1', limit: '50' };
-
-    const requestHandler = getBlueprints();
-
-    try {
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as Error).message).to.equal('test error');
-    }
   });
 
-  it('should return 200 with paginated blueprints', async () => {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    sinon.stub(BlueprintService.prototype, 'getAdminBlueprints').resolves([mockBlueprint]);
-    sinon.stub(BlueprintService.prototype, 'getAdminBlueprintsCount').resolves(1);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '1', limit: '50' };
-
-    const requestHandler = getBlueprints();
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql({
-      blueprints: [mockBlueprint],
-      pagination: { total: 1, per_page: 50, current_page: 1, last_page: 1, sort: undefined, order: undefined }
+  const handlers = [
+    ['getBlueprints', getBlueprints],
+    ['createBlueprint', createBlueprint],
+    ['getBlueprint', getBlueprint],
+    ['updateBlueprint', updateBlueprint],
+    ['retireBlueprint', retireBlueprint],
+    ['setDefaultBlueprint', setDefaultBlueprint]
+  ] as const;
+  handlers.forEach(([method, handler]) => {
+    it(`${method} commits the confirmed response and releases its connection`, async () => {
+      const connection = getMockDBConnection({
+        commit: sinon.stub().resolves(),
+        rollback: sinon.stub().resolves(),
+        release: sinon.stub()
+      });
+      sinon.stub(dbDependencies, 'getDBConnection').returns(connection);
+      const service = sinon.stub(BlueprintService.prototype, method).resolves({ blueprint_id: 1 } as any);
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { blueprintId: '1' };
+      mockReq.query = {};
+      mockReq.body = { name: 'Schema' };
+      await handler()(mockReq, mockRes, mockNext);
+      sinon.assert.calledOnce(service);
+      sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
+      sinon.assert.calledOnce(connection.release as sinon.SinonStub);
+      sinon.assert.calledWith(mockRes.json, { blueprint_id: 1 });
+      sinon.assert.calledWith(mockRes.status, method === 'createBlueprint' ? 201 : 200);
     });
+
+    it(`${method} rolls back and releases on failure`, async () => {
+      const connection = getMockDBConnection({
+        commit: sinon.stub().resolves(),
+        rollback: sinon.stub().resolves(),
+        release: sinon.stub()
+      });
+      sinon.stub(dbDependencies, 'getDBConnection').returns(connection);
+      const failure = new Error('failed');
+      sinon.stub(BlueprintService.prototype, method).rejects(failure);
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { blueprintId: '1' };
+      mockReq.query = {};
+      try {
+        await handler()(mockReq, mockRes, mockNext);
+        expect.fail('Expected failure');
+      } catch (error) {
+        expect(error).to.equal(failure);
+      }
+      sinon.assert.calledOnce(connection.rollback as sinon.SinonStub);
+      sinon.assert.calledOnce(connection.release as sinon.SinonStub);
+      sinon.assert.notCalled(connection.commit as sinon.SinonStub);
+    });
+  });
+
+  it('validates camelCase bodies, nullable metadata, and forbidden lifecycle fields', () => {
+    const ajv = new Ajv({ strict: false, formats: { date: /^\d{4}-\d{2}-\d{2}$/ } });
+    const create = ajv.compile(CreateBlueprintRequestSchema);
+    const update = ajv.compile(UpdateBlueprintRequestSchema);
+    expect(create({ name: 'Schema' })).to.equal(true);
+    for (const payload of [
+      { name: ' ' },
+      { name: 'Schema', versionNumber: 0 },
+      { name: 'Schema', versionNumber: 1, is_default: true },
+      { name: 'Schema', version_number: 1 }
+    ]) {
+      expect(create(payload)).to.equal(false);
+    }
+    expect(update({})).to.equal(true);
+    expect(update({ versionNumber: 2 })).to.equal(false);
+    expect(update({ description: null, parentBlueprintId: null, recordEffectiveDate: null })).to.equal(true);
+    expect(update({ record_end_date: '2026-01-01' })).to.equal(false);
+    expect(update({ isDefault: true })).to.equal(false);
   });
 });

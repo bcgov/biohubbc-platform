@@ -51,7 +51,7 @@ describe('getBlueprint', () => {
   it('should return 200 with the blueprint', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    const getStub = sinon.stub(BlueprintService.prototype, 'getAdminBlueprint').resolves(mockBlueprint);
+    const getStub = sinon.stub(BlueprintService.prototype, 'getBlueprint').resolves(mockBlueprint);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { blueprintId: '8' };

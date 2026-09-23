@@ -5,6 +5,8 @@ import { FeaturePropertyDefinition, FeatureTypeProperty } from './feature-proper
  * Schema for feature type basic info.
  */
 export const FeatureType = z.object({
+  record_effective_date: z.string().optional(),
+  record_end_date: z.string().nullable().optional(),
   feature_type_id: z.number(),
   name: z.string(),
   display_name: z.string(),
@@ -43,10 +45,10 @@ export interface CreateFeatureType {
   description?: string | null;
 }
 
-/** Partial fields accepted when updating a feature type. */
+/**
+ * Editable presentation metadata; canonical names remain immutable.
+ */
 export interface UpdateFeatureType {
-  name?: string;
   display_name?: string;
   description?: string | null;
-  record_end_date?: string;
 }

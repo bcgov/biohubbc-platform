@@ -1,10 +1,3 @@
-/**
- * OpenAPI schemas for Blueprint administration endpoints.
- *
- * These schemas define the API contract for managing blueprint versions, the feature types a blueprint
- * includes, and the properties it assigns to each of those feature types.
- */
-
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
 
@@ -349,4 +342,47 @@ export const UpdateBlueprintFeatureTypePropertyRequestSchema: OpenAPIV3.SchemaOb
       description: 'Custom sort order of the property within the feature type'
     }
   }
+};
+
+export const BlueprintSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: [
+    'blueprint_id',
+    'name',
+    'version_number',
+    'description',
+    'is_default',
+    'parent_blueprint_id',
+    'record_effective_date',
+    'record_end_date'
+  ],
+  properties: {
+    blueprint_id: { type: 'integer', minimum: 1 },
+    name: { type: 'string' },
+    version_number: { type: 'integer', minimum: 1 },
+    description: { type: 'string', nullable: true },
+    is_default: { type: 'boolean' },
+    parent_blueprint_id: { type: 'integer', nullable: true },
+    record_effective_date: { type: 'string', format: 'date', nullable: true },
+    record_end_date: { type: 'string', format: 'date', nullable: true }
+  }
+};
+export const UpdateBlueprintRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    name: { type: 'string', minLength: 1, pattern: '\\S' },
+    description: { type: 'string', nullable: true },
+    parentBlueprintId: { type: 'integer', minimum: 1, nullable: true },
+    recordEffectiveDate: { type: 'string', format: 'date', nullable: true }
+  }
+};
+export const CreateBlueprintRequestSchema: OpenAPIV3.SchemaObject = {
+  ...UpdateBlueprintRequestSchema,
+  required: ['name']
+};
+export const BlueprintsResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['blueprints', 'pagination'],
+  properties: { blueprints: { type: 'array', items: BlueprintSchema }, pagination: paginationResponseSchema }
 };

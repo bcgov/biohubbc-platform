@@ -1,18 +1,24 @@
+import { BLUEPRINT_SORT_FIELDS } from '../constants/blueprint';
 import { IDBConnection } from '../database/db';
-import { ApiConflictError } from '../errors/api-error';
+import { ApiConflictError, ApiNotFoundError, ApiValidationError } from '../errors/api-error';
 import {
   AdminBlueprint,
   AdminBlueprintFeatureType,
   AdminBlueprintFeatureTypeProperty,
+  Blueprint,
+  BlueprintFilters,
+  CreateBlueprint,
   CreateBlueprintFeatureTypePropertyRequest,
   CreateBlueprintVersionRecord,
   PublishBlueprintRecord,
+  UpdateBlueprint,
   UpdateBlueprintFeatureTypePropertyRecord,
   UpdateBlueprintFeatureTypeRecord
 } from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { FeatureTypeRepository } from '../repositories/feature-type-repository';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
@@ -98,6 +104,7 @@ export class BlueprintService extends DBService {
     sourceBlueprintId: number,
     overrides: CreateBlueprintVersionRecord
   ): Promise<AdminBlueprint> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     const blueprintId = await this.blueprintRepository.createBlueprintVersionFromBlueprint(
       sourceBlueprintId,
       overrides
@@ -120,6 +127,7 @@ export class BlueprintService extends DBService {
    * @memberof BlueprintService
    */
   async publishBlueprint(blueprintId: number, data: PublishBlueprintRecord): Promise<AdminBlueprint> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.assertBlueprintIsDraft(blueprintId);
 
     const isDefault = data.is_default ?? false;
@@ -165,6 +173,7 @@ export class BlueprintService extends DBService {
     blueprintId: number,
     data: { feature_type_id: number; sort?: number | null }
   ): Promise<AdminBlueprintFeatureType> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.assertBlueprintIsDraft(blueprintId);
     await this.featureTypeRepository.getFeatureType(data.feature_type_id);
 
@@ -202,6 +211,7 @@ export class BlueprintService extends DBService {
     blueprintFeatureTypeId: number,
     data: UpdateBlueprintFeatureTypeRecord
   ): Promise<AdminBlueprintFeatureType> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.assertBlueprintIsDraft(blueprintId);
     await this.blueprintRepository.updateBlueprintFeatureType(blueprintFeatureTypeId, blueprintId, data);
 
@@ -219,6 +229,7 @@ export class BlueprintService extends DBService {
    * @memberof BlueprintService
    */
   async deleteBlueprintFeatureType(blueprintId: number, blueprintFeatureTypeId: number): Promise<void> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.assertBlueprintIsDraft(blueprintId);
 
     // Retire the parent first: it is scoped to the blueprint, so an id belonging to another blueprint
@@ -305,6 +316,7 @@ export class BlueprintService extends DBService {
     blueprintFeatureTypeId: number,
     data: CreateBlueprintFeatureTypePropertyRequest
   ): Promise<AdminBlueprintFeatureTypeProperty> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.blueprintRepository.getAdminBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
     await this.assertBlueprintIsDraft(blueprintId);
     await this.featurePropertyRepository.getFeatureProperty(data.feature_property_id);
@@ -355,6 +367,7 @@ export class BlueprintService extends DBService {
     blueprintFeatureTypePropertyId: number,
     data: UpdateBlueprintFeatureTypePropertyRecord
   ): Promise<AdminBlueprintFeatureTypeProperty> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.blueprintRepository.getAdminBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
     await this.assertBlueprintIsDraft(blueprintId);
 
@@ -386,6 +399,7 @@ export class BlueprintService extends DBService {
     blueprintFeatureTypeId: number,
     blueprintFeatureTypePropertyId: number
   ): Promise<void> {
+    await this.blueprintRepository.lockBlueprintAdministration();
     await this.blueprintRepository.getAdminBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
     await this.assertBlueprintIsDraft(blueprintId);
 
@@ -416,6 +430,144 @@ export class BlueprintService extends DBService {
         'BlueprintService->assertBlueprintIsDraft',
         { blueprint_id: blueprintId, record_effective_date: blueprint.record_effective_date }
       ]);
+    }
+  }
+
+  /**
+   * Retrieve metadata, including retired blueprints.
+   * @param blueprintId Blueprint identifier.
+   * @returns Metadata or a not-found error.
+   */
+  async getBlueprint(blueprintId: number): Promise<Blueprint> {
+    const blueprint = await this.blueprintRepository.getBlueprint(blueprintId);
+    if (!blueprint) {
+      throw new ApiNotFoundError('Blueprint not found');
+    }
+    return blueprint;
+  }
+
+  /**
+   * List administrative metadata and its filtered pagination count.
+   *
+   * @param filters Keyword filters.
+   * @param pagination Requested page and sorting.
+   * @returns Blueprint list and pagination metadata.
+   */
+  async getBlueprints(filters: BlueprintFilters, pagination: ApiPaginationOptions) {
+    if (!BLUEPRINT_SORT_FIELDS.includes(pagination.sort ?? 'name')) {
+      throw new ApiValidationError('Unsupported blueprint sort field');
+    }
+    const blueprints = await this.blueprintRepository.getBlueprints(filters, pagination);
+    const count = await this.blueprintRepository.getBlueprintsCount(filters);
+    return { blueprints, pagination: makePaginationResponse(count.count, pagination) };
+  }
+
+  /**
+   * Create a non-default blueprint with the next version; an absent effective date denotes a draft.
+   * @param data Creation fields.
+   * @returns Created metadata.
+   */
+  async createBlueprint(data: CreateBlueprint): Promise<Blueprint> {
+    await this.blueprintRepository.lockBlueprintAdministration();
+    await this.validateBlueprintParent(null, data.parentBlueprintId ?? null);
+    return this.blueprintRepository.insertBlueprint(data);
+  }
+
+  /**
+   * Allow descriptive metadata edits after publication while protecting lifecycle and lineage fields.
+   *
+   * @param blueprintId Blueprint identifier.
+   * @param data Mutable metadata.
+   * @returns Confirmed metadata.
+   */
+  async updateBlueprint(blueprintId: number, data: UpdateBlueprint): Promise<Blueprint> {
+    const currentDate = await this.blueprintRepository.lockBlueprintAdministration();
+    const blueprint = await this.getBlueprint(blueprintId);
+    const metadataOnly = Object.keys(data).every((field) => field === 'name' || field === 'description');
+    if (blueprint.record_end_date !== null || !metadataOnly) {
+      this.assertBlueprintEditable(blueprint, currentDate);
+    }
+    if (data.parentBlueprintId !== undefined) {
+      await this.validateBlueprintParent(blueprintId, data.parentBlueprintId);
+    }
+    if (Object.keys(data).length === 0) {
+      return blueprint;
+    }
+    return this.blueprintRepository.updateBlueprint(blueprintId, data);
+  }
+
+  /**
+   * Retire any non-default blueprint, preserving the original date on repeated calls.
+   * @param blueprintId Blueprint identifier.
+   * @returns Retired metadata.
+   */
+  async retireBlueprint(blueprintId: number): Promise<Blueprint> {
+    await this.blueprintRepository.lockBlueprintAdministration();
+    const blueprint = await this.getBlueprint(blueprintId);
+    if (blueprint.record_end_date !== null) {
+      return blueprint;
+    }
+    if (blueprint.is_default) {
+      throw new ApiConflictError('Select another default blueprint before retiring this blueprint');
+    }
+    return this.blueprintRepository.retireBlueprint(blueprintId);
+  }
+
+  /**
+   * Replace the default atomically using the endpoint-owned transaction.
+   * @param blueprintId Blueprint identifier.
+   * @returns Selected default metadata.
+   */
+  async setDefaultBlueprint(blueprintId: number): Promise<Blueprint> {
+    const currentDate = await this.blueprintRepository.lockBlueprintAdministration();
+    const blueprint = await this.getBlueprint(blueprintId);
+    if (
+      blueprint.record_end_date !== null ||
+      blueprint.record_effective_date === null ||
+      blueprint.record_effective_date > currentDate
+    ) {
+      throw new ApiConflictError('Only effective blueprints can be made default');
+    }
+    if (blueprint.is_default) {
+      return blueprint;
+    }
+    await this.blueprintRepository.clearDefaultBlueprint();
+    return this.blueprintRepository.setDefaultBlueprint(blueprintId);
+  }
+
+  /**
+   * Validate lineage without filtering retired ancestors.
+   * @param blueprintId Existing identifier, or null during creation.
+   * @param parentBlueprintId Proposed parent, or null to clear lineage.
+   * @returns Resolves when the parent exists and would not create a cycle.
+   */
+  private async validateBlueprintParent(blueprintId: number | null, parentBlueprintId: number | null): Promise<void> {
+    if (parentBlueprintId === null) {
+      return;
+    }
+    const ancestorIds = await this.blueprintRepository.getBlueprintAncestorIds(parentBlueprintId);
+    if (!ancestorIds.length) {
+      throw new ApiValidationError('Parent blueprint does not exist');
+    }
+    if (blueprintId !== null && ancestorIds.includes(blueprintId)) {
+      throw new ApiConflictError('Blueprint lineage cannot contain a cycle');
+    }
+  }
+
+  /**
+   * Require a non-retired blueprint whose effective date has not arrived.
+   * Call after acquiring the administration lock and reading the blueprint on the same connection.
+   *
+   * @param blueprint Blueprint being edited.
+   * @param currentDate Database lifecycle date.
+   * @returns Throws conflict when metadata or composition is read-only.
+   */
+  assertBlueprintEditable(blueprint: Blueprint, currentDate: string): void {
+    if (
+      blueprint.record_end_date !== null ||
+      (blueprint.record_effective_date !== null && blueprint.record_effective_date <= currentDate)
+    ) {
+      throw new ApiConflictError('Only draft and future blueprints can be edited');
     }
   }
 }

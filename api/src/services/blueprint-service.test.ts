@@ -3,8 +3,13 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiConflictError, ApiNotFoundError } from '../errors/api-error';
-import { AdminBlueprint, AdminBlueprintFeatureType, AdminBlueprintFeatureTypeProperty } from '../models/blueprint';
+import { ApiConflictError, ApiNotFoundError, ApiValidationError } from '../errors/api-error';
+import {
+  AdminBlueprint,
+  AdminBlueprintFeatureType,
+  AdminBlueprintFeatureTypeProperty,
+  Blueprint
+} from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { FeatureTypeRepository } from '../repositories/feature-type-repository';
@@ -54,6 +59,9 @@ const mockBlueprintFeatureTypeProperty: AdminBlueprintFeatureTypeProperty = {
 };
 
 describe('BlueprintService', () => {
+  beforeEach(() => {
+    sinon.stub(BlueprintRepository.prototype, 'lockBlueprintAdministration').resolves('2026-09-23');
+  });
   afterEach(() => {
     sinon.restore();
   });
@@ -438,5 +446,220 @@ describe('BlueprintService', () => {
       expect(scopeStub).to.have.been.calledOnceWith(999, 8);
       expect(listStub).to.not.have.been.called;
     });
+  });
+});
+
+const blueprint: Blueprint = {
+  blueprint_id: 1,
+  name: 'Schema',
+  version_number: 1,
+  description: null,
+  is_default: false,
+  parent_blueprint_id: null,
+  record_effective_date: '2026-01-01',
+  record_end_date: null
+};
+
+describe('BlueprintService administration', () => {
+  let service: BlueprintService;
+  let repository: sinon.SinonStubbedInstance<BlueprintService['blueprintRepository']>;
+  beforeEach(() => {
+    service = new BlueprintService(getMockDBConnection());
+    repository = sinon.stub(service.blueprintRepository);
+    repository.lockBlueprintAdministration.resolves('2026-09-23');
+    repository.getBlueprint.resolves({ ...blueprint });
+    repository.getBlueprintAncestorIds.resolves([2]);
+  });
+  afterEach(() => sinon.restore());
+
+  it('locks creation before validating a retired parent and leaves an omitted date absent', async () => {
+    repository.insertBlueprint.resolves({ ...blueprint, record_effective_date: null });
+    const result = await service.createBlueprint({ name: 'Draft', parentBlueprintId: 2 });
+    sinon.assert.callOrder(
+      repository.lockBlueprintAdministration,
+      repository.getBlueprintAncestorIds,
+      repository.insertBlueprint
+    );
+    expect(repository.insertBlueprint.firstCall.args[0].recordEffectiveDate).to.be.undefined;
+    expect(result.record_effective_date).to.be.null;
+  });
+
+  it('clears the old default before selecting the new default under the lock', async () => {
+    repository.setDefaultBlueprint.resolves({ ...blueprint, is_default: true });
+    expect((await service.setDefaultBlueprint(1)).is_default).to.equal(true);
+    sinon.assert.callOrder(
+      repository.lockBlueprintAdministration,
+      repository.getBlueprint,
+      repository.clearDefaultBlueprint,
+      repository.setDefaultBlueprint
+    );
+  });
+
+  for (const state of [
+    { record_effective_date: null },
+    { record_effective_date: '2026-09-24' },
+    { record_end_date: '2026-09-01' },
+    { record_effective_date: null, record_end_date: '2026-09-01' }
+  ]) {
+    it(`rejects default selection for ineligible state ${JSON.stringify(state)}`, async () => {
+      repository.getBlueprint.resolves({ ...blueprint, ...state });
+      try {
+        await service.setDefaultBlueprint(1);
+        expect.fail('Expected conflict');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+      sinon.assert.notCalled(repository.clearDefaultBlueprint);
+    });
+  }
+
+  it('accepts today and makes repeated default selection a no-op', async () => {
+    repository.getBlueprint.resolves({ ...blueprint, record_effective_date: '2026-09-23', is_default: true });
+    await service.setDefaultBlueprint(1);
+    sinon.assert.notCalled(repository.clearDefaultBlueprint);
+    sinon.assert.notCalled(repository.setDefaultBlueprint);
+  });
+
+  for (const recordEffectiveDate of [null, '2026-09-24']) {
+    it(`rejects an ineligible date on the current default: ${recordEffectiveDate}`, async () => {
+      repository.getBlueprint.resolves({ ...blueprint, is_default: true });
+      try {
+        await service.updateBlueprint(1, { recordEffectiveDate });
+        expect.fail('Expected conflict');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+      sinon.assert.notCalled(repository.updateBlueprint);
+    });
+  }
+
+  it('allows scheduled metadata edits and distinguishes omitted and null fields', async () => {
+    repository.getBlueprint.resolves({ ...blueprint, record_effective_date: '2026-09-24' });
+    await service.updateBlueprint(1, { name: 'Renamed', description: null, parentBlueprintId: null });
+    expect(repository.updateBlueprint.firstCall.args[1]).to.deep.equal({
+      name: 'Renamed',
+      description: null,
+      parentBlueprintId: null
+    });
+    sinon.assert.notCalled(repository.getBlueprintAncestorIds);
+    sinon.assert.callOrder(repository.lockBlueprintAdministration, repository.getBlueprint, repository.updateBlueprint);
+  });
+
+  for (const record_effective_date of ['2026-09-22', '2026-09-23']) {
+    it(`allows name and description edits once effective on ${record_effective_date}`, async () => {
+      repository.getBlueprint.resolves({ ...blueprint, record_effective_date });
+      await service.updateBlueprint(1, { name: 'Changed', description: null });
+      sinon.assert.calledWithExactly(repository.updateBlueprint, 1, { name: 'Changed', description: null });
+      sinon.assert.callOrder(
+        repository.lockBlueprintAdministration,
+        repository.getBlueprint,
+        repository.updateBlueprint
+      );
+    });
+
+    for (const fields of [
+      { parentBlueprintId: null },
+      { recordEffectiveDate: null },
+      { recordEffectiveDate: '2999-01-01' }
+    ]) {
+      it(`rejects protected fields ${JSON.stringify(fields)} once effective on ${record_effective_date}`, async () => {
+        repository.getBlueprint.resolves({ ...blueprint, record_effective_date });
+        try {
+          await service.updateBlueprint(1, { name: 'Changed', ...fields });
+          expect.fail('Expected conflict');
+        } catch (error) {
+          expect(error).instanceOf(ApiConflictError);
+        }
+        sinon.assert.notCalled(repository.updateBlueprint);
+      });
+    }
+  }
+
+  it('rejects editing retired metadata', async () => {
+    repository.getBlueprint.resolves({ ...blueprint, record_end_date: '2026-01-01' });
+    try {
+      await service.updateBlueprint(1, { name: 'Changed' });
+      expect.fail('Expected conflict');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiConflictError);
+    }
+  });
+
+  it('preserves the original retirement metadata on repeated calls', async () => {
+    const retired = { ...blueprint, record_effective_date: null, record_end_date: '2026-01-01' };
+    repository.getBlueprint.resolves(retired);
+    expect(await service.retireBlueprint(1)).to.deep.equal(retired);
+    sinon.assert.notCalled(repository.retireBlueprint);
+  });
+
+  for (const record_effective_date of [null, '2027-01-01', '2026-01-01']) {
+    it(`allows retirement of non-default state ${record_effective_date}`, async () => {
+      repository.getBlueprint.resolves({ ...blueprint, record_effective_date });
+      await service.retireBlueprint(1);
+      sinon.assert.calledOnceWithExactly(repository.retireBlueprint, 1);
+    });
+  }
+
+  it('requires replacement before retiring the current default', async () => {
+    repository.getBlueprint.resolves({ ...blueprint, is_default: true });
+    try {
+      await service.retireBlueprint(1);
+      expect.fail('Expected conflict');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiConflictError);
+    }
+    sinon.assert.notCalled(repository.retireBlueprint);
+  });
+
+  for (const ancestorIds of [[1], [2, 1]]) {
+    it('rejects self-parenting and cycles across ancestors', async () => {
+      repository.getBlueprint.resolves({ ...blueprint, record_effective_date: null });
+      repository.getBlueprintAncestorIds.resolves(ancestorIds);
+      try {
+        await service.updateBlueprint(1, { parentBlueprintId: ancestorIds[0] });
+        expect.fail('Expected conflict');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+    });
+  }
+
+  it('rejects a missing parent', async () => {
+    repository.getBlueprintAncestorIds.resolves([]);
+    try {
+      await service.createBlueprint({ name: 'Missing parent', parentBlueprintId: 99 });
+      expect.fail('Expected validation error');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiValidationError);
+    }
+  });
+
+  it('reports missing blueprint identifiers', async () => {
+    repository.getBlueprint.resolves(undefined);
+    try {
+      await service.getBlueprint(99);
+      expect.fail('Expected missing blueprint');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiNotFoundError);
+    }
+  });
+
+  it('rejects unapproved sort fields before querying', async () => {
+    try {
+      await service.getBlueprints({}, { page: 1, limit: 10, sort: 'create_user' });
+      expect.fail('Expected validation error');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiValidationError);
+    }
+    sinon.assert.notCalled(repository.getBlueprints);
+  });
+
+  it('returns the filtered count with all lifecycle states', async () => {
+    repository.getBlueprints.resolves([{ ...blueprint, record_end_date: '2026-01-01' }]);
+    repository.getBlueprintsCount.resolves({ count: 11 });
+    const result = await service.getBlueprints({ keyword: 'schema' }, { page: 2, limit: 10, sort: 'name' });
+    expect(result.pagination.total).to.equal(11);
+    expect(result.blueprints[0].record_end_date).to.equal('2026-01-01');
+    expect(repository.getBlueprintsCount.firstCall.args[0]).to.deep.equal({ keyword: 'schema' });
   });
 });

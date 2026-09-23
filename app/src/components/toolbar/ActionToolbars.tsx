@@ -67,6 +67,8 @@ export const H2ButtonToolbar: React.FC<React.PropsWithChildren<IButtonToolbarPro
 export interface IMenuToolbarItem {
   menuIcon?: ReactNode;
   menuLabel: string;
+  disabled?: boolean;
+  title?: string;
   menuOnClick: () => void;
 }
 
@@ -148,6 +150,8 @@ export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButto
               id={menuItemId}
               key={menuItemId}
               data-testid={menuItemId}
+              disabled={menuItem.disabled}
+              title={menuItem.title}
               onClick={() => closeMenuOnItemClick(menuItem.menuOnClick)}>
               {menuItem.menuIcon && <ListItemIcon>{menuItem.menuIcon}</ListItemIcon>}
               {menuItem.menuLabel}
@@ -196,7 +200,8 @@ export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuI
         aria-controls="basic-icon-menu"
         aria-haspopup="true"
         aria-expanded={open ? 'true' : undefined}
-        onClick={handleClick}>
+        onClick={handleClick}
+        {...props.buttonProps}>
         {props.buttonIcon}
       </IconButton>
       <Menu
@@ -221,6 +226,8 @@ export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuI
               id={menuItemId}
               key={menuItemId}
               data-testid={menuItemId}
+              disabled={menuItem.disabled}
+              title={menuItem.title}
               onClick={() => closeMenuOnItemClick(menuItem.menuOnClick)}>
               {menuItem.menuIcon && <ListItemIcon>{menuItem.menuIcon}</ListItemIcon>}
               {menuItem.menuLabel}
