@@ -5,7 +5,6 @@ import { CountResult } from '../models/count';
 import {
   CreateSecurityRule,
   SecurityRule,
-  SecurityRuleAndCategory,
   SecurityRuleRecord,
   SecurityRuleWithFeatureCount,
   SecuritySearchFilters,
@@ -23,38 +22,8 @@ import { BaseRepository } from './base-repository';
  */
 export class SecurityRuleRepository extends BaseRepository {
   /**
-   * Gets a list of all active security rules. A security rule is active if it has not been end-dated.
-   *
-   * @return {Promise<SecurityRuleRecord[]>}
-   * @memberof SecurityRuleRepository
-   */
-  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
-    const sql = SQL`
-      SELECT
-        security_rule_id,
-        policy_id,
-        name,
-        description,
-        is_active,
-        record_effective_date,
-        record_end_date,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count
-      FROM security_rule
-      WHERE record_end_date IS NULL;
-    `;
-    const response = await this.connection.sql(sql, SecurityRuleRecord);
-    return response.rows;
-  }
-
-  /**
    * Gets security rules eligible for automatic screening.
    * A rule is screenable when it is not soft-deleted and is_active is true.
-   *
-   * Future automatic screening must use this method (not getActiveSecurityRules).
    *
    * @return {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityRuleRepository
@@ -79,35 +48,6 @@ export class SecurityRuleRepository extends BaseRepository {
         AND is_active = true;
     `;
     const response = await this.connection.sql(sql, SecurityRuleRecord);
-    return response.rows;
-  }
-
-  /**
-   * Gets a list of all active security rules with their associated categories.
-   *
-   * @return {Promise<SecurityRuleAndCategory[]>}
-   * @memberof SecurityRuleRepository
-   */
-  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
-    const sql = SQL`
-      SELECT 
-        sr.security_rule_id,
-        sr.policy_id,
-        sr.name,
-        sr.description,
-        sr.is_active,
-        sr.record_effective_date,
-        sr.record_end_date,
-        sc.security_category_id,
-        sc.name as category_name,
-        sc.description as category_description,
-        sc.record_effective_date as category_record_effective_date,
-        sc.record_end_date as category_record_end_date
-      FROM security_rule sr, security_category sc 
-      WHERE sr.security_category_id = sc.security_category_id
-      AND sr.record_end_date IS NULL;
-    `;
-    const response = await this.connection.sql(sql, SecurityRuleAndCategory);
     return response.rows;
   }
 

@@ -16,7 +16,6 @@ import { SecurityScopeRepository } from '../repositories/authorization/security-
 import { SubmissionFeaturePropertyIngestionService } from '../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionIngestionService } from '../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { SecurityService } from '../services/security-service';
 import { SubmissionFeatureClosureService } from '../services/submission-feature-closure-service';
 import { getLogger } from '../utils/logger';
 
@@ -242,7 +241,11 @@ export async function generateSnapshot(options: GenerateSnapshotOptions): Promis
   // Securing only happens when the caller asks for it (the sampler run omits it); the Moose run
   // passes the default identifiers, or its own override.
   if (options.secureDeploymentIdentifiers !== undefined) {
-    await secureDeploymentsAndComputeAnchors(chain.submissionId, options.secureDeploymentIdentifiers);
+    await secureDeploymentsAndComputeAnchors(
+      chain.submissionId,
+      chain.submissionUploadId,
+      options.secureDeploymentIdentifiers
+    );
   }
 
   return { submissionId: chain.submissionId, submissionUploadId: chain.submissionUploadId };
@@ -595,47 +598,46 @@ async function createSnapshotTicket(
 /**
  * Secure the demo deployment subset and compute their security-scope anchors synchronously.
  *
- * `patchSecurityRulesOnSubmissionFeatures` writes the security rows and only *enqueues* a pg-boss
- * anchor-compute job — it does not compute anchors inline. In run-once mode there is no worker
- * draining the queue, so those enqueued jobs sit inert and harmless; the synchronous anchor loop
- * below is the authoritative compute. Telemetry is never secured directly: it has no security row
- * and is hidden only because its ancestor deployment is secured and security cascades down the
- * closure ancestry path.
+ * Seed fixtures are scoped to the generated upload, and anchors are computed
+ * synchronously because run-once mode has no worker draining queued computation jobs.
+ * Telemetry inherits security from its secured deployment through closure ancestry.
  *
  * @param {number} submissionId The submission whose deployments are secured.
+ * @param {string} submissionUploadId Upload whose features are secured.
  * @param {string[]} identifiers The animal_identifier values of the deployments to secure.
  * @returns {Promise<void>}
  */
-async function secureDeploymentsAndComputeAnchors(submissionId: number, identifiers: string[]): Promise<void> {
+async function secureDeploymentsAndComputeAnchors(
+  submissionId: number,
+  submissionUploadId: string,
+  identifiers: string[]
+): Promise<void> {
   await withConnection(async (connection) => {
     const ruleId = await getSecurityRuleIdByName(connection, DEMO_SECURITY_RULE_NAME);
-    const deployments = await getTelemetryDeployments(connection, submissionId);
+    const deployments = await getTelemetryDeployments(connection, submissionId, submissionUploadId);
     const deploymentFeatureIds = selectDeploymentsToSecure(deployments, identifiers);
 
     await logDeploymentTelemetryCounts(connection, submissionId, deployments, deploymentFeatureIds);
 
-    // Never secure the dataset root — securing the root cascades through the closure (self-or-ancestor)
-    // and locks every feature in the submission, defeating the partial-secure demo. Only the deployment
-    // subset is secured here.
-    await new SecurityService(connection).patchSecurityRulesOnSubmissionFeatures(
-      submissionId,
-      deploymentFeatureIds,
-      [ruleId],
-      []
-    );
-
-    // Also secure the study_area, which activates the seed's otherwise-dormant Sampling Sites policy as a
-    // second, top-level lock demo. The study_area has no descendants, so this locks exactly one feature
-    // (no cascade); the anchor computation below binds it under the urn:*:study_area:* scope automatically.
     const studyAreaRuleId = await getSecurityRuleIdByName(connection, STUDY_AREA_SECURITY_RULE_NAME);
-    const studyAreaFeatureIds = await getStudyAreaFeatureIds(connection, submissionId);
-    if (studyAreaFeatureIds.length > 0) {
-      await new SecurityService(connection).patchSecurityRulesOnSubmissionFeatures(
-        submissionId,
-        studyAreaFeatureIds,
-        [studyAreaRuleId],
-        []
-      );
+    const studyAreaFeatureIds = await getStudyAreaFeatureIds(connection, submissionId, submissionUploadId);
+    const assignments = [
+      { securityRuleId: ruleId, submissionFeatureIds: deploymentFeatureIds },
+      { securityRuleId: studyAreaRuleId, submissionFeatureIds: studyAreaFeatureIds }
+    ].filter((assignment) => assignment.submissionFeatureIds.length > 0);
+
+    // Fixture generation owns these writes; no application mutation API exists for submission-only assignment.
+    for (const assignment of assignments) {
+      await connection.sql(SQL`INSERT INTO submission_feature_security
+        (submission_feature_id, security_rule_id, record_effective_date)
+        SELECT sf.submission_feature_id, ${assignment.securityRuleId}, now()
+        FROM submission_feature sf
+        WHERE sf.submission_id = ${submissionId}
+          AND sf.submission_upload_id = ${submissionUploadId}::uuid
+          AND sf.record_end_date IS NULL
+          AND sf.submission_feature_id = ANY(${assignment.submissionFeatureIds}::integer[])
+        ON CONFLICT (submission_feature_id, security_rule_id) DO UPDATE SET status = 'active'
+        WHERE submission_feature_security.status IS DISTINCT FROM 'active'`);
     }
 
     await computeAnchorsForSubmission(connection, submissionId);
@@ -668,14 +670,20 @@ async function getSecurityRuleIdByName(connection: IDBConnection, ruleName: stri
  *
  * @param {IDBConnection} connection Transaction-scoped connection.
  * @param {number} submissionId The submission scope.
+ * @param {string} submissionUploadId Upload scope for the seed features.
  * @returns {Promise<number[]>} The active study_area feature ids.
  */
-async function getStudyAreaFeatureIds(connection: IDBConnection, submissionId: number): Promise<number[]> {
+async function getStudyAreaFeatureIds(
+  connection: IDBConnection,
+  submissionId: number,
+  submissionUploadId: string
+): Promise<number[]> {
   const response = await connection.sql(SQL`
     SELECT sf.submission_feature_id
     FROM submission_feature sf
     JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id AND ft.name = 'study_area'
     WHERE sf.submission_id = ${submissionId}
+      AND sf.submission_upload_id = ${submissionUploadId}::uuid
       AND sf.record_end_date IS NULL;
   `);
 
@@ -687,9 +695,14 @@ async function getStudyAreaFeatureIds(connection: IDBConnection, submissionId: n
  *
  * @param {IDBConnection} connection Transaction-scoped connection.
  * @param {number} submissionId The submission scope.
+ * @param {string} submissionUploadId Upload scope for the seed features.
  * @returns {Promise<DeploymentRow[]>} One row per active deployment.
  */
-async function getTelemetryDeployments(connection: IDBConnection, submissionId: number): Promise<DeploymentRow[]> {
+async function getTelemetryDeployments(
+  connection: IDBConnection,
+  submissionId: number,
+  submissionUploadId: string
+): Promise<DeploymentRow[]> {
   const response = await connection.sql(SQL`
     SELECT
       sf.submission_feature_id,
@@ -714,6 +727,7 @@ async function getTelemetryDeployments(connection: IDBConnection, submissionId: 
         WHERE fp.name = 'device_key'
       )
     WHERE sf.submission_id = ${submissionId}
+      AND sf.submission_upload_id = ${submissionUploadId}::uuid
       AND sf.record_end_date IS NULL;
   `);
 

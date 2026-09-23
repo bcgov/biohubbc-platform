@@ -85,22 +85,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Update (patch) a submission record.
-   *
-   * @param {number} submissionId
-   * @param {{ security_reviewed?: boolean; published?: boolean }} patch
-   * @return {*}
-   */
-  const updateSubmissionRecord = async (
-    submissionId: number,
-    patch: { security_reviewed?: boolean; published?: boolean }
-  ) => {
-    const { data } = await axios.patch(`api/administrative/submission/${submissionId}`, patch);
-
-    return data;
-  };
-
-  /**
    * Fetch all published submission records for public users.
    *
    * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
@@ -172,7 +156,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getUnreviewedSubmissionsForAdmins,
     getReviewedSubmissionsForAdmins,
     getPublishedSubmissionsForAdmins,
-    updateSubmissionRecord,
     getPublishedSubmissions,
     getSubmissionsForUser,
     getSubmissionUploadUrls,
