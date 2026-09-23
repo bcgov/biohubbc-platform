@@ -87,6 +87,8 @@ export type SubmissionFeatureProperty = z.infer<typeof SubmissionFeatureProperty
  * Schema for a feature property record (includes resolved type_name from feature_property_type).
  */
 export const FeatureProperty = z.object({
+  record_effective_date: z.string().optional(),
+  record_end_date: z.string().nullable().optional(),
   feature_property_id: z.number(),
   feature_property_type_id: z.number(),
   name: z.string(),
@@ -121,13 +123,12 @@ export interface CreateFeatureProperty {
   calculated_value?: boolean;
 }
 
-/** Partial fields accepted when updating a feature property. */
+/**
+ * Editable presentation metadata; property identity and value semantics remain immutable.
+ */
 export interface UpdateFeatureProperty {
-  name?: string;
   display_name?: string;
   description?: string | null;
-  calculated_value?: boolean;
-  record_end_date?: string;
 }
 
 /**

@@ -30,7 +30,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get all active feature properties with optional pagination and search.',
+  description: 'Get active and retired feature properties with optional pagination and search.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -45,7 +45,7 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'List of active feature properties',
+      description: 'List of active and retired feature properties',
       content: {
         'application/json': {
           schema: FeaturePropertiesListResponseSchema
@@ -57,7 +57,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get all active feature properties with pagination.
+ * Get active and retired feature properties with pagination.
  *
  * @returns {RequestHandler}
  */

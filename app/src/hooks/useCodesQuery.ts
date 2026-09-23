@@ -3,7 +3,7 @@ import { codeQueryKeys } from 'utils/query-keys/code-query-keys';
 import { useApi } from './useApi';
 
 /**
- * Loads every code set, once per session: codes are reference data that change only with a deployment.
+ * Loads every code set for the session. Configuration mutations invalidate this lookup when definitions or the default blueprint change.
  *
  * @returns The code sets query.
  */

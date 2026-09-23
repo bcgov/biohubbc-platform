@@ -100,3 +100,33 @@ export interface UpdateBlueprintFeatureTypePropertyRecord {
   allow_multiple?: boolean;
   sort?: number | null;
 }
+
+export const Blueprint = z.object({
+  blueprint_id: z.number(),
+  name: z.string(),
+  version_number: z.number(),
+  description: z.string().nullable(),
+  is_default: z.boolean(),
+  parent_blueprint_id: z.number().nullable(),
+  record_effective_date: z.string().nullable(),
+  record_end_date: z.string().nullable()
+});
+export type Blueprint = z.infer<typeof Blueprint>;
+
+export interface CreateBlueprint {
+  name: string;
+  description?: string | null;
+  parentBlueprintId?: number | null;
+  recordEffectiveDate?: string | null;
+}
+
+export interface UpdateBlueprint {
+  name?: string;
+  description?: string | null;
+  parentBlueprintId?: number | null;
+  recordEffectiveDate?: string | null;
+}
+
+export interface BlueprintFilters {
+  keyword?: string;
+}
