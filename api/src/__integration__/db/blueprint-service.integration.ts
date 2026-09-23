@@ -148,6 +148,56 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     return result.rows;
   }
 
+  /**
+   * Resolve, for a feature uploaded under the default Blueprint, an active assignment of its type with
+   * the given declared property type.
+   *
+   * @param {number} submissionFeatureId - Feature whose type and upload Blueprint scope the assignment.
+   * @param {string} declaredTypeName - Declared property type the assignment must have.
+   * @return {Promise<{ blueprint_feature_type_property_id: number; feature_property_id: number }>} The assignment.
+   */
+  async function findAssignmentOfFeature(
+    submissionFeatureId: number,
+    declaredTypeName: string
+  ): Promise<{ blueprint_feature_type_property_id: number; feature_property_id: number }> {
+    const result = await connection.sql(SQL`
+      SELECT bftp.blueprint_feature_type_property_id, bftp.feature_property_id
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+      JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
+      JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+      WHERE sf.submission_feature_id = ${submissionFeatureId}
+        AND fpt.name = ${declaredTypeName}
+      ORDER BY bftp.blueprint_feature_type_property_id
+      LIMIT 1;
+    `);
+    expect(result.rows[0], `feature has a ${declaredTypeName} assignment`).to.not.be.undefined;
+    return result.rows[0];
+  }
+
+  /**
+   * Store a number value for a feature under an assignment, returning the database error if any.
+   *
+   * @param {number} submissionFeatureId - Feature receiving the value.
+   * @param {number | null} assignmentId - Assignment to store the value under.
+   * @return {Promise<unknown>} The error thrown by the insert, or null when it succeeded.
+   */
+  async function tryInsertNumber(submissionFeatureId: number, assignmentId: number | null): Promise<unknown> {
+    try {
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+        VALUES (${submissionFeatureId}, ${assignmentId}, 1, ${connection.systemUserId()});
+      `);
+      return null;
+    } catch (error) {
+      return error;
+    }
+  }
+
   // --- versioning ------------------------------------------------------------
 
   describe('createBlueprintVersion', () => {
@@ -346,46 +396,6 @@ describe('BlueprintService — blueprint-owned property assignments (integration
   // --- database guards -------------------------------------------------------
 
   describe('database guards', () => {
-    /**
-     * Resolve, for a feature uploaded under the default Blueprint, an active assignment of its type with
-     * the given declared property type.
-     */
-    async function findAssignmentOfFeature(
-      submissionFeatureId: number,
-      declaredTypeName: string
-    ): Promise<{ blueprint_feature_type_property_id: number; feature_property_id: number }> {
-      const result = await connection.sql(SQL`
-        SELECT bftp.blueprint_feature_type_property_id, bftp.feature_property_id
-        FROM submission_feature sf
-        JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
-        JOIN blueprint_feature_type bft
-          ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-        JOIN blueprint_feature_type_property bftp
-          ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
-        JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
-        JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
-        WHERE sf.submission_feature_id = ${submissionFeatureId}
-          AND fpt.name = ${declaredTypeName}
-        ORDER BY bftp.blueprint_feature_type_property_id
-        LIMIT 1;
-      `);
-      expect(result.rows[0], `feature has a ${declaredTypeName} assignment`).to.not.be.undefined;
-      return result.rows[0];
-    }
-
-    /** Store a number value for a feature under an assignment, returning the database error if any. */
-    async function tryInsertNumber(submissionFeatureId: number, assignmentId: number | null): Promise<unknown> {
-      try {
-        await connection.sql(SQL`
-          INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-          VALUES (${submissionFeatureId}, ${assignmentId}, 1, ${connection.systemUserId()});
-        `);
-        return null;
-      } catch (error) {
-        return error;
-      }
-    }
-
     it('requires every stored value to carry an assignment', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
