@@ -1,15 +1,9 @@
 import { IDBConnection } from '../database/db';
 import { ArtifactPersecution, PersecutionAndHarmSecurity } from '../models/persecution-and-harm';
-import {
-  SubmissionFeatureSecurityRecord,
-  SubmissionFeatureSecurityRulesSummary
-} from '../models/submission-feature-security';
 import { SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
 import { getLogger } from '../utils/logger';
-import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
-import { SubmissionService } from './submission-service';
 
 const defaultLog = getLogger('services/security-service');
 
@@ -22,16 +16,12 @@ const defaultLog = getLogger('services/security-service');
 export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
   artifactService: ArtifactService;
-  securityScopeService: SecurityScopeService;
-  submissionService: SubmissionService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.securityRepository = new SecurityRepository(connection);
     this.artifactService = new ArtifactService(connection);
-    this.securityScopeService = new SecurityScopeService(connection);
-    this.submissionService = new SubmissionService(connection);
   }
 
   /**
@@ -272,100 +262,6 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Patches security rules that are applied or removed to the given set of submission features. If a
-   * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
-   * added.
-   *
-   * After mutations, triggers scope recomputation for all scopes covering the submission.
-   * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
-   * added and removed rules idempotently.
-   *
-   * @param {number} submissionId ID of the submission the features belong to.
-   * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
-   * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation.
-   * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation.
-   * @returns {Promise<void>} Resolves after the mutations and anchor-recomputation jobs are queued.
-   * @memberof SecurityService
-   */
-  async patchSecurityRulesOnSubmissionFeatures(
-    submissionId: number,
-    submissionFeatureIds: number[],
-    applyRuleIds: number[],
-    removeRuleIds: number[]
-  ): Promise<void> {
-    defaultLog.debug({ label: 'patchSecurityRulesOnSubmissionFeatures', applyRuleIds, removeRuleIds });
-
-    if (!submissionFeatureIds.length) {
-      return;
-    }
-
-    // Serialize security changes with reconciliation so its predecessor snapshot is stable.
-    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionId);
-
-    if (removeRuleIds.length > 0) {
-      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(
-        submissionId,
-        submissionFeatureIds,
-        removeRuleIds
-      );
-    }
-
-    if (applyRuleIds.length > 0) {
-      await this.securityRepository.applySecurityRulesToSubmissionFeatures(
-        submissionId,
-        submissionFeatureIds,
-        applyRuleIds
-      );
-    }
-
-    // Trigger scope recomputation — the recompute job handles both added and removed rules
-    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
-  }
-
-  /**
-   * Patches security rules applied or removed for all features of a submission.
-   * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
-   *
-   * After mutations, triggers scope recomputation for all scopes covering the submission.
-   * The recompute job (deleteStaleAnchorBatch + resolveUrnForScope + computeAnchorBatch) handles both
-   * added and removed rules idempotently.
-   *
-   * @param {number} submissionId ID of the submission whose feature security should be updated.
-   * @param {number[]} applyRuleIds IDs of rules to apply.
-   * @param {number[]} removeRuleIds IDs of rules to remove.
-   * @returns {Promise<void>} Resolves after the mutations and anchor-recomputation jobs are queued.
-   * @memberof SecurityService
-   */
-  async patchSecurityRulesOnSubmission(
-    submissionId: number,
-    applyRuleIds: number[],
-    removeRuleIds: number[]
-  ): Promise<void> {
-    defaultLog.debug({
-      label: 'patchSecurityRulesOnSubmission',
-      submissionId,
-      applyRuleIds,
-      removeRuleIds
-    });
-
-    // See patchSecurityRulesOnSubmissionFeatures: reconciliation takes this same submission-scoped lock.
-    await this.submissionService.lockSubmissionFeatureStateForSubmissionId(submissionId);
-
-    // Remove rules first
-    if (removeRuleIds?.length) {
-      await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds);
-    }
-
-    // Apply rules last (wins if overlap exists)
-    if (applyRuleIds?.length) {
-      await this.securityRepository.applySecurityToSubmission(submissionId, applyRuleIds);
-    }
-
-    // Trigger scope recomputation — the recompute job handles both added and removed rules
-    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
-  }
-
-  /**
    * Copy live predecessor rules to pending successor occurrences, preserving status and provenance.
    *
    * @param {string} submissionUploadId Pending successor upload identifier.
@@ -381,38 +277,5 @@ export class SecurityService extends DBService {
       submissionUploadId,
       predecessorSubmissionUploadId
     );
-  }
-
-  /**
-   * Gets Submission Feature Security Records for a given set of submission feature ids
-   *
-   * @param {number[]} submissionFeatureIds
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
-   * @memberof SecurityService
-   */
-  async getSecurityRulesForSubmissionFeatures(
-    submissionFeatureIds: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!submissionFeatureIds.length) {
-      // no features, return early
-      return [];
-    }
-
-    return this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
-  }
-
-  /**
-   * Gets all Security Records for all featues belonging to the given submission.
-   *
-   * @param {number} submissionId
-   * @param {number[]} submissionFeatureIds
-   * @return {*}  {Promise<SubmissionFeatureSecurityRulesSummary>}
-   * @memberof SecurityService
-   */
-  async getSubmissionFeatureSecuritySummary(
-    submissionId: number,
-    submissionFeatureIds?: number[]
-  ): Promise<SubmissionFeatureSecurityRulesSummary> {
-    return this.securityRepository.getSubmissionFeatureSecuritySummary(submissionId, submissionFeatureIds);
   }
 }

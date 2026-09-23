@@ -1,8 +1,6 @@
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
-import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { ISubmissionFeatureSecurityRulesSummaryResponse } from 'interfaces/useSecurityApi.interface';
 import {
   ISubmissionFeatureForReviewResponse,
   SubmissionRecordWithSecurity
@@ -22,10 +20,6 @@ export interface ISubmissionContext {
   submissionDataLoader: DataLoader<[number], SubmissionRecordWithSecurity, unknown>;
 
   featureDataLoader: DataLoader<[number, ApiPaginationRequestOptions], ISubmissionFeatureForReviewResponse, unknown>;
-
-  securityDataLoader: DataLoader<[number[] | undefined], ISubmissionFeatureSecurityRulesSummaryResponse, unknown>;
-
-  allSecurityRulesDataLoader: DataLoader<[], ISecurityRuleAndCategory[], unknown>;
 
   paginationModel: GridPaginationModel;
   setPaginationModel: React.Dispatch<React.SetStateAction<GridPaginationModel>>;
@@ -83,25 +77,12 @@ export const SubmissionContextProvider = ({ children }: PropsWithChildren) => {
     api.admin.getSubmissionFeatures(submissionId, pagination)
   );
 
-  /**
-   * securityDataLoader(featureIds?)
-   *
-   * - undefined → all security rules for submission
-   * - number[]  → security rules for selected features
-   */
-  const securityDataLoader = useDataLoader((featureIds?: number[]) =>
-    api.security.getSubmissionFeatureSecuritySummary(submissionId, featureIds)
-  );
-
-  const allSecurityRulesDataLoader = useDataLoader(api.security.getActiveSecurityRulesWithCategories);
-
   /* ---------------- Initial Load ---------------- */
 
   useEffect(() => {
     submissionDataLoader.load(submissionId);
     featureDataLoader.load(submissionId, featuresPagination);
-    allSecurityRulesDataLoader.load();
-  }, [submissionId, featuresPagination, submissionDataLoader, featureDataLoader, allSecurityRulesDataLoader]);
+  }, [submissionId, featuresPagination, submissionDataLoader, featureDataLoader]);
 
   /* ---------------- Feature Paging / Sorting ---------------- */
 
@@ -118,8 +99,6 @@ export const SubmissionContextProvider = ({ children }: PropsWithChildren) => {
 
       submissionDataLoader,
       featureDataLoader,
-      securityDataLoader,
-      allSecurityRulesDataLoader,
 
       paginationModel,
       setPaginationModel,
@@ -127,16 +106,7 @@ export const SubmissionContextProvider = ({ children }: PropsWithChildren) => {
       setSortModel,
       featuresPagination
     }),
-    [
-      submissionId,
-      submissionDataLoader,
-      featureDataLoader,
-      securityDataLoader,
-      allSecurityRulesDataLoader,
-      paginationModel,
-      sortModel,
-      featuresPagination
-    ]
+    [submissionId, submissionDataLoader, featureDataLoader, paginationModel, sortModel, featuresPagination]
   );
 
   return <SubmissionContext.Provider value={value}>{children}</SubmissionContext.Provider>;

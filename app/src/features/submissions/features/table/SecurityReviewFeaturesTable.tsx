@@ -1,15 +1,7 @@
 import { mdiLock, mdiLockOpenVariant } from '@mdi/js';
 import Icon from '@mdi/react';
 import { grey } from '@mui/material/colors';
-import IconButton from '@mui/material/IconButton';
-import {
-  GridColDef,
-  GridPaginationModel,
-  GridRowParams,
-  GridRowSelectionModel,
-  GridSortModel,
-  MuiEvent
-} from '@mui/x-data-grid';
+import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import appTheme from 'themes/appTheme';
 import { FeatureRow } from './SecurityReviewFeaturesTable.interface';
@@ -17,25 +9,24 @@ import { FeatureRow } from './SecurityReviewFeaturesTable.interface';
 interface SecurityReviewFeaturesTableProps {
   rows: FeatureRow[];
   rowCount: number;
-  onSelectionChange: (model: GridRowSelectionModel) => void;
   paginationModel: GridPaginationModel;
   setPaginationModel: (model: GridPaginationModel) => void;
   sortModel: GridSortModel;
   setSortModel: (model: GridSortModel) => void;
-  onRowSecurityClick: (row: FeatureRow) => void;
-  onRowClick?: (params: GridRowParams, event: MuiEvent<React.MouseEvent>) => void;
 }
 
+/**
+ * Shows submission feature security indicators without mutation or selection actions.
+ * @param {SecurityReviewFeaturesTableProps} props Feature rows and paging controls.
+ * @returns {JSX.Element} Read-only feature table.
+ */
 export const SecurityReviewFeaturesTable = ({
   rows,
   rowCount,
-  onSelectionChange,
   paginationModel,
   setPaginationModel,
   sortModel,
-  setSortModel,
-  onRowSecurityClick,
-  onRowClick
+  setSortModel
 }: SecurityReviewFeaturesTableProps) => {
   const columns: GridColDef[] = [
     { field: 'submission_feature_id', headerName: 'ID', width: 100 },
@@ -46,17 +37,12 @@ export const SecurityReviewFeaturesTable = ({
       sortable: false,
       filterable: false,
       renderCell: (params) => (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onRowSecurityClick(params.row);
-          }}>
-          <Icon
-            path={params.row.secured ? mdiLock : mdiLockOpenVariant}
-            size={1}
-            color={params.row.secured ? appTheme.palette.error.main : grey[500]}
-          />
-        </IconButton>
+        <Icon
+          path={params.row.secured ? mdiLock : mdiLockOpenVariant}
+          aria-label={params.row.secured ? 'Secured' : 'Unsecured'}
+          size={1}
+          color={params.row.secured ? appTheme.palette.error.main : grey[500]}
+        />
       )
     },
     { field: 'feature_type_name', headerName: 'Feature Type', flex: 1 }
@@ -66,9 +52,8 @@ export const SecurityReviewFeaturesTable = ({
     <CustomDataGrid
       rows={rows}
       columns={columns}
-      checkboxSelection
+      rowSelection={false}
       getRowId={(row) => row.submission_feature_id}
-      onRowSelectionModelChange={onSelectionChange}
       paginationMode="server"
       paginationModel={paginationModel}
       onPaginationModelChange={setPaginationModel}
@@ -77,7 +62,6 @@ export const SecurityReviewFeaturesTable = ({
       sortModel={sortModel}
       onSortModelChange={setSortModel}
       rowCount={rowCount}
-      onRowClick={onRowClick}
     />
   );
 };

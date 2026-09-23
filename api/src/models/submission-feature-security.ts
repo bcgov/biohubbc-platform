@@ -16,14 +16,3 @@ export const SubmissionFeatureSecurityRecord = z.object({
 });
 
 export type SubmissionFeatureSecurityRecord = z.infer<typeof SubmissionFeatureSecurityRecord>;
-
-export const SubmissionFeatureSecurityRulesSummary = z.object({
-  rules: z.array(
-    z.object({
-      security_rule_id: z.number(),
-      count: z.number()
-    })
-  )
-});
-
-export type SubmissionFeatureSecurityRulesSummary = z.infer<typeof SubmissionFeatureSecurityRulesSummary>;
