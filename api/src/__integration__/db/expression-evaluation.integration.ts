@@ -50,10 +50,15 @@ import {
   buildExpressionTreeFeatureIdsSubquery
 } from '../../repositories/expression-evaluation';
 import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
+import { BlueprintService } from '../../services/blueprint-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { optimizeExpression } from '../../utils/expression-optimization';
 import { createBlueprintFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
-import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import {
+  createTestFeature,
+  createTestSubmission,
+  getActiveDefaultBlueprintId
+} from '../helpers/test-submission-helpers';
 
 // Verified seed id (checked against the live DB): feature_property name = 31. The default Blueprint's
 // assignments of it to sample_site and survey are resolved once the pool is up (see `before`).
@@ -1295,6 +1300,42 @@ describe('expression-evaluation (integration)', function () {
       expect(orResultIds).to.deep.equal(new Set([bothValues, firstValue, secondValue]));
       expect(orCountIds).to.deep.equal(new Set([bothValues, firstValue, secondValue]));
       expect(orResultIds.has(otherValue)).to.equal(false);
+    });
+
+    /**
+     * A property assigned to the anchor feature type under two Blueprints resolves to two assignment
+     * ids. A property-wide predicate (no assignment narrowing) must match values stored under either,
+     * in the result subquery and in the count subquery alike.
+     */
+    it('10e: a property assigned in more than one Blueprint evaluates property-wide in both subqueries', async () => {
+      const featureTypeName = 'species_observation';
+      const property = await createNumberProperty(featureTypeName);
+      // A new Blueprint version copies every active assignment, including the one just created.
+      const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
+      await new BlueprintService(connection).createBlueprintVersion(defaultBlueprintId, {});
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const match = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+      const belowRange = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
+
+      await indexNumberProperty(match, property.blueprintFeatureTypePropertyId, 8);
+      await indexNumberProperty(belowRange, property.blueprintFeatureTypePropertyId, 1);
+      await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
+
+      const tree = optimizeExpression({
+        type: 'expression',
+        operator: 'AND',
+        clauses: [{ ...numberPredicate(property, 'GreaterThan', 7), blueprint_feature_type_property_id: null }]
+      });
+      const resultIds = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery(featureTypeName, tree, connection.systemUserId())
+      );
+      const countIds = await runSubquery(
+        buildExpressionTreeCountFeatureIdsSubquery(featureTypeName, tree, connection.systemUserId())
+      );
+
+      expect([...resultIds]).to.deep.equal([match]);
+      expect([...countIds]).to.deep.equal([match]);
     });
 
     /**

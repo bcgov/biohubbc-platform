@@ -314,7 +314,7 @@ function buildPredicateAnchorIdsQuery(
       knex(`${tableName} as p`)
         .select(knex.raw('1'))
         .whereRaw(`p.submission_feature_id = ${anchorId}`)
-        .where(
+        .whereIn(
           'p.blueprint_feature_type_property_id',
           buildPredicateAssignmentIdsQuery(property, knex).where('bft.feature_type_id', anchorFeatureTypeId())
         ),
@@ -336,7 +336,7 @@ function buildPredicateAnchorIdsQuery(
       .whereRaw(
         '(count_direct_self.source_submission_feature_id = count_direct_self.target_submission_feature_id) IS TRUE'
       )
-      .where(
+      .whereIn(
         'p.blueprint_feature_type_property_id',
         buildPredicateAssignmentIdsQuery(property, knex).where('bft.feature_type_id', anchorFeatureTypeId())
       )
