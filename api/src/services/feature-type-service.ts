@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { CreateFeatureType, FeatureType, UpdateFeatureType } from '../models/feature-type';
 import { FeatureTypeRepository } from '../repositories/feature-type-repository';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { FeatureTypeFilters } from './feature-type-service.interface';
@@ -99,6 +100,28 @@ export class FeatureTypeService extends DBService {
    */
   async deleteFeatureType(featureTypeId: number): Promise<void> {
     await this.featureTypeRepository.deleteFeatureType(featureTypeId);
+  }
+
+  /**
+   * Search reusable definitions excluding active memberships before pagination.
+   *
+   * @param blueprintId Validated membership scope.
+   * @param keyword Name or display-name search.
+   * @param pagination Page and ordering.
+   * @returns Matching options and total count.
+   */
+  async getAvailableFeatureTypesForBlueprint(
+    blueprintId: number,
+    keyword: string | undefined,
+    pagination: ApiPaginationOptions
+  ) {
+    const options = await this.featureTypeRepository.getAvailableFeatureTypesForBlueprint(
+      blueprintId,
+      keyword,
+      pagination
+    );
+    const count = await this.featureTypeRepository.getAvailableFeatureTypesForBlueprintCount(blueprintId, keyword);
+    return { options, pagination: makePaginationResponse(count.count, pagination) };
   }
 
   /**

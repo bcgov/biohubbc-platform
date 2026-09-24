@@ -3,7 +3,6 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError, ApiNotFoundError, ApiValidationError } from '../errors/api-error';
 import {
   AdminBlueprint,
-  AdminBlueprintFeatureType,
   AdminBlueprintFeatureTypeProperty,
   Blueprint,
   BlueprintFilters,
@@ -12,12 +11,10 @@ import {
   CreateBlueprintVersionRecord,
   PublishBlueprintRecord,
   UpdateBlueprint,
-  UpdateBlueprintFeatureTypePropertyRecord,
-  UpdateBlueprintFeatureTypeRecord
+  UpdateBlueprintFeatureTypePropertyRecord
 } from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
-import { FeatureTypeRepository } from '../repositories/feature-type-repository';
 import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
@@ -37,7 +34,6 @@ import { DBService } from './db-service';
  */
 export class BlueprintService extends DBService {
   blueprintRepository: BlueprintRepository;
-  featureTypeRepository: FeatureTypeRepository;
   featurePropertyRepository: FeaturePropertyRepository;
 
   /**
@@ -49,7 +45,6 @@ export class BlueprintService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.blueprintRepository = new BlueprintRepository(connection);
-    this.featureTypeRepository = new FeatureTypeRepository(connection);
     this.featurePropertyRepository = new FeaturePropertyRepository(connection);
   }
 
@@ -139,103 +134,6 @@ export class BlueprintService extends DBService {
     await this.blueprintRepository.publishBlueprint(blueprintId, isDefault);
 
     return this.blueprintRepository.getAdminBlueprint(blueprintId);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Blueprint feature types
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Get the active feature types included in a blueprint.
-   *
-   * @param {number} blueprintId - Blueprint identifier.
-   * @return {Promise<AdminBlueprintFeatureType[]>}
-   * @throws {ApiNotFoundError} If no active blueprint exists for the id.
-   * @memberof BlueprintService
-   */
-  async getAdminBlueprintFeatureTypes(blueprintId: number): Promise<AdminBlueprintFeatureType[]> {
-    await this.blueprintRepository.getAdminBlueprint(blueprintId);
-
-    return this.blueprintRepository.getAdminBlueprintFeatureTypes(blueprintId);
-  }
-
-  /**
-   * Include a feature type in a draft blueprint.
-   *
-   * @param {number} blueprintId - Blueprint identifier.
-   * @param {{ feature_type_id: number; sort?: number | null }} data - Feature type to include.
-   * @return {Promise<AdminBlueprintFeatureType>} The created record.
-   * @throws {ApiNotFoundError} If the blueprint or feature type does not exist.
-   * @throws {ApiConflictError} If the blueprint is published, or already includes the feature type.
-   * @memberof BlueprintService
-   */
-  async createBlueprintFeatureType(
-    blueprintId: number,
-    data: { feature_type_id: number; sort?: number | null }
-  ): Promise<AdminBlueprintFeatureType> {
-    await this.blueprintRepository.lockBlueprintAdministration();
-    await this.assertBlueprintIsDraft(blueprintId);
-    await this.featureTypeRepository.getFeatureType(data.feature_type_id);
-
-    const existing = await this.blueprintRepository.findActiveBlueprintFeatureType(blueprintId, data.feature_type_id);
-
-    if (existing) {
-      throw new ApiConflictError('Feature type is already included in this blueprint', [
-        'BlueprintService->createBlueprintFeatureType',
-        { blueprint_id: blueprintId, feature_type_id: data.feature_type_id }
-      ]);
-    }
-
-    const blueprintFeatureTypeId = await this.blueprintRepository.insertBlueprintFeatureType({
-      blueprint_id: blueprintId,
-      feature_type_id: data.feature_type_id,
-      sort: data.sort
-    });
-
-    return this.blueprintRepository.getAdminBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
-  }
-
-  /**
-   * Update a feature type of a draft blueprint.
-   *
-   * @param {number} blueprintId - Parent blueprint identifier.
-   * @param {number} blueprintFeatureTypeId - Blueprint feature type identifier.
-   * @param {UpdateBlueprintFeatureTypeRecord} data - Fields to update.
-   * @return {Promise<AdminBlueprintFeatureType>} The updated record.
-   * @throws {ApiNotFoundError} If no active record exists for the id within the parent blueprint.
-   * @throws {ApiConflictError} If the blueprint is published.
-   * @memberof BlueprintService
-   */
-  async updateBlueprintFeatureType(
-    blueprintId: number,
-    blueprintFeatureTypeId: number,
-    data: UpdateBlueprintFeatureTypeRecord
-  ): Promise<AdminBlueprintFeatureType> {
-    await this.blueprintRepository.lockBlueprintAdministration();
-    await this.assertBlueprintIsDraft(blueprintId);
-    await this.blueprintRepository.updateBlueprintFeatureType(blueprintFeatureTypeId, blueprintId, data);
-
-    return this.blueprintRepository.getAdminBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
-  }
-
-  /**
-   * Remove a feature type from a draft blueprint, retiring its property assignments with it.
-   *
-   * @param {number} blueprintId - Parent blueprint identifier.
-   * @param {number} blueprintFeatureTypeId - Blueprint feature type identifier.
-   * @return {Promise<void>}
-   * @throws {ApiNotFoundError} If no active record exists for the id within the parent blueprint.
-   * @throws {ApiConflictError} If the blueprint is published.
-   * @memberof BlueprintService
-   */
-  async deleteBlueprintFeatureType(blueprintId: number, blueprintFeatureTypeId: number): Promise<void> {
-    await this.blueprintRepository.lockBlueprintAdministration();
-    await this.assertBlueprintIsDraft(blueprintId);
-
-    // Retire the parent first: it is scoped to the blueprint, so an id belonging to another blueprint
-    // is rejected before any of its assignments are touched.
-    await this.blueprintRepository.deleteBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
-    await this.blueprintRepository.deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId(blueprintFeatureTypeId);
   }
 
   // ---------------------------------------------------------------------------
@@ -569,5 +467,18 @@ export class BlueprintService extends DBService {
     ) {
       throw new ApiConflictError('Only draft and future blueprints can be edited');
     }
+  }
+
+  /**
+   * Lock administration before validating metadata or composition edits.
+   *
+   * @param blueprintId Owning blueprint.
+   * @returns Database date for writes in the same transaction.
+   */
+  async lockEditableBlueprint(blueprintId: number): Promise<string> {
+    const currentDate = await this.blueprintRepository.lockBlueprintAdministration();
+    const blueprint = await this.getBlueprint(blueprintId);
+    this.assertBlueprintEditable(blueprint, currentDate);
+    return currentDate;
   }
 }

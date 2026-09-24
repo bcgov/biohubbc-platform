@@ -192,6 +192,13 @@ describe('blueprint administration (integration)', function () {
     expect(await featureTypes.getFeatureTypesCount(filters)).equal(1);
     expect(await properties.getFeatureProperties(filters, pagination)).deep.equal([updatedProperty]);
     expect(await properties.getFeaturePropertiesCount(filters)).equal(1);
+    const options = await featureTypes.getAvailableFeatureTypesForBlueprint(
+      first.blueprint_id,
+      definitionName,
+      pagination
+    );
+    expect(options.options).to.be.empty;
+    expect(options.pagination.total).equal(0);
     for (const read of [
       () => featureTypes.getFeatureType(featureType.feature_type_id),
       () => properties.getFeatureProperty(property.feature_property_id)

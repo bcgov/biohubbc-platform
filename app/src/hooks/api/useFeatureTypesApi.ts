@@ -1,5 +1,7 @@
+import { IAvailableFeatureTypesResponse } from 'interfaces/useFeatureTypesApi.interface';
 import { AxiosInstance } from 'axios';
 import {
+  IGetAvailableFeatureTypesForBlueprintParams,
   IFeatureType,
   IFeatureTypesResponse,
   ICreateFeatureType,
@@ -57,5 +59,28 @@ export const useFeatureTypesApi = (axios: AxiosInstance) => {
     const { data } = await axios.delete(`/api/administrative/feature-types/${id}`);
     return data;
   };
-  return { getFeatureTypes, createFeatureType, updateFeatureType, deleteFeatureType };
+  /**
+   * Search definitions eligible for the selected membership scope.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param params Search, pagination, and sorting.
+   * @returns Paginated eligible options.
+   */
+  const getAvailableFeatureTypesForBlueprint = async (
+    blueprintId: number,
+    params?: IGetAvailableFeatureTypesForBlueprintParams
+  ): Promise<IAvailableFeatureTypesResponse> => {
+    const { data } = await axios.get(`/api/administrative/blueprints/${blueprintId}/types/available`, {
+      params
+    });
+    return data;
+  };
+
+  return {
+    getAvailableFeatureTypesForBlueprint,
+    getFeatureTypes,
+    createFeatureType,
+    updateFeatureType,
+    deleteFeatureType
+  };
 };
