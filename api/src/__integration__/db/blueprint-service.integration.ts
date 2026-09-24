@@ -1,6 +1,8 @@
 import { BlueprintFeatureTypeAssignment } from '../../models/blueprint-composition';
 import { BlueprintCompositionService } from '../../services/blueprint-composition-service';
+import { BlueprintFeatureTypePropertyService } from '../../services/blueprint-feature-type-property-service';
 import { BlueprintFeatureTypeService } from '../../services/blueprint-feature-type-service';
+import { BlueprintVersionService } from '../../services/blueprint-version-service';
 // Integration tests for Blueprint-owned property assignments.
 //
 // Drives BlueprintService against a real database and asserts on the rows it writes to blueprint,
@@ -72,7 +74,9 @@ describe('BlueprintService — blueprint-owned property assignments (integration
   let connection: IDBConnection;
   let service: BlueprintService;
   let blueprintCompositionService: BlueprintCompositionService;
+  let blueprintFeatureTypePropertyService: BlueprintFeatureTypePropertyService;
   let blueprintFeatureTypeService: BlueprintFeatureTypeService;
+  let blueprintVersionService: BlueprintVersionService;
 
   before(() => initDBPool(defaultPoolConfig));
 
@@ -81,7 +85,9 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     await connection.open();
     service = new BlueprintService(connection);
     blueprintCompositionService = new BlueprintCompositionService(connection);
+    blueprintFeatureTypePropertyService = new BlueprintFeatureTypePropertyService(connection);
     blueprintFeatureTypeService = new BlueprintFeatureTypeService(connection);
+    blueprintVersionService = new BlueprintVersionService(connection);
   });
 
   afterEach(async () => {
@@ -117,7 +123,7 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     blueprintFeatureType: BlueprintFeatureTypeAssignment;
   }> {
     const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
-    const draft = await service.createBlueprintVersion(defaultBlueprintId, {});
+    const draft = await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, {});
     const featureTypes = (
       await blueprintFeatureTypeService.getBlueprintFeatureTypes(draft.blueprint_id, {}, { page: 1, limit: 1000 })
     ).types;
@@ -213,7 +219,7 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     it('copies every active assignment into new rows with distinct identifiers', async () => {
       const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
 
-      const draft = await service.createBlueprintVersion(defaultBlueprintId, { name: 'Copy' });
+      const draft = await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, { name: 'Copy' });
 
       expect(draft.parent_blueprint_id).to.equal(defaultBlueprintId);
       expect(draft.record_effective_date).to.be.null;
@@ -241,7 +247,7 @@ describe('BlueprintService — blueprint-owned property assignments (integration
         SQL`SELECT MAX(version_number)::int AS max FROM blueprint;`
       );
 
-      const draft = await service.createBlueprintVersion(defaultBlueprintId, {});
+      const draft = await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, {});
 
       expect(draft.version_number).to.equal(maxBefore.rows[0].max + 1);
     });
@@ -254,51 +260,48 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       const { draft, blueprintFeatureType } = await createDraftWithFeatureType();
       const featurePropertyId = await createUnpairedNumberProperty();
 
-      const assignment = await service.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        blueprintFeatureType.blueprint_feature_type_id,
-        { feature_property_id: featurePropertyId, required_value: true, allow_multiple: true, sort: 42 }
-      );
+      const assignment = await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+        blueprintFeatureTypeId: blueprintFeatureType.blueprint_feature_type_id,
+        featurePropertyId: featurePropertyId,
+        requiredValue: true,
+        allowMultiple: true
+      });
 
       expect(assignment.feature_property_id).to.equal(featurePropertyId);
       expect(assignment.required_value).to.equal(true);
       expect(assignment.allow_multiple).to.equal(true);
-      expect(assignment.sort).to.equal(42);
-      expect(assignment.property_type_name).to.equal('number');
+      expect(assignment.sort).to.be.null;
+      expect(assignment.type_name).to.equal('number');
     });
 
     it('rejects a duplicate active assignment and allows re-assignment after retirement', async () => {
       const { draft, blueprintFeatureType } = await createDraftWithFeatureType();
       const featurePropertyId = await createUnpairedNumberProperty();
 
-      const first = await service.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        blueprintFeatureType.blueprint_feature_type_id,
-        { feature_property_id: featurePropertyId }
-      );
+      const first = await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+        blueprintFeatureTypeId: blueprintFeatureType.blueprint_feature_type_id,
+        featurePropertyId: featurePropertyId
+      });
 
       try {
-        await service.createBlueprintFeatureTypeProperty(
-          draft.blueprint_id,
-          blueprintFeatureType.blueprint_feature_type_id,
-          { feature_property_id: featurePropertyId }
-        );
+        await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+          blueprintFeatureTypeId: blueprintFeatureType.blueprint_feature_type_id,
+          featurePropertyId: featurePropertyId
+        });
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiConflictError);
       }
 
-      await service.deleteBlueprintFeatureTypeProperty(
+      await blueprintCompositionService.deleteBlueprintFeatureTypeProperty(
         draft.blueprint_id,
-        blueprintFeatureType.blueprint_feature_type_id,
         first.blueprint_feature_type_property_id
       );
 
-      const second = await service.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        blueprintFeatureType.blueprint_feature_type_id,
-        { feature_property_id: featurePropertyId }
-      );
+      const second = await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+        blueprintFeatureTypeId: blueprintFeatureType.blueprint_feature_type_id,
+        featurePropertyId: featurePropertyId
+      });
 
       expect(second.blueprint_feature_type_property_id).to.not.equal(first.blueprint_feature_type_property_id);
     });
@@ -311,15 +314,14 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       const featurePropertyId = await createUnpairedNumberProperty();
 
       try {
-        await service.createBlueprintFeatureTypeProperty(
-          defaultBlueprintId,
-          featureTypes[0].blueprint_feature_type_id,
-          { feature_property_id: featurePropertyId }
-        );
+        await blueprintCompositionService.createBlueprintFeatureTypeProperty(defaultBlueprintId, {
+          blueprintFeatureTypeId: featureTypes[0].blueprint_feature_type_id,
+          featurePropertyId: featurePropertyId
+        });
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiConflictError);
-        expect((error as ApiConflictError).message).to.include('published');
+        expect((error as ApiConflictError).message).to.include('Only draft and future blueprints');
       }
     });
   });
@@ -333,22 +335,16 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     const b = await createDraftWithFeatureType();
     const c = await createDraftWithFeatureType();
 
-    await service.createBlueprintFeatureTypeProperty(
-      a.draft.blueprint_id,
-      a.blueprintFeatureType.blueprint_feature_type_id,
-      {
-        feature_property_id: featurePropertyId,
-        required_value: true
-      }
-    );
-    await service.createBlueprintFeatureTypeProperty(
-      c.draft.blueprint_id,
-      c.blueprintFeatureType.blueprint_feature_type_id,
-      {
-        feature_property_id: featurePropertyId,
-        required_value: false
-      }
-    );
+    await blueprintCompositionService.createBlueprintFeatureTypeProperty(a.draft.blueprint_id, {
+      blueprintFeatureTypeId: a.blueprintFeatureType.blueprint_feature_type_id,
+      featurePropertyId: featurePropertyId,
+      requiredValue: true
+    });
+    await blueprintCompositionService.createBlueprintFeatureTypeProperty(c.draft.blueprint_id, {
+      blueprintFeatureTypeId: c.blueprintFeatureType.blueprint_feature_type_id,
+      featurePropertyId: featurePropertyId,
+      requiredValue: false
+    });
 
     const find = (rows: Awaited<ReturnType<typeof getActiveAssignments>>) =>
       rows.find((row) => row.feature_property_id === featurePropertyId);
@@ -366,10 +362,13 @@ describe('BlueprintService — blueprint-owned property assignments (integration
 
   it('retires the assignments of a feature type removed from a draft', async () => {
     const { draft, blueprintFeatureType } = await createDraftWithFeatureType();
-    const before = await service.getAdminBlueprintFeatureTypeProperties(
-      draft.blueprint_id,
-      blueprintFeatureType.blueprint_feature_type_id
-    );
+    const before = (
+      await blueprintFeatureTypePropertyService.getBlueprintFeatureTypeProperties(
+        draft.blueprint_id,
+        { blueprintFeatureTypeId: blueprintFeatureType.blueprint_feature_type_id },
+        { page: 1, limit: 1000 }
+      )
+    ).properties;
     expect(before.length).to.be.greaterThan(0);
 
     await blueprintCompositionService.deleteBlueprintFeatureType(
@@ -446,16 +445,19 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
       const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
-      const draft = await service.createBlueprintVersion(defaultBlueprintId, {});
+      const draft = await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, {});
       const draftFeatureType = (
         await blueprintFeatureTypeService.getBlueprintFeatureTypes(draft.blueprint_id, {}, { page: 1, limit: 1000 })
       ).types.find((featureType) => featureType.name === GUARD_FEATURE_TYPE_NAME);
       expect(draftFeatureType, 'draft includes the guard feature type').to.not.be.undefined;
-      const draftAssignments = await service.getAdminBlueprintFeatureTypeProperties(
-        draft.blueprint_id,
-        (draftFeatureType as BlueprintFeatureTypeAssignment).blueprint_feature_type_id
-      );
-      const draftNumber = draftAssignments.find((assignment) => assignment.property_type_name === 'number');
+      const draftAssignments = (
+        await blueprintFeatureTypePropertyService.getBlueprintFeatureTypeProperties(
+          draft.blueprint_id,
+          { blueprintFeatureTypeId: (draftFeatureType as BlueprintFeatureTypeAssignment).blueprint_feature_type_id },
+          { page: 1, limit: 1000 }
+        )
+      ).properties;
+      const draftNumber = draftAssignments.find((assignment) => assignment.type_name === 'number');
       expect(draftNumber, 'draft copies a number assignment').to.not.be.undefined;
 
       const error = await tryInsertNumber(
@@ -506,7 +508,7 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       expect(allowedFeatureTypeIds).to.have.lengthOf(2);
 
       const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
-      const draft = await service.createBlueprintVersion(defaultBlueprintId, {});
+      const draft = await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, {});
 
       const copied = await connection.sql<{
         blueprint_feature_type_property_id: number;
@@ -543,11 +545,12 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       )
     ).rows[0].name;
 
-    const assignment = await service.createBlueprintFeatureTypeProperty(
-      draft.blueprint_id,
-      blueprintFeatureType.blueprint_feature_type_id,
-      { feature_property_id: featurePropertyId, required_value: true, allow_multiple: true }
-    );
+    const assignment = await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+      blueprintFeatureTypeId: blueprintFeatureType.blueprint_feature_type_id,
+      featurePropertyId: featurePropertyId,
+      requiredValue: true,
+      allowMultiple: true
+    });
 
     // Stage one raw property for a feature of the fixture type in an upload pinned to the draft.
     const submissionId = await createTestSubmission(connection);

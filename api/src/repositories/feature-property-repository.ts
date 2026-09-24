@@ -2,6 +2,7 @@ import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { BlueprintCompositionOption } from '../models/blueprint-composition';
 import { CountResult } from '../models/count';
 import {
   CreateFeatureProperty,
@@ -334,6 +335,80 @@ export class FeaturePropertyRepository extends BaseRepository {
       ]);
     }
 
+    return response.rows[0];
+  }
+
+  /**
+   * Build contextual selector predicates before pagination.
+   *
+   * @param query Global definition base query.
+   * @param blueprintFeatureTypeId Owning blueprint feature-type assignment.
+   * @param keyword Global definition search.
+   * @returns Eligible global definition query.
+   */
+  private applyAvailableFeaturePropertyForBlueprintFeatureTypeFilters(
+    query: Knex.QueryBuilder,
+    blueprintFeatureTypeId: number,
+    keyword?: string
+  ): Knex.QueryBuilder {
+    const knex = getKnex();
+    query
+      .whereNull('g.record_end_date')
+      .whereNotExists(
+        knex('blueprint_feature_type_property as a')
+          .select(1)
+          .where('a.blueprint_feature_type_id', blueprintFeatureTypeId)
+          .whereRaw('a.feature_property_id = g.feature_property_id')
+          .whereNull('a.record_end_date')
+      );
+    if (keyword) {
+      query.where(function () {
+        this.whereILike('g.name', `%${keyword}%`).orWhereILike('g.display_name', `%${keyword}%`);
+      });
+    }
+    return query;
+  }
+  /**
+   * Search eligible definitions without dropping items after pagination.
+   *
+   * @param blueprintFeatureTypeId Membership scope.
+   * @param keyword Search term.
+   * @param pagination Requested page.
+   * @returns Selector options.
+   */
+  async getAvailableFeaturePropertiesForBlueprintFeatureType(
+    blueprintFeatureTypeId: number,
+    keyword: string | undefined,
+    pagination: ApiPaginationOptions
+  ) {
+    const knex = getKnex();
+    const query = knex('feature_property as g');
+    this.applyAvailableFeaturePropertyForBlueprintFeatureTypeFilters(query, blueprintFeatureTypeId, keyword)
+      .select('g.feature_property_id as id', 'g.name', 'g.display_name')
+      .orderBy('g.name', pagination.order ?? 'asc')
+      .orderBy('g.feature_property_id', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+    const response = await this.connection.knex(query, BlueprintCompositionOption);
+    return response.rows;
+  }
+  /**
+   * Count eligible definitions using selector predicates.
+   *
+   * @param blueprintFeatureTypeId Membership scope.
+   * @param keyword Search term.
+   * @returns Count row.
+   */
+  async getAvailableFeaturePropertiesForBlueprintFeatureTypeCount(
+    blueprintFeatureTypeId: number,
+    keyword?: string
+  ): Promise<CountResult> {
+    const knex = getKnex();
+    const query = knex('feature_property as g');
+    this.applyAvailableFeaturePropertyForBlueprintFeatureTypeFilters(query, blueprintFeatureTypeId, keyword).select(
+      knex.raw('count(*)::integer as count')
+    );
+    const response = await this.connection.knex(query, CountResult);
     return response.rows[0];
   }
 

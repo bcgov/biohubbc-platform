@@ -14,8 +14,9 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeaturePropertyRepository } from '../../repositories/submission-feature-property-repository';
+import { BlueprintCompositionService } from '../../services/blueprint-composition-service';
 import { BlueprintFeatureTypeService } from '../../services/blueprint-feature-type-service';
-import { BlueprintService } from '../../services/blueprint-service';
+import { BlueprintVersionService } from '../../services/blueprint-version-service';
 import {
   addCodeProperty,
   addTaxonProperty,
@@ -359,9 +360,13 @@ describe('Indexed property value read paths (integration)', function () {
 
     it('lists a property assigned to the feature type only under a Blueprint that is not the default', async () => {
       const { featurePropertyId, name } = await createUnassignedNumberProperty();
-      const blueprintService = new BlueprintService(connection);
+      const blueprintVersionService = new BlueprintVersionService(connection);
+      const blueprintCompositionService = new BlueprintCompositionService(connection);
       const blueprintFeatureTypeService = new BlueprintFeatureTypeService(connection);
-      const draft = await blueprintService.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const draft = await blueprintVersionService.createBlueprintVersion(
+        await getActiveDefaultBlueprintId(connection),
+        {}
+      );
       const featureTypes = await blueprintFeatureTypeService.getBlueprintFeatureTypes(
         draft.blueprint_id,
         { keyword: featureTypeName },
@@ -369,13 +374,10 @@ describe('Indexed property value read paths (integration)', function () {
       );
       const blueprintFeatureType = featureTypes.types.find((featureType) => featureType.name === featureTypeName);
       expect(blueprintFeatureType, `draft includes ${featureTypeName}`).to.not.be.undefined;
-      await blueprintService.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        blueprintFeatureType!.blueprint_feature_type_id,
-        {
-          feature_property_id: featurePropertyId
-        }
-      );
+      await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+        blueprintFeatureTypeId: blueprintFeatureType!.blueprint_feature_type_id,
+        featurePropertyId
+      });
 
       const columns = await searchRepository.getFeatureTypeProperties(featureTypeName);
 

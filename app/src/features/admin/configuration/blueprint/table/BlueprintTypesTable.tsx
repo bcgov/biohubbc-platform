@@ -16,6 +16,7 @@ import { IUseServerPaginatedDataGridReturn } from 'hooks/useServerPaginatedDataG
 
 interface IBlueprintTypesTableProps {
   table: IUseServerPaginatedDataGridReturn<IBlueprintFeatureType, IBlueprintFeatureTypesResponse>;
+  onOpen: (assignment: IBlueprintFeatureType) => void;
   onCreate?: () => void;
   onDelete: (assignment: IBlueprintFeatureType) => void;
 }
@@ -26,7 +27,7 @@ interface IBlueprintTypesTableProps {
  * @param props Prepared table state and assignment handlers.
  * @returns Searchable assignment table.
  */
-export const BlueprintTypesTable = ({ table, onCreate, onDelete }: IBlueprintTypesTableProps) => {
+export const BlueprintTypesTable = ({ table, onCreate, onDelete, onOpen }: IBlueprintTypesTableProps) => {
   const columns: GridColDef<IBlueprintFeatureType>[] = [
     { field: 'name', headerName: 'Name', minWidth: 160, flex: 1 },
     { field: 'display_name', headerName: 'Display name', minWidth: 180, flex: 1 },
@@ -74,6 +75,7 @@ export const BlueprintTypesTable = ({ table, onCreate, onDelete }: IBlueprintTyp
       ) : (
         <ServerPaginatedDataGrid
           dataTestId="blueprint-types-table"
+          onRowClick={onOpen}
           sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
           rows={table.rows}
           columns={columns}

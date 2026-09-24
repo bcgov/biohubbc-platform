@@ -22,6 +22,13 @@ export const BlueprintSkeleton = ({ tabCount = 2, metadata = false }: { tabCount
         { field: 'name', minWidth: 160, flex: 1 },
         { field: 'display_name', minWidth: 180, flex: 1 },
         { field: 'description', minWidth: 220, flex: 1 },
+        ...(tabCount === 1
+          ? [
+              { field: 'type_name', minWidth: 140 },
+              { field: 'required_value', width: 140 },
+              { field: 'allow_multiple', width: 140 }
+            ]
+          : []),
         { field: 'actions', width: 100 }
       ];
 

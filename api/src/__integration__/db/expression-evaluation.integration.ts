@@ -50,7 +50,7 @@ import {
   buildExpressionTreeFeatureIdsSubquery
 } from '../../repositories/expression-evaluation';
 import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
-import { BlueprintService } from '../../services/blueprint-service';
+import { BlueprintVersionService } from '../../services/blueprint-version-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { optimizeExpression } from '../../utils/expression-optimization';
 import { createBlueprintFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
@@ -1312,7 +1312,8 @@ describe('expression-evaluation (integration)', function () {
       const property = await createNumberProperty(featureTypeName);
       // A new Blueprint version copies every active assignment, including the one just created.
       const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
-      await new BlueprintService(connection).createBlueprintVersion(defaultBlueprintId, {});
+      const blueprintVersionService = new BlueprintVersionService(connection);
+      await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, {});
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const match = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });

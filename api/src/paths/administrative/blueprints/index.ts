@@ -11,6 +11,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { BlueprintService } from '../../../services/blueprint-service';
+import { BlueprintVersionService } from '../../../services/blueprint-version-service';
 import { getLogger } from '../../../utils/logger';
 import { makePaginationOptionsFromRequest } from '../../../utils/pagination';
 
@@ -92,9 +93,9 @@ export function createBlueprint(): RequestHandler {
     const connection = getDBConnection(req.keycloak_token);
     try {
       await connection.open();
-      const blueprintService = new BlueprintService(connection);
+      const blueprintVersionService = new BlueprintVersionService(connection);
 
-      const result = await blueprintService.createBlueprint(req.body);
+      const result = await blueprintVersionService.createBlueprint(req.body);
       await connection.commit();
       return res.status(201).json(result);
     } catch (error) {

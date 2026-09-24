@@ -30,8 +30,9 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
+import { BlueprintCompositionService } from '../../services/blueprint-composition-service';
 import { BlueprintFeatureTypeService } from '../../services/blueprint-feature-type-service';
-import { BlueprintService } from '../../services/blueprint-service';
+import { BlueprintVersionService } from '../../services/blueprint-version-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
@@ -1295,22 +1296,23 @@ describe('Download Parquet pipeline (integration)', function () {
         WHERE fpt.name = 'number'
         RETURNING feature_property_id;
       `);
-      const blueprintService = new BlueprintService(connection);
+      const blueprintVersionService = new BlueprintVersionService(connection);
+      const blueprintCompositionService = new BlueprintCompositionService(connection);
       const blueprintFeatureTypeService = new BlueprintFeatureTypeService(connection);
-      const draft = await blueprintService.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const draft = await blueprintVersionService.createBlueprintVersion(
+        await getActiveDefaultBlueprintId(connection),
+        {}
+      );
       const featureTypes = await blueprintFeatureTypeService.getBlueprintFeatureTypes(
         draft.blueprint_id,
         { keyword: featureTypeName },
         { page: 1, limit: 100 }
       );
       const draftFeatureType = featureTypes.types.find((featureType) => featureType.name === featureTypeName);
-      await blueprintService.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        draftFeatureType!.blueprint_feature_type_id,
-        {
-          feature_property_id: newProperty.rows[0].feature_property_id
-        }
-      );
+      await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+        blueprintFeatureTypeId: draftFeatureType!.blueprint_feature_type_id,
+        featurePropertyId: newProperty.rows[0].feature_property_id
+      });
 
       const { schemaLookup } = await pipelineService.resolveParquetSchema(source);
       const names = (schemaLookup.get(featureTypeName) ?? []).map((property) => property.feature_property_name);

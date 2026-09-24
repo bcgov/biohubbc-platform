@@ -84,4 +84,15 @@ export class BlueprintFeatureTypeService extends DBService {
     await this.blueprintFeatureTypeRepository.deleteBlueprintFeatureType(blueprintId, blueprintFeatureTypeId, date);
     return this.getBlueprintFeatureType(blueprintId, blueprintFeatureTypeId);
   }
+
+  /**
+   * Copy non-deleted memberships into a new blueprint using independent assignment identities.
+   *
+   * @param sourceBlueprintId Source blueprint.
+   * @param blueprintId New blueprint receiving the memberships.
+   * @returns Resolves after the memberships are copied.
+   */
+  async copyBlueprintFeatureTypes(sourceBlueprintId: number, blueprintId: number): Promise<void> {
+    await this.blueprintFeatureTypeRepository.copyBlueprintFeatureTypes(sourceBlueprintId, blueprintId);
+  }
 }
