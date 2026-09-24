@@ -1,3 +1,4 @@
+import { BlueprintPage } from 'features/admin/configuration/blueprint/BlueprintPage';
 import { ConfigurationPage } from 'features/admin/configuration/ConfigurationPage';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
@@ -172,6 +173,22 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <ConfigurationPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="configuration/blueprints/:blueprintId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Blueprint" description="Manage platform schema configuration" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <BlueprintPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

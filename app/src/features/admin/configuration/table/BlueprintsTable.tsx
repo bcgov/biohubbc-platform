@@ -18,6 +18,7 @@ interface IBlueprintsTableProps {
   rows: IBlueprintTableRow[];
   rowCount: number;
   isLoading: boolean;
+  onOpenBlueprint: (blueprint: IBlueprint) => void;
   onCreateBlueprint: () => void;
   onEditBlueprint: (blueprint: IBlueprint) => void;
   onRetireBlueprint: (blueprint: IBlueprint) => void;
@@ -35,6 +36,7 @@ export const BlueprintsTable = ({
   rows,
   rowCount,
   isLoading,
+  onOpenBlueprint,
   onCreateBlueprint,
   onEditBlueprint,
   onRetireBlueprint,
@@ -115,6 +117,7 @@ export const BlueprintsTable = ({
           rows={rows}
           columns={columns}
           getRowId={(row) => row.blueprint_id}
+          onRowClick={onOpenBlueprint}
           noRowsMessage="No blueprints"
           rowCount={rowCount}
           paginationModel={table.paginationModel}

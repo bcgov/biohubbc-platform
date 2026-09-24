@@ -46,6 +46,10 @@ vi.mock('features/admin/configuration/ConfigurationPage', () => ({
   ConfigurationPage: () => <div data-testid="configuration-page" />
 }));
 
+vi.mock('features/admin/configuration/blueprint/BlueprintPage', () => ({
+  BlueprintPage: () => <div data-testid="blueprint-page" />
+}));
+
 describe('AdminRouter ticket route guard', () => {
   const renderAdminRouter = (authState: ReturnType<typeof getMockAuthState>, initialEntry = '/admin/tickets') =>
     render(
@@ -60,7 +64,10 @@ describe('AdminRouter ticket route guard', () => {
       </AuthStateContext.Provider>
     );
 
-  for (const [path, testId] of [['/admin/configuration', 'configuration-page']]) {
+  for (const [path, testId] of [
+    ['/admin/configuration', 'configuration-page'],
+    ['/admin/configuration/blueprints/1', 'blueprint-page']
+  ]) {
     it(`allows system administrators at ${path}`, async () => {
       const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);
       expect(await page.findByTestId(testId)).toBeVisible();
