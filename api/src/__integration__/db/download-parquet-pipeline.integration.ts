@@ -493,6 +493,15 @@ describe('Download Parquet pipeline (integration)', function () {
     return allRows;
   }
 
+  /** End-date one Blueprint assignment. */
+  async function retireAssignment(blueprintFeatureTypePropertyId: number): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE blueprint_feature_type_property
+      SET record_end_date = now()
+      WHERE blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
+    `);
+  }
+
   // ── Tests ────────────────────────────────────────────────────────────
 
   describe('cursor + hydration', () => {
@@ -1267,15 +1276,6 @@ describe('Download Parquet pipeline (integration)', function () {
   });
 
   describe('schema and values are independent of Blueprint configuration', () => {
-    /** End-date one Blueprint assignment. */
-    async function retireAssignment(blueprintFeatureTypePropertyId: number): Promise<void> {
-      await connection.sql(SQL`
-        UPDATE blueprint_feature_type_property
-        SET record_end_date = now()
-        WHERE blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
-      `);
-    }
-
     it('describes a feature type with every property ever assigned to it, retired or not, under any Blueprint', async () => {
       const featureTypeName = 'capture';
       const downloadId = await createPolicyDownload();

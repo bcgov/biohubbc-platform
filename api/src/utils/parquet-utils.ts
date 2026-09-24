@@ -67,7 +67,7 @@ export function buildParquetPropertiesMetadata(properties: CsvPropertyDefinition
  * @param reader - An opened Parquet reader.
  * @returns The stored definitions in file order, or null when the file carries none (files written
  *   before the footer entry existed).
- * @throws When the entry is present but is not a property list.
+ * @throws When the entry is present but is not the JSON text of a property list.
  */
 export function readParquetPropertiesMetadata(reader: ParquetFileDescription): CsvPropertyDefinition[] | null {
   const stored = reader.getMetadata()[PARQUET_PROPERTIES_METADATA_KEY];
@@ -76,7 +76,12 @@ export function readParquetPropertiesMetadata(reader: ParquetFileDescription): C
     return null;
   }
 
-  return ParquetPropertiesMetadata.parse(JSON.parse(String(stored)));
+  // Footer entries are strings; anything else is a corrupt entry, not a file without one.
+  if (typeof stored !== 'string') {
+    throw new TypeError(`${PARQUET_PROPERTIES_METADATA_KEY} footer entry is not a string`);
+  }
+
+  return ParquetPropertiesMetadata.parse(JSON.parse(stored));
 }
 
 /**
