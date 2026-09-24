@@ -88,6 +88,8 @@ describe('expression-evaluation', () => {
           expression
         ).toString();
         expect(published).to.include('submission_feature_closure');
+        expect(published).to.include('anchor_sf.successor_submission_feature_id IS NULL');
+        expect(published).to.include('anchor_sf.record_end_date IS NULL OR now() < anchor_sf.record_end_date');
         expect(published).to.include('submission_feature_security');
         expect(published).not.to.include('upload_evidence');
         expect(upload).to.include('"upload_evidence" as materialized');
@@ -581,6 +583,7 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('"sf"."submission_feature_id"');
       expect(sql).to.include('from "submission_feature" as "sf"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
       expect(sql).to.not.include('inner join "feature_type" as "ft"');
       expect(sql).to.include('"sf"."feature_type_id" = (select "ft"."feature_type_id"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
@@ -599,6 +602,8 @@ describe('expression-evaluation', () => {
       const sql = buildBroadFeatureTypeSubquery('fish', 42).toString();
 
       expect(sql).to.include('inner join "feature_type" as "ft"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+      expect(sql).to.include('sf.record_end_date IS NULL OR now() < sf.record_end_date');
       expect(sql).to.include('exists');
       expect(sql).to.not.include('SELECT true');
       expect(sql).to.not.include('LIMIT 1');

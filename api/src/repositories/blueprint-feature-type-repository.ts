@@ -162,4 +162,21 @@ export class BlueprintFeatureTypeRepository extends BaseRepository {
     );
     return response.rows[0].blueprint_feature_type_id;
   }
+  /**
+   * Copy non-deleted feature memberships into a newly created blueprint.
+   *
+   * @param sourceBlueprintId Parent blueprint supplying the composition.
+   * @param blueprintId New blueprint receiving independent assignment rows.
+   * @returns Resolves after the assignments are copied.
+   */
+  async copyBlueprintFeatureTypes(sourceBlueprintId: number, blueprintId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex.raw(
+      `INSERT INTO blueprint_feature_type (blueprint_id, feature_type_id, sort)
+       SELECT ?, feature_type_id, sort FROM blueprint_feature_type
+       WHERE blueprint_id = ? AND record_end_date IS NULL`,
+      [blueprintId, sourceBlueprintId]
+    );
+    await this.connection.knex(query);
+  }
 }

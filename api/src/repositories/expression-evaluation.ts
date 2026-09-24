@@ -88,7 +88,9 @@ export function buildBroadFeatureTypeSubquery(
   options?: SearchFeatureQueryOptions
 ): Knex.QueryBuilder {
   const knex = getKnex();
-  let query = knex('submission_feature as sf').select('sf.submission_feature_id');
+  let query = knex('submission_feature as sf')
+    .select('sf.submission_feature_id')
+    .whereRaw(isSubmissionFeatureCurrent('sf'));
 
   // A limited search must start from the type/order index. A semi-join lets a bad closure-row
   // estimate drive the plan from every self-loop before applying a sparse feature type. Unpaginated
@@ -115,6 +117,7 @@ export function buildBroadFeatureTypeSubquery(
   } else {
     query = query
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .whereNull('ft.record_end_date')
       .modify((query) => {
         if (featureTypeName !== null) {
           query.where('ft.name', featureTypeName);
@@ -639,6 +642,7 @@ function buildExpressionTargetIdsQuery(
   // closure-first semi-join, scanning every self-loop before the outer page LIMIT.
   const query = knex('submission_feature as anchor_sf')
     .select('anchor_sf.submission_feature_id')
+    .whereRaw(isSubmissionFeatureCurrent('anchor_sf'))
     .where(
       'anchor_sf.feature_type_id',
       anchorFeatureType === null ? 'in' : '=',

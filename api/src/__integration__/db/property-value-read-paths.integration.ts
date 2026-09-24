@@ -14,8 +14,10 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeaturePropertyRepository } from '../../repositories/submission-feature-property-repository';
+import { BlueprintCompositionService } from '../../services/blueprint-composition-service';
 import { BlueprintFeatureTypeService } from '../../services/blueprint-feature-type-service';
-import { BlueprintService } from '../../services/blueprint-service';
+import { BlueprintVersionService } from '../../services/blueprint-version-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import {
   addCodeProperty,
   addTaxonProperty,
@@ -40,6 +42,7 @@ describe('Indexed property value read paths (integration)', function () {
   let connection: IDBConnection;
   let propertyRepository: SubmissionFeaturePropertyRepository;
   let searchRepository: SearchFeatureRepository;
+  let closureService: SubmissionFeatureClosureService;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -50,6 +53,7 @@ describe('Indexed property value read paths (integration)', function () {
     await connection.open();
     propertyRepository = new SubmissionFeaturePropertyRepository(connection);
     searchRepository = new SearchFeatureRepository(connection);
+    closureService = new SubmissionFeatureClosureService(connection);
   });
 
   afterEach(async () => {
@@ -58,11 +62,18 @@ describe('Indexed property value read paths (integration)', function () {
   });
 
   /**
-   * Search the anchor feature type without a security context and return the row for one feature.
+   * Complete the fixture ingestion state and read a feature through the public search path.
    * Newest features sort first so the fixture is on the first page regardless of how many seeded
    * features share its type.
    */
   async function findSearchRow(featureTypeName: string, submissionFeatureId: number) {
+    // Direct fixture inserts bypass ingestion. Search requires closure rows, including the self-loop,
+    // both for discovery and to establish that a feature is unsecured.
+    const result = await connection.sql(SQL`
+      SELECT submission_upload_id FROM submission_feature WHERE submission_feature_id = ${submissionFeatureId};
+    `);
+    await closureService.computeClosureForUpload(result.rows[0].submission_upload_id);
+
     const rows = await searchRepository.searchFeaturesByExpressionTree(featureTypeName, null, {
       limit: 25,
       sort: 'submission_feature_id',
@@ -280,9 +291,9 @@ describe('Indexed property value read paths (integration)', function () {
       expect(Array.isArray(searchValue) ? searchValue[0] : searchValue).to.deep.equal(expected);
     });
 
-    it('omits references to features that are no longer active', async () => {
+    it('retains ended references in direct detail reads but omits them from current search results', async () => {
       const submissionId = await createTestSubmission(connection);
-      const { blueprintFeatureTypePropertyId } = await createBlueprintFeatureTypeProperty(
+      const { blueprintFeatureTypePropertyId, propertyName } = await createBlueprintFeatureTypeProperty(
         connection,
         sourceFeatureTypeName,
         targetFeatureTypeName
@@ -295,7 +306,33 @@ describe('Indexed property value read paths (integration)', function () {
       `);
 
       const rows = await propertyRepository.getSubmissionFeatureProperties(sourceId, { page: 1, limit: 25 });
+      const urn = `urn:${submissionId}:${targetFeatureTypeName}:${targetId}`;
+      const featureRows = rows.filter((row) => row.id.startsWith('feature:'));
+      expect(featureRows).to.have.length(1);
+      const expected = { urn, label: urn };
+      expect(featureRows[0].value).to.deep.equal(expected);
+
+      const searchRow = await findSearchRow(sourceFeatureTypeName, sourceId);
+      expect(searchRow.properties[propertyName]).to.be.undefined;
+    });
+
+    it('omits references to targets that have never been published on both read paths', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const { blueprintFeatureTypePropertyId, propertyName } = await createBlueprintFeatureTypeProperty(
+        connection,
+        sourceFeatureTypeName,
+        targetFeatureTypeName
+      );
+      const targetId = await createTestFeature(connection, submissionId, targetFeatureTypeName, {});
+      const sourceId = await createTestFeature(connection, submissionId, sourceFeatureTypeName, {});
+      await insertSubmissionFeaturePropertyFeature(connection, sourceId, blueprintFeatureTypePropertyId, targetId);
+      await connection.sql(
+        SQL`UPDATE submission_feature SET record_effective_date = NULL WHERE submission_feature_id = ${targetId};`
+      );
+      const rows = await propertyRepository.getSubmissionFeatureProperties(sourceId, { page: 1, limit: 25 });
       expect(rows.filter((row) => row.id.startsWith('feature:'))).to.be.empty;
+      const searchRow = await findSearchRow(sourceFeatureTypeName, sourceId);
+      expect(searchRow.properties[propertyName]).to.be.undefined;
     });
   });
 
@@ -359,9 +396,13 @@ describe('Indexed property value read paths (integration)', function () {
 
     it('lists a property assigned to the feature type only under a Blueprint that is not the default', async () => {
       const { featurePropertyId, name } = await createUnassignedNumberProperty();
-      const blueprintService = new BlueprintService(connection);
+      const blueprintVersionService = new BlueprintVersionService(connection);
+      const blueprintCompositionService = new BlueprintCompositionService(connection);
       const blueprintFeatureTypeService = new BlueprintFeatureTypeService(connection);
-      const draft = await blueprintService.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const draft = await blueprintVersionService.createBlueprintVersion(
+        await getActiveDefaultBlueprintId(connection),
+        {}
+      );
       const featureTypes = await blueprintFeatureTypeService.getBlueprintFeatureTypes(
         draft.blueprint_id,
         { keyword: featureTypeName },
@@ -369,13 +410,10 @@ describe('Indexed property value read paths (integration)', function () {
       );
       const blueprintFeatureType = featureTypes.types.find((featureType) => featureType.name === featureTypeName);
       expect(blueprintFeatureType, `draft includes ${featureTypeName}`).to.not.be.undefined;
-      await blueprintService.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        blueprintFeatureType!.blueprint_feature_type_id,
-        {
-          feature_property_id: featurePropertyId
-        }
-      );
+      await blueprintCompositionService.createBlueprintFeatureTypeProperty(draft.blueprint_id, {
+        blueprintFeatureTypeId: blueprintFeatureType!.blueprint_feature_type_id,
+        featurePropertyId
+      });
 
       const columns = await searchRepository.getFeatureTypeProperties(featureTypeName);
 

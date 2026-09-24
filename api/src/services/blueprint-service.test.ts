@@ -4,14 +4,8 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiConflictError, ApiNotFoundError, ApiValidationError } from '../errors/api-error';
-import {
-  AdminBlueprint,
-  AdminBlueprintFeatureType,
-  AdminBlueprintFeatureTypeProperty,
-  Blueprint
-} from '../models/blueprint';
+import { AdminBlueprint, Blueprint } from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
-import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { BlueprintService } from './blueprint-service';
 
 chai.use(sinonChai);
@@ -36,27 +30,6 @@ const mockPublishedBlueprint: AdminBlueprint = {
   record_effective_date: '2026-06-16'
 };
 
-const mockBlueprintFeatureType: AdminBlueprintFeatureType = {
-  blueprint_feature_type_id: 5,
-  blueprint_id: 8,
-  feature_type_id: 10,
-  feature_type_name: 'species_observation',
-  feature_type_display_name: 'Species Observation',
-  sort: null
-};
-
-const mockBlueprintFeatureTypeProperty: AdminBlueprintFeatureTypeProperty = {
-  blueprint_feature_type_property_id: 3,
-  blueprint_feature_type_id: 5,
-  feature_property_id: 20,
-  property_name: 'latitude',
-  property_display_name: 'Latitude',
-  property_type_name: 'number',
-  required_value: true,
-  allow_multiple: true,
-  sort: 1
-};
-
 describe('BlueprintService', () => {
   beforeEach(() => {
     sinon.stub(BlueprintRepository.prototype, 'lockBlueprintAdministration').resolves('2026-09-23');
@@ -69,17 +42,16 @@ describe('BlueprintService', () => {
     const service = new BlueprintService(getMockDBConnection());
 
     expect(service.blueprintRepository).to.be.instanceof(BlueprintRepository);
-    expect(service.featurePropertyRepository).to.be.instanceof(FeaturePropertyRepository);
   });
 
-  describe('createBlueprintVersion', () => {
+  describe('createBlueprintVersionMetadata', () => {
     it('copies the source blueprint and returns the new draft', async () => {
       const service = new BlueprintService(getMockDBConnection());
 
       const createStub = sinon.stub(service.blueprintRepository, 'createBlueprintVersionFromBlueprint').resolves(8);
       const getStub = sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
 
-      const result = await service.createBlueprintVersion(7, { name: 'Next' });
+      const result = await service.createBlueprintVersionMetadata(7, { name: 'Next' });
 
       expect(createStub).to.have.been.calledOnceWith(7, { name: 'Next' });
       expect(getStub).to.have.been.calledOnceWith(8);
@@ -92,7 +64,7 @@ describe('BlueprintService', () => {
       sinon.stub(service.blueprintRepository, 'createBlueprintVersionFromBlueprint').resolves(8);
       sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
 
-      const result = await service.createBlueprintVersion(mockPublishedBlueprint.blueprint_id, {});
+      const result = await service.createBlueprintVersionMetadata(mockPublishedBlueprint.blueprint_id, {});
 
       expect(result.parent_blueprint_id).to.equal(7);
     });
@@ -139,218 +111,6 @@ describe('BlueprintService', () => {
       }
 
       expect(publishStub).to.not.have.been.called;
-    });
-  });
-
-  describe('createBlueprintFeatureTypeProperty', () => {
-    /**
-     * Stub the lookups that precede the insert, for a draft blueprint and an unassigned property.
-     *
-     * @param {BlueprintService} service
-     */
-    const stubUnassignedPropertyOnDraft = (service: BlueprintService) => {
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      sinon.stub(service.featurePropertyRepository, 'getFeatureProperty').resolves({ feature_property_id: 20 } as any);
-      sinon.stub(service.blueprintRepository, 'findActiveBlueprintFeatureTypeProperty').resolves(null);
-      sinon
-        .stub(service.blueprintRepository, 'getAdminBlueprintFeatureTypeProperty')
-        .resolves(mockBlueprintFeatureTypeProperty);
-    };
-
-    it('inserts the assignment with the requested configuration', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-      stubUnassignedPropertyOnDraft(service);
-
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty').resolves(3);
-
-      const result = await service.createBlueprintFeatureTypeProperty(8, 5, {
-        feature_property_id: 20,
-        required_value: true,
-        allow_multiple: true,
-        sort: 1
-      });
-
-      // Requiredness, multiplicity and ordering live on the assignment; the caller names only the property.
-      expect(insertStub).to.have.been.calledOnceWith({
-        blueprint_feature_type_id: 5,
-        feature_property_id: 20,
-        required_value: true,
-        allow_multiple: true,
-        sort: 1
-      });
-      expect(result).to.eql(mockBlueprintFeatureTypeProperty);
-    });
-
-    it('throws ApiConflictError when the property is already assigned to the blueprint feature type', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      sinon.stub(service.featurePropertyRepository, 'getFeatureProperty').resolves({ feature_property_id: 20 } as any);
-      sinon
-        .stub(service.blueprintRepository, 'findActiveBlueprintFeatureTypeProperty')
-        .resolves({ blueprint_feature_type_property_id: 3 });
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty');
-
-      try {
-        await service.createBlueprintFeatureTypeProperty(8, 5, { feature_property_id: 20 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-        expect((error as ApiConflictError).message).to.equal(
-          'Feature property is already assigned to this blueprint feature type'
-        );
-      }
-
-      expect(insertStub).to.not.have.been.called;
-    });
-
-    it('throws ApiConflictError when the blueprint is published', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon
-        .stub(service.blueprintRepository, 'getAdminBlueprintFeatureType')
-        .resolves({ ...mockBlueprintFeatureType, blueprint_id: 7 });
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockPublishedBlueprint);
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty');
-
-      try {
-        await service.createBlueprintFeatureTypeProperty(7, 5, { feature_property_id: 20 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-        expect((error as ApiConflictError).message).to.equal(
-          'Blueprint is published and cannot be changed; create a new version'
-        );
-      }
-
-      expect(insertStub).to.not.have.been.called;
-    });
-
-    it('throws ApiNotFoundError when the blueprint feature type is not in the blueprint', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon
-        .stub(service.blueprintRepository, 'getAdminBlueprintFeatureType')
-        .rejects(new ApiNotFoundError('Blueprint feature type not found'));
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty');
-
-      try {
-        await service.createBlueprintFeatureTypeProperty(8, 999, { feature_property_id: 20 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-
-      expect(insertStub).to.not.have.been.called;
-    });
-
-    it('throws ApiNotFoundError when the feature property does not exist', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      sinon
-        .stub(service.featurePropertyRepository, 'getFeatureProperty')
-        .rejects(new ApiNotFoundError('Feature property not found'));
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureTypeProperty');
-
-      try {
-        await service.createBlueprintFeatureTypeProperty(8, 5, { feature_property_id: 999 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-
-      expect(insertStub).to.not.have.been.called;
-    });
-  });
-
-  describe('updateBlueprintFeatureTypeProperty', () => {
-    it('updates the assignment of a draft blueprint', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      const updateStub = sinon.stub(service.blueprintRepository, 'updateBlueprintFeatureTypeProperty').resolves();
-      sinon
-        .stub(service.blueprintRepository, 'getAdminBlueprintFeatureTypeProperty')
-        .resolves(mockBlueprintFeatureTypeProperty);
-
-      const result = await service.updateBlueprintFeatureTypeProperty(8, 5, 3, { required_value: false });
-
-      expect(updateStub).to.have.been.calledOnceWith(3, 5, { required_value: false });
-      expect(result).to.eql(mockBlueprintFeatureTypeProperty);
-    });
-
-    it('throws ApiConflictError when the blueprint is published', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockPublishedBlueprint);
-      const updateStub = sinon.stub(service.blueprintRepository, 'updateBlueprintFeatureTypeProperty').resolves();
-
-      try {
-        await service.updateBlueprintFeatureTypeProperty(7, 5, 3, { required_value: false });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-      }
-
-      expect(updateStub).to.not.have.been.called;
-    });
-  });
-
-  describe('deleteBlueprintFeatureTypeProperty', () => {
-    it('retires the assignment of a draft blueprint', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      const deleteStub = sinon.stub(service.blueprintRepository, 'deleteBlueprintFeatureTypeProperty').resolves();
-
-      await service.deleteBlueprintFeatureTypeProperty(8, 5, 3);
-
-      expect(deleteStub).to.have.been.calledOnceWith(3, 5);
-    });
-
-    it('throws ApiConflictError when the blueprint is published', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockPublishedBlueprint);
-      const deleteStub = sinon.stub(service.blueprintRepository, 'deleteBlueprintFeatureTypeProperty').resolves();
-
-      try {
-        await service.deleteBlueprintFeatureTypeProperty(7, 5, 3);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-      }
-
-      expect(deleteStub).to.not.have.been.called;
-    });
-  });
-
-  describe('getAdminBlueprintFeatureTypeProperties', () => {
-    it('scopes the blueprint feature type to the blueprint before listing', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      const scopeStub = sinon
-        .stub(service.blueprintRepository, 'getAdminBlueprintFeatureType')
-        .rejects(new ApiNotFoundError('Blueprint feature type not found'));
-      const listStub = sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureTypeProperties');
-
-      try {
-        await service.getAdminBlueprintFeatureTypeProperties(8, 999);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-
-      expect(scopeStub).to.have.been.calledOnceWith(999, 8);
-      expect(listStub).to.not.have.been.called;
     });
   });
 });

@@ -74,10 +74,9 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
    * createTestFeature / createTestFeaturesInBulk each mint their OWN upload internally and cannot
    * place a parent and child under one upload, so the closure suite inserts features directly.
    *
-   * Feature type is irrelevant to closure semantics (the function never reads it), so any seeded
-   * type id satisfies the NOT NULL FK. `record_end_date` (a date) marks a feature inactive: an
-   * inactive feature is excluded from the active-feature universe, so it never appears in any
-   * closure row and any edge touching it is dropped.
+   * All features use mortality so property-edge assignments belong to their source type.
+   * `record_end_date` (a date) marks a feature inactive: an inactive feature is excluded from the
+   * active-feature universe, so it never appears in any closure row and any edge touching it is dropped.
    *
    * @returns The new submission_feature_id.
    */
@@ -105,7 +104,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
       VALUES (
         ${params.submissionId},
         ${params.submissionUploadId}::uuid,
-        (SELECT feature_type_id FROM feature_type LIMIT 1),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'mortality' AND record_end_date IS NULL),
         ${params.parentFeatureId ?? null},
         '{}'::jsonb,
         500,
@@ -188,7 +187,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     const { blueprintFeatureTypePropertyId } = await createBlueprintFeatureTypeProperty(
       connection,
       'mortality',
-      'observation_subcount'
+      'mortality'
     );
     return blueprintFeatureTypePropertyId;
   }

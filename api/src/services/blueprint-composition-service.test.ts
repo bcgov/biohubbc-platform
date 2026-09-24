@@ -26,6 +26,20 @@ const type = {
   sort: null,
   record_end_date: null
 };
+const property = {
+  blueprint_feature_type_property_id: 4,
+  blueprint_feature_type_id: 2,
+  feature_property_id: 5,
+  feature_type_name: 'type',
+  name: 'property',
+  display_name: 'Property',
+  description: null,
+  type_name: 'string',
+  required_value: false,
+  allow_multiple: false,
+  sort: null,
+  record_end_date: null
+};
 
 describe('Blueprint composition service', () => {
   let service: BlueprintCompositionService;
@@ -38,9 +52,19 @@ describe('Blueprint composition service', () => {
     sinon.stub(service.blueprintService.blueprintRepository, 'lockBlueprintAdministration').resolves('2026-09-23');
     sinon.stub(service.blueprintService, 'getBlueprint').resolves(blueprint);
     types.getBlueprintFeatureType.resolves(type);
+    properties.getBlueprintFeatureTypeProperty.resolves(property);
     sinon
       .stub(service.featureTypeService, 'getFeatureType')
       .resolves({ feature_type_id: 3, name: 'type', display_name: 'Type', description: null });
+    sinon.stub(service.featurePropertyService, 'getFeatureProperty').resolves({
+      feature_property_id: 5,
+      feature_property_type_id: 1,
+      name: 'property',
+      display_name: 'Property',
+      description: null,
+      calculated_value: false,
+      type_name: 'string'
+    });
   });
   afterEach(() => sinon.restore());
   for (const state of [
@@ -92,6 +116,17 @@ describe('Blueprint composition service', () => {
     sinon.assert.notCalled(properties.deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId);
     sinon.assert.notCalled(types.deleteBlueprintFeatureType);
   });
+  it('validates parent and reusable definition before delegating property creation', async () => {
+    const payload = { blueprintFeatureTypeId: 2, featurePropertyId: 5 };
+    await service.createBlueprintFeatureTypeProperty(1, payload);
+    sinon.assert.callOrder(
+      service.blueprintService.blueprintRepository.lockBlueprintAdministration as sinon.SinonStub,
+      types.getBlueprintFeatureType,
+      service.featurePropertyService.getFeatureProperty as sinon.SinonStub,
+      properties.createBlueprintFeatureTypeProperty
+    );
+    sinon.assert.calledWithExactly(properties.createBlueprintFeatureTypeProperty, 1, payload);
+  });
 
   it('rejects cross-blueprint assignments before any mutation', async () => {
     types.getBlueprintFeatureType.rejects(new ApiNotFoundError('Not found'));
@@ -103,5 +138,22 @@ describe('Blueprint composition service', () => {
     }
     sinon.assert.calledWithExactly(types.getBlueprintFeatureType, 99, 2);
     sinon.assert.notCalled(properties.deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId);
+  });
+  it('preserves false settings and omitted fields', async () => {
+    await service.updateBlueprintFeatureTypeProperty(1, 4, { requiredValue: false });
+    sinon.assert.calledWithExactly(properties.updateBlueprintFeatureTypeProperty, 1, 4, {
+      requiredValue: false
+    });
+  });
+  it('does not mutate a retired property assignment', async () => {
+    properties.getBlueprintFeatureTypeProperty.resolves({ ...property, record_end_date: '2020-01-01' });
+    await service.deleteBlueprintFeatureTypeProperty(1, 4);
+    sinon.assert.notCalled(properties.deleteBlueprintFeatureTypeProperty);
+    try {
+      await service.updateBlueprintFeatureTypeProperty(1, 4, { allowMultiple: true });
+      expect.fail();
+    } catch (error) {
+      expect(error).instanceOf(ApiConflictError);
+    }
   });
 });

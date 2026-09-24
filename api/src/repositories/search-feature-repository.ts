@@ -268,6 +268,7 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
       .whereNull('ft.record_end_date')
+      .whereRaw(isSubmissionFeatureCurrent('sf'))
       .whereRaw('sfs.record_effective_date <= now()')
       .where((activeSecurity) => {
         activeSecurity.whereNull('sfs.record_end_date').orWhereRaw('now() < sfs.record_end_date');

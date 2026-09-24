@@ -5,6 +5,7 @@ import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import { useBlueprintFeatureTypesApi } from './api/useBlueprintFeatureTypesApi';
+import { useBlueprintFeatureTypePropertiesApi } from './api/useBlueprintFeatureTypePropertiesApi';
 import { useBlueprintsApi } from './api/useBlueprintsApi';
 import { useFeaturePropertiesApi } from './api/useFeaturePropertiesApi';
 import { useFeatureTypesApi } from './api/useFeatureTypesApi';
@@ -87,9 +88,12 @@ export const useApi = () => {
 
   const blueprintFeatureTypes = useBlueprintFeatureTypesApi(apiAxios);
 
+  const blueprintFeatureTypeProperties = useBlueprintFeatureTypePropertiesApi(apiAxios);
+
   const apis = {
     blueprints,
     blueprintFeatureTypes,
+    blueprintFeatureTypeProperties,
     featureProperties,
     featureTypes,
     user,

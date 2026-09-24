@@ -50,7 +50,7 @@ import {
 } from '../../repositories/expression-evaluation';
 import { applyTaxonExpressionOperator } from '../../repositories/expression-predicate-sql';
 import { TaxonomyRepository } from '../../repositories/taxonomy-repository';
-import { BlueprintService } from '../../services/blueprint-service';
+import { BlueprintVersionService } from '../../services/blueprint-version-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { optimizeExpression } from '../../utils/expression-optimization';
 import { createBlueprintFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
@@ -821,8 +821,8 @@ describe('expression-evaluation (integration)', function () {
     });
 
     /**
-     * Property-reference reach in BOTH directions. F(sample_site) -> G(animal) via a property edge, NO parent
-     * link. Forward: evidence=F, closureForward(F)->G, anchor=animal returns G (the referenced feature).
+     * Property-reference reach in BOTH directions. F(sample_site) -> G(survey) via a property edge, NO parent
+     * link. Forward: evidence=F, closureForward(F)->G, anchor=survey returns G (the referenced feature).
      * Reverse: evidence=G, closureReverse(G)->F, anchor=sample_site returns F (the referencing feature).
      */
     it('3: property-reference reach — referenced (forward) and referencing (reverse) both recovered', async () => {
@@ -830,24 +830,23 @@ describe('expression-evaluation (integration)', function () {
       const uploadId = await createTestUpload(connection, submissionId);
 
       const f = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'sample_site' });
-      const g = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'animal' });
-      const label = await mintPropertyEdgeLabel('sample_site', 'animal');
+      const g = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const label = await mintPropertyEdgeLabel('sample_site', 'survey');
       await insertPropertyEdge(f, g, label);
       await indexNameProperty(f, 'ref', SAMPLE_SITE_NAME_ASSIGNMENT_ID);
-      // Index G with an animal-agnostic value reusing the sample_site slot only for evidence selection in
-      // the reverse sub-case; the predicate is type-agnostic and only needs a matching string row.
-      await indexNameProperty(g, 'ref-reverse', SAMPLE_SITE_NAME_ASSIGNMENT_ID);
+      // Each evidence value must use the assignment owned by its feature type.
+      await indexNameProperty(g, 'ref-reverse', SURVEY_NAME_ASSIGNMENT_ID);
 
       await new SubmissionFeatureClosureService(connection).computeClosureForUpload(uploadId);
 
-      // (a) forward: filter F (referencing) -> anchor animal returns G (referenced).
+      // (a) forward: filter F (referencing) -> anchor survey returns G (referenced).
       const forwardTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [namePredicate('ref', SAMPLE_SITE_NAME_ASSIGNMENT_ID)]
       };
       const forwardIds = await runSubquery(
-        buildExpressionTreeFeatureIdsSubquery('animal', forwardTree, connection.systemUserId())
+        buildExpressionTreeFeatureIdsSubquery('survey', forwardTree, connection.systemUserId())
       );
       expect(forwardIds.has(g)).to.equal(true);
 
@@ -855,7 +854,7 @@ describe('expression-evaluation (integration)', function () {
       const reverseTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
-        clauses: [namePredicate('ref-reverse', SAMPLE_SITE_NAME_ASSIGNMENT_ID)]
+        clauses: [namePredicate('ref-reverse', SURVEY_NAME_ASSIGNMENT_ID)]
       };
       const reverseIds = await runSubquery(
         buildExpressionTreeFeatureIdsSubquery('sample_site', reverseTree, connection.systemUserId())
@@ -1312,7 +1311,8 @@ describe('expression-evaluation (integration)', function () {
       const property = await createNumberProperty(featureTypeName);
       // A new Blueprint version copies every active assignment, including the one just created.
       const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
-      await new BlueprintService(connection).createBlueprintVersion(defaultBlueprintId, {});
+      const blueprintVersionService = new BlueprintVersionService(connection);
+      await blueprintVersionService.createBlueprintVersion(defaultBlueprintId, {});
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const match = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName });
