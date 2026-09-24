@@ -12,7 +12,6 @@ import {
 } from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
-import { FeatureTypeRepository } from '../repositories/feature-type-repository';
 import { BlueprintService } from './blueprint-service';
 
 chai.use(sinonChai);
@@ -70,7 +69,6 @@ describe('BlueprintService', () => {
     const service = new BlueprintService(getMockDBConnection());
 
     expect(service.blueprintRepository).to.be.instanceof(BlueprintRepository);
-    expect(service.featureTypeRepository).to.be.instanceof(FeatureTypeRepository);
     expect(service.featurePropertyRepository).to.be.instanceof(FeaturePropertyRepository);
   });
 
@@ -141,98 +139,6 @@ describe('BlueprintService', () => {
       }
 
       expect(publishStub).to.not.have.been.called;
-    });
-  });
-
-  describe('createBlueprintFeatureType', () => {
-    it('includes the feature type in a draft blueprint', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      sinon.stub(service.featureTypeRepository, 'getFeatureType').resolves({ feature_type_id: 10 } as any);
-      sinon.stub(service.blueprintRepository, 'findActiveBlueprintFeatureType').resolves(null);
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureType').resolves(5);
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprintFeatureType').resolves(mockBlueprintFeatureType);
-
-      const result = await service.createBlueprintFeatureType(8, { feature_type_id: 10, sort: 2 });
-
-      expect(insertStub).to.have.been.calledOnceWith({ blueprint_id: 8, feature_type_id: 10, sort: 2 });
-      expect(result).to.eql(mockBlueprintFeatureType);
-    });
-
-    it('throws ApiConflictError when the blueprint already includes the feature type', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      sinon.stub(service.featureTypeRepository, 'getFeatureType').resolves({ feature_type_id: 10 } as any);
-      sinon
-        .stub(service.blueprintRepository, 'findActiveBlueprintFeatureType')
-        .resolves({ blueprint_feature_type_id: 5 });
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureType').resolves(5);
-
-      try {
-        await service.createBlueprintFeatureType(8, { feature_type_id: 10 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-      }
-
-      expect(insertStub).to.not.have.been.called;
-    });
-
-    it('throws ApiConflictError when the blueprint is published', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockPublishedBlueprint);
-      const insertStub = sinon.stub(service.blueprintRepository, 'insertBlueprintFeatureType').resolves(5);
-
-      try {
-        await service.createBlueprintFeatureType(7, { feature_type_id: 10 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-      }
-
-      expect(insertStub).to.not.have.been.called;
-    });
-  });
-
-  describe('deleteBlueprintFeatureType', () => {
-    it('retires the feature type and then its property assignments', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      const deleteStub = sinon.stub(service.blueprintRepository, 'deleteBlueprintFeatureType').resolves();
-      const deletePropertiesStub = sinon
-        .stub(service.blueprintRepository, 'deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId')
-        .resolves();
-
-      await service.deleteBlueprintFeatureType(8, 5);
-
-      expect(deleteStub).to.have.been.calledOnceWith(5, 8);
-      expect(deletePropertiesStub).to.have.been.calledOnceWith(5);
-      expect(deleteStub).to.have.been.calledBefore(deletePropertiesStub);
-    });
-
-    it('leaves the assignments untouched when the feature type is not in the blueprint', async () => {
-      const service = new BlueprintService(getMockDBConnection());
-
-      sinon.stub(service.blueprintRepository, 'getAdminBlueprint').resolves(mockDraftBlueprint);
-      sinon
-        .stub(service.blueprintRepository, 'deleteBlueprintFeatureType')
-        .rejects(new ApiNotFoundError('Blueprint feature type not found'));
-      const deletePropertiesStub = sinon
-        .stub(service.blueprintRepository, 'deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId')
-        .resolves();
-
-      try {
-        await service.deleteBlueprintFeatureType(8, 999);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-
-      expect(deletePropertiesStub).to.not.have.been.called;
     });
   });
 

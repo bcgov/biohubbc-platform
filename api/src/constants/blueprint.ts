@@ -15,3 +15,13 @@ export const BLUEPRINT_COLUMNS = [
   'record_effective_date',
   'record_end_date'
 ];
+
+export const BLUEPRINT_FEATURE_TYPE_SORT_FIELDS = [
+  'name',
+  'display_name',
+  'description',
+  'sort',
+  'record_end_date',
+  'feature_type_id',
+  'blueprint_feature_type_id'
+];
