@@ -1,7 +1,7 @@
 import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
+import { PrimaryButton } from 'components/button/PrimaryButton';
 import { PageHeader } from 'components/header/PageHeader';
 import { TabGroup } from 'components/tabs/TabGroup';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
@@ -42,25 +42,28 @@ export const SubmissionUploadReviewHeader = ({
     <PageHeader
       maxWidth="xl"
       breadcrumbs={
-        <Breadcrumbs aria-label="review breadcrumb" separator=">">
+        <Breadcrumbs aria-label="review breadcrumb">
           <Link component={RouterLink} to={`/admin/submissions/${submissionId}`} underline="hover" color="inherit">
             Submission
           </Link>
-          <Typography color="inherit">Review</Typography>
-          <Typography color="text.primary">{review.name}</Typography>
+          <Typography variant="inherit" color="inherit">
+            Review
+          </Typography>
+          <Typography variant="inherit" color="text.primary">
+            {review.name}
+          </Typography>
         </Breadcrumbs>
       }
       label={<Typography variant="h1">{review.name}</Typography>}
       buttons={
-        <Button
+        <PrimaryButton
           size="small"
           color={isCompleted ? 'inherit' : 'primary'}
-          variant="contained"
           onClick={onStatusActionClick}
           disabled={isSavingStatus}
           data-testid="review-status-button">
           {statusActionButtonLabel}
-        </Button>
+        </PrimaryButton>
       }
       description={review.description}
       descriptionDialogTitle="Review Description"

@@ -4,19 +4,20 @@ import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import useCodesApi from './api/useCodesApi';
+import { useContributorsApi } from './api/useContributorsApi';
+import { useDataRequestApi } from './api/useDataRequestApi';
 import { useDownloadApi } from './api/useDownloadApi';
 import { useDownloadExportApi } from './api/useDownloadExportApi';
-import useCodesApi from './api/useCodesApi';
-import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import { useGalleryApi } from './api/useGalleryApi';
+import { useMartinApi } from './api/useMartinApi';
 import { useObjectStorageApi } from './api/useObjectStorageApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
-import { useMartinApi } from './api/useMartinApi';
 import useSecurityApi from './api/useSecurityApi';
-import useSubmissionsApi from './api/useSubmissionsApi';
 import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
+import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
@@ -32,6 +33,8 @@ export const useApi = () => {
   const config = useConfigContext();
 
   const apiAxios = useAxios(config?.API_HOST);
+
+  const contributors = useContributorsApi(apiAxios);
 
   const user = useUserApi(apiAxios);
 
@@ -76,6 +79,7 @@ export const useApi = () => {
   const objectStorage = useObjectStorageApi();
 
   const apis = {
+    contributors,
     user,
     admin,
     submissions,

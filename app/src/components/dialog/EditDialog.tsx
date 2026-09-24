@@ -24,7 +24,7 @@ export interface IEditDialogProps<T> {
   /**
    * The label of the `onSave` button.
    *
-   * Defaults to `Save Changes` if not specified.
+   * Defaults to `Save` if not specified.
    *
    * @type {string}
    * @memberof IEditDialogProps
@@ -112,7 +112,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
               variant="contained"
               autoFocus
               data-testid="edit-dialog-save-button">
-              <LoadingGuard isLoading={props.isLoading}>{props.dialogSaveButtonLabel || 'Save Changes'}</LoadingGuard>
+              <LoadingGuard isLoading={props.isLoading}>{props.dialogSaveButtonLabel || 'Save'}</LoadingGuard>
             </Button>
             <Button
               onClick={props.onCancel}

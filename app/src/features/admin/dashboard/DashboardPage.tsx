@@ -1,27 +1,48 @@
 import { mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { PrimaryButton } from 'components/button/PrimaryButton';
 import { PageHeader } from 'components/header/PageHeader';
 import { TabGroup } from 'components/tabs/TabGroup';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
 import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { useState } from 'react';
-import { NavLink } from 'react-router';
+import { Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import PublishedSubmissionsTable from './components/PublishedSubmissionsTable';
 
+/**
+ * Administrative submission dashboard with review tabs and header navigation.
+ * @returns Submission lists and creation controls.
+ */
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'pending' | 'complete' | 'published'>('pending');
 
   return (
     <>
       <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="submissions breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Submissions
+            </Typography>
+          </Breadcrumbs>
+        }
         label="Submissions"
         buttons={
-          <Button component={NavLink} to="create" variant="contained" startIcon={<Icon path={mdiPlus} size={1} />}>
+          <PrimaryButton
+            onClick={() => navigate('/admin/submissions/create')}
+            startIcon={<Icon path={mdiPlus} size={1} />}>
             New Submission
-          </Button>
+          </PrimaryButton>
         }
         tabs={
           <Box mx={2}>

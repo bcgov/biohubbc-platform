@@ -1,11 +1,15 @@
 import { Paper } from '@mui/material';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { GridRowParams } from '@mui/x-data-grid';
-import BaseHeader from 'components/layout/header/BaseHeader';
+import { PageHeader } from 'components/header/PageHeader';
 import SecuritiesDialog from 'components/security/SecuritiesDialog';
 import { useSubmissionContext } from 'hooks/useContext';
 import { useCallback, useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 import { SubmissionHeaderToolbar } from './components/SubmissionHeaderToolbar';
 import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
@@ -50,7 +54,7 @@ export const AdminSubmissionPage = () => {
 
   /* ---------------- Handlers ---------------- */
 
-  const toggleRowSelection = useCallback((params: GridRowParams<FeatureRow>) => {
+  const handleToggleRowSelection = useCallback((params: GridRowParams<FeatureRow>) => {
     const id = params.id as number;
 
     setSelectedFeatureIds((prev) => {
@@ -64,35 +68,35 @@ export const AdminSubmissionPage = () => {
     });
   }, []);
 
-  const openSecurityDialog = useCallback((featureIds: Set<number>) => {
+  const handleOpenSecurityDialog = useCallback((featureIds: Set<number>) => {
     setDialogFeatureIds(featureIds);
     setIsSecurityDialogOpen(true);
   }, []);
 
-  const openSingleRowSecurity = useCallback(
+  const handleOpenSingleRowSecurity = useCallback(
     (row: FeatureRow) => {
-      openSecurityDialog(new Set([row.submission_feature_id]));
+      handleOpenSecurityDialog(new Set([row.submission_feature_id]));
     },
-    [openSecurityDialog]
+    [handleOpenSecurityDialog]
   );
 
-  const openBulkSecurity = useCallback(() => {
-    openSecurityDialog(new Set(selectedFeatureIds));
-  }, [openSecurityDialog, selectedFeatureIds]);
+  const handleOpenBulkSecurity = useCallback(() => {
+    handleOpenSecurityDialog(new Set(selectedFeatureIds));
+  }, [handleOpenSecurityDialog, selectedFeatureIds]);
 
-  const closeSecurityDialog = useCallback(() => {
+  const handleCloseSecurityDialog = useCallback(() => {
     setIsSecurityDialogOpen(false);
   }, []);
 
-  const refreshFeatures = useCallback(() => {
+  const handleRefreshFeatures = useCallback(() => {
     featureDataLoader.refresh(submissionId, featuresPagination);
     submissionDataLoader.refresh(submissionId);
   }, [featureDataLoader, submissionDataLoader, submissionId, featuresPagination]);
 
   const handleSecurityChange = useCallback(() => {
-    refreshFeatures();
-    closeSecurityDialog();
-  }, [refreshFeatures, closeSecurityDialog]);
+    handleRefreshFeatures();
+    handleCloseSecurityDialog();
+  }, [handleRefreshFeatures, handleCloseSecurityDialog]);
 
   if (!submission) {
     return null;
@@ -100,18 +104,28 @@ export const AdminSubmissionPage = () => {
 
   return (
     <>
-      <BaseHeader
-        title={submission.name}
-        subTitle={
+      <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="submission breadcrumb">
+            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+              Submissions
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              {submission.name}
+            </Typography>
+          </Breadcrumbs>
+        }
+        label={submission.name}
+        subheader={
           <Stack direction="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
             <SubmissionHeaderSecurityStatus submission={submission} />
           </Stack>
         }
-        buttonJSX={
+        buttons={
           <SubmissionHeaderToolbar
             submission={submission}
-            onSecurityClick={openBulkSecurity}
-            onSubmissionStageChange={refreshFeatures}
+            onSecurityClick={handleOpenBulkSecurity}
+            onSubmissionStageChange={handleRefreshFeatures}
           />
         }
       />
@@ -130,8 +144,8 @@ export const AdminSubmissionPage = () => {
             setPaginationModel={setPaginationModel}
             sortModel={sortModel}
             setSortModel={setSortModel}
-            onRowClick={toggleRowSelection}
-            onRowSecurityClick={openSingleRowSecurity}
+            onRowClick={handleToggleRowSelection}
+            onRowSecurityClick={handleOpenSingleRowSecurity}
           />
         </Paper>
       </Container>
@@ -140,7 +154,7 @@ export const AdminSubmissionPage = () => {
         <SecuritiesDialog
           open={isSecurityDialogOpen}
           submissionFeatureIds={{ ids: dialogFeatureIds }}
-          onClose={closeSecurityDialog}
+          onClose={handleCloseSecurityDialog}
           onSubmit={handleSecurityChange}
         />
       )}

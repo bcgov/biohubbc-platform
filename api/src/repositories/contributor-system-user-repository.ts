@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { ContributorSystemUser } from '../models/contributor-system-user';
 import { BaseRepository } from './base-repository';
@@ -57,5 +58,19 @@ export class ContributorSystemUserRepository extends BaseRepository {
     `;
 
     await this.connection.sql(sql);
+  }
+
+  /**
+   * End all active relationships belonging to a contributor.
+   * @param contributorId - Contributor being deleted.
+   * @returns Completion without materializing affected rows.
+   */
+  async deleteContributorSystemUsers(contributorId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex('contributor_system_user')
+      .where('contributor_id', contributorId)
+      .whereNull('record_end_date')
+      .update({ record_end_date: knex.fn.now() });
+    await this.connection.knex(query);
   }
 }

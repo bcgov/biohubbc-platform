@@ -35,4 +35,13 @@ export class ContributorSystemUserService extends DBService {
   async findContributorSystemUser(systemUserId: number): Promise<ContributorSystemUser | null> {
     return this.contributorSystemUserRepository.findContributorSystemUser(systemUserId);
   }
+
+  /**
+   * End the relationships of a contributor already locked by the caller.
+   * @param contributorId - Contributor being deleted.
+   * @returns Completion without loading affected rows.
+   */
+  async deleteContributorSystemUsers(contributorId: number): Promise<void> {
+    await this.contributorSystemUserRepository.deleteContributorSystemUsers(contributorId);
+  }
 }

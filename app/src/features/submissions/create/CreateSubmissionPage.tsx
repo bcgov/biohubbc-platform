@@ -1,13 +1,19 @@
-import { Box, Button, Container, Paper, Stack } from '@mui/material';
+import { Box, Container, Paper, Stack } from '@mui/material';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { PrimaryButton } from 'components/button/PrimaryButton';
+import { SecondaryButton } from 'components/button/SecondaryButton';
 import { PageHeader } from 'components/header/PageHeader';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { uploadMultipartTar } from 'utils/submission-upload-utils';
 import yup from 'utils/YupSchema';
+import { uploadMultipartTar } from 'utils/submission-upload-utils';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
 import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 
@@ -89,15 +95,25 @@ export const CreateSubmissionPage = () => {
   return (
     <>
       <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="new submission breadcrumb">
+            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+              Submissions
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              New Submission
+            </Typography>
+          </Breadcrumbs>
+        }
         label="New Submission"
         buttons={
           <Stack gap={1} flexDirection="row">
-            <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
+            <SecondaryButton disabled={isSubmitting} onClick={handleCancel}>
               Cancel
-            </Button>
-            <Button loading={isSubmitting} variant="contained" onClick={() => formikRef.current?.submitForm()}>
+            </SecondaryButton>
+            <PrimaryButton loading={isSubmitting} onClick={() => formikRef.current?.submitForm()}>
               Submit
-            </Button>
+            </PrimaryButton>
           </Stack>
         }
       />
@@ -115,12 +131,12 @@ export const CreateSubmissionPage = () => {
               <CreateSubmissionForm />
             </Box>
             <Stack gap={1} flexDirection="row" flex="1 1 auto" justifyContent="flex-end">
-              <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
+              <SecondaryButton disabled={isSubmitting} onClick={handleCancel}>
                 Cancel
-              </Button>
-              <Button loading={isSubmitting} variant="contained" onClick={formikProps.submitForm}>
+              </SecondaryButton>
+              <PrimaryButton loading={isSubmitting} onClick={formikProps.submitForm}>
                 Submit
-              </Button>
+              </PrimaryButton>
             </Stack>
           </Container>
         )}
