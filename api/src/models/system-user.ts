@@ -85,3 +85,16 @@ export interface IUpdateSystemUserParams {
 export const isSystemUserInactive = (systemUser: Pick<SystemUser, 'record_end_date'>): boolean => {
   return Boolean(systemUser.record_end_date) && new Date(systemUser.record_end_date as string) <= new Date();
 };
+
+/** Fields used by contributor assignment selectors, including service accounts. */
+export const ContributorSystemUserOption = SystemUser.pick({
+  system_user_id: true,
+  user_identifier: true,
+  display_name: true,
+  record_end_date: true
+});
+export type ContributorSystemUserOption = z.infer<typeof ContributorSystemUserOption>;
+
+export interface ContributorSystemUserOptionFilters {
+  keyword?: string;
+}

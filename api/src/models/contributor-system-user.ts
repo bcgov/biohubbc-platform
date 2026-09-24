@@ -7,3 +7,23 @@ export const ContributorSystemUser = z.object({
 });
 
 export type ContributorSystemUser = z.infer<typeof ContributorSystemUser>;
+
+/** Administrative relationship fields with labels for both related records. */
+export const AdministrativeContributorSystemUser = ContributorSystemUser.extend({
+  client_id: z.string(),
+  user_identifier: z.string(),
+  display_name: z.string().nullable(),
+  record_end_date: z.string().nullable()
+});
+export type AdministrativeContributorSystemUser = z.infer<typeof AdministrativeContributorSystemUser>;
+
+export interface ContributorSystemUserInput {
+  contributorId: number;
+  systemUserId: number;
+}
+
+export interface ContributorSystemUserFilters {
+  keyword?: string;
+  activeOnly?: boolean;
+  contributorId?: number;
+}

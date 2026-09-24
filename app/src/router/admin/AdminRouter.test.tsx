@@ -1,8 +1,8 @@
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthStateContext } from 'contexts/authStateContext';
-import { SYSTEM_ROLE } from 'constants/roles';
-import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
 import { waitFor } from '@testing-library/react';
+import { SYSTEM_ROLE } from 'constants/roles';
+import { AuthStateContext } from 'contexts/authStateContext';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
 import { render } from 'test-helpers/test-utils';
 import { AdminRouter } from './AdminRouter';
 
@@ -12,6 +12,10 @@ vi.mock('features/admin/policies/ManagePoliciesPage', () => ({
 
 vi.mock('features/admin/policies/PolicyDetailPage', () => ({
   PolicyDetailPage: () => <div data-testid="policy-detail-page">Policy Detail Page</div>
+}));
+
+vi.mock('features/admin/users/contributors/ContributorDetailPage', () => ({
+  ContributorDetailPage: () => <div data-testid="contributor-detail-page">Contributor Details</div>
 }));
 
 vi.mock('features/admin/users/ManageUsersPage', () => ({
@@ -127,5 +131,20 @@ describe('AdminRouter ticket route guard', () => {
     await waitFor(() => {
       expect(getByTestId('not-found-page')).toBeVisible();
     });
+  });
+  it('renders contributor details for system administrators', async () => {
+    const authState = getMockAuthState({ base: SystemAdminAuthState });
+    const { findByTestId } = renderAdminRouter(authState, '/admin/users/contributor/123');
+    expect(await findByTestId('contributor-detail-page')).toBeVisible();
+  });
+
+  it('denies contributor details to data administrators', async () => {
+    const authState = getMockAuthState({
+      base: SystemUserAuthState,
+      overrides: { biohubUserWrapper: { roleNames: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } }
+    });
+    const { findByTestId, queryByTestId } = renderAdminRouter(authState, '/admin/users/contributor/123');
+    expect(await findByTestId('forbidden-page')).toBeVisible();
+    expect(queryByTestId('contributor-detail-page')).not.toBeInTheDocument();
   });
 });

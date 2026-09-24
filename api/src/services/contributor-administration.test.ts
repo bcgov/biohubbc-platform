@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiConflictError, ApiNotFoundError, ApiValidationError } from '../errors/api-error';
 import { ContributorService } from './contributor-service';
+import { ContributorSystemUserService } from './contributor-system-user-service';
 
 const contributor = {
   contributor_id: 1,
@@ -10,6 +11,16 @@ const contributor = {
   description: null,
   record_end_date: null
 };
+const relationship = {
+  contributor_system_user_id: 3,
+  contributor_id: 1,
+  system_user_id: 2,
+  client_id: 'client',
+  user_identifier: 'user',
+  display_name: null,
+  record_end_date: null
+};
+
 describe('Contributor administration services', () => {
   afterEach(() => sinon.restore());
 
@@ -109,5 +120,58 @@ describe('Contributor administration services', () => {
     );
     expect(result.contributors).eql([]);
     expect(result.pagination.total).equals(0);
+  });
+
+  it('rejects ended contributors before attempting a relationship insert', async () => {
+    const contributorSystemUserService = new ContributorSystemUserService(getMockDBConnection());
+    sinon
+      .stub(contributorSystemUserService.contributorRepository, 'getAdministrativeContributor')
+      .resolves({ ...contributor, record_end_date: '2026-01-01' });
+    try {
+      await contributorSystemUserService.insertAdministrativeContributorSystemUser({
+        contributorId: 1,
+        systemUserId: 2
+      });
+      expect.fail();
+    } catch (error) {
+      expect(error).instanceOf(ApiValidationError);
+    }
+  });
+
+  it('rejects blocked or absent system users', async () => {
+    const contributorSystemUserService = new ContributorSystemUserService(getMockDBConnection());
+    sinon
+      .stub(contributorSystemUserService.contributorRepository, 'getAdministrativeContributor')
+      .resolves(contributor);
+    sinon.stub(contributorSystemUserService.contributorSystemUserRepository, 'lockActiveSystemUser').resolves(false);
+    try {
+      await contributorSystemUserService.insertAdministrativeContributorSystemUser({
+        contributorId: 1,
+        systemUserId: 2
+      });
+      expect.fail();
+    } catch (error) {
+      expect(error).instanceOf(ApiValidationError);
+    }
+  });
+
+  it('rejects a user already assigned to a different relationship', async () => {
+    const contributorSystemUserService = new ContributorSystemUserService(getMockDBConnection());
+    sinon
+      .stub(contributorSystemUserService.contributorRepository, 'getAdministrativeContributor')
+      .resolves(contributor);
+    sinon.stub(contributorSystemUserService.contributorSystemUserRepository, 'lockActiveSystemUser').resolves(true);
+    sinon
+      .stub(contributorSystemUserService.contributorSystemUserRepository, 'findContributorSystemUser')
+      .resolves(relationship);
+    try {
+      await contributorSystemUserService.insertAdministrativeContributorSystemUser({
+        contributorId: 1,
+        systemUserId: 2
+      });
+      expect.fail();
+    } catch (error) {
+      expect(error).instanceOf(ApiConflictError);
+    }
   });
 });
