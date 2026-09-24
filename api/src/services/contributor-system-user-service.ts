@@ -1,12 +1,23 @@
 import { IDBConnection } from '../database/db';
+import { ApiConflictError, ApiNotFoundError, ApiValidationError } from '../errors/api-error';
+import {
+  AdministrativeContributorSystemUser,
+  ContributorSystemUserFilters,
+  ContributorSystemUserInput
+} from '../models/contributor-system-user';
+import { ContributorRepository } from '../repositories/contributor-repository';
 import { ContributorSystemUserRepository } from '../repositories/contributor-system-user-repository';
+import { makePaginationResponse } from '../utils/pagination';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 export class ContributorSystemUserService extends DBService {
+  contributorRepository: ContributorRepository;
   contributorSystemUserRepository: ContributorSystemUserRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
+    this.contributorRepository = new ContributorRepository(connection);
     this.contributorSystemUserRepository = new ContributorSystemUserRepository(connection);
   }
 
@@ -26,6 +37,82 @@ export class ContributorSystemUserService extends DBService {
     if (!contributorSystemUser) {
       await this.contributorSystemUserRepository.createContributorSystemUser(contributorId, systemUserId);
     }
+  }
+
+  /**
+   * List relationships with related labels and pagination metadata.
+   * @param filters - Relationship filters.
+   * @param pagination - Bounded pagination.
+   * @returns Matching relationships and pagination metadata.
+   */
+  async listAdministrativeContributorSystemUsers(
+    filters: ContributorSystemUserFilters,
+    pagination: ApiPaginationOptions
+  ) {
+    const contributor_users = await this.contributorSystemUserRepository.listAdministrativeContributorSystemUsers(
+      filters,
+      pagination
+    );
+    const count = await this.contributorSystemUserRepository.countAdministrativeContributorSystemUsers(filters);
+    return { contributor_users, pagination: makePaginationResponse(count, pagination) };
+  }
+
+  /**
+   * Read a relationship, including ended relationships.
+   * @param id - Relationship identifier.
+   * @returns Relationship details.
+   */
+  async getAdministrativeContributorSystemUser(id: number): Promise<AdministrativeContributorSystemUser> {
+    const relationship = await this.contributorSystemUserRepository.getAdministrativeContributorSystemUser(id);
+    if (!relationship) {
+      throw new ApiNotFoundError('Contributor user not found');
+    }
+    return relationship;
+  }
+
+  /**
+   * Lock selected parents and ensure they can receive an active assignment.
+   * @param input - Selected contributor and system user.
+   * @returns Completion when both selections are eligible.
+   */
+  private async validateContributorSystemUser(input: ContributorSystemUserInput): Promise<void> {
+    const contributor = await this.contributorRepository.getAdministrativeContributor(input.contributorId);
+    if (!contributor || contributor.record_end_date) {
+      throw new ApiValidationError('Select an active contributor');
+    }
+    const activeUser = await this.contributorSystemUserRepository.lockActiveSystemUser(input.systemUserId);
+    if (!activeUser) {
+      throw new ApiValidationError('Select an active system user');
+    }
+  }
+
+  /**
+   * Create a relationship for an active user not yet assigned to this contributor.
+   * @param input - Selected contributor and user.
+   * @returns Created relationship.
+   */
+  async insertAdministrativeContributorSystemUser(
+    input: ContributorSystemUserInput
+  ): Promise<AdministrativeContributorSystemUser> {
+    await this.validateContributorSystemUser(input);
+    const existing = await this.contributorSystemUserRepository.findContributorSystemUser(
+      input.contributorId,
+      input.systemUserId
+    );
+    if (existing) {
+      throw new ApiConflictError('This system user already has an active relationship with this contributor');
+    }
+    const id = await this.contributorSystemUserRepository.insertAdministrativeContributorSystemUser(input);
+    return this.getAdministrativeContributorSystemUser(id);
+  }
+
+  /**
+   * End a relationship without changing its historical attribution.
+   * @param id - Relationship identifier.
+   * @returns Completion of the idempotent deletion.
+   */
+  async deleteAdministrativeContributorSystemUser(id: number): Promise<void> {
+    await this.contributorSystemUserRepository.deleteAdministrativeContributorSystemUser(id);
   }
 
   /**

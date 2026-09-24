@@ -1,13 +1,13 @@
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthStateContext } from 'contexts/authStateContext';
+import { waitFor } from '@testing-library/react';
 import { SYSTEM_ROLE } from 'constants/roles';
+import { AuthStateContext } from 'contexts/authStateContext';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
   getMockAuthState,
   SystemAdminAuthState,
   SystemUserAuthState,
   UnauthenticatedUserAuthState
 } from 'test-helpers/auth-helpers';
-import { waitFor } from '@testing-library/react';
 import { render } from 'test-helpers/test-utils';
 import { AdminRouter } from './AdminRouter';
 
@@ -17,6 +17,10 @@ vi.mock('features/admin/policies/ManagePoliciesPage', () => ({
 
 vi.mock('features/admin/policies/PolicyDetailPage', () => ({
   PolicyDetailPage: () => <div data-testid="policy-detail-page">Policy Detail Page</div>
+}));
+
+vi.mock('features/admin/users/contributors/ContributorDetailPage', () => ({
+  ContributorDetailPage: () => <div data-testid="contributor-detail-page">Contributor Details</div>
 }));
 
 vi.mock('features/admin/users/ManageUsersPage', () => ({
@@ -162,10 +166,10 @@ describe('AdminRouter access guards', () => {
       expect(getByTestId('not-found-page')).toBeVisible();
     });
   });
-
   for (const [path, testId] of [
     ['/admin/users', 'manage-users-page'],
-    ['/admin/users?tab=contributors', 'manage-users-page']
+    ['/admin/users?tab=contributors', 'manage-users-page'],
+    ['/admin/users/contributor/123', 'contributor-detail-page']
   ]) {
     it(`allows system administrators to access ${path}`, async () => {
       const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);
