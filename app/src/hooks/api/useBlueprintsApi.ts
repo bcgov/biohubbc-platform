@@ -30,11 +30,12 @@ export const useBlueprintsApi = (axios: AxiosInstance) => {
 
   /**
    * Resolve a selected parent independently of the current search page.
-   * @param id Blueprint identifier.
+   *
+   * @param blueprintId Blueprint identifier.
    * @returns Blueprint metadata, including retired records.
    */
-  const getBlueprint = async (id: number): Promise<IBlueprint> => {
-    const { data } = await axios.get(`/api/administrative/blueprints/${id}`);
+  const getBlueprint = async (blueprintId: number): Promise<IBlueprint> => {
+    const { data } = await axios.get(`/api/administrative/blueprints/${blueprintId}`);
     return data;
   };
 
@@ -50,33 +51,55 @@ export const useBlueprintsApi = (axios: AxiosInstance) => {
 
   /**
    * Update supplied resource metadata.
-   * @param id Resource identifier.
+   *
+   * @param blueprintId Resource identifier.
    * @param payload Mutable metadata.
    * @returns Confirmed resource.
    */
-  const updateBlueprint = async (id: number, payload: IUpdateBlueprint): Promise<IBlueprint> => {
-    const { data } = await axios.put(`/api/administrative/blueprints/${id}`, payload);
+  const updateBlueprint = async (blueprintId: number, payload: IUpdateBlueprint): Promise<IBlueprint> => {
+    const { data } = await axios.put(`/api/administrative/blueprints/${blueprintId}`, payload);
     return data;
   };
 
   /**
    * Retire a resource using existing lifecycle semantics.
-   * @param id Resource identifier.
+   *
+   * @param blueprintId Resource identifier.
    * @returns Server confirmation.
    */
-  const retireBlueprint = async (id: number): Promise<IBlueprint> => {
-    const { data } = await axios.delete(`/api/administrative/blueprints/${id}`);
+  const retireBlueprint = async (blueprintId: number): Promise<IBlueprint> => {
+    const { data } = await axios.delete(`/api/administrative/blueprints/${blueprintId}`);
     return data;
   };
 
   /**
    * Select an effective blueprint as the default.
-   * @param id Blueprint identifier.
+   *
+   * @param blueprintId Blueprint identifier.
    * @returns Confirmed default metadata.
    */
-  const setDefaultBlueprint = async (id: number): Promise<IBlueprint> => {
-    const { data } = await axios.put(`/api/administrative/blueprints/${id}/default`);
+  const setDefaultBlueprint = async (blueprintId: number): Promise<IBlueprint> => {
+    const { data } = await axios.put(`/api/administrative/blueprints/${blueprintId}/default`);
     return data;
   };
-  return { getBlueprints, getBlueprint, createBlueprint, updateBlueprint, retireBlueprint, setDefaultBlueprint };
+  /**
+   * Publish a draft using the database clock without changing the default blueprint.
+   *
+   * @param blueprintId Blueprint identifier.
+   * @returns Confirmed published metadata.
+   */
+  const publishBlueprint = async (blueprintId: number): Promise<IBlueprint> => {
+    const { data } = await axios.post(`/api/administrative/blueprints/${blueprintId}/publish`);
+    return data;
+  };
+
+  return {
+    getBlueprints,
+    getBlueprint,
+    createBlueprint,
+    updateBlueprint,
+    retireBlueprint,
+    setDefaultBlueprint,
+    publishBlueprint
+  };
 };

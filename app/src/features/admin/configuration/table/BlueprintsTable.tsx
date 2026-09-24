@@ -15,6 +15,7 @@ import { IUseServerPaginatedDataGridReturn } from 'hooks/useServerPaginatedDataG
 
 interface IBlueprintsTableProps {
   table: IUseServerPaginatedDataGridReturn<IBlueprintTableRow, IBlueprintsResponse>;
+  onOpenBlueprint: (blueprint: IBlueprint) => void;
   onCreateBlueprint: () => void;
   onEditBlueprint: (blueprint: IBlueprint) => void;
   onRetireBlueprint: (blueprint: IBlueprint) => void;
@@ -29,6 +30,7 @@ interface IBlueprintsTableProps {
  */
 export const BlueprintsTable = ({
   table,
+  onOpenBlueprint,
   onCreateBlueprint,
   onEditBlueprint,
   onRetireBlueprint,
@@ -109,6 +111,7 @@ export const BlueprintsTable = ({
           rows={table.rows}
           columns={columns}
           getRowId={(row) => row.blueprint_id}
+          onRowClick={onOpenBlueprint}
           noRowsMessage="No blueprints"
           rowCount={table.rowCount}
           paginationModel={table.paginationModel}
