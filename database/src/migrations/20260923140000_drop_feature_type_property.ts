@@ -6,10 +6,10 @@ import type { Knex } from 'knex';
  * `feature_type_property` said which properties a feature type may carry, independently of any
  * Blueprint. Since `20260616120000` a Blueprint says that for itself, and since `20260921120000` its
  * assignment references the property directly. The preceding migrations moved every remaining reader of
- * the pairing onto the assignment: stored values (`20260923120000`, `20260923160000`), ingestion errors
- * (`20260923130000`), predicates (`20260923140000`) and allowed reference targets (`20260923150000`). Nothing
- * in the schema depends on the pairing any more, so this drops it together with every column, key, index
- * and trigger that carried its identifier.
+ * the pairing onto the assignment: stored values, ingestion errors, predicates and allowed reference
+ * targets (`20260923120000`), with stored values then validated and indexed by assignment
+ * (`20260923130000`). Nothing in the schema depends on the pairing any more, so this drops it together
+ * with every column, key, index and trigger that carried its identifier.
  *
  * The Martin tile functions in `database/src/procedures/` are plpgsql and are re-created from source after
  * every migration run, so the versions that read the pairing are replaced in the same deploy.
