@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FeatureTypeProperty } from './feature-type-property';
+import { FeaturePropertyDefinition, FeatureTypeProperty } from './feature-property';
 
 /**
  * Schema for feature type basic info.
@@ -22,6 +22,16 @@ export const FeatureTypeWithProperties = z.object({
 });
 
 export type FeatureTypeWithProperties = z.infer<typeof FeatureTypeWithProperties>;
+
+/**
+ * Feature type with every property ever assigned to it, as definitions rather than assignments.
+ */
+export const FeatureTypeWithPropertyDefinitions = z.object({
+  feature_type: FeatureType,
+  properties: z.array(FeaturePropertyDefinition)
+});
+
+export type FeatureTypeWithPropertyDefinitions = z.infer<typeof FeatureTypeWithPropertyDefinitions>;
 
 /** Fields required to create a feature type. */
 export interface CreateFeatureType {

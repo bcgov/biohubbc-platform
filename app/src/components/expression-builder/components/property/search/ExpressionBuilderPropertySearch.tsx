@@ -97,7 +97,7 @@ export const ExpressionBuilderPropertySearch = ({
       getOptionLabel={(option) => option.label}
       isOptionEqualToValue={(option, selectedValue) =>
         option.feature_property_id === selectedValue.feature_property_id &&
-        option.feature_type_property_id === selectedValue.feature_type_property_id
+        option.blueprint_feature_type_property_id === selectedValue.blueprint_feature_type_property_id
       }
       onInputChange={handleInputChange}
       onChange={handleChange}

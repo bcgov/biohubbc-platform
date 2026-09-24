@@ -77,7 +77,7 @@ describe('Martin upload function (integration)', function () {
 
   /** Attach a geometry (as WKT) to a feature under the fixture's spatial property, returning the new row's id. */
   const addGeometry = (featureId: number, wkt: string) =>
-    addTestGeometry(fixture.connection, featureId, fixture.geometryPropertyId, wkt);
+    addTestGeometry(fixture.connection, featureId, fixture.geometryAssignmentId, wkt);
 
   /**
    * Create a submission with one upload containing one pending feature carrying a point geometry at
@@ -281,7 +281,7 @@ describe('Martin upload function (integration)', function () {
 
       expect(geometry.properties.submission_feature_property_geometry_id).to.equal(geometryId);
       expect(geometry.properties.submission_feature_id).to.equal(featureId);
-      expect(geometry.properties.feature_type_property_id).to.equal(fixture.geometryPropertyId);
+      expect(geometry.properties.blueprint_feature_type_property_id).to.equal(fixture.geometryAssignmentId);
       expect(geometry.properties.property_display_name).to.be.a('string').and.not.empty;
       expect(geometry.properties.property_name).to.be.a('string').and.not.empty;
       // The MVT feature id keys each geometry, so fragments split across tiles share an identity.

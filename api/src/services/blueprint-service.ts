@@ -12,7 +12,6 @@ import {
 } from '../models/blueprint';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
-import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
 import { FeatureTypeRepository } from '../repositories/feature-type-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
@@ -34,7 +33,6 @@ export class BlueprintService extends DBService {
   blueprintRepository: BlueprintRepository;
   featureTypeRepository: FeatureTypeRepository;
   featurePropertyRepository: FeaturePropertyRepository;
-  featureTypePropertyRepository: FeatureTypePropertyRepository;
 
   /**
    * Build a blueprint service.
@@ -47,7 +45,6 @@ export class BlueprintService extends DBService {
     this.blueprintRepository = new BlueprintRepository(connection);
     this.featureTypeRepository = new FeatureTypeRepository(connection);
     this.featurePropertyRepository = new FeaturePropertyRepository(connection);
-    this.featureTypePropertyRepository = new FeatureTypePropertyRepository(connection);
   }
 
   // ---------------------------------------------------------------------------
@@ -291,11 +288,9 @@ export class BlueprintService extends DBService {
   /**
    * Assign an existing feature property directly to a feature type of a draft blueprint.
    *
-   * The caller names only the property. The global `feature_type_property` pairing the durable property
-   * tables, search and downloads still depend on is resolved here, and created when the feature type and
-   * property have never been paired. A created pairing is a neutral id surrogate: it is shared by every
-   * blueprint, so this blueprint's requiredness, multiplicity and ordering are stored on the assignment
-   * only and never copied onto it.
+   * The caller names only the property; requiredness, multiplicity and ordering are stored on the
+   * assignment. A property may be assigned to the same feature type in any number of blueprints, each
+   * configured on its own.
    *
    * @param {number} blueprintId - Parent blueprint identifier.
    * @param {number} blueprintFeatureTypeId - Blueprint feature type identifier.
@@ -310,11 +305,7 @@ export class BlueprintService extends DBService {
     blueprintFeatureTypeId: number,
     data: CreateBlueprintFeatureTypePropertyRequest
   ): Promise<AdminBlueprintFeatureTypeProperty> {
-    const blueprintFeatureType = await this.blueprintRepository.getAdminBlueprintFeatureType(
-      blueprintFeatureTypeId,
-      blueprintId
-    );
-
+    await this.blueprintRepository.getAdminBlueprintFeatureType(blueprintFeatureTypeId, blueprintId);
     await this.assertBlueprintIsDraft(blueprintId);
     await this.featurePropertyRepository.getFeatureProperty(data.feature_property_id);
 
@@ -330,15 +321,9 @@ export class BlueprintService extends DBService {
       ]);
     }
 
-    const featureTypePropertyId = await this.findOrCreateFeatureTypePropertyId(
-      blueprintFeatureType.feature_type_id,
-      data.feature_property_id
-    );
-
     const blueprintFeatureTypePropertyId = await this.blueprintRepository.insertBlueprintFeatureTypeProperty({
       blueprint_feature_type_id: blueprintFeatureTypeId,
       feature_property_id: data.feature_property_id,
-      feature_type_property_id: featureTypePropertyId,
       required_value: data.required_value,
       allow_multiple: data.allow_multiple,
       sort: data.sort
@@ -432,32 +417,5 @@ export class BlueprintService extends DBService {
         { blueprint_id: blueprintId, record_effective_date: blueprint.record_effective_date }
       ]);
     }
-  }
-
-  /**
-   * Resolve the global pairing id for a feature type and property, creating a neutral pairing when none
-   * is active.
-   *
-   * Transitional: removed together with `blueprint_feature_type_property.feature_type_property_id`.
-   *
-   * @param {number} featureTypeId - Feature type identifier.
-   * @param {number} featurePropertyId - Feature property identifier.
-   * @return {Promise<number>} The feature_type_property_id.
-   * @memberof BlueprintService
-   */
-  private async findOrCreateFeatureTypePropertyId(featureTypeId: number, featurePropertyId: number): Promise<number> {
-    const existing = await this.featureTypePropertyRepository.findActiveFeatureTypePropertyByFeatureTypeAndProperty(
-      featureTypeId,
-      featurePropertyId
-    );
-
-    if (existing) {
-      return existing.feature_type_property_id;
-    }
-
-    return this.featureTypePropertyRepository.insertFeatureTypeProperty({
-      feature_type_id: featureTypeId,
-      feature_property_id: featurePropertyId
-    });
   }
 }

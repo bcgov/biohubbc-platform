@@ -11,12 +11,12 @@ import { codePropertyValueJson, featureReferencePropertyValueJson, taxonProperty
 
 const normalizedPredicate = (
   feature_property_id: number,
-  feature_type_property_id: number | null,
+  blueprint_feature_type_property_id: number | null,
   internal_predicate: any
 ) => ({
   type: 'predicate' as const,
   feature_property_id,
-  feature_type_property_id,
+  blueprint_feature_type_property_id,
   operator: internal_predicate.operator,
   ...(internal_predicate.value !== undefined ? { value: internal_predicate.value } : {}),
   feature_property_type_id: internal_predicate.type === 'number' ? 2 : 1,
@@ -468,7 +468,7 @@ describe('SearchFeatureRepository', () => {
   });
 
   describe('getFeatureTypeProperties', () => {
-    it('should return active anchor-type metadata', async () => {
+    it('lists one column per property assigned to the anchor type under any Blueprint', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
@@ -476,10 +476,16 @@ describe('SearchFeatureRepository', () => {
       await repository.getFeatureTypeProperties('survey');
 
       const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('from "feature_type_property" as "ftp"');
+      expect(sql).to.include('from "feature_type" as "ft"');
+      expect(sql).to.not.include('"blueprint" as "b"');
+      expect(sql).to.not.include('is_default');
+      expect(sql).to.not.include('"bftp"."record_end_date"');
+      expect(sql).to.not.include('"bft"."record_end_date"');
       expect(sql).to.include('"ft"."name" = \'survey\'');
       expect(sql).to.include('"fpt"."name" as "type_name"');
-      expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
+      expect(sql).to.include('BOOL_OR(bftp.allow_multiple) AS allow_multiple');
+      expect(sql).to.include('group by "fp"."feature_property_id"');
+      expect(sql).to.include('order by MIN(bftp.sort) ASC NULLS LAST');
       expect(sql).to.not.include('submission_feature_property_');
       expect(sql).to.not.include('expression_match');
       expect(sql).to.not.include('exists');

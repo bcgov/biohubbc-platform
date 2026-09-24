@@ -94,7 +94,7 @@ export const ExpressionBuilder = ({
       ui_id: crypto.randomUUID(),
       type: 'predicate',
       feature_property_id: property.feature_property_id,
-      feature_type_property_id: property.feature_type_property_id,
+      blueprint_feature_type_property_id: property.blueprint_feature_type_property_id,
       predicate: createPredicateDraft(property)
     }),
     []
@@ -136,7 +136,7 @@ export const ExpressionBuilder = ({
         knownProperties.find(
           (item) =>
             item.feature_property_id === predicate.feature_property_id &&
-            item.feature_type_property_id === predicate.feature_type_property_id
+            item.blueprint_feature_type_property_id === predicate.blueprint_feature_type_property_id
         ) ?? null
       );
     },
@@ -312,7 +312,7 @@ export const ExpressionBuilder = ({
           ui_id: crypto.randomUUID(),
           type: 'predicate',
           feature_property_id: property.feature_property_id,
-          feature_type_property_id: property.feature_type_property_id,
+          blueprint_feature_type_property_id: property.blueprint_feature_type_property_id,
           predicate: {
             type: property.predicate_type,
             operator: 'Equals',
@@ -488,7 +488,7 @@ export const ExpressionBuilder = ({
           return {
             ...predicate,
             feature_property_id: property?.feature_property_id ?? null,
-            feature_type_property_id: property?.feature_type_property_id ?? null,
+            blueprint_feature_type_property_id: property?.blueprint_feature_type_property_id ?? null,
             predicate: {
               type: property?.predicate_type ?? currentDraft?.type ?? 'string',
               operator,

@@ -19,7 +19,7 @@ import {
 const properties: ExpressionBuilderProperty[] = [
   {
     feature_property_id: 1,
-    feature_type_property_id: null,
+    blueprint_feature_type_property_id: null,
     label: 'Species name',
     property_name: 'species_name',
     property_display_name: 'Species name',
@@ -28,7 +28,7 @@ const properties: ExpressionBuilderProperty[] = [
   },
   {
     feature_property_id: 2,
-    feature_type_property_id: null,
+    blueprint_feature_type_property_id: null,
     label: 'Observed at',
     property_name: 'observed_at',
     property_display_name: 'Observed at',
@@ -41,7 +41,7 @@ const condition = (overrides: Partial<BuilderPredicateNode>): BuilderPredicateNo
   ui_id: crypto.randomUUID(),
   type: 'predicate',
   feature_property_id: properties[0].feature_property_id,
-  feature_type_property_id: properties[0].feature_type_property_id,
+  blueprint_feature_type_property_id: properties[0].blueprint_feature_type_property_id,
   predicate: {
     type: 'string',
     operator: 'ILike',
@@ -68,9 +68,9 @@ describe('expression-builder-utils', () => {
   it('builds stable property keys from ids and property metadata', () => {
     expect(getExpressionBuilderPropertyKey(7, null)).toBe('7:');
     expect(getExpressionBuilderPropertyKey(7, 12)).toBe('7:12');
-    expect(getExpressionBuilderPropertyKeyFromProperty({ feature_property_id: 7, feature_type_property_id: 12 })).toBe(
-      '7:12'
-    );
+    expect(
+      getExpressionBuilderPropertyKeyFromProperty({ feature_property_id: 7, blueprint_feature_type_property_id: 12 })
+    ).toBe('7:12');
   });
 
   it('validates empty groups as invalid', () => {
@@ -89,7 +89,7 @@ describe('expression-builder-utils', () => {
     expect(root.clauses[0]).toMatchObject({
       type: 'predicate',
       feature_property_id: null,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       predicate: null
     });
   });
@@ -133,7 +133,7 @@ describe('expression-builder-utils', () => {
   it('defaults boolean predicate values to unset so the user must choose true or false', () => {
     const property: ExpressionBuilderProperty = {
       feature_property_id: 3,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       label: 'Is sensitive',
       property_name: 'is_sensitive',
       property_display_name: 'Is sensitive',
@@ -147,7 +147,7 @@ describe('expression-builder-utils', () => {
       clauses: [
         condition({
           feature_property_id: property.feature_property_id,
-          feature_type_property_id: property.feature_type_property_id,
+          blueprint_feature_type_property_id: property.blueprint_feature_type_property_id,
           predicate: createPredicateDraft(property)
         })
       ]
@@ -169,7 +169,7 @@ describe('expression-builder-utils', () => {
       clauses: [
         condition({
           feature_property_id: 1,
-          feature_type_property_id: null
+          blueprint_feature_type_property_id: null
         }),
         {
           ui_id: 'group',
@@ -178,7 +178,7 @@ describe('expression-builder-utils', () => {
           clauses: [
             condition({
               feature_property_id: 2,
-              feature_type_property_id: 9
+              blueprint_feature_type_property_id: 9
             })
           ]
         }
@@ -197,7 +197,7 @@ describe('expression-builder-utils', () => {
         condition({
           ui_id: 'first',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: { type: 'string', operator: 'ILike', value: 'wolf' }
         }),
         {
@@ -208,7 +208,7 @@ describe('expression-builder-utils', () => {
             condition({
               ui_id: 'second',
               feature_property_id: 1,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               predicate: { type: 'string', operator: 'Exists' }
             })
           ]
@@ -226,7 +226,7 @@ describe('expression-builder-utils', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'ILike',
           value: 'wolf'
         },
@@ -237,7 +237,7 @@ describe('expression-builder-utils', () => {
             {
               type: 'predicate',
               feature_property_id: 1,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Exists'
             }
           ]
@@ -270,12 +270,12 @@ describe('expression-builder-utils', () => {
       clauses: [
         condition({
           feature_property_id: 2,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: { type: 'datetime', operator: 'OnDate', value: { date_value: '2026-04-24' } }
         }),
         condition({
           feature_property_id: 2,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: { type: 'datetime', operator: 'Before', value: { time_value: '12:30' } }
         })
       ]
@@ -286,14 +286,14 @@ describe('expression-builder-utils', () => {
       {
         type: 'predicate',
         feature_property_id: 2,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'OnDate',
         value: '2026-04-24'
       },
       {
         type: 'predicate',
         feature_property_id: 2,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'Before',
         value: '12:30'
       }
@@ -308,7 +308,7 @@ describe('expression-builder-utils', () => {
       clauses: [
         condition({
           feature_property_id: 2,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: { type: 'datetime', operator: 'OnDate', value: { time_value: '12:30' } }
         })
       ]
@@ -360,7 +360,7 @@ describe('expression-builder-utils', () => {
       clauses: [
         condition({
           feature_property_id: 3,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: { type: 'spatial', operator: 'Intersects', value: geojson }
         })
       ]
@@ -370,7 +370,7 @@ describe('expression-builder-utils', () => {
     expect(serializeExpressionTree(root).clauses[0]).toEqual({
       type: 'predicate',
       feature_property_id: 3,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       operator: 'Intersects',
       value: {
         type: 'Point',
@@ -387,7 +387,7 @@ describe('expression-builder-utils', () => {
       clauses: [
         condition({
           feature_property_id: 3,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: { type: 'spatial', operator: 'Intersects', value: '{"coordinates":[]}' }
         })
       ]

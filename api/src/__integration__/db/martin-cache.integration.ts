@@ -154,22 +154,26 @@ describe('Martin tile cache keying (integration)', function () {
 
     const spatial = await connection.sql(
       SQL`
-        SELECT ftp.feature_type_property_id
-        FROM feature_type_property ftp
-        JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+        SELECT bftp.blueprint_feature_type_property_id
+        FROM blueprint b
+        JOIN blueprint_feature_type bft ON bft.blueprint_id = b.blueprint_id
+        JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+        JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
         JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
-        JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-        WHERE ft.name = ${FEATURE_TYPE} AND fpt.name = 'spatial'
+        JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id
+        WHERE b.is_default = true AND b.record_end_date IS NULL
+          AND bft.record_end_date IS NULL AND bftp.record_end_date IS NULL
+          AND ft.name = ${FEATURE_TYPE} AND fpt.name = 'spatial'
         LIMIT 1;
       `,
-      z.object({ feature_type_property_id: z.number() })
+      z.object({ blueprint_feature_type_property_id: z.number() })
     );
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
       VALUES (
         ${featureId},
-        ${spatial.rows[0].feature_type_property_id},
+        ${spatial.rows[0].blueprint_feature_type_property_id},
         public.ST_SetSRID(public.ST_MakePoint(${TEST_LNG}, ${TEST_LAT}), 4326),
         ${connection.systemUserId()}
       );

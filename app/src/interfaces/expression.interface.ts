@@ -44,7 +44,7 @@ export type ExpressionTreeClause = ExpressionTreeExpression | ExpressionTreePred
 export interface ExpressionTreePredicate {
   type: 'predicate';
   feature_property_id: number;
-  feature_type_property_id: number | null;
+  blueprint_feature_type_property_id: number | null;
   operator: ExpressionPredicateOperator;
   value?: unknown;
 }

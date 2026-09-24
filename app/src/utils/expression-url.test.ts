@@ -32,14 +32,14 @@ describe('stableStringify', () => {
         {
           type: 'predicate',
           feature_property_id: 10,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 'snake'
         },
         {
           type: 'predicate',
           feature_property_id: 20,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Contains',
           value: 'frog'
         }
@@ -132,7 +132,7 @@ describe('isValidExpressionTree', () => {
       {
         type: 'predicate',
         feature_property_id: 1,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'Equals',
         value: 'snake'
       }
@@ -156,7 +156,7 @@ describe('isValidExpressionTree', () => {
             {
               type: 'predicate',
               feature_property_id: 2,
-              feature_type_property_id: 5,
+              blueprint_feature_type_property_id: 5,
               operator: 'Contains'
             }
           ]
@@ -179,7 +179,7 @@ describe('isValidExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 'x',
           // @ts-expect-error intentionally injecting ui_id for test
@@ -203,7 +203,7 @@ describe('isValidExpressionTree', () => {
         {
           type: 'predicate' as const,
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
 
           operator: 'IsLike' as any
         }
@@ -216,7 +216,7 @@ describe('isValidExpressionTree', () => {
     const bad = {
       type: 'predicate',
       feature_property_id: 1,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       operator: 'Equals'
     };
     expect(isValidExpressionTree(bad)).toBe(false);
@@ -247,7 +247,7 @@ describe('isValidExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 0,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals'
         }
       ]
@@ -259,7 +259,7 @@ describe('isValidExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: 1.5,
+          blueprint_feature_type_property_id: 1.5,
           operator: 'Equals'
         }
       ]
@@ -283,7 +283,7 @@ describe('isValidExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           extra: 'unexpected'
         }
@@ -307,7 +307,7 @@ describe('encodeExpressionToUrl and decodeExpressionFromUrl', () => {
       {
         type: 'predicate',
         feature_property_id: 3,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'ILike',
         value: 'snake'
       },
@@ -318,7 +318,7 @@ describe('encodeExpressionToUrl and decodeExpressionFromUrl', () => {
           {
             type: 'predicate',
             feature_property_id: 7,
-            feature_type_property_id: 2,
+            blueprint_feature_type_property_id: 2,
             operator: 'GreaterThan',
             value: 10
           }
@@ -346,7 +346,9 @@ describe('encodeExpressionToUrl and decodeExpressionFromUrl', () => {
     const treeA: ExpressionTreeExpression = {
       type: 'expression',
       operator: 'AND',
-      clauses: [{ type: 'predicate', feature_property_id: 1, feature_type_property_id: null, operator: 'Equals' }]
+      clauses: [
+        { type: 'predicate', feature_property_id: 1, blueprint_feature_type_property_id: null, operator: 'Equals' }
+      ]
     };
     // Construct same logical tree but with different key insertion order
     const treeB = JSON.parse(
@@ -364,6 +366,86 @@ describe('encodeExpressionToUrl and decodeExpressionFromUrl', () => {
 // ---------------------------------------------------------------------------
 // decodeExpressionFromUrl — error handling
 // ---------------------------------------------------------------------------
+
+describe('decodeExpressionFromUrl — URLs written against the retired pairing key', () => {
+  it('accepts a null feature_type_property_id and rewrites the predicate onto the assignment key', () => {
+    const legacy = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        { type: 'predicate', feature_property_id: 1, feature_type_property_id: null, operator: 'Equals', value: 'x' }
+      ]
+    };
+
+    const decoded = decodeExpressionFromUrl(toBase64Url(JSON.stringify(legacy)));
+
+    expect(decoded).toEqual({
+      type: 'expression',
+      operator: 'AND',
+      clauses: [
+        {
+          type: 'predicate',
+          feature_property_id: 1,
+          blueprint_feature_type_property_id: null,
+          operator: 'Equals',
+          value: 'x'
+        }
+      ]
+    });
+  });
+
+  it('rewrites nested predicates too', () => {
+    const legacy = {
+      type: 'expression',
+      operator: 'OR',
+      clauses: [
+        {
+          type: 'expression',
+          operator: 'AND',
+          clauses: [{ type: 'predicate', feature_property_id: 2, feature_type_property_id: null, operator: 'Exists' }]
+        }
+      ]
+    };
+
+    const decoded = decodeExpressionFromUrl(toBase64Url(JSON.stringify(legacy)));
+    const nested = decoded?.clauses[0];
+
+    expect(nested?.type).toBe('expression');
+    expect(nested?.type === 'expression' ? nested.clauses[0] : undefined).toEqual({
+      type: 'predicate',
+      feature_property_id: 2,
+      blueprint_feature_type_property_id: null,
+      operator: 'Exists'
+    });
+  });
+
+  it('treats a missing assignment key as null', () => {
+    const bare = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [{ type: 'predicate', feature_property_id: 3, operator: 'Exists' }]
+    };
+
+    const decoded = decodeExpressionFromUrl(toBase64Url(JSON.stringify(bare)));
+
+    expect(decoded?.clauses[0]).toEqual({
+      type: 'predicate',
+      feature_property_id: 3,
+      blueprint_feature_type_property_id: null,
+      operator: 'Exists'
+    });
+  });
+
+  it('rejects a non-null feature_type_property_id, which cannot be mapped to an assignment', () => {
+    const legacy = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [{ type: 'predicate', feature_property_id: 1, feature_type_property_id: 45, operator: 'Exists' }]
+    };
+
+    expect(decodeExpressionFromUrl(toBase64Url(JSON.stringify(legacy)))).toBeNull();
+  });
+});
 
 describe('decodeExpressionFromUrl — error handling', () => {
   it('returns null for null input', () => {
@@ -401,7 +483,7 @@ describe('decodeExpressionFromUrl — error handling', () => {
           {
             type: 'predicate',
             feature_property_id: 1,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Equals',
             ui_id: 'draft-id'
           }

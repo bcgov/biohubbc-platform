@@ -49,7 +49,7 @@ describe('DownloadPolicyService (integration)', function () {
    * path as production.
    */
   async function writeNamePredicate(value: string): Promise<string> {
-    // survey.name → feature_property_id=31, feature_type_property_id=70 (seed).
+    // survey.name → feature_property_id=31, blueprint_feature_type_property_id=70 (seed).
     const tree: ExpressionTree = {
       type: 'expression',
       operator: 'AND',
@@ -57,7 +57,7 @@ describe('DownloadPolicyService (integration)', function () {
         {
           type: 'predicate',
           feature_property_id: 31,
-          feature_type_property_id: 70,
+          blueprint_feature_type_property_id: 70,
           operator: 'Equals',
           value
         }
@@ -176,7 +176,7 @@ describe('DownloadPolicyService (integration)', function () {
           {
             type: 'predicate',
             feature_property_id: 31,
-            feature_type_property_id: 70,
+            blueprint_feature_type_property_id: 70,
             operator: 'Equals',
             value: 'AuditChain-Tree'
           }

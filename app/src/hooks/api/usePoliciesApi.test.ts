@@ -195,7 +195,7 @@ describe('usePoliciesApi', () => {
           {
             type: 'predicate' as const,
             feature_property_id: 1,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Equals' as const,
             value: 'sensitive'
           }
@@ -231,7 +231,7 @@ describe('usePoliciesApi', () => {
           {
             type: 'predicate' as const,
             feature_property_id: 1,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Equals' as const,
             value: 'updated'
           }
@@ -275,7 +275,7 @@ describe('usePoliciesApi', () => {
           {
             type: 'predicate' as const,
             feature_property_id: 1,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Equals' as const,
             value: 'sensitive'
           }
