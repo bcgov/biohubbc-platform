@@ -87,6 +87,8 @@ SELECT
   (SELECT COUNT(*) FROM predicate WHERE record_end_date IS NULL) AS active_predicates,
   (SELECT COUNT(*) FROM submission_feature_error WHERE feature_type_property_id IS NOT NULL) AS property_errors,
   (SELECT COUNT(*) FROM feature_type_property_feature) AS target_declarations,
+  (SELECT COUNT(*) FROM feature_type_property_feature f
+     JOIN blueprint_feature_type_property bftp ON bftp.feature_type_property_id = f.feature_type_property_id) AS target_declarations_after_fan_out,
   (SELECT COUNT(*) FROM blueprint WHERE is_default AND record_end_date IS NULL) AS active_default_blueprints,
   (SELECT COUNT(*) FROM submission_feature_artifact sfa
      WHERE NOT EXISTS (SELECT 1 FROM submission_feature_property_artifact p WHERE p.artifact_id = sfa.artifact_id AND p.submission_feature_id = sfa.submission_feature_id)) AS artifacts_without_property_row;

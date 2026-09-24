@@ -427,7 +427,8 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
          AND a.artifact_status = 'uploaded'
         -- A feature-level artifact carries no property reference, so it is labelled with the one
         -- artifact-valued property its feature type has in the feature's own Blueprint; a type with
-        -- none or several is not labelled.
+        -- none or several is not labelled. The assignment is matched at any lifecycle: a stored
+        -- artifact keeps its label after the assignment is retired.
         JOIN submission_feature owner
           ON owner.submission_feature_id = sfa.submission_feature_id
         JOIN submission_upload su
@@ -442,12 +443,9 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
             ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
           JOIN feature_property fp
             ON fp.feature_property_id = bftp.feature_property_id
-           AND fp.record_end_date IS NULL
           JOIN feature_property_type fpt
             ON fpt.feature_property_type_id = fp.feature_property_type_id
            AND fpt.name = 'artifact_key'
-           AND fpt.record_end_date IS NULL
-          WHERE bftp.record_end_date IS NULL
           GROUP BY bft.blueprint_id, bft.feature_type_id
           HAVING COUNT(*) = 1
         ) artifact_bftp

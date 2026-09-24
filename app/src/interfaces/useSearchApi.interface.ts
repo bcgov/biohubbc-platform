@@ -1,6 +1,5 @@
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
-import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 import { JsonValue } from 'types/json';
 import { ApiCursorResponseParams, ApiPaginationResponseParams } from 'types/pagination';
 
@@ -24,9 +23,24 @@ export interface SearchFeatureResult {
   label: string;
 }
 
+/**
+ * A column of a feature type in search results: one entry per property ever assigned to the type,
+ * under any Blueprint. `allow_multiple` is true when any assignment of the property allows several values.
+ */
+export interface SearchFeatureProperty {
+  feature_property_id: number;
+  feature_property_type_id?: number;
+  name: string;
+  display_name: string;
+  description: string | null;
+  type_name: string;
+  calculated_value: boolean;
+  allow_multiple: boolean;
+}
+
 export interface SearchFeatureResponse {
   features: SearchFeatureResultWithRelevancy[];
-  properties: FeatureTypeProperty[];
+  properties: SearchFeatureProperty[];
   /** True when the search matched secured features hidden from the caller by access filtering. */
   has_inaccessible_secured_features: boolean;
   pagination: ApiCursorResponseParams;

@@ -4,15 +4,14 @@ import { Box, Typography } from '@mui/material';
 import { GridCellParams, GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PropertyValueDisplay } from 'components/property/PropertyValueDisplay';
-import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
-import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 
 interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
-  featureTypeProperties: FeatureTypeProperty[];
+  featureTypeProperties: SearchFeatureProperty[];
   pathResolvers: SubmissionPropertyValuePathResolvers;
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
 }
@@ -37,7 +36,7 @@ export const SearchResultTableLayout = ({
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
     const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map(
       (property, index) => ({
-        field: String(property.blueprint_feature_type_property_id),
+        field: String(property.feature_property_id),
         headerName: property.display_name,
         minWidth: 160,
         flex: 1,

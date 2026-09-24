@@ -583,12 +583,9 @@ export class DownloadRepository extends BaseRepository {
           ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
         INNER JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-          AND fp.record_end_date IS NULL
         INNER JOIN feature_property_type fpt
           ON fpt.feature_property_type_id = fp.feature_property_type_id
           AND fpt.name = 'artifact_key'
-          AND fpt.record_end_date IS NULL
-        WHERE bftp.record_end_date IS NULL
         GROUP BY bft.blueprint_id, bft.feature_type_id
         HAVING COUNT(*) = 1
       ) artifact_bftp

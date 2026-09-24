@@ -394,8 +394,8 @@ describe('Tile search function (integration)', function () {
       expect(limited.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
       expect(result.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
       expect(result.count).to.equal(1);
-      expect(result.properties.map((property) => property.blueprint_feature_type_property_id)).to.include(
-        geometryProperty.blueprint_feature_type_property_id
+      expect(result.properties.map((property) => property.feature_property_id)).to.include(
+        geometryProperty.feature_property_id
       );
       expect(result.has_inaccessible_secured_features).to.equal(false);
       const context = await createContext({ submissionIds });

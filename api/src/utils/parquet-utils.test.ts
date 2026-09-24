@@ -10,13 +10,17 @@ import { ParquetFeatureData } from '../models/download';
 import { CsvPropertyDefinition } from './csv-utils';
 import {
   buildGeoParquetMetadata,
+  buildParquetPropertiesMetadata,
   buildParquetSchema,
   dateStringToParquet,
+  derivePropertiesFromParquetSchema,
   expandPropertyToColumns,
   extractGeoJsonGeometry,
   featureToRow,
   geoJsonToWkb,
+  PARQUET_PROPERTIES_METADATA_KEY,
   propertyTypeToParquetType,
+  readParquetPropertiesMetadata,
   timeStringToMillis
 } from './parquet-utils';
 
@@ -1144,6 +1148,97 @@ describe('parquet-utils', () => {
       ];
       const row = await roundTrip(properties, { child_features: 'urn:1:observation:42' });
       expect(row['child_features']).to.deep.equal(['urn:1:observation:42']);
+    });
+  });
+
+  describe('file property list', () => {
+    const properties: CsvPropertyDefinition[] = [
+      { feature_property_name: 'name', feature_property_type_name: 'string' },
+      { feature_property_name: 'count', feature_property_type_name: 'number' },
+      { feature_property_name: 'verified', feature_property_type_name: 'boolean' },
+      { feature_property_name: 'observed', feature_property_type_name: 'datetime' },
+      { feature_property_name: 'location', feature_property_type_name: 'spatial' },
+      { feature_property_name: 'children', feature_property_type_name: 'feature' },
+      { feature_property_name: 'species', feature_property_type_name: 'taxon' },
+      { feature_property_name: 'file', feature_property_type_name: 'artifact_key' }
+    ];
+
+    /** Write one file with the given footer entries and hand back an opened reader. */
+    async function writeAndOpen(
+      metadata: Record<string, string>,
+      run: (reader: parquetjs.ParquetReader) => void | Promise<void>
+    ): Promise<void> {
+      const tmpFile = path.join(os.tmpdir(), `parquet-utils-properties-${Date.now()}-${Math.random()}.parquet`);
+      try {
+        const writer = await parquetjs.ParquetWriter.openFile(buildParquetSchema(properties), tmpFile);
+        for (const [key, value] of Object.entries(metadata)) {
+          writer.setMetadata(key, value);
+        }
+        await writer.close();
+
+        const reader = await parquetjs.ParquetReader.openFile(tmpFile);
+        try {
+          await run(reader);
+        } finally {
+          await reader.close();
+        }
+      } finally {
+        await fs.unlink(tmpFile).catch(() => undefined);
+      }
+    }
+
+    it('round-trips the property list through the footer in file order', async () => {
+      await writeAndOpen(
+        { [PARQUET_PROPERTIES_METADATA_KEY]: buildParquetPropertiesMetadata(properties) },
+        (reader) => {
+          expect(readParquetPropertiesMetadata(reader)).to.deep.equal(properties);
+        }
+      );
+    });
+
+    it('reports no property list for a file written without one', async () => {
+      await writeAndOpen({}, (reader) => {
+        expect(readParquetPropertiesMetadata(reader)).to.be.null;
+      });
+    });
+
+    it('rejects a footer entry that is not a property list', async () => {
+      await writeAndOpen({ [PARQUET_PROPERTIES_METADATA_KEY]: '{"not":"a list"}' }, (reader) => {
+        expect(() => readParquetPropertiesMetadata(reader)).to.throw();
+      });
+    });
+
+    it('derives the property list from the physical schema of a file written without one', async () => {
+      await writeAndOpen({}, (reader) => {
+        const derived = derivePropertiesFromParquetSchema(reader.getSchema(), ['file']);
+
+        expect(derived).to.deep.equal([
+          { feature_property_name: 'name', feature_property_type_name: 'string' },
+          { feature_property_name: 'count', feature_property_type_name: 'number' },
+          { feature_property_name: 'verified', feature_property_type_name: 'boolean' },
+          { feature_property_name: 'observed', feature_property_type_name: 'datetime' },
+          { feature_property_name: 'location', feature_property_type_name: 'spatial' },
+          { feature_property_name: 'children', feature_property_type_name: 'feature' },
+          // UTF8 columns are strings unless named as artifact keys; a taxon reads as a string.
+          { feature_property_name: 'species', feature_property_type_name: 'string' },
+          { feature_property_name: 'file', feature_property_type_name: 'artifact_key' }
+        ]);
+      });
+    });
+
+    it('keeps an unpaired datetime suffix column under its own name', () => {
+      const schema = new parquetjs.ParquetSchema({
+        uuid: { type: 'UTF8', optional: false },
+        parent_uuid: { type: 'UTF8', optional: true },
+        submission_feature_id: { type: 'INT64', optional: false },
+        observed_date: { type: 'DATE', optional: true },
+        note: { type: 'UTF8', optional: true }
+      });
+
+      expect(derivePropertiesFromParquetSchema(schema)).to.deep.equal([
+        { feature_property_name: 'observed_date', feature_property_type_name: 'string' },
+        { feature_property_name: 'note', feature_property_type_name: 'string' }
+      ]);
     });
   });
 });

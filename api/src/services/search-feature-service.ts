@@ -1,7 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-property';
+import { SearchFeatureProperty } from '../models/feature-property';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { optimizeExpression } from '../utils/expression-optimization';
@@ -72,7 +72,7 @@ export class SearchFeatureService extends DBService {
    * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination settings
    * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; has_inaccessible_secured_features: boolean; pagination: ApiCursorPaginationResults }>} Feature rows, metadata, security indicator, and adjacent-page cursors
+   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: SearchFeatureProperty[]; has_inaccessible_secured_features: boolean; pagination: ApiCursorPaginationResults }>} Feature rows, metadata, security indicator, and adjacent-page cursors
    */
   async searchFeaturesByExpressionTreeWithMetadata(
     anchorFeatureType: string,
@@ -82,7 +82,7 @@ export class SearchFeatureService extends DBService {
     submissionIds?: number[]
   ): Promise<{
     features: SearchFeatureResultWithRelevancy[];
-    properties: FeatureTypeProperty[];
+    properties: SearchFeatureProperty[];
     has_inaccessible_secured_features: boolean;
     pagination: ApiCursorPaginationResults;
   }> {

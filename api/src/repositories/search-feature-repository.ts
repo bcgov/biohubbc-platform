@@ -3,7 +3,7 @@ import { getKnex } from '../database/db';
 import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-property';
+import { SearchFeatureProperty } from '../models/feature-property';
 import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
 import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
@@ -195,34 +195,33 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Gets the active property schema for the anchor feature type.
+   * Gets the property columns of the anchor feature type.
    *
    * Property definitions are type metadata, not search-result data. Keeping this query independent
    * of the expression prevents the full expression from being evaluated once per typed value table.
-   * They are the active default Blueprint's assignments for the feature type; values stored under
-   * other Blueprints are still hydrated below through their own assignment.
+   * One column is returned per property ever assigned to the feature type, under any Blueprint at
+   * any lifecycle, so every value hydrated below has a column whatever Blueprint it was stored
+   * under. `allow_multiple` is true when any assignment of the property allows several values;
+   * the order is the earliest assignment sort, then display name.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @return {Promise<FeatureTypeProperty[]>} Active metadata for the anchor feature type.
+   * @return {Promise<SearchFeatureProperty[]>} Property columns of the anchor feature type.
    */
-  async getFeatureTypeProperties(anchorFeatureType: string): Promise<FeatureTypeProperty[]> {
+  async getFeatureTypeProperties(anchorFeatureType: string): Promise<SearchFeatureProperty[]> {
     const knex = getKnex();
 
-    const query = knex('blueprint as b')
+    const query = knex('feature_type as ft')
       .select(
-        'bftp.blueprint_feature_type_property_id',
         'fp.feature_property_id',
         'fpt.feature_property_type_id',
         'fp.name',
         'fp.display_name',
         'fp.description',
         'fpt.name as type_name',
-        'bftp.required_value',
         'fp.calculated_value',
-        'bftp.allow_multiple'
+        knex.raw('BOOL_OR(bftp.allow_multiple) AS allow_multiple')
       )
-      .join('blueprint_feature_type as bft', 'bft.blueprint_id', 'b.blueprint_id')
-      .join('feature_type as ft', 'ft.feature_type_id', 'bft.feature_type_id')
+      .join('blueprint_feature_type as bft', 'bft.feature_type_id', 'ft.feature_type_id')
       .join(
         'blueprint_feature_type_property as bftp',
         'bftp.blueprint_feature_type_id',
@@ -231,16 +230,21 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_property as fp', 'fp.feature_property_id', 'bftp.feature_property_id')
       .join('feature_property_type as fpt', 'fpt.feature_property_type_id', 'fp.feature_property_type_id')
       .where('ft.name', anchorFeatureType)
-      .where('b.is_default', true)
-      .whereNull('b.record_end_date')
-      .whereNull('bft.record_end_date')
-      .whereNull('bftp.record_end_date')
       .whereNull('ft.record_end_date')
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
-      .orderByRaw('bftp.sort ASC NULLS LAST')
+      .groupBy(
+        'fp.feature_property_id',
+        'fpt.feature_property_type_id',
+        'fp.name',
+        'fp.display_name',
+        'fp.description',
+        'fpt.name',
+        'fp.calculated_value'
+      )
+      .orderByRaw('MIN(bftp.sort) ASC NULLS LAST')
       .orderBy('fp.display_name', 'asc');
-    const response = await this.connection.knex(query, FeatureTypeProperty);
+    const response = await this.connection.knex(query, SearchFeatureProperty);
 
     return response.rows;
   }

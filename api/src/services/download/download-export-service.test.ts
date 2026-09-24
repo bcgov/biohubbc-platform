@@ -17,11 +17,11 @@ import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { CreateDownloadVersionExportRequest } from '../../models/download-version-export';
 import { DownloadVersionExportArtifactWithFile } from '../../models/download-version-export-artifact';
-import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
-import { CodeService } from '../code-service';
+import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { DownloadExportPipelineService } from './download-export-pipeline-service';
 import { DownloadExportPart, DownloadExportService } from './download-export-service';
 import { DownloadService } from './download-service';
 
@@ -60,28 +60,6 @@ const stubReadyVersion = () =>
       status: DownloadStatusEnum.READY
     })
   );
-
-/**
- * Build a `FeatureTypeWithProperties` code entry. The service maps `properties[].{name,type_name}`
- * through `materializedColumnsForType`, so the only fields that matter for column derivation are the
- * type name and each property's `name`/`type_name`; the rest carry harmless defaults.
- */
-const featureTypeCode = (
-  name: string,
-  properties: { name: string; type_name: string }[]
-): FeatureTypeWithProperties => ({
-  feature_type: { feature_type_id: 1, name, display_name: name, description: null },
-  properties: properties.map((property, index) => ({
-    blueprint_feature_type_property_id: index + 1,
-    name: property.name,
-    display_name: property.name,
-    description: null,
-    type_name: property.type_name,
-    required_value: false,
-    calculated_value: false,
-    allow_multiple: false
-  }))
-});
 
 /**
  * A per-type Parquet artifact key the materialized-types parser recognizes — version-scoped:
@@ -124,12 +102,12 @@ describe('DownloadExportService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts')
         .resolves([parquetArtifact('observation'), parquetArtifact('sample')]);
-      sinon
-        .stub(CodeService.prototype, 'getFeatureTypePropertyCodes')
-        .resolves([
-          featureTypeCode('observation', [{ name: 'count', type_name: 'number' }]),
-          featureTypeCode('sample', [{ name: 'site', type_name: 'string' }])
-        ]);
+      sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(
+        new Map<string, CsvPropertyDefinition[]>([
+          ['observation', [{ feature_property_name: 'count', feature_property_type_name: 'number' }]],
+          ['sample', [{ feature_property_name: 'site', feature_property_type_name: 'string' }]]
+        ])
+      );
     };
 
     describe('valid recipe → group lifecycle', () => {
@@ -686,24 +664,27 @@ describe('DownloadExportService', () => {
     it('returns one entry per materialized type with the full structural + property-derived column set', async () => {
       // Verifies: the picker read returns exactly the materialized types, each with the EXACT column
       // set the CSV pipeline emits — structural columns (submission_feature_id/uuid/parent_uuid) then
-      // schema-derived headers — and drops codes for types that did not materialize a Parquet file.
+      // the headers of the file's own property list — reading only the files that materialized.
 
       // Step 1: Auth resolves a READY download
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(readyDownload());
       const versionStub = stubReadyVersion();
 
-      // Step 2: Only `observation` materialized a Parquet artifact; codes also carry an
-      // unmaterialized `artifact` type that must be filtered out
+      // Step 2: Only `observation` materialized a Parquet artifact; its file describes its columns
       sinon
         .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts')
         .resolves([parquetArtifact('observation')]);
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
-        featureTypeCode('observation', [
-          { name: 'count', type_name: 'number' },
-          { name: 'comment', type_name: 'string' }
-        ]),
-        featureTypeCode('artifact', [{ name: 'filePath', type_name: 'string' }])
-      ]);
+      const readSchemaStub = sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(
+        new Map<string, CsvPropertyDefinition[]>([
+          [
+            'observation',
+            [
+              { feature_property_name: 'count', feature_property_type_name: 'number' },
+              { feature_property_name: 'comment', feature_property_type_name: 'string' }
+            ]
+          ]
+        ])
+      );
 
       // Step 3: Read the exportable feature types
       const service = new DownloadExportService(getMockDBConnection());
@@ -717,6 +698,8 @@ describe('DownloadExportService', () => {
         }
       ]);
       expect(versionStub).to.have.been.calledOnceWith(VERSION_ID);
+      // Only the materialized type's file is read.
+      expect(readSchemaStub).to.have.been.calledOnceWith(DOWNLOAD_ID, VERSION_ID, ['observation']);
     });
 
     it('delegates authorization to getAuthorizedDownload and propagates its HTTP403', async () => {

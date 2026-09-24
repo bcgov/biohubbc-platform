@@ -30,6 +30,7 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
+import { BlueprintService } from '../../services/blueprint-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
@@ -43,7 +44,11 @@ import {
   insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
 import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
-import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import {
+  createTestFeature,
+  createTestSubmission,
+  getActiveDefaultBlueprintId
+} from '../helpers/test-submission-helpers';
 
 /**
  * Helper: assemble ParquetFeatureData from base rows + typed property rows.
@@ -113,7 +118,7 @@ function assembleFeatureData(
  * remain unstubbed — those are exactly the idempotency contracts we verify.
  */
 function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
-  const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+  const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves(), setMetadata: sinon.stub() };
   sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
   const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
   return { uploadStub };
@@ -1258,6 +1263,77 @@ describe('Download Parquet pipeline (integration)', function () {
       const ids = await selectedFeatureIds('survey', source.requested_by);
       expect(ids.has(unsecuredId)).to.equal(true);
       expect(ids.has(securedId)).to.equal(true);
+    });
+  });
+
+  describe('schema and values are independent of Blueprint configuration', () => {
+    /** End-date one Blueprint assignment. */
+    async function retireAssignment(blueprintFeatureTypePropertyId: number): Promise<void> {
+      await connection.sql(SQL`
+        UPDATE blueprint_feature_type_property
+        SET record_end_date = now()
+        WHERE blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
+      `);
+    }
+
+    it('describes a feature type with every property ever assigned to it, retired or not, under any Blueprint', async () => {
+      const featureTypeName = 'capture';
+      const downloadId = await createPolicyDownload();
+      const source = await downloadRepo.getDownloadSource(downloadId);
+
+      // capture.comment retired in the default Blueprint; a new property assigned only in a draft version.
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
+      await retireAssignment(await getBlueprintFeatureTypePropertyId(connection, featureId, 'comment'));
+
+      const newPropertyName = `pq_only_draft_${Date.now()}`;
+      const newProperty = await connection.sql(SQL`
+        INSERT INTO feature_property (feature_property_type_id, name, display_name, record_effective_date, create_user)
+        SELECT fpt.feature_property_type_id, ${newPropertyName}, ${newPropertyName}, now(), ${connection.systemUserId()}
+        FROM feature_property_type fpt
+        WHERE fpt.name = 'number'
+        RETURNING feature_property_id;
+      `);
+      const service = new BlueprintService(connection);
+      const draft = await service.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const draftFeatureType = (await service.getAdminBlueprintFeatureTypes(draft.blueprint_id)).find(
+        (featureType) => featureType.feature_type_name === featureTypeName
+      );
+      await service.createBlueprintFeatureTypeProperty(
+        draft.blueprint_id,
+        draftFeatureType!.blueprint_feature_type_id,
+        {
+          feature_property_id: newProperty.rows[0].feature_property_id
+        }
+      );
+
+      const { schemaLookup } = await pipelineService.resolveParquetSchema(source);
+      const names = (schemaLookup.get(featureTypeName) ?? []).map((property) => property.feature_property_name);
+
+      expect(names).to.include('comment');
+      expect(names).to.include(newPropertyName);
+      expect(names.filter((name) => name === 'comment')).to.have.lengthOf(1);
+    });
+
+    it('hydrates an artifact after its assignment is retired', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'file', {});
+      const objectKey = `uploads/pq-pipeline/${randomUUID()}.bin`;
+      const systemUserId = connection.systemUserId();
+      const artifact = await connection.sql(SQL`
+        INSERT INTO artifact (bucket, object_key, artifact_status, uploaded_at, format, create_user)
+        VALUES ('integration-test', ${objectKey}, 'uploaded', now(), 'bin', ${systemUserId})
+        RETURNING artifact_id;
+      `);
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_artifact (submission_feature_id, artifact_id, create_user)
+        VALUES (${featureId}, ${artifact.rows[0].artifact_id}, ${systemUserId});
+      `);
+      await retireAssignment(await getBlueprintFeatureTypePropertyId(connection, featureId, 'artifact_key'));
+
+      const rows = await downloadRepo.fetchTypedPropertyRows([featureId], ['artifact_key']);
+
+      expect(rows).to.deep.include({ submission_feature_id: featureId, name: 'artifact_key', value: [objectKey] });
     });
   });
 });

@@ -1,7 +1,6 @@
 import { GridColDef } from '@mui/x-data-grid';
 import { cleanup, fireEvent, within } from '@testing-library/react';
-import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
-import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { createMockSearchFeature } from 'test-helpers/search-result-helpers';
@@ -57,37 +56,31 @@ vi.mock('components/data-grid/CustomDataGrid', () => ({
 describe('SearchResultTableLayout', () => {
   const pathResolvers = buildSubmissionPropertyValuePathResolvers('/submission');
 
-  const featureTypeProperties: FeatureTypeProperty[] = [
+  const featureTypeProperties: SearchFeatureProperty[] = [
     {
-      blueprint_feature_type_property_id: 1,
       feature_property_id: 101,
       name: 'scientific_name',
       display_name: 'Scientific Name',
       description: null,
       type_name: 'string',
-      required_value: false,
       calculated_value: false,
       allow_multiple: false
     },
     {
-      blueprint_feature_type_property_id: 2,
       feature_property_id: 102,
       name: 'count',
       display_name: 'Count',
       description: null,
       type_name: 'number',
-      required_value: false,
       calculated_value: false,
       allow_multiple: false
     },
     {
-      blueprint_feature_type_property_id: 3,
       feature_property_id: 103,
       name: 'tags',
       display_name: 'Tags',
       description: null,
       type_name: 'string',
-      required_value: false,
       calculated_value: false,
       allow_multiple: true
     }
@@ -194,24 +187,22 @@ describe('SearchResultTableLayout', () => {
     expect(getByTestId('columns')).toHaveTextContent('Count');
     expect(getByTestId('columns')).toHaveTextContent('Tags');
     expect(getByTestId('columns')).not.toHaveTextContent('Submission');
-    expect(getByTestId('column-fields')).toHaveTextContent('1');
+    expect(getByTestId('column-fields')).toHaveTextContent('101');
     expect(getByTestId('column-fields')).not.toHaveTextContent('submission_name');
     expect(getByTestId('column-fields')).not.toHaveTextContent('property:scientific_name');
-    expect(getByTestId('cell-1')).toHaveTextContent('Canis lupus');
-    expect(getByTestId('cell-2')).toHaveTextContent('12');
-    expect(getByTestId('cell-3')).toHaveTextContent('coastal, survey');
-    expect(getByTestId('cell-1').querySelector('.MuiTypography-root')).toBeInTheDocument();
+    expect(getByTestId('cell-101')).toHaveTextContent('Canis lupus');
+    expect(getByTestId('cell-102')).toHaveTextContent('12');
+    expect(getByTestId('cell-103')).toHaveTextContent('coastal, survey');
+    expect(getByTestId('cell-101').querySelector('.MuiTypography-root')).toBeInTheDocument();
   });
 
   it('renders taxon values as links to the taxon page under the row submission', () => {
-    const taxonProperty: FeatureTypeProperty = {
-      blueprint_feature_type_property_id: 4,
+    const taxonProperty: SearchFeatureProperty = {
       feature_property_id: 104,
       name: 'focal_species',
       display_name: 'Focal Species',
       description: null,
       type_name: 'taxon',
-      required_value: false,
       calculated_value: false,
       allow_multiple: false
     };
@@ -232,7 +223,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${taxonProperty.blueprint_feature_type_property_id}`);
+    const cell = getByTestId(`cell-${taxonProperty.feature_property_id}`);
     expect(cell).toHaveTextContent('Ursus americanus');
     expect(within(cell).getByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
       'href',
@@ -242,14 +233,12 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('renders code values as links to the code page under the row submission', () => {
-    const codeProperty: FeatureTypeProperty = {
-      blueprint_feature_type_property_id: 6,
+    const codeProperty: SearchFeatureProperty = {
       feature_property_id: 106,
       name: 'sign',
       display_name: 'Sign',
       description: null,
       type_name: 'code',
-      required_value: false,
       calculated_value: false,
       allow_multiple: false
     };
@@ -270,7 +259,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${codeProperty.blueprint_feature_type_property_id}`);
+    const cell = getByTestId(`cell-${codeProperty.feature_property_id}`);
     expect(within(cell).getByRole('link', { name: 'Track' })).toHaveAttribute(
       'href',
       '/submission/101/code/sign/track'
@@ -279,14 +268,12 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('renders feature reference values as links to the referenced feature', () => {
-    const featureProperty: FeatureTypeProperty = {
-      blueprint_feature_type_property_id: 7,
+    const featureProperty: SearchFeatureProperty = {
       feature_property_id: 107,
       name: 'sample_site',
       display_name: 'Sample Site',
       description: null,
       type_name: 'feature',
-      required_value: false,
       calculated_value: false,
       allow_multiple: false
     };
@@ -307,7 +294,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${featureProperty.blueprint_feature_type_property_id}`);
+    const cell = getByTestId(`cell-${featureProperty.feature_property_id}`);
     expect(within(cell).getByRole('link', { name: 'urn:18:sample_site:3339' })).toHaveAttribute(
       'href',
       '/submission/18/feature/3339'
@@ -315,14 +302,12 @@ describe('SearchResultTableLayout', () => {
   });
 
   it('renders multi-value taxon properties as a comma-separated list of links', () => {
-    const taxonProperty: FeatureTypeProperty = {
-      blueprint_feature_type_property_id: 5,
+    const taxonProperty: SearchFeatureProperty = {
       feature_property_id: 105,
       name: 'associated_species',
       display_name: 'Associated Species',
       description: null,
       type_name: 'taxon',
-      required_value: false,
       calculated_value: false,
       allow_multiple: true
     };
@@ -346,7 +331,7 @@ describe('SearchResultTableLayout', () => {
       </MemoryRouter>
     );
 
-    const cell = getByTestId(`cell-${taxonProperty.blueprint_feature_type_property_id}`);
+    const cell = getByTestId(`cell-${taxonProperty.feature_property_id}`);
     expect(cell).toHaveTextContent('Ursus americanus, Canis lupus');
     expect(within(cell).getAllByRole('link')).toHaveLength(2);
   });
