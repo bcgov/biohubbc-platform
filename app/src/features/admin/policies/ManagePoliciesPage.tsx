@@ -1,5 +1,8 @@
 import Box from '@mui/material/Box';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
@@ -7,6 +10,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { toApiPagination } from 'utils/pagination';
 import { PoliciesContainer } from './components/PoliciesContainer';
@@ -54,7 +58,7 @@ export const ManagePoliciesPage = () => {
     teamPoliciesDataLoader.load(debouncedTeamPoliciesSearchTerm, apiPagination);
   }, [debouncedTeamPoliciesSearchTerm, teamPoliciesDataLoader, teamPoliciesPaginationModel, teamPoliciesSortModel]);
 
-  const debouncedTeamPoliciesRefresh = useDebounce((searchTerm: string) => {
+  const handleDebouncedTeamPoliciesRefresh = useDebounce((searchTerm: string) => {
     setDebouncedTeamPoliciesSearchTerm(searchTerm);
     const resetPaginationModel = { ...teamPoliciesPaginationModel, page: 0 };
     setTeamPoliciesPaginationModel(resetPaginationModel);
@@ -82,7 +86,7 @@ export const ManagePoliciesPage = () => {
     [teamPoliciesPaginationModel, debouncedTeamPoliciesSearchTerm]
   );
 
-  const refreshTeamPolicies = useCallback(() => {
+  const handleRefreshTeamPolicies = useCallback(() => {
     const apiPagination = toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel);
     teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,14 +95,26 @@ export const ManagePoliciesPage = () => {
   const handleTeamPoliciesSearch = useCallback(
     (searchTerm: string) => {
       setTeamPoliciesSearchTerm(searchTerm);
-      debouncedTeamPoliciesRefresh(searchTerm);
+      handleDebouncedTeamPoliciesRefresh(searchTerm);
     },
-    [debouncedTeamPoliciesRefresh]
+    [handleDebouncedTeamPoliciesRefresh]
   );
 
   return (
     <>
-      <PageHeader label="Manage Policies" />
+      <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="policies breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Policies
+            </Typography>
+          </Breadcrumbs>
+        }
+        label="Manage Policies"
+      />
       <Box py={4}>
         <PoliciesContainer
           policies={policies.rows}
@@ -134,7 +150,7 @@ export const ManagePoliciesPage = () => {
             setPaginationModel={handleTeamPoliciesPaginationChange}
             sortModel={teamPoliciesSortModel}
             setSortModel={handleTeamPoliciesSortChange}
-            refresh={refreshTeamPolicies}
+            refresh={handleRefreshTeamPolicies}
             searchTerm={teamPoliciesSearchTerm}
             onSearch={handleTeamPoliciesSearch}
           />

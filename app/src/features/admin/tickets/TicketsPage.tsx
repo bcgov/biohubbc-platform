@@ -1,15 +1,16 @@
-import Box from '@mui/material/Box';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
+import { PageHeader } from 'components/header/PageHeader';
+import { TabGroup } from 'components/tabs/TabGroup';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useTicketsListPageState } from 'hooks/useTicketsListPageState';
 import { ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { CreateTicketDialog } from './components/dialog/create/CreateTicketDialog';
 import { EditTicketDialog } from './components/dialog/edit/EditTicketDialog';
@@ -48,11 +49,11 @@ export const TicketsPage = () => {
     setData
   } = useTicketsListPageState(api.tickets.getTicketsForAdmin);
 
-  const closeDeleteTicketDialog = useCallback(() => {
+  const handleCloseDeleteTicketDialog = useCallback(() => {
     dialogContext.setYesNoDialog({ open: false });
   }, [dialogContext]);
 
-  const showApiErrorSnackbar = useCallback(
+  const handleShowApiErrorSnackbar = useCallback(
     (caughtError: unknown) => {
       const apiError = caughtError as APIError;
       dialogContext.setSnackbar({
@@ -78,9 +79,9 @@ export const TicketsPage = () => {
             )
           });
         } catch (caughtError) {
-          showApiErrorSnackbar(caughtError);
+          handleShowApiErrorSnackbar(caughtError);
         } finally {
-          closeDeleteTicketDialog();
+          handleCloseDeleteTicketDialog();
         }
       };
 
@@ -94,13 +95,13 @@ export const TicketsPage = () => {
         yesButtonLabel: 'Remove Ticket',
         noButtonLabel: 'Cancel',
         yesButtonProps: { color: 'error' },
-        onClose: closeDeleteTicketDialog,
-        onNo: closeDeleteTicketDialog,
+        onClose: handleCloseDeleteTicketDialog,
+        onNo: handleCloseDeleteTicketDialog,
         open: true,
         onYes: handleConfirmDelete
       });
     },
-    [api.tickets, closeDeleteTicketDialog, dialogContext, refresh, showApiErrorSnackbar]
+    [api.tickets, handleCloseDeleteTicketDialog, dialogContext, refresh, handleShowApiErrorSnackbar]
   );
 
   const handleToggleTicketStatus = useCallback(
@@ -143,10 +144,10 @@ export const TicketsPage = () => {
             )
           });
         }
-        showApiErrorSnackbar(caughtError);
+        handleShowApiErrorSnackbar(caughtError);
       }
     },
-    [api.tickets, dialogContext, response, rows, setData, showApiErrorSnackbar]
+    [api.tickets, dialogContext, response, rows, setData, handleShowApiErrorSnackbar]
   );
 
   const handleCreateTicket = useCallback(
@@ -170,12 +171,12 @@ export const TicketsPage = () => {
 
         setIsCreateDialogOpen(false);
       } catch (caughtError) {
-        showApiErrorSnackbar(caughtError);
+        handleShowApiErrorSnackbar(caughtError);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [api.tickets, response, rows, setData, showApiErrorSnackbar]
+    [api.tickets, response, rows, setData, handleShowApiErrorSnackbar]
   );
 
   const handleEditTicket = useCallback((ticket: ITicket) => {
@@ -208,41 +209,47 @@ export const TicketsPage = () => {
           snackbarMessage: 'Updated ticket'
         });
       } catch (caughtError) {
-        showApiErrorSnackbar(caughtError);
+        handleShowApiErrorSnackbar(caughtError);
       } finally {
         setIsEditingTicket(false);
       }
     },
-    [api.tickets, dialogContext, response, rows, selectedTicket, setData, showApiErrorSnackbar]
+    [api.tickets, dialogContext, response, rows, selectedTicket, setData, handleShowApiErrorSnackbar]
   );
 
   return (
     <>
-      <Paper square elevation={0}>
-        <Container maxWidth="xl" sx={{ py: 4, pb: 0 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              Administrative
+      <PageHeader
+        label="Administrative"
+        breadcrumbs={
+          <Breadcrumbs aria-label="tickets breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Tickets
             </Typography>
-          </Box>
-
-          <Tabs
+          </Breadcrumbs>
+        }
+        tabs={
+          <TabGroup<'tickets'>
             value={activeTab}
-            onChange={(_, value) => {
+            onChange={(value) => {
               setActiveTab(value);
               handlePaginationChange({ ...paginationModel, page: 0 });
             }}
-            aria-label="administrative tabs"
-            sx={{ mt: 1.5 }}>
-            <Tab
-              value="tickets"
-              label="Tickets"
-              id="administrative-tickets-tab"
-              aria-controls="administrative-tickets-tabpanel"
-            />
-          </Tabs>
-        </Container>
-      </Paper>
+            ariaLabel="administrative tabs"
+            tabs={[
+              {
+                value: 'tickets',
+                label: 'Tickets',
+                id: 'administrative-tickets-tab',
+                ariaControls: 'administrative-tickets-tabpanel'
+              }
+            ]}
+          />
+        }
+      />
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
         <TicketsContainer

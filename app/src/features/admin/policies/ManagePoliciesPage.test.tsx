@@ -3,7 +3,7 @@ import { useApi } from 'hooks/useApi';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { ManagePoliciesPage } from './ManagePoliciesPage';

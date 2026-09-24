@@ -62,7 +62,7 @@ describe('SubmissionUploadReviewHeader', () => {
     );
 
     const breadcrumbs = screen.getByLabelText('review breadcrumb');
-    expect(breadcrumbs).toHaveTextContent(`Submission>Review>${review.name}`);
+    expect(breadcrumbs).toHaveTextContent(`Submission/Review/${review.name}`);
     expect(within(breadcrumbs).getByRole('link', { name: 'Submission' })).toHaveAttribute(
       'href',
       '/admin/submissions/16'
@@ -89,7 +89,7 @@ describe('SubmissionUploadReviewHeader', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByLabelText('review breadcrumb')).toHaveTextContent('Submission>Review>Access rules review');
+    expect(screen.getByLabelText('review breadcrumb')).toHaveTextContent('Submission/Review/Access rules review');
   });
 
   it('shows Reopen Review when the review is completed', () => {
