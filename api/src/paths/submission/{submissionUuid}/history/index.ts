@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { SubmissionUploadStatusHistoryResponseSchema } from '../../../../openapi/schemas/upload';
@@ -12,13 +11,13 @@ const defaultLog = getLogger('paths/submission/{submissionUuid}/history');
 
 export const GET: Operation = [
   authorizeRequestHandler((req) => ({
-    or: [
+    and: [
       {
         discriminator: 'Team',
         entity: 'submission',
         submissionUuid: req.params.submissionUuid
       },
-      { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+      { discriminator: 'Contributor' }
     ]
   })),
   getSubmissionHistory()
@@ -26,7 +25,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    'Return all upload status history for a submission. Available to submission-team members and system administrators.',
+    'Return all upload status history for a submission. Available to active contributors on the submission team and system administrators.',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [

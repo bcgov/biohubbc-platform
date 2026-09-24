@@ -4,7 +4,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET, getSubmissionHistory } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
 import * as db from '../../../../database/db';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
 import { SubmissionUploadService } from '../../../../services/upload/submission-upload-service';
@@ -16,7 +15,7 @@ describe('submission history handler', () => {
     sinon.restore();
   });
 
-  it('authorizes submission-team members and system administrators', async () => {
+  it('requires contributor and submission-team membership', async () => {
     sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionUuid: '11111111-1111-1111-1111-111111111111' };
@@ -24,13 +23,13 @@ describe('submission history handler', () => {
     await (GET[0] as RequestHandler)(mockReq, mockRes, mockNext);
 
     expect(mockReq.authorization_scheme).to.eql({
-      or: [
+      and: [
         {
           discriminator: 'Team',
           entity: 'submission',
           submissionUuid: '11111111-1111-1111-1111-111111111111'
         },
-        { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+        { discriminator: 'Contributor' }
       ]
     });
     expect(mockNext).to.have.been.calledOnce;

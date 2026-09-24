@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { Contributor } from '../models/contributor';
+import { Contributor, ContributorMembership } from '../models/contributor';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -36,6 +36,36 @@ export class ContributorRepository extends BaseRepository {
       ]);
     }
 
+    return response.rows[0];
+  }
+
+  /**
+   * Find an active contributor by client ID together with the caller's active membership.
+   *
+   * @param {string} clientId - Effective client ID for submission attribution.
+   * @param {number} systemUserId - Authenticated caller whose membership is checked.
+   * @returns {Promise<ContributorMembership | undefined>} Contributor and membership status, or undefined
+   * when no active contributor matches.
+   */
+  async findContributorMembershipByClientId(
+    clientId: string,
+    systemUserId: number
+  ): Promise<ContributorMembership | undefined> {
+    const sql = SQL`
+      SELECT c.contributor_id,
+        EXISTS (
+          SELECT 1
+          FROM contributor_system_user csu
+          WHERE csu.contributor_id = c.contributor_id
+            AND csu.system_user_id = ${systemUserId}
+            AND csu.record_end_date IS NULL
+        ) AS is_member
+      FROM contributor c
+      WHERE c.client_id = ${clientId}
+        AND c.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, ContributorMembership);
     return response.rows[0];
   }
 

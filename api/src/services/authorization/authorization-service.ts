@@ -2,6 +2,7 @@ import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUserExtended, isSystemUserInactive } from '../../models/system-user';
 import { getUserGuid } from '../../utils/keycloak-utils';
+import { ContributorService } from '../contributor-service';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
 import { DownloadService } from '../download/download-service';
@@ -90,13 +91,15 @@ export interface AuthorizeByPolicy {
 }
 
 /**
- * Authorization rule that checks if a jwt token maps to a known contributor by client id.
+ * Authorization rule that checks contributor membership, optionally selecting one by client ID.
  *
  * @export
  * @interface AuthorizeByContributor
  */
 export interface AuthorizeByContributor {
   discriminator: 'Contributor';
+  /** When supplied, require membership in this contributor and resolve its ID for attribution. */
+  clientId?: string | null;
 }
 
 export type AuthorizeRule =
@@ -120,6 +123,7 @@ export type AuthorizeConfigAnd = {
 export type AuthorizationScheme = AuthorizeConfigAnd | AuthorizeConfigOr;
 
 export class AuthorizationService extends DBService {
+  _contributorService: ContributorService;
   _userService = new UserService(this.connection);
   _contributorSystemUserService = new ContributorSystemUserService(this.connection);
   _downloadService = new DownloadService(this.connection);
@@ -129,6 +133,7 @@ export class AuthorizationService extends DBService {
 
   constructor(connection: IDBConnection, init?: { systemUser?: SystemUserExtended; keycloakToken?: object }) {
     super(connection);
+    this._contributorService = new ContributorService(connection);
 
     this._systemUser = init?.systemUser;
     this._keycloakToken = init?.keycloakToken;
@@ -177,7 +182,7 @@ export class AuthorizationService extends DBService {
           authorizeResults.push(await this.authorizeByDownload(authorizeRule));
           break;
         case 'Contributor':
-          authorizeResults.push(await this.authorizeByContributor());
+          authorizeResults.push(await this.authorizeByContributor(authorizeRule));
           break;
         case 'Team':
           authorizeResults.push(await this.authorizeByTeam(authorizeRule));
@@ -339,13 +344,14 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user is a known contributor by token client id.
+   * Check contributor membership and resolve attribution when a client ID is supplied.
    *
-   * Note: This is for submission-source attribution and authorization.
-   *
-   * @returns {Promise<boolean>}
+   * @param {AuthorizeByContributor} authorizeRule - Contributor rule with an optional effective client ID.
+   * @returns {Promise<boolean>} Whether the authenticated user has contributor access.
+   * @throws If a selected contributor cannot be resolved or the caller does not belong to it.
    */
-  async authorizeByContributor(): Promise<boolean> {
+  async authorizeByContributor(authorizeRule: AuthorizeByContributor): Promise<boolean> {
+    const { clientId } = authorizeRule;
     if (!this._keycloakToken) {
       return false;
     }
@@ -357,15 +363,12 @@ export class AuthorizationService extends DBService {
       return false;
     }
 
-    const contributorSystemUser = await this._contributorSystemUserService.findContributorSystemUser(systemUserId);
-
-    if (!contributorSystemUser) {
-      return false;
+    if (clientId !== undefined) {
+      this._contributorId = await this._contributorService.resolveAuthorizedContributorId(clientId, systemUserId);
+      return true;
     }
 
-    this._contributorId = contributorSystemUser.contributor_id;
-
-    return true;
+    return this._contributorSystemUserService.hasActiveContributor(systemUserId);
   }
 
   /**

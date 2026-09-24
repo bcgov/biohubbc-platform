@@ -1,5 +1,4 @@
 import { IDBConnection } from '../database/db';
-import { ContributorSystemUser } from '../models/contributor-system-user';
 import { ContributorSystemUserRepository } from '../repositories/contributor-system-user-repository';
 import { DBService } from './db-service';
 
@@ -19,7 +18,10 @@ export class ContributorSystemUserService extends DBService {
    * @returns {Promise<void>}
    */
   async ensureContributorSystemUser(contributorId: number, systemUserId: number): Promise<void> {
-    const contributorSystemUser = await this.contributorSystemUserRepository.findContributorSystemUser(systemUserId);
+    const contributorSystemUser = await this.contributorSystemUserRepository.findContributorSystemUser(
+      contributorId,
+      systemUserId
+    );
 
     if (!contributorSystemUser) {
       await this.contributorSystemUserRepository.createContributorSystemUser(contributorId, systemUserId);
@@ -27,12 +29,11 @@ export class ContributorSystemUserService extends DBService {
   }
 
   /**
-   * Find the active contributor-system-user relationship for a system user.
-   *
-   * @param {number} systemUserId
-   * @returns {Promise<ContributorSystemUser | null>}
+   * Check whether a user belongs to any active contributor.
+   * @param systemUserId - Authenticated user identifier.
+   * @returns Whether contributor access is available.
    */
-  async findContributorSystemUser(systemUserId: number): Promise<ContributorSystemUser | null> {
-    return this.contributorSystemUserRepository.findContributorSystemUser(systemUserId);
+  async hasActiveContributor(systemUserId: number): Promise<boolean> {
+    return this.contributorSystemUserRepository.hasActiveContributor(systemUserId);
   }
 }

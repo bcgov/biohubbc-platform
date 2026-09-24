@@ -423,65 +423,57 @@ describe('authorizeByContributor', function () {
       keycloakToken: undefined
     });
 
-    const result = await authorizationService.authorizeByContributor();
+    const result = await authorizationService.authorizeByContributor({ discriminator: 'Contributor' });
 
     expect(result).to.be.false;
   });
 
   it('returns false when no system user is available on the authorization context', async function () {
     const mockDBConnection = getMockDBConnection();
-    const findContributorSystemUserStub = sinon.stub(
-      ContributorSystemUserService.prototype,
-      'findContributorSystemUser'
-    );
+    const hasActiveContributorStub = sinon.stub(ContributorSystemUserService.prototype, 'hasActiveContributor');
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { sub: 'some-guid' }
     });
 
-    const result = await authorizationService.authorizeByContributor();
+    const result = await authorizationService.authorizeByContributor({ discriminator: 'Contributor' });
 
     expect(result).to.be.false;
-    expect(findContributorSystemUserStub).not.to.have.been.called;
+    expect(hasActiveContributorStub).not.to.have.been.called;
   });
 
   it('returns false when no contributor mapping exists for system user', async function () {
     const mockDBConnection = getMockDBConnection();
-    const findContributorSystemUserStub = sinon
-      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
-      .resolves(null);
+    const hasActiveContributorStub = sinon
+      .stub(ContributorSystemUserService.prototype, 'hasActiveContributor')
+      .resolves(false);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { sub: 'some-guid' },
       systemUser: { system_user_id: 9 } as SystemUserExtended
     });
 
-    const result = await authorizationService.authorizeByContributor();
+    const result = await authorizationService.authorizeByContributor({ discriminator: 'Contributor' });
 
     expect(result).to.be.false;
-    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(9);
+    expect(hasActiveContributorStub).to.have.been.calledOnceWith(9);
   });
 
-  it('returns true and sets contributorId when system user maps to contributor', async function () {
+  it('returns true when the user has an active contributor membership', async function () {
     const mockDBConnection = getMockDBConnection();
-    const findContributorSystemUserStub = sinon
-      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
-      .resolves({
-        contributor_system_user_id: 1,
-        contributor_id: 77,
-        system_user_id: 12
-      });
+    const hasActiveContributorStub = sinon
+      .stub(ContributorSystemUserService.prototype, 'hasActiveContributor')
+      .resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { sub: 'some-guid' },
       systemUser: { system_user_id: 12 } as SystemUserExtended
     });
 
-    const result = await authorizationService.authorizeByContributor();
+    const result = await authorizationService.authorizeByContributor({ discriminator: 'Contributor' });
 
     expect(result).to.be.true;
-    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(12);
-    expect(authorizationService.contributorId).to.equal(77);
+    expect(hasActiveContributorStub).to.have.been.calledOnceWith(12);
   });
 });
 

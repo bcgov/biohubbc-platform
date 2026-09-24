@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
@@ -11,13 +10,13 @@ const defaultLog = getLogger('paths/submission/{submissionUuid}/upload/{submissi
 
 export const DELETE: Operation = [
   authorizeRequestHandler((req) => ({
-    or: [
+    and: [
       {
         discriminator: 'Team',
         entity: 'submission_upload',
         submissionUploadId: req.params.submissionUploadId
       },
-      { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+      { discriminator: 'Contributor' }
     ]
   })),
   deleteSubmissionUpload()
@@ -25,7 +24,7 @@ export const DELETE: Operation = [
 
 DELETE.apiDoc = {
   description:
-    'Soft-delete a submission upload. The bearer token must identify a member of the upload team, or a system administrator. Deletion is only allowed while the upload decision is still pending (unreviewed).',
+    'Soft-delete a submission upload. The bearer token must identify an active contributor on the upload team, or a system administrator. Deletion is only allowed while the upload decision is still pending (unreviewed).',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
