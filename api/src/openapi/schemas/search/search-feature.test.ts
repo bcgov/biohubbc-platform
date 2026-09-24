@@ -79,12 +79,14 @@ describe('featureSearchRequestBodySchema', () => {
       items: featureSearchPropertySchema
     });
     expect(featureSearchPropertySchema.required).to.include.members([
-      'blueprint_feature_type_property_id',
+      'feature_property_id',
       'name',
       'display_name',
       'type_name',
       'allow_multiple'
     ]);
+    expect(featureSearchPropertySchema.required).to.not.include.members(['blueprint_feature_type_property_id']);
+    expect(featureSearchPropertySchema.properties).to.not.have.property('blueprint_feature_type_property_id');
     expect(featureSearchPropertySchema.properties?.allow_multiple).to.deep.include({
       type: 'boolean',
       description: 'Whether this property can be returned as an array of values.'

@@ -98,6 +98,15 @@ export const FeatureProperty = z.object({
 
 export type FeatureProperty = z.infer<typeof FeatureProperty>;
 
+/**
+ * A property definition on its own: what a stored value of the property is, independent of any
+ * Blueprint assignment. Carries no requiredness, multiplicity or order, since those belong to an
+ * assignment.
+ */
+export const FeaturePropertyDefinition = FeatureProperty.omit({ feature_property_type_id: true });
+
+export type FeaturePropertyDefinition = z.infer<typeof FeaturePropertyDefinition>;
+
 /** Fields required to create a feature property. */
 export interface CreateFeatureProperty {
   /** Foreign key to feature_property_type. */
@@ -143,6 +152,18 @@ export const FeatureTypeProperty = z.object({
 });
 
 export type FeatureTypeProperty = z.infer<typeof FeatureTypeProperty>;
+
+/**
+ * A column of a feature type in search results: one entry per property ever assigned to the type,
+ * under any Blueprint at any lifecycle, so that every stored value has a column. `allow_multiple` is
+ * true when any assignment of the property allows several values.
+ */
+export const SearchFeatureProperty = FeatureTypeProperty.omit({
+  blueprint_feature_type_property_id: true,
+  required_value: true
+});
+
+export type SearchFeatureProperty = z.infer<typeof SearchFeatureProperty>;
 
 /**
  * The property metadata a predicate is validated and typed against: the property definition, its

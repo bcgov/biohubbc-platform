@@ -3,8 +3,7 @@ import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonTable } from 'components/loading/SkeletonLoaders';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
-import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
-import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
@@ -13,7 +12,7 @@ interface SearchResultOptionsProps {
   /** Search result rows rendered by the active table or list layout. */
   rows: SearchFeatureResultWithRelevancy[];
   /** Feature type property metadata used by the table layout. */
-  featureTypeProperties: FeatureTypeProperty[];
+  featureTypeProperties: SearchFeatureProperty[];
   /** Path resolvers for handling redirects when clicking hyperlinked feature values. */
   pathResolvers: SubmissionPropertyValuePathResolvers;
   /** Whether the result request is currently loading. */

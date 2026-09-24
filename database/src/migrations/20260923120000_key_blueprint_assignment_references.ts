@@ -384,21 +384,25 @@ export async function up(knex: Knex): Promise<void> {
     -- 5. Reference targets: re-home each declaration onto every assignment that carries its
     --    pairing, and only let a feature-valued assignment declare targets.
     ----------------------------------------------------------------------------------------
+    -- The copies keep the pairing key of their original, so the pairing-keyed unique index has to
+    -- be gone before they exist. Uniqueness is re-established per assignment (nuk2) below.
+    DROP INDEX IF EXISTS feature_type_property_feature_nuk1;
+    DROP INDEX IF EXISTS feature_type_property_feature_idx1;
+
     ALTER TABLE feature_type_property_feature ADD COLUMN blueprint_feature_type_property_id integer;
 
+    -- create_user is set by the audit trigger on every insert.
     INSERT INTO feature_type_property_feature (
       feature_type_property_id,
       blueprint_feature_type_property_id,
       target_feature_type_id,
-      record_end_date,
-      create_user
+      record_end_date
     )
     SELECT
       f.feature_type_property_id,
       bftp.blueprint_feature_type_property_id,
       f.target_feature_type_id,
-      f.record_end_date,
-      f.create_user
+      f.record_end_date
     FROM feature_type_property_feature f
     JOIN blueprint_feature_type_property bftp
       ON bftp.feature_type_property_id = f.feature_type_property_id
@@ -414,9 +418,6 @@ export async function up(knex: Knex): Promise<void> {
       ADD CONSTRAINT feature_type_property_feature_fk3
       FOREIGN KEY (blueprint_feature_type_property_id)
       REFERENCES blueprint_feature_type_property(blueprint_feature_type_property_id);
-
-    DROP INDEX IF EXISTS feature_type_property_feature_nuk1;
-    DROP INDEX IF EXISTS feature_type_property_feature_idx1;
 
     -- Disallow duplicate (assignment, target) rows while a record is active.
     CREATE UNIQUE INDEX feature_type_property_feature_nuk2

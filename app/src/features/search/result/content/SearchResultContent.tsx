@@ -2,8 +2,7 @@ import { Box, Divider } from '@mui/material';
 import { CustomPagination } from 'components/pagination/CustomPagination';
 import { ToggleButtonView } from 'components/toggle-button/ToggleButtons';
 import { SEARCH_RESULT_VIEW } from 'constants/search';
-import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
-import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useState } from 'react';
 import { CursorPagination } from 'types/pagination';
 import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
@@ -14,7 +13,7 @@ export interface SearchResultContentProps {
   /** Search result rows returned by the feature search endpoint. */
   rows: SearchFeatureResultWithRelevancy[];
   /** Feature type property metadata used to build table columns. */
-  featureTypeProperties: FeatureTypeProperty[];
+  featureTypeProperties: SearchFeatureProperty[];
   /** Path resolvers for handling redirects when clicking hyperlinked feature values. */
   pathResolvers: SubmissionPropertyValuePathResolvers;
   /** Whether the result request is currently loading. */

@@ -3,11 +3,16 @@
  *
  * Used by the download pipeline to convert typed feature properties into
  * GeoParquet-compliant files. Each feature type produces its own Parquet file
- * with a schema derived from the feature type's Blueprint property assignments.
+ * with a schema covering every property ever assigned to the feature type.
+ *
+ * A file also carries the property list it was built from in its footer
+ * (`PARQUET_PROPERTIES_METADATA_KEY`), so a reader describes the file from the
+ * file itself rather than from a catalogue that can change after the write.
  *
  * Companion to csv-utils.ts — shares `CsvPropertyDefinition` for schema metadata.
  */
 import { ParquetSchema, type FieldDefinition, type SchemaDefinition } from '@dsnp/parquetjs';
+import { z } from 'zod';
 
 import {
   assertNoDatetimeColumnCollisions,
@@ -16,6 +21,147 @@ import {
 } from '../models/datetime-column';
 import { ParquetFeatureData } from '../models/download';
 import type { CsvPropertyDefinition } from './csv-utils';
+
+/**
+ * Footer key under which a feature type's Parquet file stores the property list it was written
+ * with, as a JSON array of `CsvPropertyDefinition`. A reader takes column names and types from
+ * here, since the physical schema alone cannot tell `string`, `code`, `taxon` and `artifact_key`
+ * apart (all UTF8) and `artifact_key` is exported differently.
+ */
+export const PARQUET_PROPERTIES_METADATA_KEY = 'biohub_properties';
+
+/** Columns every feature type file carries besides its properties. */
+export const PARQUET_STRUCTURAL_COLUMNS: ReadonlyArray<string> = ['uuid', 'parent_uuid', 'submission_feature_id'];
+
+const ParquetPropertiesMetadata = z.array(
+  z.object({
+    feature_property_name: z.string(),
+    feature_property_type_name: z.string()
+  })
+);
+
+/** The reader surface needed to describe a file: its physical schema and its footer metadata. */
+export interface ParquetFileDescription {
+  getSchema(): ParquetSchema;
+  getMetadata(): Record<string, unknown>;
+}
+
+/**
+ * Serialize the property list a file is written with, for `writer.setMetadata`.
+ *
+ * @param properties - The property definitions the schema was built from.
+ * @returns JSON for the `PARQUET_PROPERTIES_METADATA_KEY` footer entry.
+ */
+export function buildParquetPropertiesMetadata(properties: CsvPropertyDefinition[]): string {
+  return JSON.stringify(
+    properties.map((property) => ({
+      feature_property_name: property.feature_property_name,
+      feature_property_type_name: property.feature_property_type_name
+    }))
+  );
+}
+
+/**
+ * Read the property list a file was written with from its footer.
+ *
+ * @param reader - An opened Parquet reader.
+ * @returns The stored definitions in file order, or null when the file carries none (files written
+ *   before the footer entry existed).
+ * @throws When the entry is present but is not a property list.
+ */
+export function readParquetPropertiesMetadata(reader: ParquetFileDescription): CsvPropertyDefinition[] | null {
+  const stored = reader.getMetadata()[PARQUET_PROPERTIES_METADATA_KEY];
+
+  if (stored === undefined || stored === null) {
+    return null;
+  }
+
+  return ParquetPropertiesMetadata.parse(JSON.parse(String(stored)));
+}
+
+/**
+ * Derive property definitions from a file's physical schema, for files that carry no footer
+ * property list.
+ *
+ * Structural columns are skipped. `DOUBLE` is `number`, `BOOLEAN` is `boolean`, a plain
+ * `BYTE_ARRAY` is `spatial`, a repeated UTF8 column is `feature`, and a `<name>_date` DATE column
+ * paired with a `<name>_time` TIME_MILLIS column is one `datetime` property `<name>` (an unpaired
+ * suffix column is kept under its own name as a string). Every other UTF8 column is `string`,
+ * except those named in `artifactKeyColumns`, which are `artifact_key`: the physical schema
+ * cannot distinguish that type, and it is the one UTF8 type the CSV export treats differently.
+ *
+ * @param schema - The file's physical schema.
+ * @param artifactKeyColumns - Column names that hold artifact keys, from a catalogue the caller
+ *   trusts for this feature type.
+ * @returns Property definitions in schema order.
+ */
+export function derivePropertiesFromParquetSchema(
+  schema: ParquetSchema,
+  artifactKeyColumns: ReadonlyArray<string> = []
+): CsvPropertyDefinition[] {
+  const fields = schema.fieldList.filter(
+    (field) => field.path.length === 1 && !PARQUET_STRUCTURAL_COLUMNS.includes(field.name)
+  );
+  const byName = new Map(fields.map((field) => [field.name, field]));
+  const artifactKeys = new Set(artifactKeyColumns);
+  const consumed = new Set<string>();
+  const properties: CsvPropertyDefinition[] = [];
+
+  for (const field of fields) {
+    if (consumed.has(field.name)) {
+      continue;
+    }
+
+    if (field.originalType === 'DATE' && field.name.endsWith(DATETIME_DATE_SUFFIX)) {
+      const baseName = field.name.slice(0, -DATETIME_DATE_SUFFIX.length);
+      const timeField = byName.get(`${baseName}${DATETIME_TIME_SUFFIX}`);
+      if (timeField?.originalType === 'TIME_MILLIS') {
+        consumed.add(field.name);
+        consumed.add(timeField.name);
+        properties.push({ feature_property_name: baseName, feature_property_type_name: 'datetime' });
+        continue;
+      }
+    }
+
+    consumed.add(field.name);
+    properties.push({
+      feature_property_name: field.name,
+      feature_property_type_name: derivePropertyTypeFromField(field, artifactKeys)
+    });
+  }
+
+  return properties;
+}
+
+/**
+ * Map one physical column to a property type name.
+ *
+ * @param field - The column.
+ * @param artifactKeys - Column names that hold artifact keys.
+ * @returns The property type name the CSV export formats the column as.
+ */
+function derivePropertyTypeFromField(
+  field: ParquetSchema['fieldList'][number],
+  artifactKeys: ReadonlySet<string>
+): string {
+  if (field.repetitionType === 'REPEATED') {
+    return 'feature';
+  }
+
+  switch (field.primitiveType) {
+    case 'DOUBLE':
+      return 'number';
+    case 'BOOLEAN':
+      return 'boolean';
+    case 'BYTE_ARRAY':
+      if (field.originalType === 'UTF8') {
+        return artifactKeys.has(field.name) ? 'artifact_key' : 'string';
+      }
+      return 'spatial';
+    default:
+      return 'string';
+  }
+}
 
 /**
  * Output column spec produced by expanding a single feature property definition.

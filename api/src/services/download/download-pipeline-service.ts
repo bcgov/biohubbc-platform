@@ -17,7 +17,13 @@ import { buildParquetKey } from '../../utils/export-utils';
 import { optimizeExpression } from '../../utils/expression-optimization';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
-import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
+import {
+  buildGeoParquetMetadata,
+  buildParquetPropertiesMetadata,
+  buildParquetSchema,
+  featureToRow,
+  PARQUET_PROPERTIES_METADATA_KEY
+} from '../../utils/parquet-utils';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
@@ -344,6 +350,10 @@ export class DownloadPipelineService extends DBService {
         writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
       }
 
+      // The file describes itself: the export reads column names and types from this entry, so
+      // a later change to the property catalogue cannot alter how this file is exported.
+      writer.setMetadata(PARQUET_PROPERTIES_METADATA_KEY, buildParquetPropertiesMetadata(properties));
+
       // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
       // Count hydrated rows (what actually lands in the file), not base cursor rows.
       for await (const baseBatch of cursor) {
@@ -490,10 +500,14 @@ export class DownloadPipelineService extends DBService {
 
   /**
    * Build a lookup map from feature type name to property definitions.
+   *
+   * The definitions are every property ever assigned to the feature type under any Blueprint, so the
+   * Parquet schema describes every value a feature of the type can carry, whatever Blueprint it was
+   * uploaded under and whether or not its assignment has since been retired.
    */
   private async buildSchemaLookup(): Promise<Map<string, CsvPropertyDefinition[]>> {
     const codeService = new CodeService(this.connection);
-    const allFeatureTypeCodes = await codeService.getFeatureTypePropertyCodes();
+    const allFeatureTypeCodes = await codeService.getFeatureTypeProperties();
 
     const lookup = new Map<string, CsvPropertyDefinition[]>();
     for (const ftCode of allFeatureTypeCodes) {

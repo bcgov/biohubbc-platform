@@ -14,15 +14,21 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeaturePropertyRepository } from '../../repositories/submission-feature-property-repository';
+import { BlueprintService } from '../../services/blueprint-service';
 import {
   addCodeProperty,
   addTaxonProperty,
   createBlueprintFeatureTypeProperty,
   createCodesetCode,
   createTaxon,
+  getBlueprintFeatureTypePropertyId,
   insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
-import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import {
+  createTestFeature,
+  createTestSubmission,
+  getActiveDefaultBlueprintId
+} from '../helpers/test-submission-helpers';
 
 // Deterministic token: no seeded value contains it, so label searches can't match pre-existing data.
 const TOKEN = 'INTPROPVAL411';
@@ -289,6 +295,99 @@ describe('Indexed property value read paths (integration)', function () {
 
       const rows = await propertyRepository.getSubmissionFeatureProperties(sourceId, { page: 1, limit: 25 });
       expect(rows.filter((row) => row.id.startsWith('feature:'))).to.be.empty;
+    });
+  });
+
+  /** Attach one uploaded artifact to a feature, the way ingestion does for a file feature. */
+  async function attachArtifact(featureId: number, objectKey: string): Promise<void> {
+    const systemUserId = connection.systemUserId();
+    const artifact = await connection.sql(SQL`
+      INSERT INTO artifact (bucket, object_key, artifact_status, uploaded_at, format, create_user)
+      VALUES ('integration-test', ${objectKey}, 'uploaded', now(), 'bin', ${systemUserId})
+      RETURNING artifact_id;
+    `);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_artifact (submission_feature_id, artifact_id, create_user)
+      VALUES (${featureId}, ${artifact.rows[0].artifact_id}, ${systemUserId});
+    `);
+  }
+
+  /** End-date one Blueprint assignment. */
+  async function retireAssignment(blueprintFeatureTypePropertyId: number): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE blueprint_feature_type_property
+      SET record_end_date = now()
+      WHERE blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
+    `);
+  }
+
+  /** Insert a number property that no Blueprint assigns yet and return its id. */
+  async function createUnassignedNumberProperty(): Promise<{ featurePropertyId: number; name: string }> {
+    const name = `${TOKEN.toLowerCase()}_${Date.now()}`;
+    const result = await connection.sql(SQL`
+      INSERT INTO feature_property (feature_property_type_id, name, display_name, record_effective_date, create_user)
+      SELECT fpt.feature_property_type_id, ${name}, ${name}, now(), ${connection.systemUserId()}
+      FROM feature_property_type fpt
+      WHERE fpt.name = 'number'
+      RETURNING feature_property_id;
+    `);
+    return { featurePropertyId: result.rows[0].feature_property_id, name };
+  }
+
+  describe('artifact values', () => {
+    const featureTypeName = 'file';
+
+    it('keeps labelling an artifact with its property after the assignment is retired', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
+      const objectKey = `uploads/${TOKEN}/hello.bin`;
+      await attachArtifact(featureId, objectKey);
+
+      const before = await propertyRepository.getSubmissionFeatureProperties(featureId, { page: 1, limit: 25 });
+      expect(before.find((row) => row.id.startsWith('artifact_key:'))?.value).to.equal(objectKey);
+
+      await retireAssignment(await getBlueprintFeatureTypePropertyId(connection, featureId, 'artifact_key'));
+
+      const after = await propertyRepository.getSubmissionFeatureProperties(featureId, { page: 1, limit: 25 });
+      expect(after.find((row) => row.id.startsWith('artifact_key:'))?.value).to.equal(objectKey);
+    });
+  });
+
+  describe('property columns', () => {
+    const featureTypeName = 'capture';
+
+    it('lists a property assigned to the feature type only under a Blueprint that is not the default', async () => {
+      const { featurePropertyId, name } = await createUnassignedNumberProperty();
+      const service = new BlueprintService(connection);
+      const draft = await service.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const featureTypes = await service.getAdminBlueprintFeatureTypes(draft.blueprint_id);
+      const blueprintFeatureType = featureTypes.find(
+        (featureType) => featureType.feature_type_name === featureTypeName
+      );
+      expect(blueprintFeatureType, `draft includes ${featureTypeName}`).to.not.be.undefined;
+      await service.createBlueprintFeatureTypeProperty(
+        draft.blueprint_id,
+        blueprintFeatureType!.blueprint_feature_type_id,
+        {
+          feature_property_id: featurePropertyId
+        }
+      );
+
+      const columns = await searchRepository.getFeatureTypeProperties(featureTypeName);
+
+      expect(columns.map((column) => column.name)).to.include(name);
+      // The draft copied every existing assignment, so each property is still one column.
+      expect(columns.filter((column) => column.name === 'comment')).to.have.lengthOf(1);
+    });
+
+    it('keeps a column whose assignment has been retired', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, featureTypeName, {});
+      await retireAssignment(await getBlueprintFeatureTypePropertyId(connection, featureId, 'comment'));
+
+      const columns = await searchRepository.getFeatureTypeProperties(featureTypeName);
+
+      expect(columns.map((column) => column.name)).to.include('comment');
     });
   });
 });
