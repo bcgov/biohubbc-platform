@@ -75,6 +75,7 @@ const renderPage = (entry = '/admin/configuration') =>
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/admin/configuration" element={<ConfigurationPage />} />
+          <Route path="/admin/configuration/blueprints/1" element={<div>Blueprint composition page</div>} />
         </Routes>
       </MemoryRouter>
     </DialogContextProvider>
@@ -500,5 +501,20 @@ describe('Configuration administration', () => {
     fireEvent.click(within(page.getByRole('dialog')).getByRole('button', { name: 'Set as default' }));
     expect(await page.findByRole('alert')).toHaveTextContent('Only effective blueprints');
     expect(api.blueprints.getBlueprints).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens blueprint composition by clicking a row after pagination', async () => {
+    const page = renderPage('/admin/configuration?tab=blueprints');
+    expect(await page.findByText('Standard schema')).toBeVisible();
+    expect(page.queryByRole('link', { name: 'Standard schema' })).not.toBeInTheDocument();
+    fireEvent.click(page.getByRole('button', { name: 'Go to next page' }));
+    await waitFor(() =>
+      expect(api.blueprints.getBlueprints).toHaveBeenLastCalledWith(
+        { keyword: '' },
+        expect.objectContaining({ page: 2, limit: 10 })
+      )
+    );
+    fireEvent.click(await page.findByText('Schema description'));
+    expect(await page.findByText('Blueprint composition page')).toBeVisible();
   });
 });

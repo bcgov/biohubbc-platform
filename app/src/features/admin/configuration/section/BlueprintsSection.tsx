@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { BlueprintForm } from '../dialog/BlueprintForm';
@@ -21,6 +22,7 @@ import { getConfigurationStatus } from '../utils/lifecycleStatus';
  */
 export const BlueprintsSection = () => {
   const api = useApi();
+  const navigate = useNavigate();
   const dialogs = useDialogContext();
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -240,6 +242,7 @@ export const BlueprintsSection = () => {
       )}
       <BlueprintsTable
         table={table}
+        onOpenBlueprint={(blueprint) => navigate(`/admin/configuration/blueprints/${blueprint.blueprint_id}`)}
         onCreateBlueprint={handleCreateBlueprint}
         onEditBlueprint={handleEditBlueprint}
         onRetireBlueprint={confirmRetire}
