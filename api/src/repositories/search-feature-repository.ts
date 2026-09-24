@@ -3,7 +3,7 @@ import { getKnex } from '../database/db';
 import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-type-property';
+import { SearchFeatureProperty } from '../models/feature-property';
 import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
 import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
@@ -195,41 +195,56 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Gets the active property schema for the anchor feature type.
+   * Gets the property columns of the anchor feature type.
    *
    * Property definitions are type metadata, not search-result data. Keeping this query independent
    * of the expression prevents the full expression from being evaluated once per typed value table.
+   * One column is returned per property ever assigned to the feature type, under any Blueprint at
+   * any lifecycle, so every value hydrated below has a column whatever Blueprint it was stored
+   * under. `allow_multiple` is true when any assignment of the property allows several values;
+   * the order is the earliest assignment sort, then display name.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @return {Promise<FeatureTypeProperty[]>} Active metadata for the anchor feature type.
+   * @return {Promise<SearchFeatureProperty[]>} Property columns of the anchor feature type.
    */
-  async getFeatureTypeProperties(anchorFeatureType: string): Promise<FeatureTypeProperty[]> {
+  async getFeatureTypeProperties(anchorFeatureType: string): Promise<SearchFeatureProperty[]> {
     const knex = getKnex();
 
-    const query = knex('feature_type_property as ftp')
+    const query = knex('feature_type as ft')
       .select(
-        'ftp.feature_type_property_id',
         'fp.feature_property_id',
         'fpt.feature_property_type_id',
         'fp.name',
         'fp.display_name',
         'fp.description',
         'fpt.name as type_name',
-        'ftp.required_value',
         'fp.calculated_value',
-        'ftp.allow_multiple'
+        knex.raw('BOOL_OR(bftp.allow_multiple) AS allow_multiple')
       )
-      .join('feature_type as ft', 'ftp.feature_type_id', 'ft.feature_type_id')
-      .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
-      .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
+      .join('blueprint_feature_type as bft', 'bft.feature_type_id', 'ft.feature_type_id')
+      .join(
+        'blueprint_feature_type_property as bftp',
+        'bftp.blueprint_feature_type_id',
+        'bft.blueprint_feature_type_id'
+      )
+      .join('feature_property as fp', 'fp.feature_property_id', 'bftp.feature_property_id')
+      .join('feature_property_type as fpt', 'fpt.feature_property_type_id', 'fp.feature_property_type_id')
       .where('ft.name', anchorFeatureType)
-      .whereNull('ftp.record_end_date')
       .whereNull('ft.record_end_date')
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
-      .orderByRaw('ftp.sort ASC NULLS LAST')
+      .groupBy(
+        'fp.feature_property_id',
+        'fpt.feature_property_type_id',
+        'fp.name',
+        'fp.display_name',
+        'fp.description',
+        'fpt.name',
+        'fp.calculated_value'
+      )
+      .orderByRaw('MIN(bftp.sort) ASC NULLS LAST')
       .orderBy('fp.display_name', 'asc');
-    const response = await this.connection.knex(query, FeatureTypeProperty);
+    const response = await this.connection.knex(query, SearchFeatureProperty);
 
     return response.rows;
   }
@@ -326,17 +341,15 @@ export class SearchFeatureRepository extends BaseRepository {
           FROM (
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_string_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_string p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
@@ -347,17 +360,15 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_number_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_number p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
@@ -365,17 +376,15 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_boolean_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_boolean p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
@@ -383,8 +392,8 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_timestamp_id AS ordinal,
               to_jsonb(
                 CASE
@@ -396,12 +405,10 @@ export class SearchFeatureRepository extends BaseRepository {
                 END
               ) AS value
             FROM submission_feature_property_timestamp p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
@@ -409,17 +416,15 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_code_id AS ordinal,
               ${codePropertyValueJson('ccc', 'cs')} AS value
             FROM submission_feature_property_code p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
@@ -432,17 +437,15 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_taxon_id AS ordinal,
               ${taxonPropertyValueJson('t')} AS value
             FROM submission_feature_property_taxon p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
@@ -456,17 +459,15 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_geometry_id AS ordinal,
               public.ST_AsGeoJSON(p.value)::jsonb AS value
             FROM submission_feature_property_geometry p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
@@ -474,17 +475,15 @@ export class SearchFeatureRepository extends BaseRepository {
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_feature_id AS ordinal,
               ${featureReferencePropertyValueJson('referenced_sf')} AS value
             FROM submission_feature_property_feature p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = authorized_features.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN submission_feature referenced_sf
               ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id

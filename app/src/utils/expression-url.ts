@@ -8,6 +8,9 @@ const LOGICAL_OPERATORS: ReadonlySet<string> = new Set<ExpressionLogicalOperator
 
 const PREDICATE_OPERATORS: ReadonlySet<string> = new Set(EXPRESSION_PREDICATE_OPERATORS);
 
+/** Predicate key of the global feature-type pairing that assignments replaced; accepted in old URLs only. */
+const LEGACY_ASSIGNMENT_KEY = 'feature_type_property_id';
+
 /**
  * Recursively stringifies a value with object keys sorted alphabetically.
  * Arrays are NOT reordered so that `clauses` ordering is preserved.
@@ -65,7 +68,7 @@ export function fromBase64Url(encoded: string): string {
  *
  * Validates:
  * - Correct `type`, `operator`, and `clauses` shape on expression nodes.
- * - Correct `type`, `feature_property_id`, `feature_type_property_id`, and `operator` on predicate nodes.
+ * - Correct `type`, `feature_property_id`, `blueprint_feature_type_property_id`, and `operator` on predicate nodes.
  * - Rejects `ui_id` on any node (defense-in-depth; the serializer already strips it).
  *
  * @param value - The value to check.
@@ -146,7 +149,16 @@ function isValidClause(value: unknown): boolean {
  * @returns `true` when the node is a valid predicate.
  */
 function isValidPredicate(node: Record<string, unknown>): boolean {
-  if (!hasOnlyKeys(node, ['type', 'feature_property_id', 'feature_type_property_id', 'operator', 'value'])) {
+  if (
+    !hasOnlyKeys(node, [
+      'type',
+      'feature_property_id',
+      'blueprint_feature_type_property_id',
+      'operator',
+      'value',
+      LEGACY_ASSIGNMENT_KEY
+    ])
+  ) {
     return false;
   }
 
@@ -158,7 +170,14 @@ function isValidPredicate(node: Record<string, unknown>): boolean {
     return false;
   }
 
-  if (node['feature_type_property_id'] !== null && !isPositiveInteger(node['feature_type_property_id'])) {
+  // A URL written before assignments were Blueprint-owned carries the retired key. It only ever held
+  // null, and a non-null value cannot be mapped here, so anything else invalidates the URL.
+  if (LEGACY_ASSIGNMENT_KEY in node && node[LEGACY_ASSIGNMENT_KEY] !== null) {
+    return false;
+  }
+
+  const assignmentId = node['blueprint_feature_type_property_id'];
+  if (assignmentId !== undefined && assignmentId !== null && !isPositiveInteger(assignmentId)) {
     return false;
   }
 
@@ -258,8 +277,33 @@ export function decodeExpressionFromUrl(encoded: string | null | undefined): Exp
       return null;
     }
 
-    return parsed;
+    return normalizeLegacyPredicates(parsed);
   } catch {
     return null;
   }
+}
+
+/**
+ * Rewrites predicates decoded from an old URL onto the current contract: the retired pairing key is
+ * dropped and a missing assignment key becomes an explicit null, so the tree serializes back to the
+ * API exactly as a freshly built one would.
+ *
+ * @param expression - A validated expression tree, possibly carrying legacy predicate keys.
+ * @returns The same tree with every predicate on the current contract.
+ */
+function normalizeLegacyPredicates(expression: ExpressionTreeExpression): ExpressionTreeExpression {
+  return {
+    ...expression,
+    clauses: expression.clauses.map((clause) => {
+      if (clause.type === 'expression') {
+        return normalizeLegacyPredicates(clause);
+      }
+
+      const predicate = Object.fromEntries(
+        Object.entries(clause).filter(([key]) => key !== LEGACY_ASSIGNMENT_KEY)
+      ) as typeof clause;
+
+      return { ...predicate, blueprint_feature_type_property_id: clause.blueprint_feature_type_property_id ?? null };
+    })
+  };
 }

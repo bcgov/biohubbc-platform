@@ -115,7 +115,7 @@ export async function seed(knex: Knex): Promise<void> {
           -- Enough to tell one spatial property from another in a legend or a popup, and nothing
           -- else. Attribute level security stays in the API.
           g.submission_feature_property_geometry_id,
-          g.feature_type_property_id,
+          g.blueprint_feature_type_property_id,
           fp.display_name AS property_display_name,
           fp.name AS property_name
         FROM biohub.submission_feature_property_geometry g
@@ -126,16 +126,14 @@ export async function seed(knex: Knex): Promise<void> {
           AND sf.submission_id = v_submission_id
           AND sf.record_effective_date <= now()
           AND (sf.record_end_date IS NULL OR now() < sf.record_end_date)
-        -- The property catalog join is what makes a geometry row nameable. Guarding on
-        -- feature_type_id as well as feature_type_property_id mirrors the equivalent query in
-        -- api/src/repositories/submission-feature-property-repository.ts, so the map and the
-        -- properties table label the same geometry the same way.
-        JOIN biohub.feature_type_property ftp
-          ON ftp.feature_type_property_id = g.feature_type_property_id
-          AND ftp.feature_type_id = sf.feature_type_id
-          AND ftp.record_end_date IS NULL
+        -- The Blueprint assignment is what makes a geometry row nameable. It is joined at any lifecycle,
+        -- as api/src/repositories/submission-feature-property-repository.ts does, so the map and the
+        -- properties table label the same geometry the same way, including under a superseded Blueprint.
+        -- The assignment is guaranteed to belong to the feature's type and Blueprint on write.
+        JOIN biohub.blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_property_id = g.blueprint_feature_type_property_id
         JOIN biohub.feature_property fp
-          ON fp.feature_property_id = ftp.feature_property_id
+          ON fp.feature_property_id = bftp.feature_property_id
           AND fp.record_end_date IS NULL
         -- Equality on submission_feature_id first: this is the condition
         -- submission_feature_property_geometry_idx1 serves, and one feature's geometries are few

@@ -6,7 +6,7 @@ import { ApiValidationError } from '../errors/api-error';
 import { PredicateOperator } from '../models/expression-predicate';
 import { ExpressionPredicatePropertyMetadata } from '../models/feature-type-property';
 import { TaxonRecord } from '../models/taxon';
-import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
+import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { TaxonomyService } from './taxonomy-service';
 
@@ -15,7 +15,7 @@ const metadata = (
   overrides?: Partial<ExpressionPredicatePropertyMetadata>
 ): ExpressionPredicatePropertyMetadata => ({
   feature_property_id: 10,
-  feature_type_property_id: 20,
+  blueprint_feature_type_property_id: 20,
   feature_property_type_id: 30,
   feature_property_type_name,
   display_name: 'Species',
@@ -42,7 +42,7 @@ describe('ExpressionTreeNormalizationService', () => {
   beforeEach(() => {
     currentMetadata = metadata('string');
     getPropertyMetadata = sinon
-      .stub(FeatureTypePropertyRepository.prototype, 'getExpressionPredicatePropertyMetadata')
+      .stub(FeaturePropertyRepository.prototype, 'getExpressionPredicatePropertyMetadata')
       .callsFake(async () => currentMetadata);
   });
 
@@ -65,7 +65,7 @@ describe('ExpressionTreeNormalizationService', () => {
         {
           type: 'predicate',
           feature_property_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           operator,
           ...(value !== undefined ? { value } : {})
         }
@@ -84,7 +84,7 @@ describe('ExpressionTreeNormalizationService', () => {
         {
           type: 'predicate',
           feature_property_id: 15,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 'second'
         },
@@ -95,14 +95,14 @@ describe('ExpressionTreeNormalizationService', () => {
             {
               type: 'predicate',
               feature_property_id: 14,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Equals',
               value: 'first'
             },
             {
               type: 'predicate',
               feature_property_id: 14,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Equals',
               value: 'first'
             }
@@ -129,7 +129,7 @@ describe('ExpressionTreeNormalizationService', () => {
             {
               type: 'predicate',
               feature_property_id: 14,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Equals',
               value: 'first'
             }
@@ -150,14 +150,14 @@ describe('ExpressionTreeNormalizationService', () => {
         {
           type: 'predicate',
           feature_property_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           operator: 'Equals',
           value: 'first'
         },
         {
           type: 'predicate',
           feature_property_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           operator: 'Equals',
           value: 'second'
         }
@@ -367,7 +367,7 @@ describe('ExpressionTreeNormalizationService', () => {
     }
   });
 
-  it('preserves nullable feature_type_property_id and resolves property metadata', async () => {
+  it('preserves nullable blueprint_feature_type_property_id and resolves property metadata', async () => {
     const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
 
     const result = await expressionTreeNormalizationService.normalize({
@@ -377,7 +377,7 @@ describe('ExpressionTreeNormalizationService', () => {
         {
           type: 'predicate',
           feature_property_id: 10,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 'wolf'
         }
@@ -386,7 +386,7 @@ describe('ExpressionTreeNormalizationService', () => {
 
     expect(result.clauses[0]).to.include({
       type: 'predicate',
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       feature_property_type_id: 30,
       feature_property_type_name: 'string'
     });

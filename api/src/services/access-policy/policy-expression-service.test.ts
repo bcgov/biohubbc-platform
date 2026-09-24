@@ -170,7 +170,7 @@ describe('PolicyExpressionService', () => {
         clauses: [
           {
             type: 'predicate',
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Equals',
             value: 'A'
           }

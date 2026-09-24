@@ -8,7 +8,7 @@ import { z } from 'zod';
 export const Predicate = z.object({
   predicate_id: z.string().uuid(),
   feature_property_id: z.number().int(),
-  feature_type_property_id: z.number().int().nullable(),
+  blueprint_feature_type_property_id: z.number().int().nullable(),
   feature_property_type_id: z.number().int(),
   predicate_hash: z.string()
 });
@@ -23,7 +23,7 @@ export type ResolvedPredicateAnchor = z.infer<typeof ResolvedPredicateAnchor>;
 
 export type PredicateResolveInput = Pick<
   Predicate,
-  'feature_property_id' | 'feature_type_property_id' | 'feature_property_type_id' | 'predicate_hash'
+  'feature_property_id' | 'blueprint_feature_type_property_id' | 'feature_property_type_id' | 'predicate_hash'
 >;
 
 export const ReadPredicateNodeRow = z.object({

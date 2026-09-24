@@ -63,7 +63,7 @@ export function getFeatureType(): RequestHandler {
       await connection.open();
 
       const featureTypeService = new FeatureTypeService(connection);
-      const result = await featureTypeService.getFeatureType(featureTypeId);
+      const result = await featureTypeService.getAdminFeatureType(featureTypeId);
 
       await connection.commit();
 

@@ -19,11 +19,11 @@ export const featureSearchExpressionTreeSchema: OpenAPIV3.SchemaObject = {
         oneOf: [
           {
             type: 'object',
-            required: ['type', 'feature_property_id', 'feature_type_property_id', 'operator'],
+            required: ['type', 'feature_property_id', 'blueprint_feature_type_property_id', 'operator'],
             properties: {
               type: { type: 'string', enum: ['predicate'] },
               feature_property_id: { type: 'integer', minimum: 1 },
-              feature_type_property_id: { type: 'integer', nullable: true },
+              blueprint_feature_type_property_id: { type: 'integer', nullable: true },
               operator: { type: 'string', enum: PredicateOperator.options },
               value: {
                 description:
@@ -84,24 +84,21 @@ export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
   title: 'featureSearchProperty',
   type: 'object',
   required: [
-    'feature_type_property_id',
+    'feature_property_id',
     'name',
     'display_name',
     'description',
     'type_name',
-    'required_value',
     'calculated_value',
     'allow_multiple'
   ],
   properties: {
-    feature_type_property_id: { type: 'integer' },
     feature_property_id: { type: 'integer' },
     feature_property_type_id: { type: 'integer' },
     name: { type: 'string' },
     display_name: { type: 'string' },
     description: { type: 'string', nullable: true },
     type_name: { type: 'string' },
-    required_value: { type: 'boolean' },
     calculated_value: { type: 'boolean' },
     allow_multiple: {
       type: 'boolean',
@@ -171,7 +168,8 @@ export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
     },
     properties: {
       type: 'array',
-      description: 'Active property definitions for the selected feature type. Independent of pagination and filters.',
+      description:
+        'One entry per property ever assigned to the selected feature type, under any Blueprint. Independent of pagination and filters.',
       items: featureSearchPropertySchema
     },
     has_inaccessible_secured_features: {

@@ -73,7 +73,7 @@ describe('FeaturePropertyService', () => {
 
       const updatedProperty: FeatureProperty = { ...mockFeatureProperty, display_name: 'Updated GUID' };
       sinon.stub(service.featurePropertyRepository, 'updateFeatureProperty').resolves();
-      sinon.stub(service.featurePropertyRepository, 'getFeatureProperty').resolves(updatedProperty);
+      sinon.stub(service.featurePropertyRepository, 'getAdminFeatureProperty').resolves(updatedProperty);
 
       const result = await service.updateFeatureProperty(1, { display_name: 'Updated GUID' });
 

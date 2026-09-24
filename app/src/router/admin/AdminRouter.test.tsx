@@ -44,6 +44,10 @@ vi.mock('features/admin/reviews/SubmissionReviewFeaturePage', () => ({
   SubmissionReviewFeaturePage: () => <div data-testid="submission-review-feature-page">Review Feature</div>
 }));
 
+vi.mock('features/admin/configuration/ConfigurationPage', () => ({
+  ConfigurationPage: () => <div data-testid="configuration-page" />
+}));
+
 describe('AdminRouter ticket route guard', () => {
   const renderAdminRouter = (authState: ReturnType<typeof getMockAuthState>, initialEntry = '/admin/tickets') =>
     render(
@@ -57,6 +61,26 @@ describe('AdminRouter ticket route guard', () => {
         </MemoryRouter>
       </AuthStateContext.Provider>
     );
+
+  for (const [path, testId] of [['/admin/configuration', 'configuration-page']]) {
+    it(`allows system administrators at ${path}`, async () => {
+      const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);
+      expect(await page.findByTestId(testId)).toBeVisible();
+    });
+    it(`denies data administrators at ${path}`, async () => {
+      const page = renderAdminRouter(
+        getMockAuthState({
+          base: SystemUserAuthState,
+          overrides: {
+            biohubUserWrapper: { roleNames: [SYSTEM_ROLE.DATA_ADMINISTRATOR] }
+          }
+        }),
+        path
+      );
+      expect(await page.findByTestId('forbidden-page')).toBeVisible();
+      expect(page.queryByTestId(testId)).toBeNull();
+    });
+  }
 
   it('renders tickets route for system admin', async () => {
     const authState = getMockAuthState({ base: SystemAdminAuthState });

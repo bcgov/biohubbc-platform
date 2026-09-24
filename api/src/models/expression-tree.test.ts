@@ -11,7 +11,7 @@ describe('ExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 'Wolf'
         },
@@ -22,7 +22,7 @@ describe('ExpressionTree', () => {
             {
               type: 'predicate',
               feature_property_id: 2,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'GreaterThan',
               value: 10
             }
@@ -48,7 +48,7 @@ describe('ExpressionTree', () => {
     const result = ExpressionTree.safeParse({
       type: 'predicate',
       feature_property_id: 1,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       operator: 'Equals',
       value: true
     });
@@ -64,7 +64,7 @@ describe('ExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           predicate: {
             type: 'boolean',
             operator: 'Equals',
@@ -85,7 +85,7 @@ describe('ExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'FakeOperator',
           value: true
         }
@@ -103,7 +103,7 @@ describe('ExpressionTree', () => {
         {
           type: 'predicate',
           feature_property_id: 5,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'OnDate',
           value: '2026-04-20'
         }

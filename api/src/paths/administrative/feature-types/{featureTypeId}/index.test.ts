@@ -47,7 +47,7 @@ describe('getFeatureType', () => {
   it('should return 200 with feature type details', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    sinon.stub(FeatureTypeService.prototype, 'getFeatureType').resolves(mockFeatureType);
+    sinon.stub(FeatureTypeService.prototype, 'getAdminFeatureType').resolves(mockFeatureType);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { featureTypeId: '1' };

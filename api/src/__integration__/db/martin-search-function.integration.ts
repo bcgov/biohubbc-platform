@@ -39,7 +39,7 @@ const TEST_LAT = 48.43;
 /** Identifiers of a feature property, as an expression predicate has to name both. */
 interface PropertyIds {
   feature_property_id: number;
-  feature_type_property_id: number;
+  blueprint_feature_type_property_id: number;
 }
 
 describe('Tile search function (integration)', function () {
@@ -86,20 +86,27 @@ describe('Tile search function (integration)', function () {
   const resolvePropertyByType = async (typeName: string): Promise<PropertyIds | null> => {
     const result = await connection.sql(
       SQL`
-        SELECT fp.feature_property_id, ftp.feature_type_property_id
-        FROM feature_type_property ftp
+        SELECT fp.feature_property_id, bftp.blueprint_feature_type_property_id
+        FROM blueprint b
+        JOIN blueprint_feature_type bft
+          ON bft.blueprint_id = b.blueprint_id
+          AND bft.record_end_date IS NULL
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+          AND bftp.record_end_date IS NULL
         JOIN feature_property fp
-          ON fp.feature_property_id = ftp.feature_property_id
+          ON fp.feature_property_id = bftp.feature_property_id
           AND fp.record_end_date IS NULL
         JOIN feature_property_type fpt
           ON fpt.feature_property_type_id = fp.feature_property_type_id
-        WHERE ftp.feature_type_id = ${featureTypeId}
-          AND ftp.record_end_date IS NULL
+        WHERE b.is_default = true
+          AND b.record_end_date IS NULL
+          AND bft.feature_type_id = ${featureTypeId}
           AND fpt.name = ${typeName}
         ORDER BY fp.feature_property_id
         LIMIT 1;
       `,
-      z.object({ feature_property_id: z.number(), feature_type_property_id: z.number() })
+      z.object({ feature_property_id: z.number(), blueprint_feature_type_property_id: z.number() })
     );
 
     return result.rows[0] ?? null;
@@ -111,10 +118,10 @@ describe('Tile search function (integration)', function () {
    */
   const addPointToFeature = async (featureId: number, lng: number, lat: number): Promise<void> => {
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
       VALUES (
         ${featureId},
-        ${geometryProperty.feature_type_property_id},
+        ${geometryProperty.blueprint_feature_type_property_id},
         public.ST_SetSRID(public.ST_MakePoint(${lng}, ${lat}), 4326),
         ${connection.systemUserId()}
       );
@@ -307,15 +314,15 @@ describe('Tile search function (integration)', function () {
   /** Insert a typed number property value on a feature. */
   const setNumberValue = async (featureId: number, property: PropertyIds, value: number): Promise<void> => {
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, value, create_user)
-      VALUES (${featureId}, ${property.feature_type_property_id}, ${value}, ${connection.systemUserId()});
+      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+      VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
     `);
   };
 
   const predicate = (property: PropertyIds, operator: string, value?: unknown): ExpressionTree['clauses'][0] => ({
     type: 'predicate',
     feature_property_id: property.feature_property_id,
-    feature_type_property_id: property.feature_type_property_id,
+    blueprint_feature_type_property_id: property.blueprint_feature_type_property_id,
     operator: operator as never,
     value
   });
@@ -387,8 +394,8 @@ describe('Tile search function (integration)', function () {
       expect(limited.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
       expect(result.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
       expect(result.count).to.equal(1);
-      expect(result.properties.map((property) => property.feature_type_property_id)).to.include(
-        geometryProperty.feature_type_property_id
+      expect(result.properties.map((property) => property.feature_property_id)).to.include(
+        geometryProperty.feature_property_id
       );
       expect(result.has_inaccessible_secured_features).to.equal(false);
       const context = await createContext({ submissionIds });
@@ -572,18 +579,18 @@ describe('Tile search function (integration)', function () {
   describe('expression evaluation', () => {
     const setStringValue = async (featureId: number, property: PropertyIds, value: string): Promise<void> => {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, value, create_user)
-        VALUES (${featureId}, ${property.feature_type_property_id}, ${value}, ${connection.systemUserId()});
+        INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
       `);
     };
 
     const setTimestampValue = async (featureId: number, property: PropertyIds, isoDate: string): Promise<void> => {
       await connection.sql(SQL`
         INSERT INTO submission_feature_property_timestamp (
-          submission_feature_id, feature_type_property_id, date_value, time_value, create_user
+          submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user
         )
         VALUES (
-          ${featureId}, ${property.feature_type_property_id}, ${isoDate}::date, '00:00:00'::time,
+          ${featureId}, ${property.blueprint_feature_type_property_id}, ${isoDate}::date, '00:00:00'::time,
           ${connection.systemUserId()}
         );
       `);
@@ -591,8 +598,8 @@ describe('Tile search function (integration)', function () {
 
     const setBooleanValue = async (featureId: number, property: PropertyIds, value: boolean): Promise<void> => {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_boolean (submission_feature_id, feature_type_property_id, value, create_user)
-        VALUES (${featureId}, ${property.feature_type_property_id}, ${value}, ${connection.systemUserId()});
+        INSERT INTO submission_feature_property_boolean (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
       `);
     };
 
@@ -922,10 +929,10 @@ describe('Tile search function (integration)', function () {
         const featureId = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'geom' });
 
         await connection.sql(SQL`
-          INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+          INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
           VALUES (
             ${featureId},
-            ${geometryProperty.feature_type_property_id},
+            ${geometryProperty.blueprint_feature_type_property_id},
             public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326),
             ${connection.systemUserId()}
           );

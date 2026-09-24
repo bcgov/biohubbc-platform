@@ -4,6 +4,9 @@ import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import { useBlueprintsApi } from './api/useBlueprintsApi';
+import { useFeaturePropertiesApi } from './api/useFeaturePropertiesApi';
+import { useFeatureTypesApi } from './api/useFeatureTypesApi';
 import { useDownloadApi } from './api/useDownloadApi';
 import { useDownloadExportApi } from './api/useDownloadExportApi';
 import useCodesApi from './api/useCodesApi';
@@ -75,7 +78,16 @@ export const useApi = () => {
 
   const objectStorage = useObjectStorageApi();
 
+  const featureTypes = useFeatureTypesApi(apiAxios);
+
+  const featureProperties = useFeaturePropertiesApi(apiAxios);
+
+  const blueprints = useBlueprintsApi(apiAxios);
+
   const apis = {
+    blueprints,
+    featureProperties,
+    featureTypes,
     user,
     admin,
     submissions,

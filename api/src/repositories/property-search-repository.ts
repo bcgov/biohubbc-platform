@@ -123,12 +123,19 @@ export class PropertySearchRepository extends BaseRepository {
       .whereIn('fpt.name', this.supportedPropertyTypes);
 
     if (featureTypes.length) {
-      query
-        .innerJoin('feature_type_property as ftp', 'ftp.feature_property_id', 'fp.feature_property_id')
-        .innerJoin('feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
-        .whereIn('ft.name', featureTypes)
-        .whereNull('ftp.record_end_date')
-        .whereNull('ft.record_end_date');
+      // A property belongs to a feature type when an active Blueprint assigns it to that type. Exists
+      // rather than a join: several Blueprints may assign the same property, and the row set is properties.
+      query.whereExists(
+        knex('blueprint_feature_type_property as bftp')
+          .select(knex.raw('1'))
+          .innerJoin('blueprint_feature_type as bft', 'bft.blueprint_feature_type_id', 'bftp.blueprint_feature_type_id')
+          .innerJoin('feature_type as ft', 'ft.feature_type_id', 'bft.feature_type_id')
+          .whereRaw('bftp.feature_property_id = fp.feature_property_id')
+          .whereIn('ft.name', featureTypes)
+          .whereNull('bftp.record_end_date')
+          .whereNull('bft.record_end_date')
+          .whereNull('ft.record_end_date')
+      );
     }
 
     if (keyword) {
@@ -161,12 +168,19 @@ export class PropertySearchRepository extends BaseRepository {
       .select(knex.raw('count(DISTINCT fp.feature_property_id)::integer as count'));
 
     if (featureTypes.length) {
-      query
-        .innerJoin('feature_type_property as ftp', 'ftp.feature_property_id', 'fp.feature_property_id')
-        .innerJoin('feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
-        .whereIn('ft.name', featureTypes)
-        .whereNull('ftp.record_end_date')
-        .whereNull('ft.record_end_date');
+      // A property belongs to a feature type when an active Blueprint assigns it to that type. Exists
+      // rather than a join: several Blueprints may assign the same property, and the row set is properties.
+      query.whereExists(
+        knex('blueprint_feature_type_property as bftp')
+          .select(knex.raw('1'))
+          .innerJoin('blueprint_feature_type as bft', 'bft.blueprint_feature_type_id', 'bftp.blueprint_feature_type_id')
+          .innerJoin('feature_type as ft', 'ft.feature_type_id', 'bft.feature_type_id')
+          .whereRaw('bftp.feature_property_id = fp.feature_property_id')
+          .whereIn('ft.name', featureTypes)
+          .whereNull('bftp.record_end_date')
+          .whereNull('bft.record_end_date')
+          .whereNull('ft.record_end_date')
+      );
     }
 
     if (keyword) {

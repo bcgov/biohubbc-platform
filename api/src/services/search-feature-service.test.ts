@@ -35,14 +35,12 @@ describe('SearchFeatureService', () => {
   ];
   const mockProperties = [
     {
-      feature_type_property_id: 1,
       feature_property_id: 31,
       feature_property_type_id: 1,
       name: 'name',
       display_name: 'Name',
       description: null,
       type_name: 'string',
-      required_value: false,
       calculated_value: false,
       allow_multiple: false
     }
@@ -54,7 +52,7 @@ describe('SearchFeatureService', () => {
       {
         type: 'predicate',
         feature_property_id: 14,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'Exists'
       }
     ]
@@ -271,7 +269,7 @@ describe('SearchFeatureService', () => {
     const lowerBound = {
       type: 'predicate',
       feature_property_id: 14,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       feature_property_type_id: 5,
       feature_property_type_name: 'number',
       operator: 'GreaterThan',
@@ -281,7 +279,7 @@ describe('SearchFeatureService', () => {
     const upperBound = {
       type: 'predicate',
       feature_property_id: 14,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       feature_property_type_id: 5,
       feature_property_type_name: 'number',
       operator: 'LessThan',

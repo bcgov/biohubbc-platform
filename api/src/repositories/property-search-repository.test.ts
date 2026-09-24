@@ -71,7 +71,7 @@ describe('PropertySearchRepository', () => {
       expect(sql).to.include('limit 10');
     });
 
-    it('applies feature type filters through feature_type_property', async () => {
+    it('applies feature type filters through active Blueprint assignments', async () => {
       let sql = '';
 
       const mockDBConnection = getMockDBConnection({
@@ -90,10 +90,10 @@ describe('PropertySearchRepository', () => {
       await repo.searchProperties({ keyword: 'name', feature_types: ['survey'] });
 
       expect(sql).to.include('distinct');
-      expect(sql).to.include('"feature_type_property" as "ftp"');
+      expect(sql).to.include('"blueprint_feature_type_property" as "bftp"');
       expect(sql).to.include('"feature_type" as "ft"');
       expect(sql).to.include('"ft"."name" in (\'survey\')');
-      expect(sql).to.include('"ftp"."record_end_date" is null');
+      expect(sql).to.include('"bftp"."record_end_date" is null');
       expect(sql).to.include('"ft"."record_end_date" is null');
     });
 
@@ -150,7 +150,7 @@ describe('PropertySearchRepository', () => {
 
       expect(result).to.equal(1);
       expect(sql).to.include('count(DISTINCT fp.feature_property_id)::integer as count');
-      expect(sql).to.include('"feature_type_property" as "ftp"');
+      expect(sql).to.include('"blueprint_feature_type_property" as "bftp"');
       expect(sql).to.include('"feature_type" as "ft"');
       expect(sql).to.include('"ft"."name" in (\'telemetry\')');
     });

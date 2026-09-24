@@ -472,7 +472,7 @@ export class ExpressionTreeService extends DBService {
    *
    * This identity text is the contract for predicate dedupe. It includes:
    * - the shared property id (`fp`)
-   * - the optional feature-type-property scope (`ftp`)
+   * - the optional Blueprint assignment scope (`bftp`)
    * - the resolved property type id (`fpt`)
    * - the operator
    * - type-specific normalized value fields
@@ -482,7 +482,7 @@ export class ExpressionTreeService extends DBService {
    *
    * @private
    * @param {number} featurePropertyId - Shared feature property identifier.
-   * @param {number | null} featureTypePropertyId - Optional feature type property identifier.
+   * @param {number | null} blueprintFeatureTypePropertyId - Optional Blueprint assignment identifier.
    * @param {number} featurePropertyTypeId - Resolved feature property type identifier.
    * @param {string} operator - Predicate operator.
    * @param {Record<string, string | number>} fields - Additional canonical key/value fields.
@@ -491,7 +491,7 @@ export class ExpressionTreeService extends DBService {
    */
   private buildPredicateIdentity(
     featurePropertyId: number,
-    featureTypePropertyId: number | null,
+    blueprintFeatureTypePropertyId: number | null,
     featurePropertyTypeId: number,
     operator: string,
     fields: Record<string, string | number>
@@ -499,7 +499,7 @@ export class ExpressionTreeService extends DBService {
     const parts = [
       'predicate',
       `fp=${featurePropertyId}`,
-      `ftp=${featureTypePropertyId ?? ''}`,
+      `bftp=${blueprintFeatureTypePropertyId ?? ''}`,
       `fpt=${featurePropertyTypeId}`,
       `op=${operator}`
     ];
@@ -536,7 +536,7 @@ export class ExpressionTreeService extends DBService {
   private buildNormalizedPredicateIdentityForHash(clause: NormalizedExpressionTreePredicate): string {
     const {
       feature_property_id,
-      feature_type_property_id,
+      blueprint_feature_type_property_id,
       feature_property_type_id,
       internal_predicate: predicate
     } = clause;
@@ -545,7 +545,7 @@ export class ExpressionTreeService extends DBService {
       case 'string':
         return this.buildPredicateIdentity(
           feature_property_id,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
@@ -555,7 +555,7 @@ export class ExpressionTreeService extends DBService {
       case 'number':
         return this.buildPredicateIdentity(
           feature_property_id,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
@@ -565,7 +565,7 @@ export class ExpressionTreeService extends DBService {
       case 'boolean':
         return this.buildPredicateIdentity(
           feature_property_id,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
@@ -580,7 +580,7 @@ export class ExpressionTreeService extends DBService {
         if (predicate.value === undefined) {
           return this.buildPredicateIdentity(
             feature_property_id,
-            feature_type_property_id,
+            blueprint_feature_type_property_id,
             feature_property_type_id,
             predicate.operator,
             {
@@ -592,7 +592,7 @@ export class ExpressionTreeService extends DBService {
 
         return this.buildPredicateIdentity(
           feature_property_id,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
@@ -605,7 +605,7 @@ export class ExpressionTreeService extends DBService {
       case 'code':
         return this.buildPredicateIdentity(
           feature_property_id,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
@@ -615,7 +615,7 @@ export class ExpressionTreeService extends DBService {
       case 'geometry':
         return this.buildPredicateIdentity(
           feature_property_id,
-          feature_type_property_id,
+          blueprint_feature_type_property_id,
           feature_property_type_id,
           predicate.operator,
           {
@@ -799,7 +799,7 @@ export class ExpressionTreeService extends DBService {
 
     const resolvedPredicate = await this.predicateRepository.insertPredicateAnchor({
       feature_property_id: clause.feature_property_id,
-      feature_type_property_id: clause.feature_type_property_id,
+      blueprint_feature_type_property_id: clause.blueprint_feature_type_property_id,
       feature_property_type_id: clause.feature_property_type_id,
       predicate_hash: clause.hash
     });

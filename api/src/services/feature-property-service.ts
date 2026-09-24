@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { CreateFeatureProperty, FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
+import { FeaturePropertyTypeRepository } from '../repositories/feature-property-type-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { FeaturePropertyFilters } from './feature-property-service.interface';
@@ -14,6 +15,7 @@ import { FeaturePropertyFilters } from './feature-property-service.interface';
  */
 export class FeaturePropertyService extends DBService {
   featurePropertyRepository: FeaturePropertyRepository;
+  featurePropertyTypeRepository: FeaturePropertyTypeRepository;
 
   /**
    * Creates a FeaturePropertyService instance.
@@ -23,6 +25,7 @@ export class FeaturePropertyService extends DBService {
    */
   constructor(connection: IDBConnection) {
     super(connection);
+    this.featurePropertyTypeRepository = new FeaturePropertyTypeRepository(connection);
     this.featurePropertyRepository = new FeaturePropertyRepository(connection);
   }
 
@@ -55,7 +58,7 @@ export class FeaturePropertyService extends DBService {
   }
 
   /**
-   * Get active feature properties with optional search and pagination.
+   * Get active and retired feature properties with optional search and pagination.
    *
    * @param {FeaturePropertyFilters} [filters] - Optional filter set.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
@@ -70,7 +73,7 @@ export class FeaturePropertyService extends DBService {
   }
 
   /**
-   * Get total count of active feature properties matching optional filters.
+   * Get total count of active and retired feature properties matching optional filters.
    *
    * @param {FeaturePropertyFilters} [filters] - Optional filter set.
    * @return {Promise<number>} Count of matching feature properties.
@@ -81,18 +84,18 @@ export class FeaturePropertyService extends DBService {
   }
 
   /**
-   * Update a feature property record by ID.
+   * Update descriptive metadata on an active or retired feature property record by ID.
    *
    * @param {number} featurePropertyId - Feature property identifier.
    * @param {UpdateFeatureProperty} data - Partial feature property fields to update.
    * @return {Promise<FeatureProperty>} Updated feature property (with resolved type_name).
    * @throws {ApiExecuteSQLError} If the update does not affect exactly one row.
-   * @throws {ApiNotFoundError} If no active feature property exists for the id.
+   * @throws {ApiNotFoundError} If no feature property exists for the id.
    * @memberof FeaturePropertyService
    */
   async updateFeatureProperty(featurePropertyId: number, data: UpdateFeatureProperty): Promise<FeatureProperty> {
     await this.featurePropertyRepository.updateFeatureProperty(featurePropertyId, data);
-    return this.featurePropertyRepository.getFeatureProperty(featurePropertyId);
+    return this.featurePropertyRepository.getAdminFeatureProperty(featurePropertyId);
   }
 
   /**
@@ -105,5 +108,23 @@ export class FeaturePropertyService extends DBService {
    */
   async deleteFeatureProperty(featurePropertyId: number): Promise<void> {
     await this.featurePropertyRepository.deleteFeatureProperty(featurePropertyId);
+  }
+  /**
+   * Retrieve supported property types for administration.
+   * @returns Selector response with identifiers and names.
+   */
+  async getFeaturePropertyTypes() {
+    const feature_property_types = await this.featurePropertyTypeRepository.getFeaturePropertyTypes();
+    return { feature_property_types };
+  }
+
+  /**
+   * Read global definition metadata for administration, including retired records.
+   *
+   * @param featurePropertyId Global definition identifier.
+   * @returns Existing definition metadata regardless of lifecycle.
+   */
+  getAdminFeatureProperty(featurePropertyId: number): Promise<FeatureProperty> {
+    return this.featurePropertyRepository.getAdminFeatureProperty(featurePropertyId);
   }
 }
