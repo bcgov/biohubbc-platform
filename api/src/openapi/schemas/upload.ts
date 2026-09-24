@@ -36,6 +36,13 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes', 'name', 'description', 'comment'],
   properties: {
+    client_id: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+      description:
+        'Optional client ID of the active contributor represented by this request. Defaults to the authenticated Keycloak token client ID when omitted. The authenticated user must belong to this contributor.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -149,6 +156,13 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes'],
   properties: {
+    client_id: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+      description:
+        'Optional client ID of the active contributor represented by this request. Defaults to the authenticated Keycloak token client ID when omitted. The authenticated user must belong to this contributor.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,

@@ -26,7 +26,7 @@ describe('ContributorSystemUserService', () => {
 
       await service.ensureContributorSystemUser(123, 456);
 
-      expect(findStub).to.have.been.calledOnceWith(456);
+      expect(findStub).to.have.been.calledOnceWith(123, 456);
       expect(createStub).to.have.been.calledOnceWith(123, 456);
     });
 
@@ -45,7 +45,7 @@ describe('ContributorSystemUserService', () => {
 
       await service.ensureContributorSystemUser(123, 456);
 
-      expect(findStub).to.have.been.calledOnceWith(456);
+      expect(findStub).to.have.been.calledOnceWith(123, 456);
       expect(createStub).to.not.have.been.called;
     });
   });

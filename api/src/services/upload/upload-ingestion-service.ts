@@ -1,16 +1,20 @@
 import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
-import { SYSTEM_ROLE } from '../../constants/roles';
-import { HTTP401, HTTP403 } from '../../errors/http-error';
+import { v4 } from 'uuid';
+import { HTTP401 } from '../../errors/http-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
+import {
+  CreateExistingSubmissionArchiveUploadInput,
+  CreateSubmissionArchiveUploadInput,
+  SubmissionUploadSubmitter
+} from '../../models/submission-upload';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { publishMalwareScanJob } from '../../queue/publisher';
 import { ICreateSubmission } from '../../repositories/submission-repository';
 import { getSecurityObjectStoreBucketName, getSecurityS3Client } from '../../utils/file-utils';
 import { generateMultipartUploadPresignedUrls } from '../../utils/submission-upload-utils';
-import { TeamAuthorizationService } from '../authorization/team-authorization-service';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { TicketService } from '../ticket-service';
@@ -40,8 +44,46 @@ export class UploadIngestionService extends DBService {
   submissionUploadService = new SubmissionUploadService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
-  teamAuthorizationService = new TeamAuthorizationService(this.connection);
   userService = new UserService(this.connection);
+
+  /**
+   * Resolve submitters and create a submission upload for the authorized contributor.
+   * @param input - Validated submission request with the contributor ID resolved by authorization middleware.
+   * @returns Multipart upload resources.
+   */
+  async createSubmissionArchiveUpload(input: CreateSubmissionArchiveUploadInput): Promise<PresignedUploadUrlResponse> {
+    const systemUserId = this.connection.systemUserId();
+    const submitterSystemUserIds = await this.resolveSubmissionUploadSubmitters(input.submitters ?? []);
+    const submission: ICreateSubmission = {
+      uuid: v4(),
+      system_user_id: systemUserId,
+      contributor_id: input.contributorId,
+      name: input.name,
+      description: input.description,
+      comment: input.comment
+    };
+    return this.startArchiveUpload(input.bytes, submission, submitterSystemUserIds, input.blueprintId);
+  }
+
+  /**
+   * Resolve additional team members once per identity GUID.
+   * @param submitters - Requested additional submitters.
+   * @returns System user identifiers for submission and upload teams.
+   */
+  private async resolveSubmissionUploadSubmitters(submitters: SubmissionUploadSubmitter[]): Promise<number[]> {
+    const systemUserIds: number[] = [];
+    const resolvedGuids = new Set<string>();
+    for (const { guid, identifier, identitySource } of submitters) {
+      const normalizedGuid = guid.toLowerCase();
+      if (resolvedGuids.has(normalizedGuid)) {
+        continue;
+      }
+      resolvedGuids.add(normalizedGuid);
+      const submitter = await this.userService.ensureSystemUser(guid, identifier, identitySource);
+      systemUserIds.push(submitter.system_user_id);
+    }
+    return systemUserIds;
+  }
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -91,37 +133,24 @@ export class UploadIngestionService extends DBService {
    * Create a new archive upload for an existing submission (append mode).
    * Does not create a new submission record. Identifies submission by UUID.
    *
-   * @param {number} bytes
-   * @param {string} submissionUuid - Submission UUID (submission.uuid).
-   * @param {number[]} [submitterSystemUserIds] Optional additional people who may access this submission and upload.
-   * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
-   * the submission's most recent prior upload Blueprint when omitted.
+   * Requires prior middleware authorization for submission-team and contributor membership.
+   * Resolves additional submitters and adds them to both teams.
+   * The Blueprint defaults to the submission's most recent prior upload Blueprint when omitted.
+   *
+   * @param {CreateExistingSubmissionArchiveUploadInput} input - Submission UUID, archive size, optional
+   * submitter identities, and optional Blueprint selection.
    * @returns {Promise<PresignedUploadUrlResponse>}
    * @throws {ApiNotFoundError} If no submission exists for the given UUID (mapped to 404 by error handler).
    */
   async startArchiveUploadForExistingSubmissionByUuid(
-    bytes: number,
-    submissionUuid: string,
-    submitterSystemUserIds: number[] = [],
-    requestedBlueprintId?: number | null
+    input: CreateExistingSubmissionArchiveUploadInput
   ): Promise<PresignedUploadUrlResponse> {
+    const { bytes, submissionUuid, blueprintId } = input;
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
 
     const authenticatedSystemUserId = this.connection.systemUserId();
-    const authenticatedUser = await this.userService.getUserById(authenticatedSystemUserId);
-    const isSystemAdministrator = authenticatedUser.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN);
-    const canCreateUpload =
-      isSystemAdministrator ||
-      (await this.teamAuthorizationService.isUserAuthorizedForTeamEntity(authenticatedSystemUserId, {
-        entity: 'submission',
-        submissionId: byUuid.submission_id
-      }));
-
-    if (!canCreateUpload) {
-      throw new HTTP403('Authenticated user is not authorized to create an upload for this submission');
-    }
-
+    const submitterSystemUserIds = await this.resolveSubmissionUploadSubmitters(input.submitters ?? []);
     const submissionTeamSystemUserIds = [authenticatedSystemUserId, ...submitterSystemUserIds];
     await this.submissionService.addSubmissionTeamMembers(submissionRecord.team_id, submissionTeamSystemUserIds);
 
@@ -132,7 +161,7 @@ export class UploadIngestionService extends DBService {
       [authenticatedSystemUserId],
       submitterSystemUserIds,
       submissionRecord.comment ?? null,
-      requestedBlueprintId
+      blueprintId
     );
   }
 

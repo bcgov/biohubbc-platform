@@ -1,23 +1,25 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { v4 } from 'uuid';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   CreateSubmissionUploadRequestSchema,
   CreateSubmissionUploadResponseSchema
 } from '../../../../openapi/schemas/upload';
-import { ICreateSubmission } from '../../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
-import { UserService } from '../../../../services/user-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/upload/archive');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => ({
-    or: [{ discriminator: 'Contributor' }]
+  authorizeRequestHandler((req) => ({
+    or: [
+      {
+        discriminator: 'Contributor',
+        clientId: req.body.client_id ?? req.keycloak_token?.clientId ?? req.keycloak_token?.azp ?? null
+      }
+    ]
   })),
   startUpload()
 ];
@@ -61,42 +63,16 @@ export function startUpload(): RequestHandler {
     try {
       await connection.open();
 
-      // The authenticated user always owns the submission and belongs to both teams. Resolve every
-      // additional submitter and add all of them to both teams as well.
-      const submitterSystemUserIds: number[] = [];
-      const userService = new UserService(connection);
-      const resolvedSubmitterGuids = new Set<string>();
-      for (const { guid, identifier, identitySource } of req.body.submitters ?? []) {
-        const normalizedGuid = guid.toLowerCase();
-        if (resolvedSubmitterGuids.has(normalizedGuid)) {
-          continue;
-        }
-        resolvedSubmitterGuids.add(normalizedGuid);
-
-        const submitter = await userService.ensureSystemUser(guid, identifier, identitySource);
-        submitterSystemUserIds.push(submitter.system_user_id);
-      }
-
-      const system_user_id = connection.systemUserId();
-      const contributorId = req.contributor_id!;
-
-      const { bytes, blueprint_id, name, description, comment } = req.body;
-      const submission: ICreateSubmission = {
-        uuid: v4(),
-        system_user_id,
-        contributor_id: contributorId,
-        name,
-        description,
-        comment
-      };
       const uploadIngestionService = new UploadIngestionService(connection);
-
-      const result = await uploadIngestionService.startArchiveUpload(
-        bytes,
-        submission,
-        submitterSystemUserIds,
-        blueprint_id
-      );
+      const result = await uploadIngestionService.createSubmissionArchiveUpload({
+        contributorId: req.contributor_id!,
+        bytes: req.body.bytes,
+        name: req.body.name,
+        description: req.body.description,
+        comment: req.body.comment,
+        submitters: req.body.submitters,
+        blueprintId: req.body.blueprint_id
+      });
 
       await connection.commit();
 
