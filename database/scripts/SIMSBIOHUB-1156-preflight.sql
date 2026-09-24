@@ -1,6 +1,6 @@
 -- SIMSBIOHUB-1156 pre-flight. Read-only. Run against DEV, TEST and PROD before merging.
 --
--- Migrations 20260923120000 to 20260923170000 raise and abort the deploy when any of the first five
+-- Migrations 20260923120000 to 20260923140000 raise and abort the deploy when any of the first five
 -- queries returns a row. The remaining queries are informational.
 SET search_path = biohub, public;
 
