@@ -1,16 +1,19 @@
 import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
-import { SYSTEM_ROLE } from '../../constants/roles';
-import { HTTP401, HTTP403 } from '../../errors/http-error';
+import { v4 } from 'uuid';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
-import { Upload, UploadStatusEnum } from '../../models/upload';
+import {
+  CreateExistingSubmissionArchiveUploadInput,
+  CreateSubmissionArchiveUploadInput,
+  SubmissionUploadSubmitter
+} from '../../models/submission-upload';
+import { UploadStatusEnum } from '../../models/upload';
 import { publishMalwareScanJob } from '../../queue/publisher';
 import { ICreateSubmission } from '../../repositories/submission-repository';
 import { getSecurityObjectStoreBucketName, getSecurityS3Client } from '../../utils/file-utils';
 import { generateMultipartUploadPresignedUrls } from '../../utils/submission-upload-utils';
-import { TeamAuthorizationService } from '../authorization/team-authorization-service';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { TicketService } from '../ticket-service';
@@ -40,8 +43,60 @@ export class UploadIngestionService extends DBService {
   submissionUploadService = new SubmissionUploadService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
   ticketService = new TicketService(this.connection);
-  teamAuthorizationService = new TeamAuthorizationService(this.connection);
   userService = new UserService(this.connection);
+
+  /**
+   * Resolve submitters and create a submission upload for the authorized contributor.
+   * @param {CreateSubmissionArchiveUploadInput} input - Validated submission request with the contributor ID resolved by authorization middleware.
+   * @return {Promise<PresignedUploadUrlResponse>} Multipart upload resources.
+   * @memberof UploadIngestionService
+   */
+  async createSubmissionArchiveUpload(input: CreateSubmissionArchiveUploadInput): Promise<PresignedUploadUrlResponse> {
+    const systemUserId = this.connection.systemUserId();
+    const submitterSystemUserIds = await this.resolveSubmissionUploadSubmitters(input.submitters ?? []);
+    const submission: ICreateSubmission = {
+      uuid: v4(),
+      system_user_id: systemUserId,
+      contributor_id: input.contributorId,
+      name: input.name,
+      description: input.description,
+      comment: input.comment
+    };
+    return this.startArchiveUpload(input.bytes, submission, submitterSystemUserIds, input.blueprintId);
+  }
+
+  /**
+   * Resolve additional team members once per identity GUID.
+   * @param {SubmissionUploadSubmitter[]} submitters - Requested additional submitters.
+   * @return {Promise<number[]>} System user identifiers for submission and upload teams.
+   * @memberof UploadIngestionService
+   */
+  private async resolveSubmissionUploadSubmitters(submitters: SubmissionUploadSubmitter[]): Promise<number[]> {
+    const resolvedGuids = new Set<string>();
+    const uniqueSubmitters = submitters.filter(({ guid }) => {
+      const normalizedGuid = guid.toLowerCase();
+      if (resolvedGuids.has(normalizedGuid)) {
+        return false;
+      }
+      resolvedGuids.add(normalizedGuid);
+      return true;
+    });
+
+    // Finish all work on the shared connection before the caller can roll back or release it.
+    const results = await Promise.allSettled(
+      uniqueSubmitters.map(async ({ guid, identifier, identitySource }) => {
+        const submitter = await this.userService.ensureSystemUser(guid, identifier, identitySource);
+        return submitter.system_user_id;
+      })
+    );
+
+    return results.map((result) => {
+      if (result.status === 'rejected') {
+        throw result.reason;
+      }
+      return result.value;
+    });
+  }
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -91,37 +146,27 @@ export class UploadIngestionService extends DBService {
    * Create a new archive upload for an existing submission (append mode).
    * Does not create a new submission record. Identifies submission by UUID.
    *
-   * @param {number} bytes
-   * @param {string} submissionUuid - Submission UUID (submission.uuid).
-   * @param {number[]} [submitterSystemUserIds] Optional additional people who may access this submission and upload.
-   * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
-   * the submission's most recent prior upload Blueprint when omitted.
+   * Requires prior middleware authorization for submission-team access or administrator access.
+   * Validates owning-contributor membership before changing the submission.
+   * Resolves additional submitters and adds them to both teams.
+   * The Blueprint defaults to the submission's most recent prior upload Blueprint when omitted.
+   *
+   * @param {CreateExistingSubmissionArchiveUploadInput} input - Submission UUID, archive size, optional
+   * submitter identities, and optional Blueprint selection.
    * @returns {Promise<PresignedUploadUrlResponse>}
    * @throws {ApiNotFoundError} If no submission exists for the given UUID (mapped to 404 by error handler).
+   * @memberof UploadIngestionService
    */
   async startArchiveUploadForExistingSubmissionByUuid(
-    bytes: number,
-    submissionUuid: string,
-    submitterSystemUserIds: number[] = [],
-    requestedBlueprintId?: number | null
+    input: CreateExistingSubmissionArchiveUploadInput
   ): Promise<PresignedUploadUrlResponse> {
+    const { bytes, submissionUuid, blueprintId } = input;
+    await this.submissionService.assertSubmissionContributorWriteAccess(submissionUuid);
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
 
     const authenticatedSystemUserId = this.connection.systemUserId();
-    const authenticatedUser = await this.userService.getUserById(authenticatedSystemUserId);
-    const isSystemAdministrator = authenticatedUser.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN);
-    const canCreateUpload =
-      isSystemAdministrator ||
-      (await this.teamAuthorizationService.isUserAuthorizedForTeamEntity(authenticatedSystemUserId, {
-        entity: 'submission',
-        submissionId: byUuid.submission_id
-      }));
-
-    if (!canCreateUpload) {
-      throw new HTTP403('Authenticated user is not authorized to create an upload for this submission');
-    }
-
+    const submitterSystemUserIds = await this.resolveSubmissionUploadSubmitters(input.submitters ?? []);
     const submissionTeamSystemUserIds = [authenticatedSystemUserId, ...submitterSystemUserIds];
     await this.submissionService.addSubmissionTeamMembers(submissionRecord.team_id, submissionTeamSystemUserIds);
 
@@ -132,7 +177,7 @@ export class UploadIngestionService extends DBService {
       [authenticatedSystemUserId],
       submitterSystemUserIds,
       submissionRecord.comment ?? null,
-      requestedBlueprintId
+      blueprintId
     );
   }
 
@@ -245,7 +290,8 @@ export class UploadIngestionService extends DBService {
    * Finalize a multipart archive upload after all parts have been uploaded.
    *
    * This completes the upload in the security bucket and enqueues the
-   * archive artifact(s) for malware scanning.
+   * archive artifact(s) for malware scanning. The endpoint must first authorize the upload
+   * creator and owning contributor through the Upload discriminator.
    *
    * @param {CompleteMultipartUploadParams} params
    * @returns {Promise<void>}
@@ -253,8 +299,8 @@ export class UploadIngestionService extends DBService {
   async completeArchiveUpload(params: CompleteMultipartUploadParams): Promise<void> {
     const { uploadId, s3UploadId, key, parts } = params;
 
-    // 1. Ensure the caller is allowed to complete this upload
-    await this._authorizeUploadCompletion(uploadId, s3UploadId);
+    // 1. Validate multipart identity and upload state after middleware authorization
+    await this.uploadService.validateUploadCompletion(uploadId, s3UploadId);
 
     // Update upload status, artifact statuses, and create security records
     const [, , securityRecords] = await Promise.all([
@@ -296,42 +342,5 @@ export class UploadIngestionService extends DBService {
         })
       )
     );
-  }
-
-  /**
-   * Ensure the caller is allowed to finalize this upload.
-   *
-   * @param {string} uploadId - The unique identifier for the upload in the system
-   * @param {string} s3UploadId - The S3 multipart upload ID, used to verify client intent
-   * @returns {Promise<Upload>} - Returns the upload record if authorization succeeds
-   * @throws {HTTP401} - Throws if the caller is not authorized to complete the upload
-   */
-  async _authorizeUploadCompletion(uploadId: string, s3UploadId: string): Promise<Upload> {
-    const upload = await this.uploadService.getUpload(uploadId);
-
-    const now = dayjs();
-
-    // Determine if the caller is authorized to complete the upload
-    const authorized =
-      // Ensure the S3 upload ID matches
-      // Prevents clients from completing someone else's upload by providing a different S3 ID
-      upload.s3_upload_id === s3UploadId &&
-      // Ensure the caller is the same user who created the upload
-      // Only the creator of the upload can finalize it
-      upload.create_user === this.connection.systemUserId() &&
-      // Ensure the upload is still valid (not expired)
-      // Prevents completing uploads that have passed their allowed time window
-      now.isBefore(upload.record_end_date) &&
-      // Ensure the upload status is PENDING
-      // Only uploads that are in a pending state can be finalized; completed or failed uploads cannot
-      upload.upload_status === UploadStatusEnum.PENDING;
-
-    // If any of the above checks fail, the caller is unauthorized
-    if (!authorized) {
-      throw new HTTP401('Access Denied');
-    }
-
-    // Return the upload record for further processing
-    return upload;
   }
 }

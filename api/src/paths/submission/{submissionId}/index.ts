@@ -11,7 +11,8 @@ const defaultLog = getLogger('paths/submission/{submissionId}');
 export const GET: Operation = [getSubmissionRecordWithSecurity()];
 
 GET.apiDoc = {
-  description: 'Retrieves a submission record metadata',
+  description:
+    'Public submission metadata is available by ID regardless of publication, upload decision, or end date. Returns identifiers, name, description, audit timestamps and user IDs, contributor identity, and feature/security summaries. Internal comments are excluded; feature content has separate access checks.',
   tags: ['meta'],
   security: [
     {
@@ -47,7 +48,6 @@ GET.apiDoc = {
               'contributor_id',
               'name',
               'description',
-              'comment',
               'create_date',
               'create_user',
               'update_date',
@@ -91,10 +91,6 @@ GET.apiDoc = {
                 maxLength: 200
               },
               description: {
-                type: 'string',
-                maxLength: 3000
-              },
-              comment: {
                 type: 'string',
                 maxLength: 3000
               },

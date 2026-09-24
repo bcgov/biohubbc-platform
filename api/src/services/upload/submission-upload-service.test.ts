@@ -417,6 +417,7 @@ describe('SubmissionUploadService', () => {
     const teamId = '33333333-3333-3333-3333-333333333333';
 
     beforeEach(() => {
+      sinon.stub(service.submissionService, 'assertSubmissionContributorWriteAccess').resolves();
       sinon.stub(service, 'getSubmissionUploadBySubmissionUuid').resolves({
         submission_upload_id: submissionUploadId,
         submission_id: 1,

@@ -101,3 +101,29 @@ export const TicketSubmissionUpload = z.object({
   reviews: TicketSubmissionUploadReviews
 });
 export type TicketSubmissionUpload = z.infer<typeof TicketSubmissionUpload>;
+
+/** Identity supplied for an additional submission/upload team member. */
+export interface SubmissionUploadSubmitter {
+  guid: string;
+  identifier: string;
+  identitySource: string;
+}
+
+/** Request fields for creating a submission and its first archive upload. */
+export interface CreateSubmissionArchiveUploadInput {
+  contributorId: number;
+  bytes: number;
+  name: string;
+  description: string;
+  comment: string;
+  submitters?: SubmissionUploadSubmitter[];
+  blueprintId?: number | null;
+}
+
+/** Request fields for appending an archive to an existing submission. */
+export interface CreateExistingSubmissionArchiveUploadInput {
+  bytes: number;
+  submissionUuid: string;
+  submitters?: SubmissionUploadSubmitter[];
+  blueprintId?: number | null;
+}
