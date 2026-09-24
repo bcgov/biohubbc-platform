@@ -30,6 +30,7 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
+import { BlueprintFeatureTypeService } from '../../services/blueprint-feature-type-service';
 import { BlueprintService } from '../../services/blueprint-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
@@ -1294,12 +1295,16 @@ describe('Download Parquet pipeline (integration)', function () {
         WHERE fpt.name = 'number'
         RETURNING feature_property_id;
       `);
-      const service = new BlueprintService(connection);
-      const draft = await service.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
-      const draftFeatureType = (await service.getAdminBlueprintFeatureTypes(draft.blueprint_id)).find(
-        (featureType) => featureType.feature_type_name === featureTypeName
+      const blueprintService = new BlueprintService(connection);
+      const blueprintFeatureTypeService = new BlueprintFeatureTypeService(connection);
+      const draft = await blueprintService.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const featureTypes = await blueprintFeatureTypeService.getBlueprintFeatureTypes(
+        draft.blueprint_id,
+        { keyword: featureTypeName },
+        { page: 1, limit: 100 }
       );
-      await service.createBlueprintFeatureTypeProperty(
+      const draftFeatureType = featureTypes.types.find((featureType) => featureType.name === featureTypeName);
+      await blueprintService.createBlueprintFeatureTypeProperty(
         draft.blueprint_id,
         draftFeatureType!.blueprint_feature_type_id,
         {

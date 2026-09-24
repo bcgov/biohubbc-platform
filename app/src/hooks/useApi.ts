@@ -4,6 +4,7 @@ import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import { useBlueprintFeatureTypesApi } from './api/useBlueprintFeatureTypesApi';
 import { useBlueprintsApi } from './api/useBlueprintsApi';
 import { useFeaturePropertiesApi } from './api/useFeaturePropertiesApi';
 import { useFeatureTypesApi } from './api/useFeatureTypesApi';
@@ -84,8 +85,11 @@ export const useApi = () => {
 
   const blueprints = useBlueprintsApi(apiAxios);
 
+  const blueprintFeatureTypes = useBlueprintFeatureTypesApi(apiAxios);
+
   const apis = {
     blueprints,
+    blueprintFeatureTypes,
     featureProperties,
     featureTypes,
     user,

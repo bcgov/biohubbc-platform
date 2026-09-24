@@ -69,18 +69,6 @@ export interface PublishBlueprintRecord {
   is_default?: boolean;
 }
 
-/** Fields required to include a feature type in a blueprint. */
-export interface CreateBlueprintFeatureTypeRecord {
-  blueprint_id: number;
-  feature_type_id: number;
-  sort?: number | null;
-}
-
-/** Fields accepted when updating a blueprint feature type. */
-export interface UpdateBlueprintFeatureTypeRecord {
-  sort?: number | null;
-}
-
 /** Fields accepted from a client when assigning a property to a blueprint feature type. */
 export interface CreateBlueprintFeatureTypePropertyRequest {
   feature_property_id: number;

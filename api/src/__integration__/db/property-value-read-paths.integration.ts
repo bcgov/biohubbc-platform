@@ -14,6 +14,7 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeaturePropertyRepository } from '../../repositories/submission-feature-property-repository';
+import { BlueprintFeatureTypeService } from '../../services/blueprint-feature-type-service';
 import { BlueprintService } from '../../services/blueprint-service';
 import {
   addCodeProperty,
@@ -358,14 +359,17 @@ describe('Indexed property value read paths (integration)', function () {
 
     it('lists a property assigned to the feature type only under a Blueprint that is not the default', async () => {
       const { featurePropertyId, name } = await createUnassignedNumberProperty();
-      const service = new BlueprintService(connection);
-      const draft = await service.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
-      const featureTypes = await service.getAdminBlueprintFeatureTypes(draft.blueprint_id);
-      const blueprintFeatureType = featureTypes.find(
-        (featureType) => featureType.feature_type_name === featureTypeName
+      const blueprintService = new BlueprintService(connection);
+      const blueprintFeatureTypeService = new BlueprintFeatureTypeService(connection);
+      const draft = await blueprintService.createBlueprintVersion(await getActiveDefaultBlueprintId(connection), {});
+      const featureTypes = await blueprintFeatureTypeService.getBlueprintFeatureTypes(
+        draft.blueprint_id,
+        { keyword: featureTypeName },
+        { page: 1, limit: 100 }
       );
+      const blueprintFeatureType = featureTypes.types.find((featureType) => featureType.name === featureTypeName);
       expect(blueprintFeatureType, `draft includes ${featureTypeName}`).to.not.be.undefined;
-      await service.createBlueprintFeatureTypeProperty(
+      await blueprintService.createBlueprintFeatureTypeProperty(
         draft.blueprint_id,
         blueprintFeatureType!.blueprint_feature_type_id,
         {

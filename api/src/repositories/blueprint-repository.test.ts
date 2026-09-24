@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { ApiNotFoundError } from '../errors/api-error';
 import { BlueprintRepository } from './blueprint-repository';
 
 chai.use(sinonChai);
@@ -243,84 +243,6 @@ describe('BlueprintRepository', () => {
     });
   });
 
-  describe('blueprint feature types', () => {
-    it('findActiveBlueprintFeatureType returns null when the feature type is not included', async () => {
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: async () => mockKnexResult([]) }));
-
-      expect(await repo.findActiveBlueprintFeatureType(7, 10)).to.be.null;
-    });
-
-    it('insertBlueprintFeatureType returns the new id', async () => {
-      const knexStub = sinon.stub().resolves(mockKnexResult([{ blueprint_feature_type_id: 5 }]));
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: knexStub }));
-
-      const result = await repo.insertBlueprintFeatureType({ blueprint_id: 7, feature_type_id: 10 });
-
-      expect(result).to.equal(5);
-    });
-
-    it('insertBlueprintFeatureType throws ApiExecuteSQLError when no row is inserted', async () => {
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: async () => mockKnexResult([]) }));
-
-      try {
-        await repo.insertBlueprintFeatureType({ blueprint_id: 7, feature_type_id: 10 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-      }
-    });
-
-    it('getAdminBlueprintFeatureType scopes the lookup to the parent blueprint', async () => {
-      const knexStub = sinon.stub().resolves(mockKnexResult([{ blueprint_feature_type_id: 5 }]));
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: knexStub }));
-
-      await repo.getAdminBlueprintFeatureType(5, 7);
-
-      const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
-      expect(sql).to.include('"bft"."record_end_date" is null');
-      expect(sql).to.include('"bft"."blueprint_feature_type_id" =');
-      expect(sql).to.include('"bft"."blueprint_id" =');
-      expect(bindings).to.eql([5, 7]);
-    });
-
-    it('getAdminBlueprintFeatureType throws ApiNotFoundError outside the parent blueprint', async () => {
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: async () => mockKnexResult([]) }));
-
-      try {
-        await repo.getAdminBlueprintFeatureType(5, 99);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-    });
-
-    it('updateBlueprintFeatureType throws ApiNotFoundError when scoped update affects no rows', async () => {
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: async () => mockKnexResult([]) }));
-
-      try {
-        await repo.updateBlueprintFeatureType(5, 99, { sort: 1 });
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-    });
-
-    it('deleteBlueprintFeatureType soft deletes and throws ApiNotFoundError when no row is affected', async () => {
-      const knexStub = sinon.stub().resolves(mockKnexResult([]));
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: knexStub }));
-
-      try {
-        await repo.deleteBlueprintFeatureType(5, 99);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiNotFoundError);
-      }
-
-      const { sql } = knexStub.firstCall.args[0].toSQL().toNative();
-      expect(sql).to.include('update "blueprint_feature_type" set "record_end_date" = CURRENT_TIMESTAMP');
-    });
-  });
-
   describe('blueprint feature type properties', () => {
     it('findActiveBlueprintFeatureTypeProperty matches on the owned feature property', async () => {
       const knexStub = sinon.stub().resolves(mockKnexResult([{ blueprint_feature_type_property_id: 3 }]));
@@ -400,18 +322,6 @@ describe('BlueprintRepository', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
-    });
-
-    it('deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId retires only active assignments', async () => {
-      const knexStub = sinon.stub().resolves(mockKnexResult([]));
-      const repo = new BlueprintRepository(getMockDBConnection({ knex: knexStub }));
-
-      await repo.deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId(5);
-
-      const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
-      expect(sql).to.include('update "blueprint_feature_type_property" set "record_end_date" = CURRENT_TIMESTAMP');
-      expect(sql).to.include('"record_end_date" is null');
-      expect(bindings).to.eql([5]);
     });
   });
 });
