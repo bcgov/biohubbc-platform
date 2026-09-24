@@ -619,9 +619,7 @@ export class DownloadExportPipelineService extends DBService {
           continue;
         }
 
-        if (!artifactKeyColumnsByType) {
-          artifactKeyColumnsByType = await this.readArtifactKeyColumnsByFeatureType();
-        }
+        artifactKeyColumnsByType ??= await this.readArtifactKeyColumnsByFeatureType();
         lookup.set(
           featureTypeName,
           derivePropertiesFromParquetSchema(reader.getSchema(), artifactKeyColumnsByType.get(featureTypeName) ?? [])

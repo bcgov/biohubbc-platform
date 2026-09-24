@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import wkx from 'wkx';
+import { ZodError } from 'zod';
 
 import { ParquetFeatureData } from '../models/download';
 import { CsvPropertyDefinition } from './csv-utils';
@@ -1204,7 +1205,7 @@ describe('parquet-utils', () => {
 
     it('rejects a footer entry that is not a property list', async () => {
       await writeAndOpen({ [PARQUET_PROPERTIES_METADATA_KEY]: '{"not":"a list"}' }, (reader) => {
-        expect(() => readParquetPropertiesMetadata(reader)).to.throw();
+        expect(() => readParquetPropertiesMetadata(reader)).to.throw(ZodError);
       });
     });
 
