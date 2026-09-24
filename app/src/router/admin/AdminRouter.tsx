@@ -2,10 +2,11 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
 import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
 import { PolicyDetailPage } from 'features/admin/policies/PolicyDetailPage';
-import { SubmissionUploadReviewValidationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationPage';
 import { SubmissionReviewFeaturePage } from 'features/admin/reviews/SubmissionReviewFeaturePage';
+import { SubmissionUploadReviewValidationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationPage';
 import { ManageSecurityPage } from 'features/admin/security/ManageSecurityPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
+import { ContributorDetailPage } from 'features/admin/users/contributors/ContributorDetailPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -74,6 +75,21 @@ export const AdminRouter = () => {
         }
       />
 
+      <Route
+        path="users/contributor/:contributorId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Contributor" description="Manage contributor and associated users" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <ContributorDetailPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
       {/* Manage Users route */}
       <Route
         path="users"

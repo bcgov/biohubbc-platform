@@ -7,49 +7,52 @@ import { PageSection } from 'components/section/PageSection';
 import { CONTRIBUTOR_STATUS_PRESENTATION } from 'constants/contributor';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IContributor } from 'interfaces/useContributorsApi.interface';
+import { IContributor, IContributorUser } from 'interfaces/useContributorsApi.interface';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ContributorDialog } from '../dialog/ContributorDialog';
-import { ContributorActions } from '../table/ContributorActions';
+import { ContributorUserDialog } from '../dialog/ContributorUserDialog';
+import { ContributorUserActions } from '../table/ContributorUserActions';
 
 /**
- * Paginated contributors with administrative create, edit and delete actions.
- *
+ * Paginated contributor users with administrative create, edit and delete actions.
+ * @param props - Contributor whose relationships are managed on its details page.
  * @returns Searchable administrative table and creation dialog.
  */
-export const ContributorPanel = () => {
+export const ContributorUserPanel = ({ contributor }: { contributor: IContributor }) => {
   const api = useApi();
-  const navigate = useNavigate();
-  const handleRowClick = (contributor: IContributor) => {
-    navigate(`/admin/users/contributor/${contributor.contributor_id}`);
-  };
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   const grid = useServerPaginatedDataGrid({
     fetcher: async (keyword, pagination) => {
       setError('');
       try {
-        return await api.contributors.listContributors({ keyword }, pagination);
+        return await api.contributors.listContributorUsers(
+          { keyword, contributor_id: contributor.contributor_id },
+          pagination
+        );
       } catch (caughtError) {
         setError((caughtError as Error).message);
         throw caughtError;
       }
     },
-    extractData: (response) => response.contributors,
+    extractData: (response) => response.contributor_users,
     extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'client_id', sort: 'asc' },
+    defaultSort: { field: 'user_identifier', sort: 'asc' },
     defaultPageSize: 10
   });
-  const columns: GridColDef<IContributor>[] = [
-    { field: 'contributor_id', headerName: 'Contributor ID', width: 140 },
+  const columns: GridColDef<IContributorUser>[] = [
     {
-      field: 'client_id',
-      headerName: 'Client ID',
-      minWidth: 200,
-      flex: 1
+      field: 'system_user_id',
+      headerName: 'System user ID',
+      minWidth: 160,
+      sortable: false
     },
-    { field: 'description', headerName: 'Description', minWidth: 250, flex: 1 },
+    {
+      field: 'user_identifier',
+      headerName: 'System user',
+      minWidth: 220,
+      flex: 1,
+      renderCell: ({ row }) => row.display_name || row.user_identifier
+    },
     {
       field: 'record_end_date',
       headerName: 'Status',
@@ -65,19 +68,19 @@ export const ContributorPanel = () => {
       headerName: 'Actions',
       width: 100,
       sortable: false,
-      renderCell: ({ row }) => <ContributorActions record={row} onChanged={grid.refresh} />
+      renderCell: ({ row }) => <ContributorUserActions record={row} onChanged={grid.refresh} />
     }
   ];
   return (
     <PageSection
-      id="contributors"
-      label="Contributors"
-      onAdd={() => setAdding(true)}
-      addLabel="Add Contributor"
+      id="contributor_users"
+      label="Users"
+      onAdd={contributor.record_end_date ? undefined : () => setAdding(true)}
+      addLabel="Add Contributor User"
       headerContent={
         <SearchTextField
           size="small"
-          placeholder="Search contributors"
+          placeholder="Search contributor users"
           value={grid.searchTerm}
           onChange={(event) => grid.handleSearch(event.target.value)}
         />
@@ -88,19 +91,19 @@ export const ContributorPanel = () => {
         </Alert>
       )}
       {!grid.response && grid.isLoading ? (
-        <Stack gap={1} aria-label="Loading contributors">
+        <Stack gap={1} aria-label="Loading contributor users">
           {Array.from({ length: 10 }, (_, index) => (
             <Skeleton key={index} variant="rectangular" height={48} />
           ))}
         </Stack>
       ) : (
         <ServerPaginatedDataGrid
-          onRowClick={handleRowClick}
+          sx={{ '& .MuiDataGrid-cell': { cursor: 'default' } }}
           rows={grid.rows}
           columns={columns}
-          getRowId={(row) => row.contributor_id}
-          dataTestId="contributors-table"
-          noRowsMessage="No contributors"
+          getRowId={(row) => row.contributor_system_user_id}
+          dataTestId="contributor_users-table"
+          noRowsMessage="No contributor users"
           rowCount={grid.rowCount}
           paginationModel={grid.paginationModel}
           setPaginationModel={grid.handlePaginationChange}
@@ -109,7 +112,8 @@ export const ContributorPanel = () => {
         />
       )}
       {adding && (
-        <ContributorDialog
+        <ContributorUserDialog
+          contributor={contributor}
           onClose={() => setAdding(false)}
           onSaved={() => grid.handlePaginationChange({ ...grid.paginationModel, page: 0 })}
         />

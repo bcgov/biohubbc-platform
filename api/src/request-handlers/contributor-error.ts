@@ -10,10 +10,14 @@ export function translateContributorError(error: unknown): unknown {
   if (error instanceof ApiExecuteSQLError) {
     const conflict = error.errors.some((detail) => {
       const message = typeof detail === 'object' && 'message' in detail ? String(detail.message) : '';
-      return /duplicate key value violates unique constraint "contributor_uk"/.test(message);
+      return /duplicate key value violates unique constraint "(contributor_uk|contributor_system_uk1|contributor_system_uk2)"/.test(
+        message
+      );
     });
     if (conflict) {
-      return new ApiConflictError('An active contributor with this client ID already exists');
+      return new ApiConflictError(
+        'An active contributor with this client ID or an active relationship for this user already exists'
+      );
     }
   }
   return error;
