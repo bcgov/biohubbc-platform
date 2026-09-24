@@ -85,7 +85,7 @@ export const AdminRouter = () => {
             <PageTitle title="Manage Users" description="Manage users and their roles" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
-                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <ManageUsersPage />
               </SystemRoleGuard>

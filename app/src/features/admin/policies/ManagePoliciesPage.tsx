@@ -10,6 +10,10 @@ import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 import { teamPolicyQueryKeys } from 'utils/query-keys/team-policy-query-keys';
 import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { Link as RouterLink } from 'react-router-dom';
 import { PoliciesContainer } from './components/PoliciesContainer';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
@@ -78,7 +82,19 @@ export const ManagePoliciesPage = () => {
 
   return (
     <>
-      <PageHeader label="Manage Policies" />
+      <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="policies breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Policies
+            </Typography>
+          </Breadcrumbs>
+        }
+        label="Manage Policies"
+      />
       <Box py={4}>
         <QueryErrorDialog error={policiesQuery.error} label="policies" />
         <PoliciesContainer

@@ -54,7 +54,7 @@ describe('AdminSubmissionPage', () => {
   it('keeps feature security and upload navigation visible without legacy security actions', async () => {
     renderAt('/admin/submissions/7');
 
-    expect(await screen.findByText('Submission seven')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Submission seven' })).toBeVisible();
     expect(await screen.findByLabelText('Secured')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upload reviews' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /security|publish/i })).not.toBeInTheDocument();

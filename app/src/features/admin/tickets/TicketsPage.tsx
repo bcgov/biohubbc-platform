@@ -1,9 +1,10 @@
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { PageHeader } from 'components/header/PageHeader';
+import { TabGroup } from 'components/tabs/TabGroup';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
-import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import { hashKey, keepPreviousData, QueryKey, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TICKETS_LIST_DEFAULT_SORT } from 'constants/ticket';
@@ -12,7 +13,6 @@ import { useDialogContext } from 'hooks/useContext';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { IGetTicketsResponse, ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { refreshChangedQueries } from 'utils/query-client';
 import {
   useCoordinatedMutation,
@@ -240,31 +240,37 @@ export const TicketsPage = () => {
 
   return (
     <>
-      <Paper square elevation={0}>
-        <Container maxWidth="xl" sx={{ py: 4, pb: 0 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              Administrative
+      <PageHeader
+        label="Administrative"
+        breadcrumbs={
+          <Breadcrumbs aria-label="tickets breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Tickets
             </Typography>
-          </Box>
-
-          <Tabs
+          </Breadcrumbs>
+        }
+        tabs={
+          <TabGroup<'tickets'>
             value={activeTab}
-            onChange={(_, value) => {
+            onChange={(value) => {
               setActiveTab(value);
               grid.handlePaginationChange({ ...grid.paginationModel, page: 0 });
             }}
-            aria-label="administrative tabs"
-            sx={{ mt: 1.5 }}>
-            <Tab
-              value="tickets"
-              label="Tickets"
-              id="administrative-tickets-tab"
-              aria-controls="administrative-tickets-tabpanel"
-            />
-          </Tabs>
-        </Container>
-      </Paper>
+            ariaLabel="administrative tabs"
+            tabs={[
+              {
+                value: 'tickets',
+                label: 'Tickets',
+                id: 'administrative-tickets-tab',
+                ariaControls: 'administrative-tickets-tabpanel'
+              }
+            ]}
+          />
+        }
+      />
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
         <QueryErrorDialog error={ticketsQuery.error} label="tickets" />
