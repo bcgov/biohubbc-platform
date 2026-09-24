@@ -1,5 +1,7 @@
+import { IAvailableFeaturePropertiesResponse } from 'interfaces/useFeaturePropertiesApi.interface';
 import { AxiosInstance } from 'axios';
 import {
+  IGetAvailableFeaturePropertiesForBlueprintFeatureTypeParams,
   IFeatureProperty,
   IFeaturePropertiesResponse,
   ICreateFeatureProperty,
@@ -69,7 +71,28 @@ export const useFeaturePropertiesApi = (axios: AxiosInstance) => {
     const { data } = await axios.get('/api/administrative/feature-property-types');
     return data;
   };
+  /**
+   * Search definitions eligible for the selected membership scope.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param blueprintFeatureTypeId Parent assignment.
+   * @param params Search, pagination, and sorting.
+   * @returns Paginated eligible options.
+   */
+  const getAvailableFeaturePropertiesForBlueprintFeatureType = async (
+    blueprintId: number,
+    blueprintFeatureTypeId: number,
+    params?: IGetAvailableFeaturePropertiesForBlueprintFeatureTypeParams
+  ): Promise<IAvailableFeaturePropertiesResponse> => {
+    const { data } = await axios.get(
+      `/api/administrative/blueprints/${blueprintId}/types/${blueprintFeatureTypeId}/properties/available`,
+      { params }
+    );
+    return data;
+  };
+
   return {
+    getAvailableFeaturePropertiesForBlueprintFeatureType,
     getFeatureProperties,
     createFeatureProperty,
     updateFeatureProperty,

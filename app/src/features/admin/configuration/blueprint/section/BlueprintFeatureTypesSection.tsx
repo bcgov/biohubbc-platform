@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { typeAssignmentSchema } from '../dialog/CompositionFormSchema';
@@ -18,6 +19,7 @@ interface IBlueprintFeatureTypesSectionProps {
  * @returns Independent table and dialog presentations.
  */
 export const BlueprintFeatureTypesSection = ({ blueprintId, readOnly, tab }: IBlueprintFeatureTypesSectionProps) => {
+  const navigate = useNavigate();
   const {
     table,
     error,
@@ -35,6 +37,11 @@ export const BlueprintFeatureTypesSection = ({ blueprintId, readOnly, tab }: IBl
       {error && <Alert severity="error">{error}</Alert>}
       <BlueprintTypesTable
         table={table}
+        onOpen={(assignment) =>
+          navigate(
+            `/admin/configuration/blueprints/${blueprintId}/feature_type/${assignment.blueprint_feature_type_id}`
+          )
+        }
         onCreate={readOnly ? undefined : onCreateBlueprintFeatureType}
         onDelete={onDeleteBlueprintFeatureType}
       />

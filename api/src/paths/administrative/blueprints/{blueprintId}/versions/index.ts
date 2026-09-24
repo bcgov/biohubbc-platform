@@ -6,7 +6,7 @@ import { CreateBlueprintVersionRecord } from '../../../../../models/blueprint';
 import { AdminBlueprintSchema, CreateBlueprintVersionRequestSchema } from '../../../../../openapi/schemas/blueprint';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { BlueprintService } from '../../../../../services/blueprint-service';
+import { BlueprintVersionService } from '../../../../../services/blueprint-version-service';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/blueprints/{blueprintId}/versions');
@@ -72,8 +72,8 @@ export function createBlueprintVersion(): RequestHandler {
     try {
       await connection.open();
 
-      const blueprintService = new BlueprintService(connection);
-      const result = await blueprintService.createBlueprintVersion(blueprintId, payload);
+      const blueprintVersionService = new BlueprintVersionService(connection);
+      const result = await blueprintVersionService.createBlueprintVersion(blueprintId, payload);
 
       await connection.commit();
 

@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { AdminBlueprint } from '../../../../../models/blueprint';
-import { BlueprintService } from '../../../../../services/blueprint-service';
+import { BlueprintVersionService } from '../../../../../services/blueprint-version-service';
 import { createBlueprintVersion } from './index';
 
 chai.use(sinonChai);
@@ -51,7 +51,7 @@ describe('createBlueprintVersion', () => {
   it('should return 201 with the new draft version', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    const createStub = sinon.stub(BlueprintService.prototype, 'createBlueprintVersion').resolves(mockBlueprint);
+    const createStub = sinon.stub(BlueprintVersionService.prototype, 'createBlueprintVersion').resolves(mockBlueprint);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { blueprintId: '7' };
@@ -68,7 +68,7 @@ describe('createBlueprintVersion', () => {
   it('should create a version when no request body is sent', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    const createStub = sinon.stub(BlueprintService.prototype, 'createBlueprintVersion').resolves(mockBlueprint);
+    const createStub = sinon.stub(BlueprintVersionService.prototype, 'createBlueprintVersion').resolves(mockBlueprint);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { blueprintId: '7' };

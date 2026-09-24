@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { BlueprintPage } from './BlueprintPage';
+import { BlueprintFeatureTypePage } from './feature/BlueprintFeatureTypePage';
 
 vi.mock('hooks/useApi');
 vi.mock('@mui/x-data-grid', async () => {
@@ -73,6 +74,10 @@ const renderPage = (id = '1', tab = 'feature-types') =>
       <MemoryRouter initialEntries={[`/admin/configuration/blueprints/${id}?tab=${tab}`]}>
         <Routes>
           <Route path="/admin/configuration/blueprints/:blueprintId" element={<BlueprintPage />} />
+          <Route
+            path="/admin/configuration/blueprints/:blueprintId/feature_type/:blueprintFeatureTypeId"
+            element={<BlueprintFeatureTypePage />}
+          />
         </Routes>
       </MemoryRouter>
     </DialogContextProvider>
@@ -114,6 +119,13 @@ describe('Blueprint composition page', () => {
       )
     );
     expect(api.blueprintFeatureTypeProperties.getBlueprintFeatureTypeProperties).not.toHaveBeenCalled();
+    fireEvent.click(page.getByText('Type description'));
+    expect(await page.findByText('Property description')).toBeVisible();
+    expect(api.blueprintFeatureTypes.getBlueprintFeatureType).toHaveBeenCalledWith(1, 2);
+    expect(api.blueprintFeatureTypeProperties.getBlueprintFeatureTypeProperties).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ blueprintFeatureTypeId: 2, page: 1 })
+    );
   });
   it.each(['', 'invalid'])('defaults to Feature Types for tab %j and shows metadata last', async (tab) => {
     const page = renderPage('1', tab);

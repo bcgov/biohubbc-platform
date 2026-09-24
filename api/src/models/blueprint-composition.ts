@@ -18,6 +18,28 @@ export const BlueprintFeatureTypeAssignment = z.object({
 export type BlueprintFeatureTypeAssignment = z.infer<typeof BlueprintFeatureTypeAssignment>;
 
 /**
+ * A reusable property assigned to a specific blueprint feature type.
+ * Membership and settings belong only to this blueprint assignment; no global
+ * feature type/property membership is implied.
+ */
+export const BlueprintFeaturePropertyAssignment = z.object({
+  blueprint_feature_type_property_id: z.number(),
+  blueprint_feature_type_id: z.number(),
+  feature_property_id: z.number(),
+  feature_type_name: z.string(),
+  name: z.string(),
+  display_name: z.string(),
+  description: z.string().nullable(),
+  type_name: z.string(),
+  required_value: z.boolean(),
+  allow_multiple: z.boolean(),
+  sort: z.number().int().nullable(),
+  record_end_date: z.string().nullable()
+});
+
+export type BlueprintFeaturePropertyAssignment = z.infer<typeof BlueprintFeaturePropertyAssignment>;
+
+/**
  * Reusable global definition exposed as an assignment selector option.
  */
 export const BlueprintCompositionOption = z.object({
@@ -43,4 +65,33 @@ export interface BlueprintCompositionFilters {
  */
 export interface CreateBlueprintFeatureTypeAssignment {
   featureTypeId: number;
+}
+
+/**
+ * Request to assign a reusable property to a blueprint feature type.
+ * Membership exists only within the referenced blueprint feature type assignment.
+ * Omitted flags default to false.
+ */
+export interface CreateBlueprintFeaturePropertyAssignment {
+  blueprintFeatureTypeId: number;
+  featurePropertyId: number;
+  requiredValue?: boolean;
+  allowMultiple?: boolean;
+}
+
+/**
+ * Editable settings for a property assignment with immutable membership.
+ * Omitted fields preserve existing values. Flags accept only
+ * booleans, including false to clear either setting.
+ */
+export interface UpdateBlueprintFeaturePropertyAssignment {
+  requiredValue?: boolean;
+  allowMultiple?: boolean;
+}
+
+/**
+ * Property membership search within an optional feature-type assignment.
+ */
+export interface BlueprintFeaturePropertyFilters extends BlueprintCompositionFilters {
+  blueprintFeatureTypeId?: number;
 }

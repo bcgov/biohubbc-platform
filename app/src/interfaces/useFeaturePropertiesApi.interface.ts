@@ -1,4 +1,4 @@
-import { ApiPaginationResponseParams } from 'types/pagination';
+import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
 
 export interface IFeatureProperty {
   feature_property_id: number;
@@ -29,4 +29,16 @@ export interface ICreateFeatureProperty {
 export interface IUpdateFeatureProperty {
   display_name?: string;
   description?: string | null;
+}
+
+export interface IAvailableFeaturePropertiesResponse {
+  options: { id: number; name: string; display_name: string }[];
+  pagination: ApiPaginationResponseParams;
+}
+
+/**
+ * Query options for global properties eligible for a blueprint feature-type assignment.
+ */
+export interface IGetAvailableFeaturePropertiesForBlueprintFeatureTypeParams extends ApiPaginationRequestOptions {
+  keyword?: string;
 }

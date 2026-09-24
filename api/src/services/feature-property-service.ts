@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { CreateFeatureProperty, FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { FeaturePropertyTypeRepository } from '../repositories/feature-property-type-repository';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { FeaturePropertyFilters } from './feature-property-service.interface';
@@ -116,6 +117,31 @@ export class FeaturePropertyService extends DBService {
   async getFeaturePropertyTypes() {
     const feature_property_types = await this.featurePropertyTypeRepository.getFeaturePropertyTypes();
     return { feature_property_types };
+  }
+
+  /**
+   * Search reusable definitions excluding active memberships before pagination.
+   *
+   * @param blueprintFeatureTypeId Validated membership scope.
+   * @param keyword Name or display-name search.
+   * @param pagination Page and ordering.
+   * @returns Matching options and total count.
+   */
+  async getAvailableFeaturePropertiesForBlueprintFeatureType(
+    blueprintFeatureTypeId: number,
+    keyword: string | undefined,
+    pagination: ApiPaginationOptions
+  ) {
+    const options = await this.featurePropertyRepository.getAvailableFeaturePropertiesForBlueprintFeatureType(
+      blueprintFeatureTypeId,
+      keyword,
+      pagination
+    );
+    const count = await this.featurePropertyRepository.getAvailableFeaturePropertiesForBlueprintFeatureTypeCount(
+      blueprintFeatureTypeId,
+      keyword
+    );
+    return { options, pagination: makePaginationResponse(count.count, pagination) };
   }
 
   /**
