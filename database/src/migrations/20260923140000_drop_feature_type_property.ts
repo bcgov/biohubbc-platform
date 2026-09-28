@@ -293,6 +293,11 @@ export async function down(knex: Knex): Promise<void> {
     ALTER TABLE submission_feature_error ADD CONSTRAINT submission_feature_error_fk2 FOREIGN KEY (feature_type_property_id) REFERENCES feature_type_property(feature_type_property_id);
     CREATE INDEX submission_feature_error_idx3 ON submission_feature_error(submission_upload_id, feature_type_property_id);
 
+    -- The backfill queued the deferred predicate trigger for every narrowed predicate; a table with
+    -- pending trigger events cannot be altered, so validate them now and defer again.
+    SET CONSTRAINTS validate_predicate_feature_property_type_match IMMEDIATE;
+    SET CONSTRAINTS validate_predicate_feature_property_type_match DEFERRED;
+
     ALTER TABLE predicate ADD CONSTRAINT predicate_fk1 FOREIGN KEY (feature_type_property_id) REFERENCES feature_type_property(feature_type_property_id);
     CREATE INDEX predicate_idx1 ON predicate(feature_type_property_id);
     CREATE INDEX predicate_idx2 ON predicate(feature_type_property_id) WHERE record_end_date IS NULL;

@@ -380,6 +380,12 @@ export async function up(knex: Knex): Promise<void> {
     END;
     $$;
 
+    -- The backfill queued this deferred trigger for every mapped predicate. A table with pending
+    -- trigger events cannot be altered, and every migration in a batch shares one transaction, so
+    -- validate the queued rows now, against the assignment check above, and defer again.
+    SET CONSTRAINTS validate_predicate_feature_property_type_match IMMEDIATE;
+    SET CONSTRAINTS validate_predicate_feature_property_type_match DEFERRED;
+
     ----------------------------------------------------------------------------------------
     -- 5. Reference targets: re-home each declaration onto every assignment that carries its
     --    pairing, and only let a feature-valued assignment declare targets.
