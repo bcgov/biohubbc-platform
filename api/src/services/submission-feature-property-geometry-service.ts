@@ -102,6 +102,33 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
   }
 
   /**
+   * Get the spatial extent of one current upload feature without requiring publication.
+   *
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {number} submissionFeatureId Feature to map.
+   * @returns {Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }>} Extent and geometry count.
+   */
+  async getSubmissionUploadFeatureGeometryExtent(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeatureId: number
+  ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
+    const extent = await this.submissionFeaturePropertyGeometryRepository.getSubmissionUploadFeatureGeometryExtent(
+      submissionId,
+      submissionUploadId,
+      submissionFeatureId
+    );
+    if (extent.min_x === null || extent.min_y === null || extent.max_x === null || extent.max_y === null) {
+      return { bbox: null, geometry_count: 0 };
+    }
+    return {
+      bbox: [extent.min_x, extent.min_y, extent.max_x, extent.max_y],
+      geometry_count: extent.geometry_count
+    };
+  }
+
+  /**
    * Get every stored spatial property value recorded against one feature type property.
    *
    * @param {number} featureTypePropertyId

@@ -3,6 +3,7 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyGeometry,
   GeometryBoundingBox,
+  SubmissionFeatureGeometryExtent,
   SubmissionFeatureGeometryExtentSchema,
   SubmissionFeaturePropertyGeometry,
   SubmissionFeaturePropertyGeometrySchema
@@ -205,6 +206,42 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     `);
 
     return this.queryGeometryExtent(scope);
+  }
+
+  /**
+   * Get the spatial extent of one current feature within an upload, including unpublished review features.
+   *
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {number} submissionFeatureId Feature to map.
+   * @returns {Promise<SubmissionFeatureGeometryExtent>} Extent coordinates and geometry count.
+   */
+  async getSubmissionUploadFeatureGeometryExtent(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeatureId: number
+  ): Promise<SubmissionFeatureGeometryExtent> {
+    const query = SQL`
+      SELECT public.ST_XMin(public.ST_Extent(g.value)) AS min_x,
+        public.ST_YMin(public.ST_Extent(g.value)) AS min_y,
+        public.ST_XMax(public.ST_Extent(g.value)) AS max_x,
+        public.ST_YMax(public.ST_Extent(g.value)) AS max_y,
+        count(*)::integer AS geometry_count
+      FROM submission_feature sf
+      JOIN submission_feature_property_geometry g ON g.submission_feature_id = sf.submission_feature_id
+      JOIN feature_type_property ftp
+        ON ftp.feature_type_property_id = g.feature_type_property_id
+       AND ftp.feature_type_id = sf.feature_type_id
+       AND ftp.record_end_date IS NULL
+      JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+      WHERE sf.submission_id = ${submissionId}
+        AND sf.submission_upload_id = ${submissionUploadId}::uuid
+        AND sf.submission_feature_id = ${submissionFeatureId}
+        AND sf.record_end_date IS NULL
+    `;
+
+    const response = await this.connection.sql(query, SubmissionFeatureGeometryExtentSchema);
+    return response.rows[0];
   }
 
   /**

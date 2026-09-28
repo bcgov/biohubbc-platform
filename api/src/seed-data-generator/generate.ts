@@ -11,12 +11,15 @@ import path from 'node:path';
 import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
 import { IDBConnection } from '../database/db';
+import { SubmissionUploadReviewScope, SubmissionUploadReviewStatus } from '../models/submission-upload-review';
 import { withConnection } from '../queue/with-connection';
 import { SecurityScopeRepository } from '../repositories/authorization/security-scope-repository';
 import { SubmissionFeaturePropertyIngestionService } from '../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionIngestionService } from '../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { SubmissionFeatureClosureService } from '../services/submission-feature-closure-service';
+import { SubmissionUploadReviewSecurityService } from '../services/upload/submission-upload-review-security-service';
+import { SubmissionUploadReviewService } from '../services/upload/submission-upload-review-service';
 import { getLogger } from '../utils/logger';
 
 const defaultLog = getLogger('seed-data-generator/generate');
@@ -598,7 +601,7 @@ async function createSnapshotTicket(
 /**
  * Secure the demo deployment subset and compute their security-scope anchors synchronously.
  *
- * Seed fixtures are scoped to the generated upload, and anchors are computed
+ * Seed assignments use the upload security-review workflow, and anchors are computed
  * synchronously because run-once mode has no worker draining queued computation jobs.
  * Telemetry inherits security from its secured deployment through closure ancestry.
  *
@@ -626,17 +629,27 @@ async function secureDeploymentsAndComputeAnchors(
       { securityRuleId: studyAreaRuleId, submissionFeatureIds: studyAreaFeatureIds }
     ].filter((assignment) => assignment.submissionFeatureIds.length > 0);
 
-    // Fixture generation owns these writes; no application mutation API exists for submission-only assignment.
-    for (const assignment of assignments) {
-      await connection.sql(SQL`INSERT INTO submission_feature_security
-        (submission_feature_id, security_rule_id, record_effective_date)
-        SELECT sf.submission_feature_id, ${assignment.securityRuleId}, now()
-        FROM submission_feature sf
-        WHERE sf.submission_id = ${submissionId}
-          AND sf.submission_upload_id = ${submissionUploadId}::uuid
-          AND sf.record_end_date IS NULL
-          AND sf.submission_feature_id = ANY(${assignment.submissionFeatureIds}::integer[])
-        ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING`);
+    // Empty review selections mean the whole upload. Skip empty seed selections to avoid securing the dataset root.
+    if (assignments.length) {
+      const reviewService = new SubmissionUploadReviewService(connection);
+      const securityService = new SubmissionUploadReviewSecurityService(connection);
+      const review = await reviewService.insertSubmissionUploadReview(submissionId, {
+        submission_upload_id: submissionUploadId,
+        scope: SubmissionUploadReviewScope.SECURITY,
+        name: 'Seed security assignments',
+        description: null,
+        status: SubmissionUploadReviewStatus.COMPLETED,
+        requested_by: connection.systemUserId()
+      });
+      for (const assignment of assignments) {
+        await securityService.insertSubmissionUploadReviewSecurityRuleAssignments(
+          submissionId,
+          submissionUploadId,
+          review.submission_upload_review_id,
+          assignment.securityRuleId,
+          assignment.submissionFeatureIds
+        );
+      }
     }
 
     await computeAnchorsForSubmission(connection, submissionId);
