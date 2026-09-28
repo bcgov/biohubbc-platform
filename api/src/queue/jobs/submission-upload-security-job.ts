@@ -24,16 +24,16 @@ export interface ISubmissionUploadSecurityJobData {
  * Runs automatic security screening as an independent background workflow — it does NOT change
  * `submission_upload.status`. The screening lifecycle is recorded as an event row in
  * `submission_upload_security` (`started` → `completed`). For each screenable rule the policy
- * evaluator seam identifies trigger `submission_feature_id` values; the service then uses
- * `submission_feature_closure` to find related features in the same upload and inserts draft
+ * evaluator seam identifies matching `submission_feature_id` values; the service then uses
+ * `submission_feature_closure` to find related features in the same upload and inserts immediately effective
  * `submission_feature_security` rows linked to the scan event.
  *
  * **Single-flight:** A `pg_try_advisory_xact_lock` keyed on the upload id (distinct hash seed from
  * the closure job) prevents two concurrent screening jobs for the same upload from racing. An
  * overlapping retry that cannot acquire the lock skips the run and returns cleanly.
  *
- * **Idempotency:** The draft insert uses `ON CONFLICT DO NOTHING`, so rerunning screening for the
- * same upload produces no duplicate rows.
+ * **Idempotency:** Existing current assignments retain their provenance. Inactive assignments
+ * become effective again, and repeated screening produces no duplicate feature/rule pairs.
  *
  * @param {PgBoss.Job<ISubmissionUploadSecurityJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -54,7 +54,7 @@ export const submissionUploadSecurityJobHandler: PgBoss.WorkHandler<ISubmissionU
 
     try {
       await withConnection(async (conn) => {
-        // Single-flight per upload — screening inserts a scan event row and bulk-inserts draft rows.
+        // Single-flight per upload — screening inserts a scan event row and inserts current assignments.
         // Hash seed 2 is distinct from the closure job's seed (1) so both locks can coexist
         // when both jobs happen to run in the same transaction context.
         const lock = await conn.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1::text, 2)) AS locked', [

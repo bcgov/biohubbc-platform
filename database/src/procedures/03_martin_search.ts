@@ -31,7 +31,7 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * (`martin_feature_accessible`) is a direct port of `isEffectivelySecured`/`isAccessibleToUser` in
  * `api/src/repositories/sql-fragments.ts`, applied at the same two points the search applies it: on
  * the evidence rows inside each predicate, and once on the anchor. Keeping the semantics identical —
- * including `status = 'active'` and the fail-closed missing-self-loop probe — is what stops the map
+ * including the fail-closed missing-self-loop probe — is what stops the map
  * and the table view from ever disagreeing.
  *
  * SECURITY DEFINER with a pinned search_path: the tile function is owned by the migration role, which
@@ -77,7 +77,6 @@ export async function seed(knex: Knex): Promise<void> {
           WHERE c.source_submission_feature_id = p_submission_feature_id
             AND c.is_ancestor = true
             AND sfs.record_end_date IS NULL
-            AND sfs.status = 'active'
             AND sf_sec.record_effective_date <= now()
             AND (sf_sec.record_end_date IS NULL OR now() < sf_sec.record_end_date)
         )

@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { ApiConflictError } from '../errors/api-error';
+import { ApiConflictError, ApiValidationError } from '../errors/api-error';
 import {
   CreateSecurityRule,
   SecurityRule,
@@ -42,6 +42,22 @@ export class SecurityRuleService extends DBService {
    */
   async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
     return this.securityRuleRepository.getScreenableSecurityRules();
+  }
+
+  /**
+   * Assert that each requested rule and its category have not been deleted.
+   * Rules opted out of automatic screening remain valid for manual assignments.
+   * @param {number[]} securityRuleIds Rules requested for assignment.
+   * @returns {Promise<void>} Resolves when every requested rule is available.
+   * @throws {ApiValidationError} When a rule is missing or its rule/category is deleted.
+   */
+  async assertSecurityRulesValid(securityRuleIds: number[]): Promise<void> {
+    for (const securityRuleId of new Set(securityRuleIds)) {
+      const rule = await this.securityRuleRepository.getSecurityRuleWithCategory(securityRuleId);
+      if (rule?.record_end_date !== null || rule.category_record_end_date !== null) {
+        throw new ApiValidationError('One or more security rules are unavailable.', [{ securityRuleIds }]);
+      }
+    }
   }
 
   /**

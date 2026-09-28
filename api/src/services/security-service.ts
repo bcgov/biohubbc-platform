@@ -183,6 +183,7 @@ export class SecurityService extends DBService {
 
     return Promise.all(promises);
   }
+
   /**
    *
    *
@@ -259,23 +260,5 @@ export class SecurityService extends DBService {
     const isPendingReview = artifactSecurityRules.includes(true);
 
     return isPendingReview;
-  }
-
-  /**
-   * Copy live predecessor rules to pending successor occurrences, preserving status and provenance.
-   *
-   * @param {string} submissionUploadId Pending successor upload identifier.
-   * @param {string | null} predecessorSubmissionUploadId Preferred pending predecessor upload identifier.
-   * @returns {Promise<void>} Resolves after missing inherited assignments have been inserted.
-   * @memberof SecurityService
-   */
-  async copyPredecessorSecurityRulesToSuccessors(
-    submissionUploadId: string,
-    predecessorSubmissionUploadId: string | null
-  ): Promise<void> {
-    await this.securityRepository.copyPredecessorSecurityRulesToSuccessors(
-      submissionUploadId,
-      predecessorSubmissionUploadId
-    );
   }
 }

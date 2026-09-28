@@ -56,6 +56,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: [
     'submission_feature_id',
+    'parent_submission_feature_id',
+    'provenance',
     'submission_id',
     'uuid',
     'feature_type_id',
@@ -68,6 +70,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
   ],
   properties: {
     submission_feature_id: { type: 'integer' },
+    parent_submission_feature_id: { type: 'integer', nullable: true },
+    provenance: { type: 'string', enum: ['direct', 'inherited', null], nullable: true },
     submission_id: { type: 'integer' },
     uuid: { type: 'string', format: 'uuid' },
     feature_type_id: { type: 'integer' },
@@ -193,5 +197,15 @@ export const featureSearchCountResponseSchema: OpenAPIV3.SchemaObject = {
       minimum: 0,
       description: 'Number of matching features.'
     }
+  }
+};
+
+/** Administrator upload search returns a mixed-type page without property metadata. */
+export const submissionUploadFeatureSearchResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['features', 'pagination'],
+  properties: {
+    features: { type: 'array', items: featureSearchResultSchema },
+    pagination: cursorPaginationResponseSchema
   }
 };

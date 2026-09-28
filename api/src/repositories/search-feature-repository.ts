@@ -1,9 +1,15 @@
 import { Knex } from 'knex';
+import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security';
 import { getKnex } from '../database/db';
 import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { FeatureTypeProperty } from '../models/feature-type-property';
+import {
+  NormalizedSubmissionUploadFeatureSearchFilters,
+  SearchFeatureFilters,
+  SearchFeatureSecurityContext
+} from '../models/search';
 import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
 import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
@@ -17,42 +23,142 @@ import {
   isSubmissionFeatureCurrent,
   taxonPropertyValueJson
 } from './sql-fragments';
+import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-feature-search';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
  */
 export class SearchFeatureRepository extends BaseRepository {
   /**
+   * Search review-upload features and resolve security through upload-local parent ancestry.
+   * Published closure is neither required nor consulted; properties are not hydrated.
+   *
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {NormalizedSubmissionUploadFeatureSearchFilters} filters Normalized criteria; omitted or null expression matches all upload features.
+   * @param {ApiCursorPaginationOptions} [cursorPagination] Cursor ordering and page limit.
+   * @returns {Promise<SearchFeatureResultWithRelevancy[]>} Matching features with review-time security state.
+   */
+  async searchSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    filters: NormalizedSubmissionUploadFeatureSearchFilters,
+    cursorPagination?: ApiCursorPaginationOptions
+  ): Promise<SearchFeatureResultWithRelevancy[]> {
+    const knex = getKnex();
+    const options = this.getExpressionSearchQueryOptions(cursorPagination);
+    const featureIds = buildSubmissionUploadFeatureIdsSubquery(
+      submissionId,
+      submissionUploadId,
+      filters.expression ?? undefined,
+      options
+    );
+    const query = knex
+      .from(featureIds.as('matches'))
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .join('submission as s', 's.submission_id', 'sf.submission_id')
+      .select(
+        'sf.submission_feature_id',
+        'sf.parent_submission_feature_id',
+        'sf.submission_id',
+        knex.raw('sf.uuid::text as uuid'),
+        'sf.feature_type_id',
+        'ft.name as feature_type_name',
+        'sf.create_date',
+        's.name as submission_name',
+        knex.raw('1.0 AS relevancy_score'),
+        knex.raw("'{}'::jsonb AS properties"),
+        'security.provenance',
+        knex.raw('security.provenance IS NOT NULL AS is_secured')
+      )
+      .joinRaw(
+        `LEFT JOIN LATERAL (
+        WITH RECURSIVE ancestors AS (
+          SELECT sf.submission_feature_id AS target_id
+          UNION
+          SELECT parent.submission_feature_id
+          FROM ancestors
+          JOIN submission_feature child ON child.submission_feature_id = ancestors.target_id
+          JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
+            AND parent.submission_upload_id = ?::uuid AND parent.record_end_date IS NULL
+        )
+        SELECT CASE WHEN bool_or(sfs.submission_feature_id = sf.submission_feature_id)
+          THEN 'direct' ELSE 'inherited' END AS provenance
+        FROM ancestors JOIN submission_feature_security sfs ON sfs.submission_feature_id = ancestors.target_id
+        JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id AND sr.record_end_date IS NULL
+        JOIN security_category sc ON sc.security_category_id = sr.security_category_id AND sc.record_end_date IS NULL
+        WHERE sfs.record_effective_date <= now() AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+        HAVING count(*) > 0
+      ) security ON true`,
+        [submissionUploadId]
+      );
+    this.applyExpressionSearchOrder(query, 'sf', options);
+    const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
+    return response.rows;
+  }
+
+  /**
+   * Count review-upload matches without depending on published closure or public visibility.
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {NormalizedSubmissionUploadFeatureSearchFilters} filters Normalized criteria; omitted or null expression matches all upload features.
+   * @returns {Promise<number>} Matching upload feature count.
+   */
+  async countSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    filters: NormalizedSubmissionUploadFeatureSearchFilters
+  ): Promise<number> {
+    const knex = getKnex();
+    const featureIds = buildSubmissionUploadFeatureIdsSubquery(
+      submissionId,
+      submissionUploadId,
+      filters.expression ?? undefined
+    );
+    const query = knex.from(featureIds.as('matches')).select(knex.raw('count(*)::integer AS count'));
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
+  }
+
+  /**
    * Searches for submission features matching the provided expression tree.
    *
-   * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTree} [expression] - Optional validated and optimized expression criteria
+   * @param {string | null} anchorFeatureType - Target feature type returned by the search
+   * @param {NormalizedExpressionTree | null} expression - Optional validated and optimized expression criteria
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination options
-   * @param {number | null} [systemUserId] - Security context
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<SearchFeatureResultWithRelevancy[]>} Ordered, accessible feature rows
    */
   async searchFeaturesByExpressionTree(
-    anchorFeatureType: string,
-    expression?: NormalizedExpressionTree,
+    anchorFeatureType: string | null,
+    expression: NormalizedExpressionTree | null,
     cursorPagination?: ApiCursorPaginationOptions,
-    systemUserId?: number | null,
-    submissionIds?: number[]
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
     const queryOptions = this.getExpressionSearchQueryOptions(cursorPagination);
+    let searchUserId: number | null | undefined = null;
+    if (securityContext.type === 'user') {
+      searchUserId = securityContext.systemUserId;
+    } else if (securityContext.type === 'unrestricted') {
+      searchUserId = undefined;
+    }
     const featureIds = expression
       ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
           anchorFeatureType,
           expression,
-          systemUserId ?? null,
+          searchUserId,
           queryOptions
         )
-      : expressionEvaluation.buildBroadFeatureTypeSubquery(anchorFeatureType, systemUserId ?? null, queryOptions);
+      : expressionEvaluation.buildBroadFeatureTypeSubquery(anchorFeatureType, searchUserId, queryOptions);
 
-    this.applySubmissionScope(
+    this.applySearchFilters(
       featureIds,
       expression ? 'anchor_sf.submission_feature_id' : 'sf.submission_feature_id',
-      submissionIds
+      filters
     );
     const query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, featureIds, queryOptions);
 
@@ -65,26 +171,31 @@ export class SearchFeatureRepository extends BaseRepository {
    * Counts matching anchor features.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search.
-   * @param {NormalizedExpressionTree} [expression] - Validated and optimized expression criteria.
-   * @param {number | null} [systemUserId] - Security context.
+   * @param {NormalizedExpressionTree | null} expression - Validated criteria, or null for all features in scope.
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<number>} Matching feature count.
    */
   async countFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expression?: NormalizedExpressionTree,
-    systemUserId?: number | null,
-    submissionIds?: number[]
+    expression: NormalizedExpressionTree | null,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<number> {
     const knex = getKnex();
-    const featureIds = expression
-      ? expressionEvaluation.buildExpressionTreeCountFeatureIdsSubquery(
-          anchorFeatureType,
-          expression,
-          systemUserId ?? null
-        )
-      : expressionEvaluation.buildBroadFeatureTypeCountSubquery(anchorFeatureType, systemUserId ?? null);
+    let featureIds: Knex.QueryBuilder;
+    if (securityContext.type === 'unrestricted') {
+      featureIds = expression
+        ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(anchorFeatureType, expression, undefined)
+        : expressionEvaluation.buildBroadFeatureTypeSubquery(anchorFeatureType, undefined);
+    } else {
+      const searchUserId = securityContext.type === 'user' ? securityContext.systemUserId : null;
+      featureIds = expression
+        ? expressionEvaluation.buildExpressionTreeCountFeatureIdsSubquery(anchorFeatureType, expression, searchUserId)
+        : expressionEvaluation.buildBroadFeatureTypeCountSubquery(anchorFeatureType, searchUserId);
+    }
     const countQuery = knex.from(featureIds.as('matching_features')).select(knex.raw('count(*)::integer as count'));
-    this.applySubmissionScope(countQuery, 'matching_features.submission_feature_id', submissionIds);
+    this.applySearchFilters(countQuery, 'matching_features.submission_feature_id', filters);
     const response = await this.connection.knex(countQuery, CountResult);
 
     return response.rows[0]?.count ?? 0;
@@ -109,16 +220,20 @@ export class SearchFeatureRepository extends BaseRepository {
    * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTree} [expression] - Validated and optimized expression criteria
-   * @param {number | null} [systemUserId] - Security context (null = anonymous)
+   * @param {NormalizedExpressionTree | null} expression - Validated criteria, or null for all features in scope
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<boolean>} True if matching secured features exist that the caller cannot access
    */
   async hasInaccessibleSecuredFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expression?: NormalizedExpressionTree,
-    systemUserId?: number | null,
-    submissionIds?: number[]
+    expression: NormalizedExpressionTree | null,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<boolean> {
+    if (securityContext.type === 'unrestricted') {
+      return false;
+    }
     const knex = getKnex();
 
     const expressionFeatureIds = expression
@@ -139,7 +254,6 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
       .whereNull('ft.record_end_date')
-      .where('sfs.status', 'active')
       .whereRaw('sfs.record_effective_date <= now()')
       .where((activeSecurity) => {
         activeSecurity.whereNull('sfs.record_end_date').orWhereRaw('now() < sfs.record_end_date');
@@ -152,7 +266,7 @@ export class SearchFeatureRepository extends BaseRepository {
       )
       .limit(1);
 
-    this.applySubmissionScope(existsQuery, 'sf.submission_feature_id', submissionIds);
+    this.applySearchFilters(existsQuery, 'sf.submission_feature_id', filters);
 
     if (expressionFeatureIds) {
       existsQuery.join(expressionFeatureIds.clone().as('expression_matches'), function () {
@@ -164,9 +278,9 @@ export class SearchFeatureRepository extends BaseRepository {
     // isAccessibleToUser check (anchor-based, identical to the visible-results access filter) so the
     // banner stays consistent with which rows are actually shown. The candidate is already effectively
     // secured here, so isAccessibleToUser short-circuits to its team-scope-anchor branch.
-    // Anonymous (null/undefined): every secured match is hidden.
-    if (systemUserId) {
-      existsQuery.whereRaw(`NOT ${isAccessibleToUser('sf.submission_feature_id')}`, [systemUserId]);
+    // Anonymous context: every secured match is hidden.
+    if (securityContext.type === 'user') {
+      existsQuery.whereRaw(`NOT ${isAccessibleToUser('sf.submission_feature_id')}`, [securityContext.systemUserId]);
     }
 
     const response = await this.connection.knex(existsQuery);
@@ -174,24 +288,34 @@ export class SearchFeatureRepository extends BaseRepository {
     return response.rows.length > 0;
   }
 
-  /** Restrict candidate IDs to the requested submissions' searchable closure snapshots. */
-  private applySubmissionScope(query: Knex.QueryBuilder, featureIdColumn: string, submissionIds?: number[]): void {
-    if (!submissionIds?.length) {
+  /**
+   * Constrain shared search candidates before pagination.
+   * @param {Knex.QueryBuilder} query Candidate query.
+   * @param {string} featureIdColumn Qualified feature identifier.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
+   * @returns {void}
+   */
+  private applySearchFilters(query: Knex.QueryBuilder, featureIdColumn: string, filters?: SearchFeatureFilters): void {
+    if (!filters) {
       return;
     }
     const knex = getKnex();
-    query.whereIn(
-      featureIdColumn,
-      knex('submission_feature as scoped_feature')
-        .select('scoped_feature.submission_feature_id')
-        .whereIn('scoped_feature.submission_id', submissionIds)
+
+    const scopedFeatures = knex('submission_feature').select('submission_feature_id');
+    if (filters.submissionIds?.length) {
+      scopedFeatures
+        .whereIn('submission_id', filters.submissionIds)
         .whereExists(
           knex('submission_feature_closure as scope_closure')
             .select(knex.raw('1'))
-            .whereRaw('scope_closure.source_submission_feature_id = scoped_feature.submission_feature_id')
-            .whereRaw('scope_closure.target_submission_feature_id = scoped_feature.submission_feature_id')
-        )
-    );
+            .whereRaw('scope_closure.source_submission_feature_id = submission_feature.submission_feature_id')
+            .whereRaw('scope_closure.target_submission_feature_id = submission_feature.submission_feature_id')
+        );
+    }
+    if (filters.submissionUploadIds?.length) {
+      scopedFeatures.whereIn('submission_upload_id', filters.submissionUploadIds).whereNull('record_end_date');
+    }
+    query.whereIn(featureIdColumn, scopedFeatures);
   }
 
   /**
@@ -245,14 +369,14 @@ export class SearchFeatureRepository extends BaseRepository {
    * JSON only for the authorized page of features.
    *
    * @param {Knex} knex - Knex instance
-   * @param {string} anchorFeatureType - Route anchor/result feature type
+   * @param {string | null} anchorFeatureType - Route anchor/result feature type
    * @param {Knex.QueryBuilder} featureIds - Paginated subquery returning matching submission_feature_id values.
    * @param {SearchFeatureQueryOptions} queryOptions - Applied cursor pagination and sort options
    * @return {Knex.QueryBuilder} Knex query builder with security filter applied
    */
   private buildExpressionTreeSearchQuery(
     knex: Knex,
-    anchorFeatureType: string,
+    anchorFeatureType: string | null,
     featureIds: Knex.QueryBuilder,
     queryOptions: SearchFeatureQueryOptions
   ): Knex.QueryBuilder {
@@ -263,6 +387,7 @@ export class SearchFeatureRepository extends BaseRepository {
     authorizedFeatures
       .select(
         'sf.submission_feature_id',
+        'sf.parent_submission_feature_id',
         'sf.submission_id',
         knex.raw('sf.uuid::text as uuid'),
         'sf.feature_type_id',
@@ -271,13 +396,26 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw('1.0 as relevancy_score')
       )
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .where('ft.name', anchorFeatureType)
+      .modify((query) => {
+        if (anchorFeatureType !== null) {
+          query.where('ft.name', anchorFeatureType);
+        }
+      })
       .whereNull('ft.record_end_date');
 
     const finalQuery = knex
       .from(authorizedFeatures.as('authorized_features'))
       .select(
         'authorized_features.submission_feature_id',
+        'authorized_features.parent_submission_feature_id',
+        knex.raw(`(SELECT CASE WHEN bool_or(sfs.submission_feature_id = authorized_features.submission_feature_id)
+          THEN 'direct' ELSE 'inherited' END
+          FROM submission_feature_closure c JOIN submission_feature_security sfs
+            ON sfs.submission_feature_id = c.target_submission_feature_id
+          WHERE c.source_submission_feature_id = authorized_features.submission_feature_id AND c.is_ancestor
+            AND sfs.record_effective_date <= now()
+            AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+          HAVING count(*) > 0) AS provenance`),
         'authorized_features.submission_id',
         'authorized_features.uuid',
         'authorized_features.feature_type_id',

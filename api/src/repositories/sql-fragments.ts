@@ -158,7 +158,6 @@ export function isEffectivelySecured(featureIdExpr: string): string {
       JOIN submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
       WHERE c.source_submission_feature_id = ${featureIdExpr}
         AND c.is_ancestor = true
-        AND sfs.status = 'active'
         AND sfs.record_effective_date <= now()
         AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
     )

@@ -80,7 +80,7 @@ describe('SearchFeatureService', () => {
       const repoStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree');
 
       try {
-        await service.searchFeaturesByExpressionTree('does-not-exist', undefined);
+        await service.searchFeaturesByExpressionTree('does-not-exist', null);
         expect.fail('Expected searchFeaturesByExpressionTree to reject');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
@@ -96,11 +96,87 @@ describe('SearchFeatureService', () => {
         .stub(SearchFeatureRepository.prototype, 'searchFeaturesByExpressionTree')
         .resolves(mockFeatures);
 
-      const result = await service.searchFeaturesByExpressionTree('survey', undefined, undefined, 42);
+      const result = await service.searchFeaturesByExpressionTree('survey', null, undefined, {
+        type: 'user',
+        systemUserId: 42
+      });
 
       expect(repoStub).to.have.been.calledOnce;
-      expect(repoStub.firstCall.args).to.deep.equal(['survey', undefined, undefined, 42, undefined]);
+      expect(repoStub.firstCall.args).to.deep.equal([
+        'survey',
+        null,
+        undefined,
+        { type: 'user', systemUserId: 42 },
+        undefined
+      ]);
       expect(result).to.equal(mockFeatures);
+    });
+  });
+
+  describe('admin upload search', () => {
+    for (const filters of [{}, { expression: null }]) {
+      it(`searches and counts the whole upload without normalizing ${JSON.stringify(filters)}`, async () => {
+        const service = new SearchFeatureService(getMockDBConnection());
+        const normalize = sinon.stub(ExpressionTreeNormalizationService.prototype, 'normalize');
+        const search = sinon
+          .stub(SearchFeatureRepository.prototype, 'searchSubmissionUploadFeatures')
+          .resolves(mockFeatures);
+        const count = sinon
+          .stub(SearchFeatureRepository.prototype, 'countSubmissionUploadFeatures')
+          .resolves(mockFeatures.length);
+
+        const page = await service.searchSubmissionUploadFeatures(7, 'upload', filters);
+        const total = await service.countSubmissionUploadFeatures(7, 'upload', filters);
+
+        expect(normalize).not.called;
+        expect(search).calledOnceWithExactly(7, 'upload', { expression: null }, sinon.match.object);
+        expect(count).calledOnceWithExactly(7, 'upload', { expression: null });
+        expect(page.features).deep.equal(mockFeatures);
+        expect(total).equal(page.features.length);
+      });
+    }
+
+    it('returns a mixed-type page scoped to both identifiers without metadata or public-access probes', async () => {
+      const service = new SearchFeatureService(getMockDBConnection());
+      const typeLookup = sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName');
+      const normalize = sinon
+        .stub(ExpressionTreeNormalizationService.prototype, 'normalize')
+        .resolves(normalizedExpression);
+      const search = sinon
+        .stub(SearchFeatureRepository.prototype, 'searchSubmissionUploadFeatures')
+        .resolves(mockFeatures);
+      const metadata = sinon.stub(SearchFeatureRepository.prototype, 'getFeatureTypeProperties');
+      const inaccessible = sinon.stub(
+        SearchFeatureRepository.prototype,
+        'hasInaccessibleSecuredFeaturesByExpressionTree'
+      );
+      const pagination = { limit: 10, sort: 'submission_feature_id' as const, order: 'asc' as const };
+      const result = await service.searchSubmissionUploadFeatures(
+        7,
+        'upload',
+        { expression: expressionTree },
+        pagination
+      );
+      expect(normalize).calledOnceWithExactly(expressionTree);
+      expect(search).calledOnceWithExactly(
+        7,
+        'upload',
+        { expression: normalizedExpression },
+        sinon.match({ limit: 11 })
+      );
+      expect(typeLookup).not.called;
+      expect(metadata).not.called;
+      expect(inaccessible).not.called;
+      expect(result).to.have.all.keys('features', 'pagination');
+      expect(result.features).deep.equal(mockFeatures);
+    });
+
+    it('counts with the same expression, scope, and administrator context', async () => {
+      const service = new SearchFeatureService(getMockDBConnection());
+      sinon.stub(ExpressionTreeNormalizationService.prototype, 'normalize').resolves(normalizedExpression);
+      const count = sinon.stub(SearchFeatureRepository.prototype, 'countSubmissionUploadFeatures').resolves(2);
+      expect(await service.countSubmissionUploadFeatures(7, 'upload', { expression: expressionTree })).equal(2);
+      expect(count).calledOnceWithExactly(7, 'upload', { expression: normalizedExpression });
     });
   });
 
@@ -130,11 +206,11 @@ describe('SearchFeatureService', () => {
         'survey',
         normalizedExpression,
         { limit: 26, sort: 'relevancy_score', order: 'desc', boundary: undefined },
-        undefined,
+        { type: 'anonymous' },
         undefined
       ]);
       expect(propertiesStub).to.have.been.calledOnceWith('survey');
-      expect(hiddenSecuredStub).to.have.been.calledOnceWith('survey', normalizedExpression, undefined);
+      expect(hiddenSecuredStub).to.have.been.calledOnceWith('survey', normalizedExpression, { type: 'anonymous' });
       expect(result).to.deep.equal({
         features: mockFeatures,
         properties: mockProperties,
@@ -161,9 +237,9 @@ describe('SearchFeatureService', () => {
 
       const result = await service.searchFeaturesByExpressionTreeWithMetadata(
         'survey',
-        undefined,
+        null,
         { limit: 1, sort: 'create_date', order: 'desc' },
-        null
+        { type: 'anonymous' }
       );
 
       expect(result.pagination.previous_cursor).to.be.null;
@@ -185,7 +261,7 @@ describe('SearchFeatureService', () => {
 
       const result = await service.searchFeaturesByExpressionTreeWithMetadata(
         'survey',
-        undefined,
+        null,
         {
           limit: 1,
           sort: 'create_date',
@@ -196,7 +272,7 @@ describe('SearchFeatureService', () => {
             create_date: '2026-05-10T00:00:00.000Z'
           }
         },
-        null
+        { type: 'anonymous' }
       );
 
       expect(decodeSearchFeatureCursor(result.pagination.previous_cursor!)).to.include({
@@ -224,7 +300,7 @@ describe('SearchFeatureService', () => {
           const boundary = direction
             ? { direction, submission_feature_id: 10, create_date: mockFeatures[0].create_date }
             : undefined;
-          const result = await service.searchFeaturesByExpressionTreeWithMetadata('survey', undefined, {
+          const result = await service.searchFeaturesByExpressionTreeWithMetadata('survey', null, {
             limit: 2,
             boundary
           });
@@ -263,7 +339,13 @@ describe('SearchFeatureService', () => {
     await service.searchFeaturesByExpressionTree('survey', expressionTree);
 
     expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
-    expect(searchStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, undefined, undefined, undefined]);
+    expect(searchStub.firstCall.args).to.deep.equal([
+      'survey',
+      normalizedExpression,
+      undefined,
+      { type: 'anonymous' },
+      undefined
+    ]);
   });
 
   it('passes the same deduplicated range expression to result and count queries', async () => {
@@ -321,14 +403,22 @@ describe('SearchFeatureService', () => {
         .resolves(normalizedExpression);
       const countStub = sinon.stub(SearchFeatureRepository.prototype, 'countFeaturesByExpressionTree').resolves(42_000);
 
-      const result = await service.countSearchFeaturesByExpressionTree('survey', expressionTree, 91);
+      const result = await service.countSearchFeaturesByExpressionTree('survey', expressionTree, {
+        type: 'user',
+        systemUserId: 91
+      });
 
       expect(normalizeStub).to.have.been.calledOnceWith(expressionTree);
-      expect(countStub.firstCall.args).to.deep.equal(['survey', normalizedExpression, 91, undefined]);
+      expect(countStub.firstCall.args).to.deep.equal([
+        'survey',
+        normalizedExpression,
+        { type: 'user', systemUserId: 91 },
+        undefined
+      ]);
       expect(result).to.equal(42_000);
     });
 
-    it('does not normalize when the expression is omitted', async () => {
+    it('does not normalize when the expression is null', async () => {
       const service = new SearchFeatureService(getMockDBConnection());
 
       sinon.stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName').resolves({ feature_type_id: 7 });
@@ -337,10 +427,10 @@ describe('SearchFeatureService', () => {
         .stub(SearchFeatureRepository.prototype, 'countFeaturesByExpressionTree')
         .resolves(5_000_000);
 
-      const result = await service.countSearchFeaturesByExpressionTree('survey', undefined, null);
+      const result = await service.countSearchFeaturesByExpressionTree('survey', null, { type: 'anonymous' });
 
       expect(normalizeStub).to.not.have.been.called;
-      expect(countStub.firstCall.args).to.deep.equal(['survey', undefined, null, undefined]);
+      expect(countStub.firstCall.args).to.deep.equal(['survey', null, { type: 'anonymous' }, undefined]);
       expect(result).to.equal(5_000_000);
     });
   });

@@ -351,7 +351,7 @@ describe('Martin upload function (integration)', function () {
 
       const planText = plan.rows.map((row) => row['QUERY PLAN']).join('\n');
 
-      expect(planText).to.contain('submission_feature_idx5_active_submission_upload');
+      expect(planText).to.match(/submission_feature_idx5_active_submission_upload|submission_feature_idx9/);
       expect(planText).to.not.contain('Seq Scan on submission_feature ');
       expect(planText).to.not.contain('Seq Scan on submission_feature_property_geometry');
     });

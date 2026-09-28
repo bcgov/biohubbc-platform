@@ -1,3 +1,4 @@
+import type { SearchFeatureSecurityContext } from '../../models/search';
 // Integration test for the authorized tile function — verifies that biohub.martin_search only ever
 // encodes geometry the tile context is permitted to see, against the real database.
 //
@@ -347,18 +348,22 @@ describe('Tile search function (integration)', function () {
   describe('submission scope', () => {
     const search = async (submissionIds: number[], expression?: ExpressionTree, systemUserId: number | null = null) => {
       const service = new SearchFeatureService(connection);
+      const securityContext: SearchFeatureSecurityContext =
+        systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId };
       const result = await service.searchFeaturesByExpressionTreeWithMetadata(
         FEATURE_TYPE,
-        expression,
+        expression ?? null,
         undefined,
-        systemUserId,
-        submissionIds
+        securityContext,
+        { submissionIds }
       );
       const count = await service.countSearchFeaturesByExpressionTree(
         FEATURE_TYPE,
-        expression,
-        systemUserId,
-        submissionIds
+        expression ?? null,
+        securityContext,
+        {
+          submissionIds
+        }
       );
       return { ...result, count };
     };
@@ -379,10 +384,10 @@ describe('Tile search function (integration)', function () {
       const result = await search(submissionIds);
       const limited = await new SearchFeatureService(connection).searchFeaturesByExpressionTreeWithMetadata(
         FEATURE_TYPE,
-        undefined,
-        { limit: 1, sort: 'create_date', order: 'desc' },
         null,
-        submissionIds
+        { limit: 1, sort: 'create_date', order: 'desc' },
+        { type: 'anonymous' },
+        { submissionIds }
       );
       expect(limited.features.map((feature) => feature.submission_feature_id)).to.eql([included]);
       expect(result.features.map((feature) => feature.submission_feature_id)).to.eql([included]);

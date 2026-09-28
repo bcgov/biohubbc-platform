@@ -6,7 +6,7 @@
 // treats a feature with no closure rows as secured. `security_reasons` is the distinct set of active
 // security_rule names across that same closure ancestry, alphabetical, `[]` when none. These
 // scenarios exercise: direct security, inherited security via parent/grandparent ancestry, dedup,
-// draft/end-dated security exclusion, multi-rule alphabetical ordering, and the fail-closed
+// immediate security enforcement and end-dated exclusion, multi-rule alphabetical ordering, and the fail-closed
 // no-closure case.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
@@ -93,13 +93,12 @@ describe('SubmissionFeatureRepository (integration)', function () {
    * Insert one active-window security row on a feature, resolving security_rule_id by name.
    *
    * Unlike the shared secureFeature helper (which hardcodes rule 1), this resolves the rule by name so
-   * the security_reasons assertions read real rule names. `status` defaults to 'active' and
-   * `recordEndDate` to NULL — pass 'draft' / a past date to exercise the exclusion branches.
+   * the security_reasons assertions read real rule names. Pass a past recordEndDate to test exclusion.
    */
   async function insertSecurity(
     submissionFeatureId: number,
     ruleName: string,
-    options?: { status?: 'active' | 'draft'; recordEndDate?: string }
+    options?: { recordEndDate?: string }
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
 
@@ -108,14 +107,12 @@ describe('SubmissionFeatureRepository (integration)', function () {
         submission_feature_id,
         security_rule_id,
         create_user,
-        status,
         record_end_date
       )
       VALUES (
         ${submissionFeatureId},
         (SELECT security_rule_id FROM security_rule WHERE name = ${ruleName} LIMIT 1),
         ${systemUserId},
-        ${options?.status ?? 'active'},
         ${options?.recordEndDate ?? null}
       );
     `);
@@ -214,17 +211,6 @@ describe('SubmissionFeatureRepository (integration)', function () {
 
     expect(result.secured).to.equal(true);
     expect(result.security_reasons).to.deep.equal(['Moose']);
-  });
-
-  it('5a. draft security → not secured, no reasons', async () => {
-    const { uploadId, featureId } = await createFeature();
-    await insertSecurity(featureId, 'Moose', { status: 'draft' });
-    await buildClosure(uploadId);
-
-    const result = await repo.getSubmissionFeatureById(featureId);
-
-    expect(result.secured).to.equal(false);
-    expect(result.security_reasons).to.deep.equal([]);
   });
 
   it('5b. end-dated security → not secured, no reasons', async () => {

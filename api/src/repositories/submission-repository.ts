@@ -842,8 +842,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -948,8 +946,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -1029,8 +1025,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -1083,8 +1077,6 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
-      AND
-        submission_feature_security.status = 'active'
       AND
         submission_feature_security.record_effective_date <= now()
       AND
@@ -1149,7 +1141,6 @@ export class SubmissionRepository extends BaseRepository {
       })
       .leftJoin('submission_feature_security as sfs', function () {
         this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id')
-          .andOnVal('sfs.status', '=', 'active')
           .andOn(knex.raw('sfs.record_effective_date <= now()'))
           .andOn(knex.raw('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)'));
       })
@@ -1368,8 +1359,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -1508,8 +1497,6 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
-      AND
-        submission_feature_security.status = 'active'
       AND
         submission_feature_security.record_effective_date <= now()
       AND

@@ -1,7 +1,14 @@
+import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security';
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { FeatureTypeProperty } from '../models/feature-type-property';
+import {
+  SearchFeatureFilters,
+  SearchFeaturePage,
+  SearchFeatureSecurityContext,
+  SubmissionUploadFeatureSearchFilters
+} from '../models/search';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { optimizeExpression } from '../utils/expression-optimization';
@@ -36,18 +43,19 @@ export class SearchFeatureService extends DBService {
   /**
    * Search features that match an expression tree.
    *
-   * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
+   * @param {string | null} anchorFeatureType - Result feature type, or null to match all feature types
+   * @param {ExpressionTree | null} expressionTree - Matching criteria, or null for all features in scope.
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination settings
-   * @param {number | null} [systemUserId] - Security context
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<SearchFeatureResultWithRelevancy[]>} Matching, accessible feature rows
    */
   async searchFeaturesByExpressionTree(
-    anchorFeatureType: string,
-    expressionTree?: ExpressionTree,
+    anchorFeatureType: string | null,
+    expressionTree: ExpressionTree | null,
     cursorPagination?: ApiCursorPaginationOptions,
-    systemUserId?: number | null,
-    submissionIds?: number[]
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({
       label: 'searchFeaturesByExpressionTree',
@@ -60,8 +68,8 @@ export class SearchFeatureService extends DBService {
       anchorFeatureType,
       expression,
       cursorPagination,
-      systemUserId,
-      submissionIds
+      securityContext,
+      filters
     );
   }
 
@@ -69,50 +77,114 @@ export class SearchFeatureService extends DBService {
    * Search features and load result property metadata for a feature-type anchored expression search.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
+   * @param {ExpressionTree | null} expressionTree - Matching criteria, or null for all features in scope.
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination settings
-   * @param {number | null} [systemUserId] - Security context
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; has_inaccessible_secured_features: boolean; pagination: ApiCursorPaginationResults }>} Feature rows, metadata, security indicator, and adjacent-page cursors
    */
   async searchFeaturesByExpressionTreeWithMetadata(
     anchorFeatureType: string,
-    expressionTree?: ExpressionTree,
+    expressionTree: ExpressionTree | null,
     cursorPagination?: ApiCursorPaginationOptions,
-    systemUserId?: number | null,
-    submissionIds?: number[]
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<{
     features: SearchFeatureResultWithRelevancy[];
     properties: FeatureTypeProperty[];
     has_inaccessible_secured_features: boolean;
     pagination: ApiCursorPaginationResults;
   }> {
-    defaultLog.debug({
-      label: 'searchFeaturesByExpressionTreeWithMetadata',
-      anchorFeatureType,
-      expressionTree,
-      cursorPagination
-    });
-
     const expression = await this.prepareSearchExpression(anchorFeatureType, expressionTree);
-
-    const pagination = ensureCompleteCursorPaginationOptions(cursorPagination);
-    const [rows, properties, hasInaccessibleSecuredFeatures] = await Promise.all([
-      this.searchFeatureRepository.searchFeaturesByExpressionTree(
-        anchorFeatureType,
-        expression,
-        { ...pagination, limit: pagination.limit + 1 },
-        systemUserId,
-        submissionIds
-      ),
+    const [page, properties, hasInaccessibleSecuredFeatures] = await Promise.all([
+      this.getPublishedSearchFeaturePage(anchorFeatureType, expression, cursorPagination, securityContext, filters),
       this.searchFeatureRepository.getFeatureTypeProperties(anchorFeatureType),
       this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
         anchorFeatureType,
         expression,
-        systemUserId,
-        submissionIds
+        securityContext,
+        filters
       )
     ]);
+    return { ...page, properties, has_inaccessible_secured_features: hasInaccessibleSecuredFeatures };
+  }
 
+  /**
+   * Search every feature type within an upload for an authorized administrator.
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {SubmissionUploadFeatureSearchFilters} filters Matching criteria; omitted or null expression matches all upload features.
+   * @param {ApiCursorPaginationOptions} [cursorPagination] Requested cursor page.
+   * @returns {Promise<SearchFeaturePage>} Matching upload features, including secured features, without property metadata.
+   */
+  async searchSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    filters: SubmissionUploadFeatureSearchFilters,
+    cursorPagination?: ApiCursorPaginationOptions
+  ): Promise<SearchFeaturePage> {
+    const expression = await this.prepareSearchExpression(null, filters.expression ?? null);
+    const pagination = ensureCompleteCursorPaginationOptions(cursorPagination);
+    const rows = await this.searchFeatureRepository.searchSubmissionUploadFeatures(
+      submissionId,
+      submissionUploadId,
+      { expression },
+      { ...pagination, limit: pagination.limit + 1 }
+    );
+    const isPrevious = pagination.boundary?.direction === 'previous';
+    const hasLookahead = rows.length > pagination.limit;
+    const features = isPrevious ? rows.slice(-pagination.limit) : rows.slice(0, pagination.limit);
+    return {
+      features,
+      pagination: this.buildSearchFeatureCursorPagination(
+        features,
+        pagination,
+        isPrevious || hasLookahead,
+        pagination.boundary?.direction === 'next' || (isPrevious && hasLookahead)
+      )
+    };
+  }
+
+  /**
+   * Count mixed-type upload matches for an authorized administrator using the same scope as upload search.
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {SubmissionUploadFeatureSearchFilters} filters Matching criteria; omitted or null expression matches all upload features.
+   * @returns {Promise<number>} Matching feature count, including secured features.
+   */
+  async countSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    filters: SubmissionUploadFeatureSearchFilters
+  ): Promise<number> {
+    const expression = await this.prepareSearchExpression(null, filters.expression ?? null);
+    return this.searchFeatureRepository.countSubmissionUploadFeatures(submissionId, submissionUploadId, { expression });
+  }
+
+  /**
+   * Fetch a published-search cursor page with lookahead and boundary handling.
+   * @param {string} anchorFeatureType Published result feature type.
+   * @param {NormalizedExpressionTree | null} expression Normalized criteria, or null for all features in scope.
+   * @param {ApiCursorPaginationOptions} [cursorPagination] Requested cursor page.
+   * @param {SearchFeatureSecurityContext} [securityContext] Search authorization context.
+   * @param {SearchFeatureFilters} [filters] Submission/upload boundaries.
+   * @returns {Promise<SearchFeaturePage>} Feature page with adjacent-page cursors.
+   */
+  private async getPublishedSearchFeaturePage(
+    anchorFeatureType: string,
+    expression: NormalizedExpressionTree | null,
+    cursorPagination?: ApiCursorPaginationOptions,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
+  ): Promise<SearchFeaturePage> {
+    const pagination = ensureCompleteCursorPaginationOptions(cursorPagination);
+    const rows = await this.searchFeatureRepository.searchFeaturesByExpressionTree(
+      anchorFeatureType,
+      expression,
+      { ...pagination, limit: pagination.limit + 1 },
+      securityContext,
+      filters
+    );
     const direction = pagination.boundary?.direction;
     const isPrevious = direction === 'previous';
     const hasLookahead = rows.length > pagination.limit;
@@ -123,8 +195,6 @@ export class SearchFeatureService extends DBService {
 
     return {
       features,
-      properties,
-      has_inaccessible_secured_features: hasInaccessibleSecuredFeatures,
       pagination: this.buildSearchFeatureCursorPagination(features, pagination, hasNext, hasPrevious)
     };
   }
@@ -179,15 +249,16 @@ export class SearchFeatureService extends DBService {
    * Counts the number of features matching an expression tree.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search.
-   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria.
-   * @param {number | null} [systemUserId] - Security context.
+   * @param {ExpressionTree | null} expressionTree - Matching criteria, or null for all features in scope.
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<number>} Matching feature count.
    */
   async countSearchFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree?: ExpressionTree,
-    systemUserId?: number | null,
-    submissionIds?: number[]
+    expressionTree: ExpressionTree | null,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<number> {
     defaultLog.debug({ label: 'countSearchFeaturesByExpressionTree', anchorFeatureType, expressionTree });
     const expression = await this.prepareSearchExpression(anchorFeatureType, expressionTree);
@@ -195,8 +266,8 @@ export class SearchFeatureService extends DBService {
     return this.searchFeatureRepository.countFeaturesByExpressionTree(
       anchorFeatureType,
       expression,
-      systemUserId,
-      submissionIds
+      securityContext,
+      filters
     );
   }
 
@@ -205,22 +276,24 @@ export class SearchFeatureService extends DBService {
    *
    * @example
    * `Count > 7 AND Count < 9 AND Count > 7` first resolves Count as a numeric property, then returns the optimized
-   * `AND(Count > 7, Count < 9)` representation consumed by both result and count repositories. An omitted expression
-   * returns undefined after feature-type validation.
+   * `AND(Count > 7, Count < 9)` representation consumed by both result and count repositories. A null expression
+   * returns null after feature-type validation.
    *
-   * @param {string} anchorFeatureType - Target feature type to validate
-   * @param {ExpressionTree} [expressionTree] - Optional structured expression tree criteria
-   * @return {Promise<NormalizedExpressionTree | undefined>} Validated and optimized expression tree, when supplied
+   * @param {string | null} anchorFeatureType - Target feature type to validate
+   * @param {ExpressionTree | null} expressionTree - Matching criteria, or null for all features in scope.
+   * @return {Promise<NormalizedExpressionTree | null>} Validated and optimized expression tree, or null.
    */
   private async prepareSearchExpression(
-    anchorFeatureType: string,
-    expressionTree?: ExpressionTree
-  ): Promise<NormalizedExpressionTree | undefined> {
+    anchorFeatureType: string | null,
+    expressionTree: ExpressionTree | null
+  ): Promise<NormalizedExpressionTree | null> {
     const submissionRepository = new SubmissionRepository(this.connection);
-    await submissionRepository.getFeatureTypeIdByName(anchorFeatureType);
+    if (anchorFeatureType !== null) {
+      await submissionRepository.getFeatureTypeIdByName(anchorFeatureType);
+    }
 
     if (!expressionTree) {
-      return undefined;
+      return null;
     }
 
     const normalizedExpression = await this.expressionTreeNormalizationService.normalize(expressionTree);

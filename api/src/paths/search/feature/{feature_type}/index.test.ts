@@ -379,7 +379,7 @@ describe('searchFeatures', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(searchStub.firstCall.args[0]).to.equal('telemetry');
-    expect(searchStub.firstCall.args[1]).to.equal(undefined);
+    expect(searchStub.firstCall.args[1]).to.be.null;
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue.pagination).to.eql({ next_cursor: null, previous_cursor: null });
   });
@@ -464,7 +464,7 @@ describe('searchFeatures', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(searchStub.firstCall.args[0]).to.equal('survey');
-    expect(searchStub.firstCall.args[3]).to.equal(null);
+    expect(searchStub.firstCall.args[3]).to.eql({ type: 'anonymous' });
   });
 
   it('should pass systemUserId for authenticated requests', async () => {
@@ -500,7 +500,7 @@ describe('searchFeatures', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(searchStub.firstCall.args[0]).to.equal('survey');
-    expect(searchStub.firstCall.args[3]).to.equal(123);
+    expect(searchStub.firstCall.args[3]).to.eql({ type: 'user', systemUserId: 123 });
   });
 
   it('should pass null systemUserId for inactive authenticated requests', async () => {
@@ -536,7 +536,7 @@ describe('searchFeatures', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(searchStub.firstCall.args[0]).to.equal('survey');
-    expect(searchStub.firstCall.args[3]).to.equal(null);
+    expect(searchStub.firstCall.args[3]).to.eql({ type: 'anonymous' });
   });
 
   it('should cancel database work when the HTTP client disconnects', async () => {
