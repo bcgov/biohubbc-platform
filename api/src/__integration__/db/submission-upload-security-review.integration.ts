@@ -125,7 +125,7 @@ describe('Submission upload security review (integration)', function () {
     return result.rows[0].blueprint_feature_type_property_id;
   }
 
-  /** Publish only fixtures exercising the post-publication screening pathway. */
+  /** Activate the upload's features and build their closure, for cases that exercise published state. */
   async function publishUpload(): Promise<void> {
     await connection.sql(
       SQL`UPDATE submission_feature SET record_effective_date = now() WHERE submission_upload_id = ${submissionUploadId}::uuid`
@@ -1006,7 +1006,6 @@ describe('Submission upload security review (integration)', function () {
   });
 
   it('creates distinct completed reviews and linked events without changing assignments', async () => {
-    await publishUpload();
     const screening = new SubmissionUploadSecurityService(connection);
     await insertSecurityFixture({
       submissionId,
@@ -1038,7 +1037,7 @@ describe('Submission upload security review (integration)', function () {
         requested_by: connection.systemUserId()
       });
     }
-    expect(events.rows.map((row) => row.metadata.insertedCount)).to.eql([0, 0]);
+    expect(events.rows.map((row) => row.metadata.insertedAssignmentCount)).to.eql([0, 0]);
     for (const assignment of first) {
       expect(assignment).to.include({
         submission_upload_review_id: reviewA,
@@ -1047,12 +1046,9 @@ describe('Submission upload security review (integration)', function () {
     }
   });
 
-  it('completes an automatic review and event without fetching or applying rules', async () => {
-    await publishUpload();
+  it('completes an automatic review and event with the screening summary', async () => {
     const screening = new SubmissionUploadSecurityService(connection);
-    const getRules = sinon
-      .stub(SecurityRuleService.prototype, 'getScreenableSecurityRules')
-      .rejects(new Error('Rule fetching is deferred'));
+    sinon.stub(SecurityRuleService.prototype, 'getScreenableSecurityRules').resolves([]);
     await screening.screenSubmissionUpload(submissionUploadId, submissionId, null);
     const events = await connection.sql(SQL`
       SELECT e.status, e.metadata, r.status AS review_status FROM submission_upload_security e
@@ -1060,9 +1056,12 @@ describe('Submission upload security review (integration)', function () {
       WHERE e.submission_upload_id = ${submissionUploadId}::uuid
     `);
     expect(events.rows).to.eql([
-      { status: 'completed', review_status: 'completed', metadata: { ruleCount: 0, insertedCount: 0 } }
+      {
+        status: 'completed',
+        review_status: 'completed',
+        metadata: { evaluatedRuleCount: 0, skippedRuleCount: 0, matchedFeatureCount: 0, insertedAssignmentCount: 0 }
+      }
     ]);
-    sinon.assert.notCalled(getRules);
     expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
   });
 
@@ -1081,7 +1080,6 @@ describe('Submission upload security review (integration)', function () {
   });
 
   it('rolls back the automatic review and event after completion fails', async () => {
-    await publishUpload();
     const screening = new SubmissionUploadSecurityService(connection);
     const failure = new Error('Review completion failed');
     sinon.stub(SubmissionUploadReviewService.prototype, 'updateSubmissionUploadReview').rejects(failure);

@@ -3,7 +3,7 @@ import { ApiConflictError, ApiValidationError } from '../errors/api-error';
 import {
   CreateSecurityRule,
   SecurityRule,
-  SecurityRuleRecord,
+  SecurityRuleWithExpressions,
   SecurityRuleWithFeatureCount,
   SecuritySearchFilters,
   UpdateSecurityRule
@@ -31,16 +31,16 @@ export class SecurityRuleService extends DBService {
   }
 
   /**
-   * Gets security rules eligible for automatic screening.
+   * Gets security rules eligible for automatic screening, each with the ids of its active expressions.
    *
-   * A rule is screenable when it is not soft-deleted (`record_end_date IS NULL`) and
-   * `is_active = true`. Admins can opt individual rules out of
+   * A rule is screenable when it and its category are not soft-deleted (`record_end_date IS NULL`)
+   * and `is_active = true`. Admins can opt individual rules out of
    * screening without soft-deleting them.
    *
-   * @return {Promise<SecurityRuleRecord[]>}
+   * @return {Promise<SecurityRuleWithExpressions[]>} Screenable rules; `expression_ids` is empty for a rule with no active expression.
    * @memberof SecurityRuleService
    */
-  async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
+  async getScreenableSecurityRules(): Promise<SecurityRuleWithExpressions[]> {
     return this.securityRuleRepository.getScreenableSecurityRules();
   }
 

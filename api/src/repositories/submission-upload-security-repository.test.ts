@@ -32,7 +32,12 @@ describe('SubmissionUploadSecurityRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new SubmissionUploadSecurityRepository(mockDBConnection);
-      await repo.updateSubmissionUploadSecurityStatus(42, 'completed', { ruleCount: 2, insertedCount: 3 });
+      await repo.updateSubmissionUploadSecurityStatus(42, 'completed', {
+        evaluatedRuleCount: 2,
+        skippedRuleCount: 1,
+        matchedFeatureCount: 4,
+        insertedAssignmentCount: 3
+      });
 
       expect(sqlStub).to.have.been.calledOnce;
     });

@@ -790,10 +790,9 @@ const SUBMISSION_UPLOAD_SECURITY_OPTIONS: IPublishOptions = {
 /**
  * Publish a submission upload security (automatic screening) job to the queue.
  *
- * Queues screening for a submission upload after its `submission_feature_closure`
- * has been populated. Uses the caller's DB connection via pg-boss's `db` option so
- * the job insert participates in the same transaction as the closure write — if the
- * caller rolls back, the job is never visible.
+ * Queues screening for a submission upload once it has been indexed. Uses the caller's DB
+ * connection via pg-boss's `db` option so the job insert participates in the same transaction
+ * as the `indexed` transition — if the caller rolls back, the job is never visible.
  *
  * `singletonKey: screening-${submissionUploadId}` paired with `policy: 'short'` on the
  * queue prevents two concurrent screening jobs for the same upload.

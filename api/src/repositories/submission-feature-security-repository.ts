@@ -4,12 +4,14 @@ import { getKnex } from '../database/db';
 import {
   NormalizedDeleteSubmissionFeatureSecurity,
   NormalizedDeleteSubmissionFeatureSecurityRules,
+  NormalizedInsertScreenedSubmissionFeatureSecurity,
   NormalizedInsertSubmissionFeatureSecurity,
   NormalizedSubmissionFeatureSecurityFeatureScope,
   NormalizedSubmissionFeatureSecurityRulesFilters,
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesFilters,
   SubmissionFeatureSecurityRulesResult,
+  SubmissionFeatureSecurityScreeningResult,
   SubmissionFeatureSecuritySelectedRulesResult
 } from '../models/submission-feature-security';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -238,6 +240,61 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
     );
 
     await this.connection.knex(query);
+  }
+
+  /**
+   * Assign each screened rule to the current upload features its expression matches, with the screening event as
+   * provenance. Matching is the upload-review search, so it follows upload-local parent and feature-reference
+   * relationships, needs neither approval nor published closure, and applies no access filtering. Current
+   * assignments retain their provenance; reactivated assignments receive the screening provenance and clear review
+   * provenance. All rules are evaluated and written in one statement, so the matched count is distinct across rules.
+   *
+   * @param {NormalizedInsertScreenedSubmissionFeatureSecurity} input Upload boundary, rule expressions, and screening event.
+   * @returns {Promise<SubmissionFeatureSecurityScreeningResult>} Distinct matched features and inserted or reactivated assignments.
+   * @memberof SubmissionFeatureSecurityRepository
+   */
+  async insertScreenedSubmissionFeatureSecurity(
+    input: NormalizedInsertScreenedSubmissionFeatureSecurity
+  ): Promise<SubmissionFeatureSecurityScreeningResult> {
+    if (!input.rules.length) {
+      return { matched_feature_count: 0, inserted_count: 0 };
+    }
+
+    const knex = getKnex();
+    const ruleMatches = input.rules.map(({ securityRuleId, expression }) =>
+      knex
+        .from(
+          buildSubmissionUploadFeatureIdsSubquery(input.submissionId, input.submissionUploadId, expression).as(
+            'rule_matches'
+          )
+        )
+        .select('rule_matches.submission_feature_id', knex.raw('?::integer AS security_rule_id', [securityRuleId]))
+    );
+    const matches = ruleMatches.length === 1 ? ruleMatches[0] : knex.unionAll(ruleMatches, true);
+
+    const query = knex.raw(
+      `
+      WITH matches AS (?), inserted AS (
+        INSERT INTO submission_feature_security
+          (submission_feature_id, security_rule_id, submission_upload_security_id, record_effective_date)
+        SELECT matches.submission_feature_id, matches.security_rule_id, ?, now()
+        FROM matches
+        ON CONFLICT (submission_feature_id, security_rule_id)
+        DO UPDATE SET record_effective_date = now(), record_end_date = NULL,
+          submission_upload_security_id = EXCLUDED.submission_upload_security_id,
+          submission_upload_review_id = NULL
+        WHERE submission_feature_security.record_effective_date > now()
+          OR submission_feature_security.record_end_date <= now()
+        RETURNING submission_feature_id
+      )
+      SELECT (SELECT count(DISTINCT submission_feature_id) FROM matches)::integer AS matched_feature_count,
+        (SELECT count(*) FROM inserted)::integer AS inserted_count
+    `,
+      [matches, input.submissionUploadSecurityId]
+    );
+
+    const response = await this.connection.knex(query, SubmissionFeatureSecurityScreeningResult);
+    return response.rows[0];
   }
 
   /**

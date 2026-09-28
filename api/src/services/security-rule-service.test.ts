@@ -23,17 +23,8 @@ describe('SecurityRuleService', () => {
       const mockRules = [
         {
           security_rule_id: 1,
-          policy_id: null,
           name: 'Victoria Rule',
-          description: 'Geometry rule',
-          is_active: true,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
+          expression_ids: ['2b7d1f7c-5d0f-4a46-a2c9-6f1f3a5d8e10']
         }
       ];
 

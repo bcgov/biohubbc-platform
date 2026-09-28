@@ -98,8 +98,8 @@ export const JobQueues = {
   DELETE_EXPIRED_MARTIN_CONTEXTS_FAILED: 'delete-expired-martin-contexts-failed',
   /**
    * Submission upload security queue — automatic security screening. Evaluates active security
-   * rules against a submission upload's features after closure has been populated and inserts
-   * draft submission_feature_security records. Records its lifecycle in submission_upload_security.
+   * rule expressions against a submission upload's features once it is indexed and assigns each
+   * rule to its matches in submission_feature_security. Records its lifecycle in submission_upload_security.
    */
   SUBMISSION_UPLOAD_SECURITY: 'submission-upload-security',
   /**

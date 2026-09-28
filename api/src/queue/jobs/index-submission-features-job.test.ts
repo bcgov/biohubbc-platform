@@ -61,6 +61,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon
       .stub(indexSubmissionFeaturesJobDependencies, 'publishComputeSubmissionFeatureClosureJob')
       .resolves({ status: 'published', jobId: 'job-xyz' });
+    sinon
+      .stub(indexSubmissionFeaturesJobDependencies, 'publishSubmissionUploadSecurityJob')
+      .resolves({ status: 'published', jobId: 'screening-job' });
   });
 
   it('indexes successfully and sets indexed', async () => {
@@ -85,6 +88,27 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(toIndexedStub.calledBefore(publishStub)).to.be.true;
   });
 
+  it('queues security screening for the indexed upload in the indexing transaction', async () => {
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .resolves({ status: 'ok' });
+
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
+
+    const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
+    const publishClosureStub =
+      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
+    expect(publishScreeningStub).to.have.been.calledOnce;
+    expect(publishScreeningStub.firstCall.args[1]).to.deep.equal({
+      submissionId: 777,
+      submissionUploadId: 'submission-upload-1'
+    });
+    expect(publishScreeningStub.firstCall.args[0]).to.equal(publishClosureStub.firstCall.args[0]);
+    expect(toIndexedStub.calledBefore(publishScreeningStub)).to.be.true;
+  });
+
   it('marks invalid for deterministic validation outcomes', async () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
@@ -100,9 +124,12 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
     const publishStub =
       indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
     expect(toInvalidStub.calledWith('submission-upload-1')).to.be.true;
     // An invalid outcome must not enqueue a closure recompute — prior closure rows stay untouched.
     expect(publishStub.notCalled).to.be.true;
+    expect(publishScreeningStub.notCalled).to.be.true;
   });
 
   it('skips work when status is terminal', async () => {
@@ -163,7 +190,10 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     }
 
     const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToFailed as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
     expect(toFailedStub.called).to.be.false;
+    expect(publishScreeningStub.notCalled).to.be.true;
   });
 
   it('allows retry/resume when status is already indexing', async () => {
@@ -267,6 +297,10 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
   it('marks upload failed and logs failure with error output without throwing', async () => {
     stubConnections();
     const toFailedStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
+    const publishScreeningStub = sinon.stub(
+      indexSubmissionFeaturesJobDependencies,
+      'publishSubmissionUploadSecurityJob'
+    );
 
     const job = {
       id: 'job-1',
@@ -284,6 +318,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
 
     expect(thrownError).to.be.undefined;
     expect(toFailedStub).to.have.been.calledOnceWith('submission-upload-1');
+    expect(publishScreeningStub).not.to.have.been.called;
   });
 
   it('should mark upload failed and log default message when output is null', async () => {

@@ -14,6 +14,27 @@ describe('SecurityRuleRepository', () => {
     sinon.restore();
   });
 
+  describe('getScreenableSecurityRules', () => {
+    it('returns active rules with their current expression ids', async () => {
+      const rows = [
+        { security_rule_id: 1, name: 'rule-a', expression_ids: ['2b7d1f7c-5d0f-4a46-a2c9-6f1f3a5d8e10'] },
+        { security_rule_id: 2, name: 'rule-b', expression_ids: [] }
+      ];
+      const sql = sinon.stub().resolves({ rowCount: 2, rows });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ sql }));
+
+      const result = await repo.getScreenableSecurityRules();
+
+      const text = sql.firstCall.args[0].text as string;
+      expect(text).to.include('sr.is_active = true');
+      expect(text).to.include('sr.record_end_date IS NULL');
+      expect(text).to.include('sc.record_end_date IS NULL');
+      expect(text).to.include('sre.record_end_date IS NULL');
+      expect(text).to.include('e.record_end_date IS NULL');
+      expect(result).to.eql(rows);
+    });
+  });
+
   describe('getSecurityRulesWithFeatureCount', () => {
     it('counts only non-soft-deleted applications', async () => {
       const mockRow = {

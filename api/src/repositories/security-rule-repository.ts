@@ -6,7 +6,7 @@ import {
   CreateSecurityRule,
   SecurityRule,
   SecurityRuleAndCategory,
-  SecurityRuleRecord,
+  SecurityRuleWithExpressions,
   SecurityRuleWithFeatureCount,
   SecuritySearchFilters,
   UpdateSecurityRule
@@ -23,32 +23,37 @@ import { BaseRepository } from './base-repository';
  */
 export class SecurityRuleRepository extends BaseRepository {
   /**
-   * Gets security rules eligible for automatic screening.
-   * A rule is screenable when it is not soft-deleted and is_active is true.
+   * Gets security rules eligible for automatic screening, each with the ids of its active expressions.
    *
-   * @return {Promise<SecurityRuleRecord[]>}
+   * A rule is screenable when it is active (`is_active = true`) and neither it nor its category is
+   * soft-deleted, which is the same availability manual assignment requires. An expression counts when
+   * both its `security_rule_expression` link and the expression itself are current; a rule with none
+   * has an empty `expression_ids`.
+   *
+   * @return {Promise<SecurityRuleWithExpressions[]>} Screenable rules ordered by id.
    * @memberof SecurityRuleRepository
    */
-  async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
+  async getScreenableSecurityRules(): Promise<SecurityRuleWithExpressions[]> {
     const sql = SQL`
-      SELECT
-        security_rule_id,
-        policy_id,
-        name,
-        description,
-        is_active,
-        record_effective_date,
-        record_end_date,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count
-      FROM security_rule
-      WHERE record_end_date IS NULL
-        AND is_active = true;
+      SELECT sr.security_rule_id, sr.name, expressions.expression_ids
+      FROM security_rule sr
+      JOIN security_category sc
+        ON sc.security_category_id = sr.security_category_id
+        AND sc.record_end_date IS NULL
+      CROSS JOIN LATERAL (
+        SELECT COALESCE(array_agg(sre.expression_id ORDER BY sre.expression_id), '{}') AS expression_ids
+        FROM security_rule_expression sre
+        JOIN expression e
+          ON e.expression_id = sre.expression_id
+          AND e.record_end_date IS NULL
+        WHERE sre.security_rule_id = sr.security_rule_id
+          AND sre.record_end_date IS NULL
+      ) expressions
+      WHERE sr.record_end_date IS NULL
+        AND sr.is_active = true
+      ORDER BY sr.security_rule_id;
     `;
-    const response = await this.connection.sql(sql, SecurityRuleRecord);
+    const response = await this.connection.sql(sql, SecurityRuleWithExpressions);
     return response.rows;
   }
 

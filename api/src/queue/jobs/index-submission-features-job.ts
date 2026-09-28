@@ -6,15 +6,17 @@ import { SubmissionFeaturePropertyIngestionService } from '../../services/ingest
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-import { publishComputeSubmissionFeatureClosureJob } from '../publisher';
+import { publishComputeSubmissionFeatureClosureJob, publishSubmissionUploadSecurityJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 export interface IndexSubmissionFeaturesJobDependencies {
   publishComputeSubmissionFeatureClosureJob: typeof publishComputeSubmissionFeatureClosureJob;
+  publishSubmissionUploadSecurityJob: typeof publishSubmissionUploadSecurityJob;
 }
 
 export const indexSubmissionFeaturesJobDependencies: IndexSubmissionFeaturesJobDependencies = {
-  publishComputeSubmissionFeatureClosureJob
+  publishComputeSubmissionFeatureClosureJob,
+  publishSubmissionUploadSecurityJob
 };
 
 /**
@@ -110,7 +112,7 @@ async function executeIndexSubmissionFeaturesIngestion(
  *
  * Outcome handling:
  * - `invalid`: mark upload `invalid` and log validation counts
- * - otherwise: mark upload `indexed`
+ * - otherwise: mark upload `indexed` and queue the closure recompute and automatic security screening
  *
  * This is the stage-commit step after heavy indexing work has finished.
  *
@@ -154,6 +156,13 @@ async function finalizeIndexSubmissionFeaturesStage(
   // leaves any prior closure rows untouched until re-indexing succeeds. The recompute is derived and
   // idempotent, so the retry triggered by a rollback on any failure here is safe.
   await indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob(connection, {
+    submissionUploadId
+  });
+
+  // Screening reads the upload's own features rather than the published closure, so it depends on indexing alone.
+  // This is its only trigger: a run after approval would restore assignments a reviewer removed during review.
+  await indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob(connection, {
+    submissionId,
     submissionUploadId
   });
 

@@ -7,22 +7,7 @@ import { SecurityScopeService } from '../../services/access-policy/security-scop
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-import { publishSubmissionUploadSecurityJob } from '../publisher';
 import { withConnection } from '../with-connection';
-
-export interface ComputeSubmissionFeatureClosureJobDependencies {
-  publishSubmissionUploadSecurityJob: typeof publishSubmissionUploadSecurityJob;
-}
-
-/**
- * Mutable dependency bag for the compute-submission-feature-closure job.
- *
- * Tests should stub this bag rather than the publisher module directly, since
- * named ESM exports are non-configurable.
- */
-export const computeSubmissionFeatureClosureJobDependencies: ComputeSubmissionFeatureClosureJobDependencies = {
-  publishSubmissionUploadSecurityJob
-};
 
 const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job');
 
@@ -33,7 +18,7 @@ const defaultLog = getLogger('queue/jobs/compute-submission-feature-closure-job'
  * authoritative submission ID from that upload before recomputing submission-wide closure.
  */
 export interface IComputeSubmissionFeatureClosureJobData {
-  /** The submission upload ID that triggered the recompute (forwarded to screening) */
+  /** The submission upload ID that triggered the recompute */
   submissionUploadId: string;
 }
 
@@ -50,8 +35,8 @@ export interface IComputeSubmissionFeatureClosureJobData {
  * the secondary `(target, source)` index serves search's reverse "who reaches Y" down-probe.
  *
  * Each submission's recompute takes the shared blocking active-state lock. A job waits for an
- * overlapping recompute or upload activation instead of being acknowledged without publishing its
- * upload-specific security-screening job. On failure the handler logs and rethrows so pg-boss
+ * overlapping recompute or upload activation instead of being skipped, so the closure it writes
+ * reflects every activation committed before it. On failure the handler logs and rethrows so pg-boss
  * applies its retry policy — the recompute is idempotent (it deletes the submission's prior closure
  * rows before reinserting), so a retry is safe.
  *
@@ -77,7 +62,7 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
         const upload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
         const submissionId = upload.submission_id;
         // The recompute is DELETE-all + recursive-CTE INSERT in one transaction. Wait for every
-        // feature-state writer; every upload must reach the downstream security job.
+        // feature-state writer so the rebuilt closure includes each committed activation.
         await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
           SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
           submissionId,
@@ -99,14 +84,6 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
           submissionId,
           submissionUploadId,
           insertedCount: result.insertedCount
-        });
-
-        // Enqueue screening in the same transaction as the closure write so the job
-        // is only visible if the closure rows commit. This guarantees AC1: screening
-        // never starts before closure population is complete.
-        await computeSubmissionFeatureClosureJobDependencies.publishSubmissionUploadSecurityJob(connection, {
-          submissionId,
-          submissionUploadId
         });
       });
     } catch (error) {
