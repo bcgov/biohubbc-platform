@@ -20,19 +20,24 @@ export class SubmissionUploadSecurityRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId The upload being screened.
    * @param {(string | null)} jobId The pg-boss job id (for resync), if available.
-   * @returns {Promise<number>} The new submission_upload_security_id.
+   * @param {string} submissionUploadReviewId Security review identifier.
+   * @returns {Promise<SubmissionUploadSecurityId>} The new submission_upload_security_id.
    * @memberof SubmissionUploadSecurityRepository
    */
-  async insertScanEvent(submissionUploadId: string, jobId: string | null): Promise<number> {
+  async insertSubmissionUploadSecurity(
+    submissionUploadId: string,
+    jobId: string | null,
+    submissionUploadReviewId: string
+  ): Promise<SubmissionUploadSecurityId> {
     const sqlStatement = SQL`
-      INSERT INTO submission_upload_security (submission_upload_id, job_id, status, started_at)
-      VALUES (${submissionUploadId}::uuid, ${jobId}::uuid, 'started'::submission_upload_security_status, now())
+      INSERT INTO submission_upload_security (submission_upload_id, job_id, submission_upload_review_id, status, started_at)
+      VALUES (${submissionUploadId}::uuid, ${jobId}::uuid, ${submissionUploadReviewId}::uuid, 'started'::submission_upload_security_status, now())
       RETURNING submission_upload_security_id;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadSecurityId);
 
-    return response.rows[0].submission_upload_security_id;
+    return response.rows[0];
   }
 
   /**
@@ -44,7 +49,7 @@ export class SubmissionUploadSecurityRepository extends BaseRepository {
    * @returns {Promise<void>}
    * @memberof SubmissionUploadSecurityRepository
    */
-  async updateScanEventStatus(
+  async updateSubmissionUploadSecurityStatus(
     submissionUploadSecurityId: number,
     status: Extract<SubmissionUploadSecurityStatus, 'completed' | 'failed'>,
     metadata?: Record<string, unknown>

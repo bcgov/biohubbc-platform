@@ -117,7 +117,11 @@ export const submissionUploadSecurityFailedHandler: PgBoss.WorkHandler<ISubmissi
 
     await withConnection(async (connection) => {
       const submissionUploadSecurityService = new SubmissionUploadSecurityService(connection);
-      await submissionUploadSecurityService.recordScreeningFailure(submissionUploadId, job.id);
+      await submissionUploadSecurityService.recordSubmissionUploadSecurityFailure(
+        submissionUploadId,
+        submissionId,
+        job.id
+      );
     });
 
     defaultLog.warn({
