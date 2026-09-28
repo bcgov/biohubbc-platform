@@ -22,9 +22,9 @@ import {
 } from '../../utils/export-config-utils';
 import { parseExportPartKey, parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
-import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { DownloadExportPipelineService } from './download-export-pipeline-service';
 import { DownloadService } from './download-service';
 
 /**
@@ -53,7 +53,7 @@ export interface DownloadExportPart {
 export class DownloadExportService extends DBService {
   downloadService: DownloadService;
   downloadVersionExportRepository: DownloadVersionExportRepository;
-  codeService: CodeService;
+  downloadExportPipelineService: DownloadExportPipelineService;
   downloadVersionRepository: DownloadVersionRepository;
 
   /**
@@ -73,7 +73,7 @@ export class DownloadExportService extends DBService {
     super(connection);
     this.downloadService = new DownloadService(connection);
     this.downloadVersionExportRepository = new DownloadVersionExportRepository(connection);
-    this.codeService = new CodeService(connection);
+    this.downloadExportPipelineService = new DownloadExportPipelineService(connection);
     this.downloadVersionRepository = new DownloadVersionRepository(connection);
   }
 
@@ -252,23 +252,20 @@ export class DownloadExportService extends DBService {
    * headers, via `materializedColumnsForType`. Backs both AC8 recipe validation and the picker read,
    * so a divergence here would either reject valid recipes or offer columns the CSV can't produce.
    *
-   * Only types that actually produced a Parquet file for this version are included; the schema
-   * codes are filtered down to that materialized set so the picker never offers a type with no data.
+   * Only types that actually produced a Parquet file for this version are included, and each
+   * type's columns are read from that file, so the picker offers exactly the columns the file
+   * holds: a column of an assignment retired since the file was written stays available, and a
+   * property assigned since is not offered for this version.
    */
   private async buildAvailableColumnsByType(downloadId: string, versionId: string): Promise<Map<string, Set<string>>> {
     const materialized = await this.listMaterializedFeatureTypes(downloadId, versionId);
-    const codes = await this.codeService.getFeatureTypePropertyCodes();
+    const schemaLookup = await this.downloadExportPipelineService.readSchemaLookup(downloadId, versionId, [
+      ...materialized
+    ]);
 
     const availableColumnsByType = new Map<string, Set<string>>();
-    for (const code of codes) {
-      if (!materialized.has(code.feature_type.name)) {
-        continue;
-      }
-      const properties = code.properties.map((p) => ({
-        feature_property_name: p.name,
-        feature_property_type_name: p.type_name
-      }));
-      availableColumnsByType.set(code.feature_type.name, new Set(materializedColumnsForType(properties)));
+    for (const [featureType, properties] of schemaLookup) {
+      availableColumnsByType.set(featureType, new Set(materializedColumnsForType(properties)));
     }
 
     return availableColumnsByType;

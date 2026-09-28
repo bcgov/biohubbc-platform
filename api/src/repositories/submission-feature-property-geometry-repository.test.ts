@@ -19,7 +19,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
   const mockRow: SubmissionFeaturePropertyGeometry = {
     submission_feature_property_geometry_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: mockGeometry
   };
 
@@ -34,7 +34,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyGeometry({
         submission_feature_id: 10,
-        feature_type_property_id: 20,
+        blueprint_feature_type_property_id: 20,
         value: mockGeometry
       });
 
@@ -49,7 +49,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyGeometry({
           submission_feature_id: 10,
-          feature_type_property_id: 20,
+          blueprint_feature_type_property_id: 20,
           value: mockGeometry
         });
         expect.fail();
@@ -105,15 +105,6 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       const result = await repository.getSubmissionFeaturePropertyGeometryBySubmissionFeatureId(10);
       expect(result).to.eql([mockRow]);
     });
-
-    it('lists by feature_type_property_id', async () => {
-      const repository = new SubmissionFeaturePropertyGeometryRepository(
-        getMockDBConnection({ sql: () => Promise.resolve(mockQueryResult([mockRow])) })
-      );
-
-      const result = await repository.getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(20);
-      expect(result).to.eql([mockRow]);
-    });
   });
 
   describe('getActiveGeometryExtent', () => {
@@ -136,7 +127,9 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
     it('excludes unpublished features and retired property definitions', async () => {
       const sqlStub = sinon.stub().callsFake((statement: any) => {
         expect(statement.text).to.contain('record_effective_date <= now()');
-        expect(statement.text).to.contain('ftp.record_end_date IS NULL');
+        expect(statement.text).to.contain(
+          'bftp.blueprint_feature_type_property_id = g.blueprint_feature_type_property_id'
+        );
         expect(statement.text).to.contain('fp.record_end_date IS NULL');
         return Promise.resolve(
           mockQueryResult([{ min_x: null, min_y: null, max_x: null, max_y: null, geometry_count: 0 }])
@@ -190,7 +183,9 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
         // Upload features under review have never been published, so the extent must not be
         // published-gated or every review map would open on an empty state.
         expect(statement.text).to.not.contain('record_effective_date');
-        expect(statement.text).to.contain('ftp.record_end_date IS NULL');
+        expect(statement.text).to.contain(
+          'bftp.blueprint_feature_type_property_id = g.blueprint_feature_type_property_id'
+        );
         expect(statement.text).to.contain('fp.record_end_date IS NULL');
         return Promise.resolve(
           mockQueryResult([{ min_x: null, min_y: null, max_x: null, max_y: null, geometry_count: 0 }])

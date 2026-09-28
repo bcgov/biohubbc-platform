@@ -228,7 +228,6 @@ export const AdminBlueprintFeatureTypePropertySchema: OpenAPIV3.SchemaObject = {
     'blueprint_feature_type_property_id',
     'blueprint_feature_type_id',
     'feature_property_id',
-    'feature_type_property_id',
     'property_name',
     'property_display_name',
     'property_type_name',
@@ -251,11 +250,6 @@ export const AdminBlueprintFeatureTypePropertySchema: OpenAPIV3.SchemaObject = {
       type: 'integer',
       minimum: 1,
       description: 'Foreign key to the feature_property table; the reusable property definition being assigned'
-    },
-    feature_type_property_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Compatibility reference to the global feature_type_property pairing'
     },
     property_name: {
       type: 'string',

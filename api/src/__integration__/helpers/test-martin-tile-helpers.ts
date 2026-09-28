@@ -27,13 +27,13 @@ export interface TileFunctionFixture {
   /** The feature type the fixtures are created as. */
   readonly featureTypeId: number;
   /** A spatial property of that feature type, which geometries are recorded against. */
-  readonly geometryPropertyId: number;
+  readonly geometryAssignmentId: number;
 }
 
 /**
  * Register the mocha hooks a tile function suite needs: a pooled connection opened before each test and rolled back
- * after it, so no fixture is persisted, plus the catalog ids of the fixture feature type and one of its spatial
- * properties. Call it once at the top of the `describe`; the returned getters read the current test's values.
+ * after it, so no fixture is persisted, plus the id of the fixture feature type and the default Blueprint's assignment
+ * of one of its spatial properties. Call it once at the top of the `describe`; the returned getters read the current test's values.
  *
  * @param {string} featureTypeName - Feature type the fixtures are created as. Any type with a spatial property will do.
  * @return {TileFunctionFixture}
@@ -41,7 +41,7 @@ export interface TileFunctionFixture {
 export function useTileFunctionFixture(featureTypeName: string): TileFunctionFixture {
   let connection: IDBConnection;
   let featureTypeId: number;
-  let geometryPropertyId: number;
+  let geometryAssignmentId: number;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -53,9 +53,9 @@ export function useTileFunctionFixture(featureTypeName: string): TileFunctionFix
 
     featureTypeId = await featureTypeIdByName(connection, featureTypeName);
 
-    const spatialPropertyId = await findSpatialPropertyId(connection, featureTypeId);
-    expect(spatialPropertyId, 'fixture feature type needs a spatial property').to.be.a('number');
-    geometryPropertyId = spatialPropertyId as number;
+    const spatialAssignmentId = await findSpatialAssignmentId(connection, featureTypeId);
+    expect(spatialAssignmentId, 'fixture feature type needs a spatial property').to.be.a('number');
+    geometryAssignmentId = spatialAssignmentId as number;
   });
 
   afterEach(async () => {
@@ -70,8 +70,8 @@ export function useTileFunctionFixture(featureTypeName: string): TileFunctionFix
     get featureTypeId() {
       return featureTypeId;
     },
-    get geometryPropertyId() {
-      return geometryPropertyId;
+    get geometryAssignmentId() {
+      return geometryAssignmentId;
     }
   };
 }
@@ -86,38 +86,45 @@ export interface DecodedTileFeature {
 }
 
 /**
- * Find a geometry-valued property of a feature type. Geometry-valued properties are typed 'spatial' in the property
- * catalog. Returns null when the type has no (other) spatial property.
+ * Find the active default Blueprint's assignment of a geometry-valued property to a feature type.
+ * Geometry-valued properties are typed 'spatial' in the property catalog. Returns null when the type has
+ * no (other) spatial property assigned. Fixtures are uploaded under the active default Blueprint, so this
+ * is the assignment their geometry rows must carry.
  *
  * @param {IDBConnection} connection
  * @param {number} featureTypeId
- * @param {number} [excludeFeatureTypePropertyId] - A property to skip, to find a second spatial property.
- * @return {Promise<number | null>} The feature_type_property id, or null.
+ * @param {number} [excludeAssignmentId] - An assignment to skip, to find a second spatial property.
+ * @return {Promise<number | null>} The blueprint_feature_type_property id, or null.
  */
-export async function findSpatialPropertyId(
+export async function findSpatialAssignmentId(
   connection: IDBConnection,
   featureTypeId: number,
-  excludeFeatureTypePropertyId?: number
+  excludeAssignmentId?: number
 ): Promise<number | null> {
   const sqlStatement = SQL`
-    SELECT ftp.feature_type_property_id
-    FROM feature_type_property ftp
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    SELECT bftp.blueprint_feature_type_property_id
+    FROM blueprint b
+    JOIN blueprint_feature_type bft ON bft.blueprint_id = b.blueprint_id
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
     JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
-    WHERE ftp.feature_type_id = ${featureTypeId}
+    WHERE b.is_default = true
+      AND b.record_end_date IS NULL
+      AND bft.feature_type_id = ${featureTypeId}
+      AND bft.record_end_date IS NULL
+      AND bftp.record_end_date IS NULL
       AND fpt.name = 'spatial'
-      AND ftp.record_end_date IS NULL
   `;
 
-  if (excludeFeatureTypePropertyId !== undefined) {
-    sqlStatement.append(SQL` AND ftp.feature_type_property_id <> ${excludeFeatureTypePropertyId}`);
+  if (excludeAssignmentId !== undefined) {
+    sqlStatement.append(SQL` AND bftp.blueprint_feature_type_property_id <> ${excludeAssignmentId}`);
   }
 
-  sqlStatement.append(SQL` LIMIT 1;`);
+  sqlStatement.append(SQL` ORDER BY bftp.blueprint_feature_type_property_id LIMIT 1;`);
 
-  const result = await connection.sql(sqlStatement, z.object({ feature_type_property_id: z.number() }));
+  const result = await connection.sql(sqlStatement, z.object({ blueprint_feature_type_property_id: z.number() }));
 
-  return result.rows[0]?.feature_type_property_id ?? null;
+  return result.rows[0]?.blueprint_feature_type_property_id ?? null;
 }
 
 /**
@@ -125,22 +132,22 @@ export async function findSpatialPropertyId(
  *
  * @param {IDBConnection} connection
  * @param {number} submissionFeatureId
- * @param {number} featureTypePropertyId - The spatial property the value is recorded against.
+ * @param {number} blueprintFeatureTypePropertyId - The spatial property assignment the value is recorded against.
  * @param {string} wkt
  * @return {Promise<number>} The submission_feature_property_geometry id.
  */
 export async function addTestGeometry(
   connection: IDBConnection,
   submissionFeatureId: number,
-  featureTypePropertyId: number,
+  blueprintFeatureTypePropertyId: number,
   wkt: string
 ): Promise<number> {
   const result = await connection.sql(
     SQL`
-      INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
       VALUES (
         ${submissionFeatureId},
-        ${featureTypePropertyId},
+        ${blueprintFeatureTypePropertyId},
         public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326),
         ${connection.systemUserId()}
       )

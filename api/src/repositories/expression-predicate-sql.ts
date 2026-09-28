@@ -5,27 +5,31 @@ import { NormalizedExpressionTreeClause, NormalizedExpressionTreePredicate } fro
 import type { LogicalOperator } from '../models/logical-operator';
 
 /**
- * Resolves active concrete feature-type-property ids for one semantic property.
+ * Resolves the Blueprint assignments one semantic property is stored under.
+ *
+ * Assignments are taken at any lifecycle, in every Blueprint: a value stored under a Blueprint version
+ * that has since been superseded is still evidence for the property. Callers narrow on the joined
+ * `bft.feature_type_id` to split evidence on the anchor's own type from evidence on related types.
  *
  * @example
- * A predicate with `feature_property_id = 14` and `feature_type_property_id = null` returns every active assignment of
- * property 14. Supplying assignment 108 adds that exact assignment constraint and returns at most 108.
+ * A predicate with `feature_property_id = 14` and `blueprint_feature_type_property_id = null` returns every
+ * assignment of property 14. Supplying assignment 108 adds that exact assignment constraint and returns at most 108.
  *
  * @param {NormalizedExpressionTreePredicate} property - Predicate containing the resolved property identity.
  * @param {Knex} knex - Knex instance used to build the metadata query.
- * @return {Knex.QueryBuilder} Query returning concrete feature_type_property_id rows.
+ * @return {Knex.QueryBuilder} Query returning blueprint_feature_type_property_id rows.
  */
-export function buildPredicateFeatureTypePropertyIdsQuery(
+export function buildPredicateAssignmentIdsQuery(
   property: NormalizedExpressionTreePredicate,
   knex: Knex
 ): Knex.QueryBuilder {
-  const query = knex('feature_type_property as ftp')
-    .select('ftp.feature_type_property_id')
-    .where('ftp.feature_property_id', property.feature_property_id)
-    .whereNull('ftp.record_end_date');
+  const query = knex('blueprint_feature_type_property as bftp')
+    .select('bftp.blueprint_feature_type_property_id')
+    .join('blueprint_feature_type as bft', 'bft.blueprint_feature_type_id', 'bftp.blueprint_feature_type_id')
+    .where('bftp.feature_property_id', property.feature_property_id);
 
-  if (property.feature_type_property_id !== null) {
-    query.where('ftp.feature_type_property_id', property.feature_type_property_id);
+  if (property.blueprint_feature_type_property_id !== null) {
+    query.where('bftp.blueprint_feature_type_property_id', property.blueprint_feature_type_property_id);
   }
 
   return query;
@@ -197,12 +201,12 @@ function applyExpressionPredicateNotEquals(
   const columnName = valueColumn.replace('p.', '');
   const value = getScalarPredicateValue(clause.internal_predicate);
 
-  if (clause.feature_type_property_id !== null) {
+  if (clause.blueprint_feature_type_property_id !== null) {
     return query.whereNotExists(
       knex(`${tableName} as p_not_equals`)
         .select(knex.raw('1'))
         .whereRaw('p_not_equals.submission_feature_id = p.submission_feature_id')
-        .where('p_not_equals.feature_type_property_id', clause.feature_type_property_id)
+        .where('p_not_equals.blueprint_feature_type_property_id', clause.blueprint_feature_type_property_id)
         .where(`p_not_equals.${columnName}`, value)
     );
   }
@@ -211,14 +215,13 @@ function applyExpressionPredicateNotEquals(
     knex(`${tableName} as p_not_equals`)
       .select(knex.raw('1'))
       .join(
-        'feature_type_property as ftp_not_equals',
-        'ftp_not_equals.feature_type_property_id',
-        'p_not_equals.feature_type_property_id'
+        'blueprint_feature_type_property as bftp_not_equals',
+        'bftp_not_equals.blueprint_feature_type_property_id',
+        'p_not_equals.blueprint_feature_type_property_id'
       )
       .whereRaw('p_not_equals.submission_feature_id = p.submission_feature_id')
-      .where('ftp_not_equals.feature_property_id', clause.feature_property_id)
+      .where('bftp_not_equals.feature_property_id', clause.feature_property_id)
       .where(`p_not_equals.${columnName}`, value)
-      .whereNull('ftp_not_equals.record_end_date')
   );
 }
 

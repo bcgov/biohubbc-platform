@@ -101,7 +101,7 @@ vi.mock('components/expression-builder/PolicyExpressionBuilder', () => ({
               {
                 type: 'predicate',
                 feature_property_id: 1,
-                feature_type_property_id: 1,
+                blueprint_feature_type_property_id: 1,
                 operator: 'Equals',
                 value: 'sensitive'
               }
@@ -123,7 +123,7 @@ const expression: ExpressionTreeExpression = {
     {
       type: 'predicate',
       feature_property_id: 1,
-      feature_type_property_id: 1,
+      blueprint_feature_type_property_id: 1,
       operator: 'Equals',
       value: 'sensitive'
     }

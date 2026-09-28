@@ -569,7 +569,7 @@ describe('PolicyService', () => {
           {
             type: 'predicate',
             feature_property_id: 19,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Contains',
             value: 'x'
           }
@@ -621,7 +621,7 @@ describe('PolicyService', () => {
           {
             type: 'predicate',
             feature_property_id: 19,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Contains',
             value: 'x'
           }
@@ -669,7 +669,7 @@ describe('PolicyService', () => {
           {
             type: 'predicate',
             feature_property_id: 19,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Contains',
             value: 'x'
           }
@@ -718,7 +718,7 @@ describe('PolicyService', () => {
           {
             type: 'predicate',
             feature_property_id: 19,
-            feature_type_property_id: null,
+            blueprint_feature_type_property_id: null,
             operator: 'Contains',
             value: 'x'
           }

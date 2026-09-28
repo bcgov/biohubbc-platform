@@ -156,7 +156,7 @@ describe('useAdminApi', () => {
         {
           type: 'predicate' as const,
           feature_property_id: 4,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Contains' as const,
           value: 'moose'
         }
@@ -195,7 +195,7 @@ describe('useAdminApi', () => {
         {
           type: 'predicate' as const,
           feature_property_id: 4,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Contains' as const,
           value: 'moose'
         }

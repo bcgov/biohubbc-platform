@@ -37,15 +37,13 @@ export type AdminBlueprintFeatureType = z.infer<typeof AdminBlueprintFeatureType
  * Schema for a property assigned to a blueprint feature type, with the property's names and type
  * joined in.
  *
- * `feature_property_id` identifies the reusable property definition the assignment configures.
- * `feature_type_property_id` is the compatibility reference to the global pairing, retained until
- * that table is removed.
+ * `blueprint_feature_type_property_id` identifies the configured assignment; `feature_property_id`
+ * identifies the reusable property definition it configures.
  */
 export const AdminBlueprintFeatureTypeProperty = z.object({
   blueprint_feature_type_property_id: z.number(),
   blueprint_feature_type_id: z.number(),
   feature_property_id: z.number(),
-  feature_type_property_id: z.number(),
   property_name: z.string(),
   property_display_name: z.string(),
   property_type_name: z.string(),
@@ -94,8 +92,6 @@ export interface CreateBlueprintFeatureTypePropertyRequest {
 /** Fields required to insert a blueprint feature type property assignment. */
 export interface CreateBlueprintFeatureTypePropertyRecord extends CreateBlueprintFeatureTypePropertyRequest {
   blueprint_feature_type_id: number;
-  /** Compatibility reference to the global pairing; resolved by the service, never supplied by a client. */
-  feature_type_property_id: number;
 }
 
 /** Fields accepted when updating a blueprint feature type property assignment. */

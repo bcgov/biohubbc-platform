@@ -2,7 +2,7 @@ import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-type-property';
+import { SearchFeatureProperty } from '../models/feature-property';
 import {
   SearchFeatureFilters,
   SearchFeaturePage,
@@ -81,7 +81,7 @@ export class SearchFeatureService extends DBService {
    * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination settings
    * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous
    * @param {SearchFeatureFilters} [filters] Submission/upload scope.
-   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: FeatureTypeProperty[]; has_inaccessible_secured_features: boolean; pagination: ApiCursorPaginationResults }>} Feature rows, metadata, security indicator, and adjacent-page cursors
+   * @return {Promise<{ features: SearchFeatureResultWithRelevancy[]; properties: SearchFeatureProperty[]; has_inaccessible_secured_features: boolean; pagination: ApiCursorPaginationResults }>} Feature rows, metadata, security indicator, and adjacent-page cursors
    */
   async searchFeaturesByExpressionTreeWithMetadata(
     anchorFeatureType: string,
@@ -91,7 +91,7 @@ export class SearchFeatureService extends DBService {
     filters?: SearchFeatureFilters
   ): Promise<{
     features: SearchFeatureResultWithRelevancy[];
-    properties: FeatureTypeProperty[];
+    properties: SearchFeatureProperty[];
     has_inaccessible_secured_features: boolean;
     pagination: ApiCursorPaginationResults;
   }> {

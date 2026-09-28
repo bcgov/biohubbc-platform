@@ -1,9 +1,9 @@
-// Integration tests for Blueprint-owned property assignments (SIMSBIOHUB-1142).
+// Integration tests for Blueprint-owned property assignments.
 //
 // Drives BlueprintService against a real database and asserts on the rows it writes to blueprint,
-// blueprint_feature_type and blueprint_feature_type_property, plus the constraints and trigger the
-// migration adds to keep the transitional `feature_type_property_id` reference in agreement with the
-// owned `feature_property_id`.
+// blueprint_feature_type, blueprint_feature_type_property and feature_type_property_feature, plus the
+// database guards that keep every stored value, and every allowed reference target, on an assignment
+// that belongs to the right feature type, Blueprint and storage table.
 //
 // Each test seeds its own fixture inside a transaction and rolls back after, so nothing is persisted.
 // A new draft version is always created from the seeded default blueprint, so the composition being
@@ -22,10 +22,24 @@ import { ApiConflictError, ApiExecuteSQLError } from '../../errors/api-error';
 import { AdminBlueprint, AdminBlueprintFeatureType } from '../../models/blueprint';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { BlueprintService } from '../../services/blueprint-service';
-import { createTestUpload, featureTypeIdByName } from '../helpers/test-feature-property-helpers';
-import { createTestSubmission, getActiveDefaultBlueprintId } from '../helpers/test-submission-helpers';
+import {
+  createBlueprintFeatureTypeProperty,
+  createTestUpload,
+  featureTypeIdByName
+} from '../helpers/test-feature-property-helpers';
+import {
+  createTestFeature,
+  createTestSubmission,
+  getActiveDefaultBlueprintId
+} from '../helpers/test-submission-helpers';
 
 const FEATURE_TYPE_NAME = 'capture';
+
+/** A feature type the default Blueprint assigns number and string properties to, for the storage guards. */
+const GUARD_FEATURE_TYPE_NAME = 'species_observation';
+
+/** A second feature type with a number assignment, for the cross-type guard. */
+const OTHER_GUARD_FEATURE_TYPE_NAME = 'measurement';
 
 /**
  * Extract the Postgres error message from a failed statement.
@@ -105,28 +119,12 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     return { draft, blueprintFeatureType: blueprintFeatureType as AdminBlueprintFeatureType };
   }
 
-  /** Read the active global pairing for a feature type and property, if any. */
-  async function getActivePairing(
-    featureTypeId: number,
-    featurePropertyId: number
-  ): Promise<{ feature_type_property_id: number; required_value: boolean; allow_multiple: boolean } | null> {
-    const result = await connection.sql(SQL`
-      SELECT feature_type_property_id, required_value, allow_multiple
-      FROM feature_type_property
-      WHERE feature_type_id = ${featureTypeId}
-        AND feature_property_id = ${featurePropertyId}
-        AND record_end_date IS NULL;
-    `);
-    return result.rows[0] ?? null;
-  }
-
   /** Read the active assignments of a blueprint as a comparable set. */
   async function getActiveAssignments(blueprintId: number): Promise<
     {
       blueprint_feature_type_property_id: number;
       feature_type_id: number;
       feature_property_id: number;
-      feature_type_property_id: number;
       required_value: boolean;
       allow_multiple: boolean;
       sort: number | null;
@@ -137,7 +135,6 @@ describe('BlueprintService — blueprint-owned property assignments (integration
         bftp.blueprint_feature_type_property_id,
         bft.feature_type_id,
         bftp.feature_property_id,
-        bftp.feature_type_property_id,
         bftp.required_value,
         bftp.allow_multiple,
         bftp.sort
@@ -149,6 +146,56 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       ORDER BY bft.feature_type_id, bftp.feature_property_id;
     `);
     return result.rows;
+  }
+
+  /**
+   * Resolve, for a feature uploaded under the default Blueprint, an active assignment of its type with
+   * the given declared property type.
+   *
+   * @param {number} submissionFeatureId - Feature whose type and upload Blueprint scope the assignment.
+   * @param {string} declaredTypeName - Declared property type the assignment must have.
+   * @return {Promise<{ blueprint_feature_type_property_id: number; feature_property_id: number }>} The assignment.
+   */
+  async function findAssignmentOfFeature(
+    submissionFeatureId: number,
+    declaredTypeName: string
+  ): Promise<{ blueprint_feature_type_property_id: number; feature_property_id: number }> {
+    const result = await connection.sql(SQL`
+      SELECT bftp.blueprint_feature_type_property_id, bftp.feature_property_id
+      FROM submission_feature sf
+      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
+      JOIN blueprint_feature_type bft
+        ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+      JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
+      JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+      WHERE sf.submission_feature_id = ${submissionFeatureId}
+        AND fpt.name = ${declaredTypeName}
+      ORDER BY bftp.blueprint_feature_type_property_id
+      LIMIT 1;
+    `);
+    expect(result.rows[0], `feature has a ${declaredTypeName} assignment`).to.not.be.undefined;
+    return result.rows[0];
+  }
+
+  /**
+   * Store a number value for a feature under an assignment, returning the database error if any.
+   *
+   * @param {number} submissionFeatureId - Feature receiving the value.
+   * @param {number | null} assignmentId - Assignment to store the value under.
+   * @return {Promise<unknown>} The error thrown by the insert, or null when it succeeded.
+   */
+  async function tryInsertNumber(submissionFeatureId: number, assignmentId: number | null): Promise<unknown> {
+    try {
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+        VALUES (${submissionFeatureId}, ${assignmentId}, 1, ${connection.systemUserId()});
+      `);
+      return null;
+    } catch (error) {
+      return error;
+    }
   }
 
   // --- versioning ------------------------------------------------------------
@@ -194,11 +241,9 @@ describe('BlueprintService — blueprint-owned property assignments (integration
   // --- assignment ------------------------------------------------------------
 
   describe('createBlueprintFeatureTypeProperty', () => {
-    it('assigns a property the feature type has never been paired with, creating a neutral pairing', async () => {
+    it('assigns a property with the requested configuration', async () => {
       const { draft, blueprintFeatureType } = await createDraftWithFeatureType();
       const featurePropertyId = await createUnpairedNumberProperty();
-
-      expect(await getActivePairing(blueprintFeatureType.feature_type_id, featurePropertyId)).to.be.null;
 
       const assignment = await service.createBlueprintFeatureTypeProperty(
         draft.blueprint_id,
@@ -211,41 +256,6 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       expect(assignment.allow_multiple).to.equal(true);
       expect(assignment.sort).to.equal(42);
       expect(assignment.property_type_name).to.equal('number');
-
-      // The compatibility pairing exists, points at the same property, and carries none of the
-      // blueprint's configuration.
-      const pairing = await getActivePairing(blueprintFeatureType.feature_type_id, featurePropertyId);
-      expect(pairing).to.not.be.null;
-      expect(pairing?.feature_type_property_id).to.equal(assignment.feature_type_property_id);
-      expect(pairing?.required_value).to.equal(false);
-      expect(pairing?.allow_multiple).to.equal(false);
-    });
-
-    it('reuses an existing pairing without changing it', async () => {
-      const { draft, blueprintFeatureType } = await createDraftWithFeatureType();
-      const featurePropertyId = await createUnpairedNumberProperty();
-
-      const inserted = await connection.sql(SQL`
-        INSERT INTO feature_type_property (feature_type_id, feature_property_id, required_value, record_effective_date, create_user)
-        VALUES (${
-          blueprintFeatureType.feature_type_id
-        }, ${featurePropertyId}, true, now(), ${connection.systemUserId()})
-        RETURNING feature_type_property_id;
-      `);
-      const pairingId = inserted.rows[0].feature_type_property_id;
-
-      const assignment = await service.createBlueprintFeatureTypeProperty(
-        draft.blueprint_id,
-        blueprintFeatureType.blueprint_feature_type_id,
-        { feature_property_id: featurePropertyId, required_value: false }
-      );
-
-      expect(assignment.feature_type_property_id).to.equal(pairingId);
-      expect(assignment.required_value).to.equal(false);
-
-      const pairing = await getActivePairing(blueprintFeatureType.feature_type_id, featurePropertyId);
-      expect(pairing?.feature_type_property_id).to.equal(pairingId);
-      expect(pairing?.required_value).to.equal(true);
     });
 
     it('rejects a duplicate active assignment and allows re-assignment after retirement', async () => {
@@ -339,12 +349,6 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     expect(inA?.required_value).to.equal(true);
     expect(inB).to.be.undefined;
     expect(inC?.required_value).to.equal(false);
-
-    // One shared pairing, untouched by either configuration.
-    const pairing = await getActivePairing(a.blueprintFeatureType.feature_type_id, featurePropertyId);
-    expect(pairing?.required_value).to.equal(false);
-    expect(inA?.feature_type_property_id).to.equal(pairing?.feature_type_property_id);
-    expect(inC?.feature_type_property_id).to.equal(pairing?.feature_type_property_id);
   });
 
   // --- feature types -----------------------------------------------------------
@@ -392,69 +396,122 @@ describe('BlueprintService — blueprint-owned property assignments (integration
   // --- database guards -------------------------------------------------------
 
   describe('database guards', () => {
-    it('derives feature_property_id from the pairing when an insert omits it', async () => {
-      const { blueprintFeatureType } = await createDraftWithFeatureType();
-      const featurePropertyId = await createUnpairedNumberProperty();
-      const inserted = await connection.sql(SQL`
-        INSERT INTO feature_type_property (feature_type_id, feature_property_id, record_effective_date, create_user)
-        VALUES (${blueprintFeatureType.feature_type_id}, ${featurePropertyId}, now(), ${connection.systemUserId()})
-        RETURNING feature_type_property_id;
-      `);
+    it('requires every stored value to carry an assignment', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
 
-      const result = await connection.sql(SQL`
-        INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_type_property_id, create_user)
-        VALUES (${blueprintFeatureType.blueprint_feature_type_id}, ${
-        inserted.rows[0].feature_type_property_id
-      }, ${connection.systemUserId()})
-        RETURNING feature_property_id;
-      `);
+      const error = await tryInsertNumber(featureId, null);
 
-      expect(result.rows[0].feature_property_id).to.equal(featurePropertyId);
+      expect(databaseErrorMessage(error)).to.include('blueprint_feature_type_property_id');
     });
 
-    it('rejects an assignment whose pairing names a different property', async () => {
-      const { blueprintFeatureType } = await createDraftWithFeatureType();
-      const propertyA = await createUnpairedNumberProperty();
-      const propertyB = await createUnpairedNumberProperty();
-      const inserted = await connection.sql(SQL`
-        INSERT INTO feature_type_property (feature_type_id, feature_property_id, record_effective_date, create_user)
-        VALUES (${blueprintFeatureType.feature_type_id}, ${propertyA}, now(), ${connection.systemUserId()})
-        RETURNING feature_type_property_id;
+    it('rejects a value whose assignment is declared for another storage table', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
+      const stringAssignment = await findAssignmentOfFeature(featureId, 'string');
+
+      const error = await tryInsertNumber(featureId, stringAssignment.blueprint_feature_type_property_id);
+
+      expect(databaseErrorMessage(error)).to.include('is declared as string');
+    });
+
+    it('rejects a value whose assignment belongs to another feature type', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
+      const otherFeatureId = await createTestFeature(connection, submissionId, OTHER_GUARD_FEATURE_TYPE_NAME, {});
+      const otherAssignment = await findAssignmentOfFeature(otherFeatureId, 'number');
+
+      const error = await tryInsertNumber(featureId, otherAssignment.blueprint_feature_type_property_id);
+
+      expect(databaseErrorMessage(error)).to.include('does not belong to the feature type');
+    });
+
+    it('rejects a value whose assignment belongs to another Blueprint', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
+      const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
+      const draft = await service.createBlueprintVersion(defaultBlueprintId, {});
+      const draftFeatureType = (await service.getAdminBlueprintFeatureTypes(draft.blueprint_id)).find(
+        (featureType) => featureType.feature_type_name === GUARD_FEATURE_TYPE_NAME
+      );
+      expect(draftFeatureType, 'draft includes the guard feature type').to.not.be.undefined;
+      const draftAssignments = await service.getAdminBlueprintFeatureTypeProperties(
+        draft.blueprint_id,
+        (draftFeatureType as AdminBlueprintFeatureType).blueprint_feature_type_id
+      );
+      const draftNumber = draftAssignments.find((assignment) => assignment.property_type_name === 'number');
+      expect(draftNumber, 'draft copies a number assignment').to.not.be.undefined;
+
+      const error = await tryInsertNumber(
+        featureId,
+        (draftNumber as { blueprint_feature_type_property_id: number }).blueprint_feature_type_property_id
+      );
+
+      expect(databaseErrorMessage(error)).to.include('was uploaded under blueprint');
+    });
+
+    it('accepts a value under an assignment that has since been retired', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
+      const numberAssignment = await findAssignmentOfFeature(featureId, 'number');
+      await connection.sql(SQL`
+        UPDATE blueprint_feature_type_property
+        SET record_end_date = now()
+        WHERE blueprint_feature_type_property_id = ${numberAssignment.blueprint_feature_type_property_id};
       `);
+
+      const error = await tryInsertNumber(featureId, numberAssignment.blueprint_feature_type_property_id);
+
+      expect(error).to.be.null;
+    });
+
+    it('rejects allowed reference targets declared for a non-feature assignment', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, GUARD_FEATURE_TYPE_NAME, {});
+      const numberAssignment = await findAssignmentOfFeature(featureId, 'number');
+      const targetFeatureTypeId = await featureTypeIdByName(connection, 'dataset');
 
       try {
         await connection.sql(SQL`
-          INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_property_id, feature_type_property_id, create_user)
-          VALUES (${blueprintFeatureType.blueprint_feature_type_id}, ${propertyB}, ${
-          inserted.rows[0].feature_type_property_id
-        }, ${connection.systemUserId()});
+          INSERT INTO feature_type_property_feature (blueprint_feature_type_property_id, target_feature_type_id, create_user)
+          VALUES (${
+            numberAssignment.blueprint_feature_type_property_id
+          }, ${targetFeatureTypeId}, ${connection.systemUserId()});
         `);
         expect.fail();
       } catch (error) {
-        expect(databaseErrorMessage(error)).to.include('blueprint_feature_type_property_ftp_pairing_fk');
+        expect(databaseErrorMessage(error)).to.include('cannot declare target feature types');
       }
     });
 
-    it('rejects an assignment whose pairing belongs to a different feature type', async () => {
-      const { blueprintFeatureType } = await createDraftWithFeatureType();
-      const otherFeatureTypeId = await featureTypeIdByName(connection, 'dataset');
-      const featurePropertyId = await createUnpairedNumberProperty();
-      const inserted = await connection.sql(SQL`
-        INSERT INTO feature_type_property (feature_type_id, feature_property_id, record_effective_date, create_user)
-        VALUES (${otherFeatureTypeId}, ${featurePropertyId}, now(), ${connection.systemUserId()})
-        RETURNING feature_type_property_id;
+    it('copies allowed reference targets onto the assignments of a new version', async () => {
+      const { blueprintFeatureTypePropertyId, featurePropertyId, allowedFeatureTypeIds } =
+        await createBlueprintFeatureTypeProperty(connection, GUARD_FEATURE_TYPE_NAME, ['dataset', 'survey']);
+      expect(allowedFeatureTypeIds).to.have.lengthOf(2);
+
+      const defaultBlueprintId = await getActiveDefaultBlueprintId(connection);
+      const draft = await service.createBlueprintVersion(defaultBlueprintId, {});
+
+      const copied = await connection.sql<{
+        blueprint_feature_type_property_id: number;
+        target_feature_type_id: number;
+      }>(SQL`
+        SELECT ftpf.blueprint_feature_type_property_id, ftpf.target_feature_type_id
+        FROM feature_type_property_feature ftpf
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_property_id = ftpf.blueprint_feature_type_property_id
+        JOIN blueprint_feature_type bft ON bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+        WHERE bft.blueprint_id = ${draft.blueprint_id}
+          AND bftp.feature_property_id = ${featurePropertyId}
+          AND ftpf.record_end_date IS NULL
+        ORDER BY ftpf.target_feature_type_id;
       `);
 
-      try {
-        await connection.sql(SQL`
-          INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_property_id, feature_type_property_id, create_user)
-          VALUES (${blueprintFeatureType.blueprint_feature_type_id}, ${featurePropertyId}, ${
-          inserted.rows[0].feature_type_property_id
-        }, ${connection.systemUserId()});
-        `);
-        expect.fail();
-      } catch (error) {
-        expect(databaseErrorMessage(error)).to.include('does not belong to the feature type');
+      expect(copied.rows.map((row) => row.target_feature_type_id)).to.eql(
+        [...allowedFeatureTypeIds].sort((a, b) => a - b)
+      );
+      for (const row of copied.rows) {
+        expect(row.blueprint_feature_type_property_id).to.not.equal(blueprintFeatureTypePropertyId);
       }
     });
   });
@@ -499,7 +556,7 @@ describe('BlueprintService — blueprint-owned property assignments (integration
     await ingestion.populateResolvedPropertyStagingBySubmissionUploadId(submissionUploadId, draft.blueprint_id);
 
     const resolved = await connection.sql(SQL`
-      SELECT feature_type_property_id, blueprint_feature_type_property_id, required_value, allow_multiple, property_type_name
+      SELECT blueprint_feature_type_property_id, required_value, allow_multiple, property_type_name
       FROM submission_upload_staging_resolved_property
       WHERE submission_upload_id = ${submissionUploadId}::uuid
         AND property_name = ${propertyName};
@@ -507,7 +564,6 @@ describe('BlueprintService — blueprint-owned property assignments (integration
 
     expect(resolved.rowCount).to.equal(1);
     expect(resolved.rows[0].blueprint_feature_type_property_id).to.equal(assignment.blueprint_feature_type_property_id);
-    expect(resolved.rows[0].feature_type_property_id).to.equal(assignment.feature_type_property_id);
     expect(resolved.rows[0].required_value).to.equal(true);
     expect(resolved.rows[0].allow_multiple).to.equal(true);
     expect(resolved.rows[0].property_type_name).to.equal('number');

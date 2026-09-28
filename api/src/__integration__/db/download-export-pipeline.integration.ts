@@ -31,9 +31,15 @@ import { DownloadPolicyService } from '../../services/download/download-policy-s
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
+import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
 import { buildPartZipKey } from '../../utils/export-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
+import {
+  buildParquetPropertiesMetadata,
+  PARQUET_PROPERTIES_METADATA_KEY,
+  PARQUET_STRUCTURAL_COLUMNS
+} from '../../utils/parquet-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 /**
@@ -60,8 +66,26 @@ function fakeParquetReader(rows: Record<string, unknown>[], declaredRowCount?: n
   return {
     getCursor: () => cursor,
     getRowCount: async () => BigInt(declaredRowCount ?? rows.length),
+    getMetadata: () => ({ [PARQUET_PROPERTIES_METADATA_KEY]: buildParquetPropertiesMetadata(propertiesOfRows(rows)) }),
     close: async () => undefined
   } as unknown as parquetjs.ParquetReader;
+}
+
+/**
+ * The property list a real writer would have stored for these rows: every non-structural key,
+ * as a string property, in first-seen order. The fakes describe themselves the way a written
+ * file does, so the pipeline reads column names from the reader and never from a catalogue.
+ */
+function propertiesOfRows(rows: Record<string, unknown>[]): CsvPropertyDefinition[] {
+  const names: string[] = [];
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (!PARQUET_STRUCTURAL_COLUMNS.includes(key) && !names.includes(key)) {
+        names.push(key);
+      }
+    }
+  }
+  return names.map((name) => ({ feature_property_name: name, feature_property_type_name: 'string' }));
 }
 
 /**

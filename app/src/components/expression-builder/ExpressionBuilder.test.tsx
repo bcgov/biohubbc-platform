@@ -177,7 +177,7 @@ describe('ExpressionBuilder', () => {
             {
               type: 'predicate',
               feature_property_id: 1,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Equals',
               value: 'sensitive'
             }
@@ -215,7 +215,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'ILike',
           value: 'wolf'
         }
@@ -290,7 +290,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180701
         }
@@ -363,7 +363,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'DescendsFrom',
           value: 180701
         }
@@ -434,7 +434,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 15,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: '179913'
         }
@@ -494,7 +494,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 999999
         }
@@ -660,7 +660,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 3,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         }
@@ -722,7 +722,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         }
@@ -791,14 +791,14 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         },
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         }
@@ -1245,7 +1245,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Exists'
         }
       ]

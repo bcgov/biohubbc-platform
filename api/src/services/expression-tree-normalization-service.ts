@@ -13,10 +13,10 @@ import type {
   NormalizedExpressionTreeClause,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
+import type { ExpressionPredicatePropertyMetadata } from '../models/feature-property';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
-import type { ExpressionPredicatePropertyMetadata } from '../models/feature-type-property';
 import { ItisTsnLookupValue, type FindTaxonFilters } from '../models/taxon';
-import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
+import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { parseTimestamp } from '../utils/timestamp';
 import { GeoJSONGeometryZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { TaxonomyService } from './taxonomy-service';
@@ -29,7 +29,7 @@ import { TaxonomyService } from './taxonomy-service';
  * Logical simplification remains the responsibility of the expression optimization utility.
  */
 export class ExpressionTreeNormalizationService {
-  featureTypePropertyRepository: FeatureTypePropertyRepository;
+  featurePropertyRepository: FeaturePropertyRepository;
   taxonomyService: TaxonomyService;
 
   /**
@@ -38,7 +38,7 @@ export class ExpressionTreeNormalizationService {
    * @param {IDBConnection} connection - Active database connection.
    */
   constructor(connection: IDBConnection) {
-    this.featureTypePropertyRepository = new FeatureTypePropertyRepository(connection);
+    this.featurePropertyRepository = new FeaturePropertyRepository(connection);
     this.taxonomyService = new TaxonomyService(connection);
   }
 
@@ -204,16 +204,16 @@ export class ExpressionTreeNormalizationService {
     predicate: ExpressionTreePredicate,
     metadataByProperty: Map<string, Promise<ExpressionPredicatePropertyMetadata>>
   ): Promise<ExpressionPredicatePropertyMetadata> {
-    const identity = `${predicate.feature_property_id}:${predicate.feature_type_property_id ?? ''}`;
+    const identity = `${predicate.feature_property_id}:${predicate.blueprint_feature_type_property_id ?? ''}`;
     const cachedMetadata = metadataByProperty.get(identity);
 
     if (cachedMetadata) {
       return cachedMetadata;
     }
 
-    const metadata = this.featureTypePropertyRepository.getExpressionPredicatePropertyMetadata(
+    const metadata = this.featurePropertyRepository.getExpressionPredicatePropertyMetadata(
       predicate.feature_property_id,
-      predicate.feature_type_property_id
+      predicate.blueprint_feature_type_property_id
     );
     metadataByProperty.set(identity, metadata);
     return metadata;

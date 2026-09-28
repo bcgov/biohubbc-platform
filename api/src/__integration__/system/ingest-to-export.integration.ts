@@ -67,29 +67,14 @@ describe('Ingest → Download → Export (system integration)', function () {
   });
 
   /**
-   * Look up the active feature_type_property_id for a (feature_type, property) pair.
-   * Hardcoding seed IDs is brittle; this name-based lookup mirrors how the
-   * indexer resolves them at runtime.
+   * Resolve the assignment a feature's property is stored under: the active assignment of the named
+   * property, within the feature's type, in the Blueprint its upload is pinned to. Hardcoding seed ids
+   * is brittle; this name-based lookup mirrors how the indexer resolves them at runtime.
    */
-  async function lookupFeatureTypePropertyId(featureTypeName: string, propertyName: string): Promise<number> {
-    const result = await connection.sql(SQL`
-      SELECT ftp.feature_type_property_id
-      FROM feature_type_property ftp
-      INNER JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-      INNER JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
-      WHERE ft.name = ${featureTypeName}
-        AND fp.name = ${propertyName}
-        AND ftp.record_end_date IS NULL
-      LIMIT 1;
-    `);
-    if (!result.rowCount) {
-      throw new Error(`feature_type_property not found: ${featureTypeName}.${propertyName}`);
-    }
-    return result.rows[0].feature_type_property_id as number;
-  }
-
-  /** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
-  async function lookupBlueprintFeatureTypePropertyId(submissionFeatureId: number, ftpId: number): Promise<number> {
+  async function lookupBlueprintFeatureTypePropertyId(
+    submissionFeatureId: number,
+    propertyName: string
+  ): Promise<number> {
     const result = await connection.sql(SQL`
       SELECT bftp.blueprint_feature_type_property_id
       FROM submission_feature sf
@@ -97,14 +82,16 @@ describe('Ingest → Download → Export (system integration)', function () {
       INNER JOIN blueprint_feature_type bft
         ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
       INNER JOIN blueprint_feature_type_property bftp
-        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-       AND bftp.feature_type_property_id = ${ftpId}
-       AND bftp.record_end_date IS NULL
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+      INNER JOIN feature_property fp
+        ON fp.feature_property_id = bftp.feature_property_id AND fp.name = ${propertyName}
       WHERE sf.submission_feature_id = ${submissionFeatureId}
       LIMIT 1;
     `);
     if (!result.rowCount) {
-      throw new Error(`blueprint_feature_type_property not found for feature ${submissionFeatureId}, ftp ${ftpId}`);
+      throw new Error(
+        `blueprint_feature_type_property not found for feature ${submissionFeatureId}, property ${propertyName}`
+      );
     }
     return result.rows[0].blueprint_feature_type_property_id as number;
   }
@@ -120,21 +107,16 @@ describe('Ingest → Download → Export (system integration)', function () {
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
 
-    const dopId = await lookupFeatureTypePropertyId('telemetry', 'dop');
-    const elevationId = await lookupFeatureTypePropertyId('telemetry', 'elevation');
-    const timestampId = await lookupFeatureTypePropertyId('telemetry', 'timestamp');
-    const geometryId = await lookupFeatureTypePropertyId('telemetry', 'geometry');
-
-    const dopBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, dopId);
-    const elevationBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, elevationId);
-    const timestampBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, timestampId);
-    const geometryBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, geometryId);
+    const dopBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'dop');
+    const elevationBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'elevation');
+    const timestampBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'timestamp');
+    const geometryBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'geometry');
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
       VALUES
-        (${submissionFeatureId}, ${dopId}, ${dopBftpId}, ${data.dop}, ${systemUserId}),
-        (${submissionFeatureId}, ${elevationId}, ${elevationBftpId}, ${data.elevation}, ${systemUserId});
+        (${submissionFeatureId}, ${dopBftpId}, ${data.dop}, ${systemUserId}),
+        (${submissionFeatureId}, ${elevationBftpId}, ${data.elevation}, ${systemUserId});
     `);
     // The timestamp table stores partial-component datetimes — split the ISO
     // string into date + time at the call site (the boundary that has the
@@ -144,15 +126,15 @@ describe('Ingest → Download → Export (system integration)', function () {
     const timeValue = data.timestamp.slice(11, 19);
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_timestamp
-        (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
-      VALUES (${submissionFeatureId}, ${timestampId}, ${timestampBftpId}, ${dateValue}::date, ${timeValue}::time, ${systemUserId});
+        (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
+      VALUES (${submissionFeatureId}, ${timestampBftpId}, ${dateValue}::date, ${timeValue}::time, ${systemUserId});
     `);
     // Geometry uses ST_GeomFromGeoJSON; pass the inner Feature.geometry, not the FeatureCollection wrapper.
     const innerGeom = (data.geometry as any)?.features?.[0]?.geometry ?? data.geometry;
     await connection.query(
-      `INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
-       VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4), $5)`,
-      [submissionFeatureId, geometryId, geometryBftpId, JSON.stringify(innerGeom), systemUserId]
+      `INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+       VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
+      [submissionFeatureId, geometryBftpId, JSON.stringify(innerGeom), systemUserId]
     );
   }
 
