@@ -106,4 +106,43 @@ describe('searchSubmissionUploadFeatures', () => {
       expect(release).to.have.been.calledOnce;
     });
   }
+
+  it('cancels database work when the HTTP client disconnects', async () => {
+    let rejectSearch!: (error: Error) => void;
+    const cancel = sinon.stub().callsFake(async () => rejectSearch(new Error('Query cancelled')));
+    const connection = getMockDBConnection({
+      cancel,
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub()
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').callsFake((_token, options) => {
+      options?.signal?.addEventListener('abort', () => void connection.cancel(), { once: true });
+      return connection;
+    });
+    const search = sinon
+      .stub(SearchFeatureService.prototype, 'searchSubmissionUploadFeatures')
+      .returns(new Promise((_, reject) => (rejectSearch = reject)));
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: '16', submissionUploadId: '11111111-1111-4111-8111-111111111111' };
+    mockReq.body = {};
+
+    const handler = index.searchSubmissionUploadFeatures()(mockReq, mockRes, mockNext);
+    await Promise.resolve();
+    mockRes.emit('close');
+    let caught: unknown;
+    try {
+      await handler;
+    } catch (error) {
+      caught = error;
+    }
+
+    expect((caught as Error).message).to.equal('Query cancelled');
+    expect(search).to.have.been.calledOnce;
+    expect(cancel).to.have.been.calledOnce;
+    expect(connection.rollback).to.have.been.calledOnce;
+    expect(connection.release).to.have.been.calledOnce;
+    expect(connection.commit).not.to.have.been.called;
+  });
 });

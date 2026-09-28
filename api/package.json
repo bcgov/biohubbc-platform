@@ -19,6 +19,7 @@
     "test": "npm run test:mocha -- --config .mocharc.json",
     "test-watch": "npm run test:mocha -- --config .mocharc.json --watch",
     "test:db": "npm run test:mocha -- --config .mocharc.integration.json",
+    "test:bench": "npm run test:mocha -- --config .mocharc.benchmark.json",
     "test:sys": "npm run test:mocha -- --config .mocharc.system.json",
     "test:sys:file": "npm run test:mocha -- --no-config --extension ts --timeout 60000",
     "coverage": "cross-env TSX_TSCONFIG_PATH=./tsconfig.mocha.json c8 node --import tsx ./node_modules/mocha/bin/mocha.js --config .mocharc.json",

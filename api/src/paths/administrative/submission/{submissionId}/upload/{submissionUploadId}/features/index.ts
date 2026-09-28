@@ -22,6 +22,7 @@ import {
   makePaginationOptionsFromRequest,
   makePaginationResponse
 } from '../../../../../../../utils/pagination';
+import { registerRequestCancellation } from '../../../../../../../utils/request-cancellation';
 import { validateSearchExpressionTree } from '../../../../../../../utils/search-feature-validation';
 
 const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/features');
@@ -163,7 +164,8 @@ POST.apiDoc = {
  */
 export function searchSubmissionUploadFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const cancellation = registerRequestCancellation(res);
+    const connection = getDBConnection(req.keycloak_token, { signal: cancellation.signal });
     try {
       await connection.open();
       const expression = validateSearchExpressionTree(req.body.expression) ?? null;
@@ -177,10 +179,12 @@ export function searchSubmissionUploadFeatures(): RequestHandler {
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {
+      cancellation.unregister();
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      cancellation.unregister();
+      await connection.release();
     }
   };
 }

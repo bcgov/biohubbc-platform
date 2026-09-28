@@ -63,6 +63,45 @@ describe('review assignment search and reset bodies', () => {
       expect(mockRes.statusValue).equal(204);
     });
   }
+
+  it('cancels database work when the HTTP client disconnects', async () => {
+    let rejectRead!: (error: Error) => void;
+    const cancel = sinon.stub().callsFake(async () => rejectRead(new Error('Query cancelled')));
+    const connection = getMockDBConnection({
+      cancel,
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub()
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').callsFake((_token, options) => {
+      options?.signal?.addEventListener('abort', () => void connection.cancel(), { once: true });
+      return connection;
+    });
+    const read = sinon
+      .stub(SubmissionUploadReviewSecurityService.prototype, 'getSubmissionUploadReviewSecurityAssignments')
+      .returns(new Promise((_, reject) => (rejectRead = reject)));
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: '7', submissionUploadId: 'upload', submissionUploadReviewId: 'review' };
+    mockReq.body = {};
+
+    const handler = getSubmissionUploadReviewSecurityAssignments()(mockReq, mockRes, mockNext);
+    await Promise.resolve();
+    mockRes.emit('close');
+    let caught: unknown;
+    try {
+      await handler;
+    } catch (error) {
+      caught = error;
+    }
+
+    expect((caught as Error).message).equal('Query cancelled');
+    sinon.assert.calledOnce(read);
+    sinon.assert.calledOnce(cancel);
+    sinon.assert.calledOnce(connection.rollback as sinon.SinonStub);
+    sinon.assert.calledOnce(connection.release as sinon.SinonStub);
+    sinon.assert.notCalled(connection.commit as sinon.SinonStub);
+  });
 });
 
 describe('assignment expression validation', () => {
