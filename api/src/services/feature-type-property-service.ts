@@ -147,6 +147,7 @@ export class FeatureTypePropertyService extends DBService {
    * @param {UpdateFeatureTypePropertyRecord} data - Partial fields to update.
    * @return {Promise<AdminFeatureTypeProperty>} The updated record.
    * @throws {ApiNotFoundError} If no active record exists for the id within the parent feature type.
+   * @throws {ApiConflictError} If the update retires a pairing an active blueprint assignment references.
    * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
    * @memberof FeatureTypePropertyService
    */
@@ -155,6 +156,10 @@ export class FeatureTypePropertyService extends DBService {
     featureTypeId: number,
     data: UpdateFeatureTypePropertyRecord
   ): Promise<AdminFeatureTypeProperty> {
+    if (data.record_end_date) {
+      await this.assertNotAssignedByBlueprint(featureTypePropertyId, 'updateFeatureTypeProperty');
+    }
+
     await this.featureTypePropertyRepository.updateFeatureTypeProperty(featureTypePropertyId, featureTypeId, data);
     return this.featureTypePropertyRepository.getAdminFeatureTypeProperty(featureTypePropertyId, featureTypeId);
   }
@@ -166,9 +171,39 @@ export class FeatureTypePropertyService extends DBService {
    * @param {number} featureTypeId - Parent feature type identifier.
    * @return {Promise<void>}
    * @throws {ApiNotFoundError} If no active record exists for the id within the parent feature type.
+   * @throws {ApiConflictError} If an active blueprint assignment references the pairing.
    * @memberof FeatureTypePropertyService
    */
   async deleteFeatureTypeProperty(featureTypePropertyId: number, featureTypeId: number): Promise<void> {
+    await this.assertNotAssignedByBlueprint(featureTypePropertyId, 'deleteFeatureTypeProperty');
+
     await this.featureTypePropertyRepository.deleteFeatureTypeProperty(featureTypePropertyId, featureTypeId);
+  }
+
+  /**
+   * Refuse to retire a pairing while an active blueprint assignment references it.
+   *
+   * Ingestion resolves properties through the blueprint assignment and would keep storing values
+   * against a retired pairing, while search, downloads and codes only read through active pairings and
+   * would hide them.
+   *
+   * @param {number} featureTypePropertyId - Feature type property identifier.
+   * @param {string} caller - Calling method name, for the error context.
+   * @return {Promise<void>}
+   * @throws {ApiConflictError} If an active blueprint assignment references the pairing.
+   * @memberof FeatureTypePropertyService
+   */
+  private async assertNotAssignedByBlueprint(featureTypePropertyId: number, caller: string): Promise<void> {
+    const assignmentCount =
+      await this.featureTypePropertyRepository.countActiveBlueprintAssignmentsByFeatureTypePropertyId(
+        featureTypePropertyId
+      );
+
+    if (assignmentCount > 0) {
+      throw new ApiConflictError('Feature type property is assigned by an active blueprint and cannot be retired', [
+        `FeatureTypePropertyService->${caller}`,
+        { feature_type_property_id: featureTypePropertyId, active_blueprint_assignments: assignmentCount }
+      ]);
+    }
   }
 }
