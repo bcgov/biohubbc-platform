@@ -5,17 +5,21 @@ import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { PageSection } from 'components/section/PageSection';
-import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { SubmissionFeatureTable } from 'features/submissions/components/SubmissionFeatureTable';
 import { SubmissionUploadMap } from './components/map/SubmissionUploadMap';
 import { SubmissionUploadReconciliationTable } from './components/SubmissionUploadReconciliationTable';
-import { SubmissionUploadReviewHeader, SubmissionUploadReviewTab } from './components/SubmissionUploadReviewHeader';
+import { SubmissionUploadReviewHeader } from './components/SubmissionUploadReviewHeader';
+
+interface SubmissionUploadReviewValidationPageProps {
+  review: ISubmissionUploadReviewDetail;
+}
 
 /**
  * Validation review workspace for a single submission upload.
@@ -24,22 +28,20 @@ import { SubmissionUploadReviewHeader, SubmissionUploadReviewTab } from './compo
  * spatial features, and a server-paginated table containing the features belonging to
  * the reviewed submission upload.
  *
+ * @param {SubmissionUploadReviewValidationPageProps} props - Validation review page properties.
  * @returns {JSX.Element} The submission upload validation review page.
  */
-export const SubmissionUploadReviewValidationPage = () => {
+export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadReviewValidationPageProps) => {
+  const { review: initialReview } = props;
   const navigate = useNavigate();
-  const { submissionId, submissionUploadId, reviewId } = useParams<{
+  const { submissionId, submissionUploadId, submissionUploadReviewId } = useParams<{
     submissionId: string;
     submissionUploadId: string;
-    reviewId: string;
+    submissionUploadReviewId: string;
   }>();
   const api = useApi();
   const dialogContext = useDialogContext();
-  const [activeTab, setActiveTab] = useState<SubmissionUploadReviewTab>('features');
-  const [isSavingStatus, setIsSavingStatus] = useState(false);
-  const reviewDataLoader = useDataLoader((currentSubmissionId: number, uploadId: string, uploadReviewId: string) =>
-    api.admin.getSubmissionUploadReview(currentSubmissionId, uploadId, uploadReviewId)
-  );
+  const [currentReview, setCurrentReview] = useState(initialReview);
   const reconciliationDataLoader = useDataLoader((currentSubmissionId: number, uploadId: string) =>
     api.admin.getSubmissionUploadReconciliationCounts(currentSubmissionId, uploadId)
   );
@@ -56,17 +58,18 @@ export const SubmissionUploadReviewValidationPage = () => {
   });
 
   useEffect(() => {
-    if (submissionId && submissionUploadId && reviewId) {
-      reviewDataLoader.load(Number(submissionId), submissionUploadId, reviewId);
+    if (submissionId && submissionUploadId) {
       reconciliationDataLoader.load(Number(submissionId), submissionUploadId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId, submissionUploadId, reviewId]);
+  }, [reconciliationDataLoader, submissionId, submissionUploadId]);
 
-  const review = reviewDataLoader.data;
+  useEffect(() => {
+    setCurrentReview(initialReview);
+  }, [initialReview]);
+
+  const review = currentReview;
   const reconciliationCounts = reconciliationDataLoader.data;
-  const isLoading =
-    (reviewDataLoader.isLoading && !review) || (reconciliationDataLoader.isLoading && !reconciliationCounts);
+  const isLoading = reconciliationDataLoader.isLoading && !reconciliationCounts;
 
   if (review?.scope && review.scope !== 'validation') {
     return <Navigate to="/page-not-found" replace />;
@@ -87,7 +90,7 @@ export const SubmissionUploadReviewValidationPage = () => {
    * @returns {Promise<void>} Resolves after the review status update finishes.
    */
   const updateReviewStatus = async () => {
-    if (!submissionId || !submissionUploadId || !reviewId || !review) {
+    if (!submissionId || !submissionUploadId || !submissionUploadReviewId || !review) {
       return;
     }
 
@@ -95,21 +98,18 @@ export const SubmissionUploadReviewValidationPage = () => {
     const status = review.status === 'completed' ? 'in_progress' : 'completed';
 
     try {
-      setIsSavingStatus(true);
       const updatedReview = await api.admin.updateSubmissionUploadReview(
         Number(submissionId),
         submissionUploadId,
-        reviewId,
+        submissionUploadReviewId,
         status
       );
-      reviewDataLoader.setData(updatedReview);
+      setCurrentReview(updatedReview);
     } catch (error) {
       dialogContext.setSnackbar({
         open: true,
         snackbarMessage: (error as Error).message
       });
-    } finally {
-      setIsSavingStatus(false);
     }
   };
 
@@ -162,38 +162,25 @@ export const SubmissionUploadReviewValidationPage = () => {
           <SubmissionUploadReviewHeader
             submissionId={Number(submissionId)}
             review={review}
-            isSavingStatus={isSavingStatus}
             onStatusActionClick={handleStatusActionClick}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
           />
           <Container maxWidth="xl" sx={{ py: 4 }}>
-            <ComponentSwitch<SubmissionUploadReviewTab>
-              switch={activeTab}
-              components={{
-                features: (
-                  <Stack spacing={4}>
-                    <SubmissionUploadReconciliationTable counts={reconciliationCounts} />
-                    <PageSection id="review-map" label="Map">
-                      <SubmissionUploadMap
-                        submissionId={Number(submissionId)}
-                        submissionUploadId={submissionUploadId!}
-                      />
-                    </PageSection>
-                    <SubmissionFeatureTable
-                      rows={featureGrid.rows}
-                      rowCount={featureGrid.rowCount}
-                      isLoading={featureGrid.isLoading}
-                      onRowClick={(params) => handleFeatureRowClick(params.row.submission_feature_id)}
-                      paginationModel={featureGrid.paginationModel}
-                      onPaginationModelChange={featureGrid.handlePaginationChange}
-                      sortModel={featureGrid.sortModel}
-                      onSortModelChange={featureGrid.handleSortChange}
-                    />
-                  </Stack>
-                )
-              }}
-            />
+            <Stack spacing={4}>
+              <SubmissionUploadReconciliationTable counts={reconciliationCounts} />
+              <PageSection id="review-map" label="Map">
+                <SubmissionUploadMap submissionId={Number(submissionId)} submissionUploadId={submissionUploadId!} />
+              </PageSection>
+              <SubmissionFeatureTable
+                rows={featureGrid.rows}
+                rowCount={featureGrid.rowCount}
+                isLoading={featureGrid.isLoading && !featureGrid.response}
+                onRowClick={(params) => handleFeatureRowClick(params.row.submission_feature_id)}
+                paginationModel={featureGrid.paginationModel}
+                onPaginationModelChange={featureGrid.handlePaginationChange}
+                sortModel={featureGrid.sortModel}
+                onSortModelChange={featureGrid.handleSortChange}
+              />
+            </Stack>
           </Container>
         </>
       ) : null}

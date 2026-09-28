@@ -137,4 +137,29 @@ describe('useOptimisticDataLoader', () => {
     expect(response).toEqual({ ok: true });
     expect(dataLoader.setData).toHaveBeenCalledWith(1);
   });
+
+  it('uses the latest optimistic data before its consumer rerenders', async () => {
+    const dataLoader = {
+      data: { value: 1 },
+      setData: vi.fn((nextData: { value: number }) => {
+        dataLoader.data = nextData;
+      })
+    };
+
+    const { result } = renderHook(() => useOptimisticDataLoader(dataLoader));
+
+    await act(async () => {
+      await result.current.refresh((currentData) => ({
+        optimisticState: { value: currentData.value + 1 },
+        mutation: async () => undefined
+      }));
+      await result.current.refresh((currentData) => ({
+        optimisticState: { value: currentData.value + 1 },
+        mutation: async () => undefined
+      }));
+    });
+
+    expect(dataLoader.setData).toHaveBeenNthCalledWith(1, { value: 2 });
+    expect(dataLoader.setData).toHaveBeenNthCalledWith(2, { value: 3 });
+  });
 });
