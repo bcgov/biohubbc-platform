@@ -6,7 +6,6 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionModel,
-  PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
@@ -709,45 +708,6 @@ describe('SubmissionService', () => {
         }
       ]);
       expect(response).to.be.undefined;
-    });
-  });
-
-  describe('patchSubmissionRecord', () => {
-    it('should patch the submission record and return the updated record', async () => {
-      const submissionId = 1;
-
-      const patch: PatchSubmissionRecord = { security_reviewed: true };
-
-      const mockSubmissionRecord: SubmissionRecord = {
-        submission_id: 1,
-        uuid: '123-456-789',
-        security_review_timestamp: '2023-12-12',
-        submitted_timestamp: '2023-12-12',
-        system_user_id: 3,
-        contributor_id: 1,
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        publish_timestamp: '2023-12-12',
-        record_end_date: '2023-12-12',
-        create_date: '2023-12-12',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-      const mockDBConnection = getMockDBConnection();
-
-      const patchSubmissionRecordStub = sinon
-        .stub(SubmissionRepository.prototype, 'patchSubmissionRecord')
-        .resolves(mockSubmissionRecord);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.patchSubmissionRecord(submissionId, patch);
-
-      expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
-      expect(response).to.be.eql(mockSubmissionRecord);
     });
   });
 

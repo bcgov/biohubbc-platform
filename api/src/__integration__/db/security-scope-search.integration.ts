@@ -20,7 +20,6 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
-import { SecurityRepository } from '../../repositories/security-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { computeScopeHash } from '../../utils/scope-hash';
@@ -2460,14 +2459,18 @@ describe('Security scope search (integration)', function () {
         currentSecured: false
       });
       const repo = new TeamAuthorizationRepository(connection);
-      const securityRepo = new SecurityRepository(connection);
 
       expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
 
-      await securityRepo.removeSecurityRulesFromSubmissionFeatures(submissionId, [historicalParentId], [1]);
+      // Remove the fixture assignment to verify that authorization reflects the current security state.
+      await connection.sql(SQL`
+        DELETE FROM submission_feature_security
+        WHERE submission_feature_id = ${historicalParentId}
+          AND security_rule_id = 1;
+      `);
       expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
 
-      await securityRepo.applySecurityRulesToSubmissionFeatures(submissionId, [historicalParentId], [1]);
+      await secureFeature(connection, historicalParentId);
       expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
     });
 

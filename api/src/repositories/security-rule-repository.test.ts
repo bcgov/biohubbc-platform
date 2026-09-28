@@ -14,43 +14,6 @@ describe('SecurityRuleRepository', () => {
     sinon.restore();
   });
 
-  describe('getActiveSecurityRules', () => {
-    it('returns an array of security rules', async () => {
-      const mockRow = {
-        security_rule_id: 1,
-        policy_id: null,
-        name: 'rule-a',
-        description: 'desc',
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => ({ rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>)
-      });
-
-      const repo = new SecurityRuleRepository(mockDBConnection);
-      const result = await repo.getActiveSecurityRules();
-
-      expect(result).to.have.length(1);
-    });
-
-    it('returns an empty array when there are no active rules', async () => {
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => ({ rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>)
-      });
-
-      const repo = new SecurityRuleRepository(mockDBConnection);
-      const result = await repo.getActiveSecurityRules();
-
-      expect(result).to.eql([]);
-    });
-  });
-
   describe('getSecurityRulesWithFeatureCount', () => {
     it('counts only non-soft-deleted applications', async () => {
       const mockRow = {

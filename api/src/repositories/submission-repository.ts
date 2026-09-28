@@ -301,13 +301,6 @@ export const SubmissionMessageRecord = z.object({
 
 export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
 
-export const PatchSubmissionRecord = z.object({
-  security_reviewed: z.boolean().optional(),
-  published: z.boolean().optional()
-});
-
-export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
-
 /**
  * A repository class for accessing submission data.
  *
@@ -1608,88 +1601,6 @@ export class SubmissionRepository extends BaseRepository {
         `rowCount was ${response.rowCount}, expected rowCount === ${messages.length}`
       ]);
     }
-  }
-
-  /**
-   * Patch a submission record.
-   *
-   * @param {number} submissionId
-   * @param {PatchSubmissionRecord} patch
-   * @returns {Promise<SubmissionRecord>}
-   * @memberof SubmissionRepository
-   */
-  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
-    const knex = getKnex();
-    const queryBuilder = knex.table('submission').where('submission_id', submissionId);
-
-    // Collect all update operations
-    let updateOperations: Record<string, Knex.Raw> = {};
-
-    if (patch.security_reviewed === true) {
-      updateOperations = {
-        ...updateOperations,
-        security_review_timestamp: knex.raw(
-          'CASE WHEN security_review_timestamp IS NULL THEN NOW() ELSE security_review_timestamp END'
-        )
-      };
-    } else if (patch.security_reviewed === false) {
-      updateOperations = {
-        ...updateOperations,
-        security_review_timestamp: knex.raw(
-          'CASE WHEN security_review_timestamp IS NOT NULL THEN NULL ELSE security_review_timestamp END'
-        )
-      };
-    }
-
-    if (patch.published === true) {
-      updateOperations = {
-        ...updateOperations,
-        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
-      };
-
-      // Publishing this submission, first unpublish all submissions with the same uuid as the target submission.
-      // Why? Because we only want one published submission per uuid.
-      await this.unpublishAllSubmissionsBySubmissionId(submissionId);
-    } else if (patch.published === false) {
-      updateOperations = {
-        ...updateOperations,
-        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NOT NULL THEN NULL ELSE publish_timestamp END')
-      };
-    }
-
-    // Register all update operations
-    queryBuilder
-      .update(updateOperations)
-      .returning([
-        'submission_id',
-        'uuid',
-        'security_review_timestamp',
-        'submitted_timestamp',
-        'system_user_id',
-        'contributor_id',
-        'name',
-        'description',
-        'comment',
-        'publish_timestamp',
-        'record_end_date',
-        'create_date',
-        'create_user',
-        'update_date',
-        'update_user',
-        'revision_count'
-      ]);
-
-    const response = await this.connection.knex(queryBuilder);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to patch submission record', [
-        'SubmissionRepository->patchSubmissionRecord',
-        `rowCount was ${response.rowCount}, expected rowCount === 1`
-      ]);
-    }
-
-    const submissionRecord = response.rows[0];
-    return submissionRecord as SubmissionRecord;
   }
 
   /**

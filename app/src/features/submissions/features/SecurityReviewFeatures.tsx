@@ -1,35 +1,30 @@
 import { Box, Stack, Typography } from '@mui/material';
-import { GridPaginationModel, GridRowParams, GridRowSelectionModel, GridSortModel } from '@mui/x-data-grid';
+import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { SecurityReviewFeaturesTable } from './table/SecurityReviewFeaturesTable';
 import { FeatureRow } from './table/SecurityReviewFeaturesTable.interface';
 
 interface SecurityReviewFeaturesProps {
   rows: FeatureRow[];
   rowCount: number;
-  setSelectedFeatureIds: (ids: Set<number>) => void;
   paginationModel: GridPaginationModel;
   setPaginationModel: (model: GridPaginationModel) => void;
   sortModel: GridSortModel;
   setSortModel: (model: GridSortModel) => void;
-  onRowClick: (params: GridRowParams<FeatureRow>) => void;
-  onRowSecurityClick: (row: FeatureRow) => void;
 }
 
+/**
+ * Displays paginated submission features and their security status.
+ * @param {SecurityReviewFeaturesProps} props Feature rows and paging controls.
+ * @returns {JSX.Element} Read-only feature section.
+ */
 export const SecurityReviewFeatures = ({
   rows,
   rowCount,
-  setSelectedFeatureIds,
   paginationModel,
   setPaginationModel,
   sortModel,
-  setSortModel,
-  onRowClick,
-  onRowSecurityClick
+  setSortModel
 }: SecurityReviewFeaturesProps) => {
-  const handleSelectionChange = (newSelection: GridRowSelectionModel) => {
-    setSelectedFeatureIds(new Set([...newSelection.ids].map(Number)));
-  };
-
   return (
     <Stack gap={2} py={2}>
       <Box px={2}>
@@ -44,13 +39,10 @@ export const SecurityReviewFeatures = ({
       <SecurityReviewFeaturesTable
         rows={rows}
         rowCount={rowCount}
-        onSelectionChange={handleSelectionChange}
         paginationModel={paginationModel}
         setPaginationModel={setPaginationModel}
         sortModel={sortModel}
         setSortModel={setSortModel}
-        onRowClick={onRowClick}
-        onRowSecurityClick={onRowSecurityClick}
       />
     </Stack>
   );
