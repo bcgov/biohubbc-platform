@@ -71,6 +71,11 @@ export const submissionUploadSecurityJobHandler: PgBoss.WorkHandler<ISubmissionU
           return;
         }
 
+        // Screening evaluates every rule's evidence walks in one statement. Its estimated cost clears jit_above_cost
+        // with only a few rules, and compiling it takes about a second for work that is index probes, which
+        // compilation does not speed up. SET LOCAL keeps the setting to this job's transaction.
+        await conn.query('SET LOCAL jit = off');
+
         const submissionUploadSecurityService = new SubmissionUploadSecurityService(conn);
         await submissionUploadSecurityService.screenSubmissionUpload(submissionUploadId, submissionId, job.id);
       });

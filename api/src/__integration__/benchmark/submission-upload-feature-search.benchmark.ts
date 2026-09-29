@@ -208,6 +208,9 @@ describe('Submission upload expression evaluation benchmark', function () {
         }
 
         const ruleCount = await createScreeningRules(connection, fixture);
+        // Screening is timed as the job runs it, with JIT off for the transaction; the review timings above run first
+        // and keep the API's default.
+        await connection.query('SET LOCAL jit = off');
         const screening = await time(() =>
           new SubmissionUploadSecurityService(connection).screenSubmissionUpload(
             fixture.submissionUploadId,

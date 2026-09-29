@@ -46,6 +46,27 @@ describe('submissionUploadSecurityJobHandler', () => {
     expect(mockConn.commit).to.have.been.calledOnce;
   });
 
+  it('turns JIT off for the transaction after taking the lock and before screening', async () => {
+    const mockConn = getMockDBConnection();
+    mockConn.open = sinon.stub().resolves();
+    mockConn.commit = sinon.stub().resolves();
+    mockConn.release = sinon.stub();
+    const query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
+    mockConn.query = query;
+
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockConn);
+
+    const screenStub = sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload').resolves();
+
+    await submissionUploadSecurityJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
+
+    expect(query.getCalls().map((call) => call.args[0])).to.eql([
+      'SELECT pg_try_advisory_xact_lock(hashtextextended($1::text, 2)) AS locked',
+      'SET LOCAL jit = off'
+    ]);
+    expect(query.secondCall.calledBefore(screenStub.firstCall)).to.be.true;
+  });
+
   it('skips screening when advisory lock is not acquired (concurrent job)', async () => {
     const mockConn = getMockDBConnection();
     mockConn.open = sinon.stub().resolves();
