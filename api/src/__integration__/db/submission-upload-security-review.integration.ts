@@ -848,7 +848,7 @@ describe('Submission upload security review (integration)', function () {
         submissionUploadId: submissionUploadId,
         featureScope: {}
       })
-    ).to.equal(undefined);
+    ).to.be.undefined;
     expect(await repository.getSubmissionFeatureSecurities([parentId])).to.have.length(1);
     await service.deleteSubmissionUploadReviewSecurityAssignments(submissionId, submissionUploadId, reviewB);
     expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
@@ -1579,7 +1579,7 @@ describe('Submission upload security review (integration)', function () {
         expect(
           [...first.features, ...second.features, ...last.features].map((row) => row.submission_feature_id)
         ).to.eql(expected);
-        expect(last.pagination.next_cursor).to.equal(null);
+        expect(last.pagination.next_cursor).to.be.null;
         const previous = await search.searchSubmissionUploadFeatures(
           submissionId,
           submissionUploadId,
@@ -1600,7 +1600,7 @@ describe('Submission upload security review (integration)', function () {
         );
         expect(previous.features[0].submission_feature_id).to.equal(expected[1]);
         expect(start.features[0].submission_feature_id).to.equal(expected[0]);
-        expect(start.pagination.previous_cursor).to.equal(null);
+        expect(start.pagination.previous_cursor).to.be.null;
       });
     }
   }
