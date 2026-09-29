@@ -1,69 +1,19 @@
-import { Paper } from '@mui/material';
-import Container from '@mui/material/Container';
-import Stack from '@mui/material/Stack';
-import BaseHeader from 'components/layout/header/BaseHeader';
-import { useSubmissionContext } from 'hooks/useContext';
-import { useMemo } from 'react';
-import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
-import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
-import { FeatureRow } from './features/table/SecurityReviewFeaturesTable.interface';
-import { SubmissionUploadStatus } from './page/status/SubmissionUploadStatus';
+import { Navigate, useParams } from 'react-router';
+import { parseRouteId } from 'utils/routes';
+import { AdminSubmissionPageContent } from './components/AdminSubmissionPageContent';
 
 /**
- * Displays submission features and upload status without submission-wide security editing.
+ * Administrative submission page: validates the route's submission id, then shows the submission. The content is
+ * keyed by submission, so its grid starts on the first page for each one.
  *
- * @returns {JSX.Element | null} Read-only submission overview when loaded.
+ * @returns {JSX.Element} The submission overview, or a redirect when the id identifies no submission.
  */
 export const AdminSubmissionPage = () => {
-  const { submissionDataLoader, featureDataLoader, paginationModel, setPaginationModel, sortModel, setSortModel } =
-    useSubmissionContext();
+  const submissionId = parseRouteId(useParams<{ submission_id: string }>().submission_id);
 
-  const submission = submissionDataLoader.data;
-
-  const rows: FeatureRow[] = useMemo(() => {
-    return (
-      featureDataLoader.data?.features.map((feature) => ({
-        id: feature.submission_feature_id,
-        submission_feature_id: feature.submission_feature_id,
-        feature_type_name: feature.feature_type_name,
-        secured: feature.secured
-      })) ?? []
-    );
-  }, [featureDataLoader.data]);
-
-  const rowCount = featureDataLoader.data?.pagination.total ?? 0;
-
-  if (!submission) {
-    return null;
+  if (submissionId === null) {
+    return <Navigate to="/page-not-found" replace />;
   }
 
-  return (
-    <>
-      <BaseHeader
-        title={submission.name}
-        subTitle={
-          <Stack direction="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
-            <SubmissionHeaderSecurityStatus submission={submission} />
-          </Stack>
-        }
-      />
-
-      <Container maxWidth="xl">
-        <Paper sx={{ my: 3 }}>
-          <SubmissionUploadStatus submissionId={submission.submission_id} />
-        </Paper>
-
-        <Paper sx={{ my: 3 }}>
-          <SecurityReviewFeatures
-            rows={rows}
-            rowCount={rowCount}
-            paginationModel={paginationModel}
-            setPaginationModel={setPaginationModel}
-            sortModel={sortModel}
-            setSortModel={setSortModel}
-          />
-        </Paper>
-      </Container>
-    </>
-  );
+  return <AdminSubmissionPageContent key={submissionId} submissionId={submissionId} />;
 };

@@ -3,7 +3,7 @@ import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import dayjs from 'dayjs';
 import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
-import { useCodesContext } from 'hooks/useContext';
+import { useCodesQuery } from 'hooks/useCodesQuery';
 import { useMemo, useState } from 'react';
 import { Navigate, useLocation, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
@@ -35,19 +35,19 @@ import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
 export const SearchResultPage = () => {
   const { featureType } = useParams<{ featureType: string }>();
   const location = useLocation();
-  const { codesDataLoader } = useCodesContext();
+  const codesQuery = useCodesQuery();
   const [view, setView] = useState<SEARCH_RESULT_VIEW>(SEARCH_RESULT_VIEW.TABLE);
 
-  const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
+  const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesQuery.data?.feature_type_with_properties);
   const featureTypeLinks = useMemo(
-    () => buildSearchFeatureTypeLinks(codesDataLoader.data?.feature_type_with_properties),
-    [codesDataLoader.data?.feature_type_with_properties]
+    () => buildSearchFeatureTypeLinks(codesQuery.data?.feature_type_with_properties),
+    [codesQuery.data?.feature_type_with_properties]
   );
   const pathResolvers = useMemo(
     () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
     [location.search]
   );
-  const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
+  const { expressionTree, handleExpressionApply } = useSearchResultExpression();
   const {
     rows,
     properties,
@@ -56,8 +56,9 @@ export const SearchResultPage = () => {
     searchParams,
     setSearchParams,
     totalCount,
-    cursor
-  } = useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
+    cursor,
+    reload
+  } = useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
     useSearchResultPagingSort({ cursor, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
@@ -90,7 +91,11 @@ export const SearchResultPage = () => {
             featureTypeLinks={featureTypeLinks}
             searchTerm={searchQuery}
             expressionTree={expressionTree}
-            onExpressionApply={handleExpressionApply}
+            onExpressionApply={(expression) => {
+              if (!handleExpressionApply(expression)) {
+                reload();
+              }
+            }}
             onFeatureTypeChange={handleFeatureTypeTabChange}
           />
 
@@ -145,7 +150,7 @@ export const SearchResultPage = () => {
     );
   }
 
-  if (codesDataLoader.isReady) {
+  if (codesQuery.isFetched) {
     return <Navigate to="/page-not-found" replace />;
   }
 

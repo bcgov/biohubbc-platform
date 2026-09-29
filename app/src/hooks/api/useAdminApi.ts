@@ -377,15 +377,18 @@ const useAdminApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
    * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated submission features.
    */
   const getSubmissionFeatures = async (
     submissionId: number,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureForReviewResponse> => {
     const { data } = await axios.get(`/api/administrative/submission/${submissionId}/features`, {
       params: pagination,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;

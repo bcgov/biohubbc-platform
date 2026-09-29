@@ -170,7 +170,7 @@ describe('SubmissionDetailPage', () => {
         await act(async () => resolveFirst(mockSubmission));
       }
       expect(queryByRole('heading', { name: 'Test Submission' })).not.toBeInTheDocument();
-      expect(mockUseSearchResults).toHaveBeenLastCalledWith('observation', true, null, 0, [2]);
+      expect(mockUseSearchResults).toHaveBeenLastCalledWith('observation', true, null, [2]);
     }
   );
 

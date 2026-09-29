@@ -240,14 +240,17 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId
    * @param {string} submissionUploadId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISubmissionUploadProcessingStatusHistoryItem[]>}
    */
   const getSubmissionUploadProcessingStatusHistory = async (
     submissionId: number,
-    submissionUploadId: string
+    submissionUploadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionUploadProcessingStatusHistoryItem[]> => {
     const { data } = await axios.get<ISubmissionUploadProcessingStatusHistoryItem[]>(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status/history`
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status/history`,
+      options
     );
 
     return data;

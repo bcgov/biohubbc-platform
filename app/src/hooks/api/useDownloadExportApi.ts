@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   CreateExportPayload,
   DownloadExport,
@@ -80,10 +80,14 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    * which drive the export config picker.
    *
    * @param {string} downloadId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<DownloadFeatureType[]>}
    */
-  const getDownloadFeatureTypes = async (downloadId: string): Promise<DownloadFeatureType[]> => {
-    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`);
+  const getDownloadFeatureTypes = async (
+    downloadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadFeatureType[]> => {
+    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`, options);
     return data;
   };
 

@@ -1,3 +1,4 @@
+import { notifyManager } from '@tanstack/react-query';
 import { configure } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
@@ -13,3 +14,9 @@ if (typeof window !== 'undefined') {
 // Vitest still caps each test at its own 5s timeout, so this stays below that: a genuinely missing
 // element fails with Testing Library's DOM dump rather than a bare test timeout.
 configure({ asyncUtilTimeout: 4000 });
+
+// The query client delivers updates to components on a zero-delay timer. Tests deliver them on a microtask instead:
+// a test flushing promises then sees a settled query without advancing (possibly fake) timers, and a `waitFor` whose
+// callback mutates the DOM, and so re-runs on every mutation, cannot starve the timer the update is waiting on.
+notifyManager.setScheduler(queueMicrotask);
+

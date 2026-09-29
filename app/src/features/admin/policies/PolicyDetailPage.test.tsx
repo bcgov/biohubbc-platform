@@ -357,7 +357,11 @@ describe('PolicyDetailPage', () => {
       expect(getByText('Filters sensitive species observations')).toBeVisible();
       expect(getByTestId('policy-expressions-table').textContent).toContain(JSON.stringify(expression, null, 2));
     });
-    expect(getPolicyExpressions).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'name', order: 'asc' });
+    expect(getPolicyExpressions).toHaveBeenCalledWith(
+      'policy-1',
+      { page: 1, limit: 10, sort: 'name', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
   });
 
   it('renders the statements section from the statements tab', async () => {

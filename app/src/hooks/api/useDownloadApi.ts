@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   CreateDownloadRequest,
   CreateDownloadResponse,
@@ -20,10 +20,14 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    * Get paginated downloads accessible to the current user.
    *
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination params (page, limit, sort, order).
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] - Request cancellation.
    * @return {Promise<DownloadListResponse>}
    */
-  const getDownloads = async (pagination?: ApiPaginationRequestOptions): Promise<DownloadListResponse> => {
-    const { data } = await axios.get<DownloadListResponse>('/api/download', { params: pagination });
+  const getDownloads = async (
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadListResponse> => {
+    const { data } = await axios.get<DownloadListResponse>('/api/download', { params: pagination, ...options });
     return data;
   };
 

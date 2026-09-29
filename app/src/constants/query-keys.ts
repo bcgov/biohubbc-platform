@@ -5,6 +5,11 @@
  * other's queries. Each builder module starts its keys with its own root from here.
  */
 export const QUERY_KEY_ROOT = {
+  CODE: 'code',
+  DOWNLOAD: 'download',
+  POLICY: 'policy',
+  SEARCH: 'search',
+  SUBMISSION: 'submission',
   SUBMISSION_UPLOAD: 'submission-upload',
   TEAM: 'team',
   TICKET: 'ticket',

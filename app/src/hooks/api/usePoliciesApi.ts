@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   IPolicy,
   IPolicySummary,
@@ -43,10 +43,11 @@ const usePoliciesApi = (axios: AxiosInstance) => {
    * Get a single policy by ID.
    *
    * @param {string} policyId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IPolicy>}
    */
-  const getPolicy = async (policyId: string): Promise<IPolicy> => {
-    const { data } = await axios.get(`/api/administrative/policies/${policyId}`);
+  const getPolicy = async (policyId: string, options?: Pick<AxiosRequestConfig, 'signal'>): Promise<IPolicy> => {
+    const { data } = await axios.get(`/api/administrative/policies/${policyId}`, options);
 
     return data;
   };
@@ -56,13 +57,18 @@ const usePoliciesApi = (axios: AxiosInstance) => {
    *
    * @param {string} policyId
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IPolicyExpressionsResponse>}
    */
   const getPolicyExpressions = async (
     policyId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IPolicyExpressionsResponse> => {
-    const { data } = await axios.get(`/api/administrative/policies/${policyId}/expressions`, { params: pagination });
+    const { data } = await axios.get(`/api/administrative/policies/${policyId}/expressions`, {
+      params: pagination,
+      ...options
+    });
 
     return data;
   };

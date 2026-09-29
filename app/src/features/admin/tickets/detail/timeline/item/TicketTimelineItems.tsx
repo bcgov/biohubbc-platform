@@ -15,7 +15,6 @@ import {
   TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
-import { SubmissionUploadStatusHistoryState } from '../hooks/upload/useSubmissionUploadStatusHistory';
 import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
 import { TicketTimelineCommentItem } from './comment/TicketTimelineCommentItem';
 import { TicketTimelineDataRequestItem } from './data-request/TicketTimelineDataRequestItem';
@@ -34,8 +33,6 @@ interface ITicketTimelineItemsProps {
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
   canViewSubmissionUploadStatusHistory: boolean;
-  submissionUploadStatusHistoryByUploadId: Record<string, SubmissionUploadStatusHistoryState>;
-  onLoadSubmissionUploadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
   onCreateSubmissionUploadReview: (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
@@ -68,8 +65,6 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
     canViewSubmissionUploadStatusHistory,
-    submissionUploadStatusHistoryByUploadId,
-    onLoadSubmissionUploadStatusHistory,
     onCreateSubmissionUploadReview,
     onOpenSubmissionUploadReview,
     onConfirmSubmissionUploadDecisionUpdate,
@@ -166,8 +161,6 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                 }) ?? ''
               }
               canViewStatusHistory={canViewSubmissionUploadStatusHistory}
-              statusHistory={submissionUploadStatusHistoryByUploadId[item.upload.submission_upload_id]}
-              onLoadStatusHistory={onLoadSubmissionUploadStatusHistory}
               onCreateReview={onCreateSubmissionUploadReview}
               onOpenReview={onOpenSubmissionUploadReview}
               onAccept={(upload) => onConfirmSubmissionUploadDecisionUpdate(upload, 'approved')}

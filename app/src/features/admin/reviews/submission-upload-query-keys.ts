@@ -1,5 +1,6 @@
 import { QUERY_KEY_ROOT } from 'constants/query-keys';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
 
 /** Identifies one submission upload. */
@@ -190,6 +191,17 @@ const featureGeometryExtent = (scope: SubmissionUploadKeyScope, submissionFeatur
   [...feature(scope, submissionFeatureId), 'geometry-extent'] as const;
 
 /**
+ * Key of an upload's processing status history as it stood when the upload held a given status. The history only
+ * grows as the status moves on, so a history loaded for the current status stays current.
+ *
+ * @param {SubmissionUploadKeyScope} scope The upload.
+ * @param {SubmissionUploadJobStatus} uploadStatus The status the upload currently holds.
+ * @returns The status history key.
+ */
+const statusHistory = (scope: SubmissionUploadKeyScope, uploadStatus: SubmissionUploadJobStatus) =>
+  [...upload(scope), 'status-history', { uploadStatus }] as const;
+
+/**
  * Query keys for submission uploads and their reviews, ordered from broad to narrow so that each prefix
  * names the set of queries a change invalidates.
  */
@@ -208,5 +220,6 @@ export const submissionUploadQueryKeys = {
   feature,
   featureDetail,
   featureProperties,
-  featureGeometryExtent
+  featureGeometryExtent,
+  statusHistory
 };

@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook } from 'test-helpers/test-utils';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -70,7 +70,8 @@ describe('useSearchResultDownload', () => {
     );
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
@@ -98,7 +99,8 @@ describe('useSearchResultDownload', () => {
     );
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
@@ -121,7 +123,8 @@ describe('useSearchResultDownload', () => {
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);
@@ -147,7 +150,8 @@ describe('useSearchResultDownload', () => {
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);

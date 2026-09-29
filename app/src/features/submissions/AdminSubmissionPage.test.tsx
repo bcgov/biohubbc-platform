@@ -1,19 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
+import { render, screen } from 'test-helpers/test-utils';
 import { AdminSubmissionPage } from './AdminSubmissionPage';
 
-vi.mock('hooks/useContext', () => ({
-  useSubmissionContext: () => ({
-    submissionDataLoader: { data: { submission_id: 7, name: 'Submission seven' } },
-    featureDataLoader: {
-      data: {
-        features: [{ submission_feature_id: 42, feature_type_name: 'survey', secured: true }],
-        pagination: { total: 1 }
-      }
-    },
-    paginationModel: { page: 0, pageSize: 10 },
-    setPaginationModel: vi.fn(),
-    sortModel: [],
-    setSortModel: vi.fn()
+const mocks = vi.hoisted(() => ({ getSubmission: vi.fn(), getFeatures: vi.fn() }));
+vi.mock('hooks/useApi', () => ({
+  useApi: () => ({
+    submissions: { getSubmissionRecordWithSecurity: mocks.getSubmission },
+    admin: { getSubmissionFeatures: mocks.getFeatures }
   })
 }));
 vi.mock('./components/SubmissionHeaderSecurityStatus', () => ({ default: () => <span>Security status</span> }));
@@ -25,19 +18,58 @@ vi.mock('./page/status/SubmissionUploadStatus', () => ({
 vi.mock('components/data-grid/CustomDataGrid', () => ({
   default: (props: any) => (
     <div>
-      {props.columns.find((column: any) => column.field === 'secured').renderCell({ row: props.rows[0] })}
+      {props.rows[0] &&
+        props.columns.find((column: any) => column.field === 'secured').renderCell({ row: props.rows[0] })}
       {props.checkboxSelection && <input type="checkbox" aria-label="Select feature" />}
     </div>
   )
 }));
 
+/**
+ * Renders the page at a submission route.
+ *
+ * @param {string} path The route to open.
+ * @returns The RTL render result.
+ */
+const renderAt = (path: string) =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/admin/submissions/:submission_id" element={<AdminSubmissionPage />} />
+        <Route path="/page-not-found" element={<div>Not found</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+
 describe('AdminSubmissionPage', () => {
-  it('keeps feature security and upload navigation visible without legacy security actions', () => {
-    render(<AdminSubmissionPage />);
-    expect(screen.getByText('Submission seven')).toBeVisible();
-    expect(screen.getByLabelText('Secured')).toBeInTheDocument();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getSubmission.mockResolvedValue({ submission_id: 7, name: 'Submission seven' });
+    mocks.getFeatures.mockResolvedValue({
+      features: [{ submission_feature_id: 42, feature_type_name: 'survey', secured: true }],
+      pagination: { total: 1 }
+    });
+  });
+
+  it('keeps feature security and upload navigation visible without legacy security actions', async () => {
+    renderAt('/admin/submissions/7');
+
+    expect(await screen.findByText('Submission seven')).toBeVisible();
+    expect(await screen.findByLabelText('Secured')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upload reviews' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /security|publish/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(mocks.getFeatures).toHaveBeenCalledWith(
+      7,
+      { page: 1, limit: 10, sort: 'submission_feature_id', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
+  });
+
+  it('redirects when the route does not identify a submission', () => {
+    renderAt('/admin/submissions/not-a-number');
+
+    expect(screen.getByText('Not found')).toBeVisible();
+    expect(mocks.getSubmission).not.toHaveBeenCalled();
   });
 });

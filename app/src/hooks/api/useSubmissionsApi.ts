@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICreateSubmission,
   IGetSubmissionsForUserResponse,
@@ -43,10 +43,14 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * Fetch submission record with security data by submission id.
    *
    * @param {number} submissionId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*}
    */
-  const getSubmissionRecordWithSecurity = async (submissionId: number): Promise<SubmissionRecordWithSecurity> => {
-    const { data } = await axios.get(`api/submission/${submissionId}`);
+  const getSubmissionRecordWithSecurity = async (
+    submissionId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurity> => {
+    const { data } = await axios.get(`api/submission/${submissionId}`, options);
 
     return data;
   };

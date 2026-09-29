@@ -1,57 +1,49 @@
+import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DOWNLOAD_SIDEBAR_PAGE_SIZE } from 'constants/download';
 import { EXPORT_CONFIG_VERSION, EXPORT_TYPE } from 'constants/export-config-constants';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import { type CreateExportPayload } from 'interfaces/useDownloadExportApi.interface';
-import { useCallback, useEffect, useState } from 'react';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { useState } from 'react';
 import { buildExportConfig } from '../sidebar/download/export-config-form';
 import { triggerIframeDownload } from 'utils/download';
+import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
 import { IExportConfigFormValues } from '../sidebar/download/ConfigureExportForm';
-
-const PAGE_SIZE = 10;
 
 /**
  * Owns the Downloads-sidebar export lifecycle so `DownloadSidebarDownloads` stays presentational.
  *
- * Holds the paged downloads loader, the per-open feature-types loader, the config-dialog state, and
- * every export/download handler (one-click export, custom-CSV config open/submit/cancel, per-part and
- * all-parts download, rebuild stub). No polling on exports — each `downloadsDataLoader.refresh` replays
- * the backend's pre-join (`download.exports`), so new export rows surface without a dedicated cache.
- *
- * Handlers are left as plain functions rather than `useCallback`-wrapped: they close over
- * `useDataLoader`'s `refresh` methods, whose refs are unstable per render, so memoizing without the
- * ref-mirroring pattern buys nothing — and the component re-renders cheaply.
+ * Holds the paged downloads query, the feature types of the download whose export is being configured, the
+ * config-dialog state, and every export/download handler (one-click export, custom-CSV config open/submit/cancel,
+ * per-part and all-parts download, rebuild stub). No polling on exports: each reload of the downloads replays the
+ * backend's pre-join (`download.exports`), so new export rows surface with the list.
  *
  * @returns Paging state, derived download list, config-dialog state, and the export/download handlers.
  */
 export const useDownloadExportActions = () => {
   const biohubApi = useApi();
+  const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
   const [page, setPage] = useState(1);
-
-  const downloadsDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions) =>
-    biohubApi.download.getDownloads(pagination)
-  );
-
-  // Feature types for a single open download — drives the config dialog's pickers and the
-  // all-types recipe the one-click path builds. Refreshed per open so it never shows another
-  // download's types.
-  const featureTypesLoader = useDataLoader((downloadId: string) =>
-    biohubApi.downloadExport.getDownloadFeatureTypes(downloadId)
-  );
-
   const [configDownloadId, setConfigDownloadId] = useState<string | null>(null);
-  const [isSubmittingConfig, setIsSubmittingConfig] = useState(false);
 
-  useEffect(() => {
-    downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  const pagination = { page, limit: DOWNLOAD_SIDEBAR_PAGE_SIZE };
+  const downloadsQuery = useQuery({
+    queryKey: downloadQueryKeys.list(pagination),
+    queryFn: ({ signal }) => biohubApi.download.getDownloads(pagination, { signal }),
+    placeholderData: keepPreviousData
+  });
 
-  const downloads = downloadsDataLoader.data?.downloads ?? [];
-  const lastPage = downloadsDataLoader.data?.pagination?.last_page ?? 1;
+  // Feature types of the download whose export is being configured: they drive the config dialog's pickers.
+  const featureTypesQuery = useQuery({
+    queryKey: downloadQueryKeys.featureTypes(configDownloadId ?? ''),
+    queryFn: configDownloadId
+      ? ({ signal }) => biohubApi.downloadExport.getDownloadFeatureTypes(configDownloadId, { signal })
+      : skipToken
+  });
+
+  const downloads = downloadsQuery.data?.downloads ?? [];
+  const lastPage = downloadsQuery.data?.pagination?.last_page ?? 1;
 
   // The export route names an explicit download version. The download list row and the feature-types
   // picker both resolve the same most-recent version, so sourcing the id off the in-memory row keeps
@@ -59,13 +51,61 @@ export const useDownloadExportActions = () => {
   const resolveDownloadVersionId = (downloadId: string): string | undefined =>
     downloads.find((download) => download.download_id === downloadId)?.download_version_id;
 
-  // Re-fetches the current page; the refresh button and the post-create refreshes call it.
-  // `downloadsDataLoader.refresh` is an unstable ref, so it's omitted from the deps — `refresh`
-  // re-creates only when `page` changes.
-  const refresh = useCallback(() => {
-    downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  /**
+   * Reloads the downloads, so their exports show the latest state; the refresh button and each created export call
+   * it.
+   *
+   * @returns {Promise<void>} Resolves once the page on screen has reloaded.
+   */
+  const refresh = () => queryClient.invalidateQueries({ queryKey: downloadQueryKeys.lists() });
+
+  const createExportMutation = useMutation({
+    mutationFn: async (downloadId: string) => {
+      const downloadVersionId = resolveDownloadVersionId(downloadId);
+      if (!downloadVersionId) {
+        throw new Error('Download version not found');
+      }
+      const featureTypes = await queryClient.fetchQuery({
+        queryKey: downloadQueryKeys.featureTypes(downloadId),
+        queryFn: ({ signal }) => biohubApi.downloadExport.getDownloadFeatureTypes(downloadId, { signal })
+      });
+      const config: CreateExportPayload = {
+        version: EXPORT_CONFIG_VERSION,
+        export_type: EXPORT_TYPE,
+        mode: 'per_feature_type',
+        feature_types: featureTypes.map((ft) => ft.feature_type),
+        merge_steps: []
+      };
+      await biohubApi.downloadExport.createExport(downloadId, downloadVersionId, config);
+    },
+    onSuccess: refresh,
+    onError: () => {
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: 'Export Error',
+        dialogText: 'Failed to start the export.',
+        onOk: () => dialogContext.setErrorDialog({ open: false }),
+        onClose: () => dialogContext.setErrorDialog({ open: false })
+      });
+    }
+  });
+
+  const createConfigExportMutation = useMutation({
+    mutationFn: ({
+      downloadId,
+      downloadVersionId,
+      values
+    }: {
+      downloadId: string;
+      downloadVersionId: string;
+      values: IExportConfigFormValues;
+    }) => biohubApi.downloadExport.createExport(downloadId, downloadVersionId, buildExportConfig(values)),
+    onSuccess: () => {
+      setConfigDownloadId(null);
+      return refresh();
+    },
+    onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+  });
 
   /**
    * One-click "CSV — per feature type" export: build an all-types per-feature-type recipe client-side,
@@ -80,43 +120,18 @@ export const useDownloadExportActions = () => {
    *
    * @param {string} downloadId - Download request id to export.
    */
-  const handleCreateExport = async (downloadId: string) => {
-    try {
-      const downloadVersionId = resolveDownloadVersionId(downloadId);
-      if (!downloadVersionId) {
-        throw new Error('Download version not found');
-      }
-      const featureTypes = await biohubApi.downloadExport.getDownloadFeatureTypes(downloadId);
-      const config: CreateExportPayload = {
-        version: EXPORT_CONFIG_VERSION,
-        export_type: EXPORT_TYPE,
-        mode: 'per_feature_type',
-        feature_types: featureTypes.map((ft) => ft.feature_type),
-        merge_steps: []
-      };
-      await biohubApi.downloadExport.createExport(downloadId, downloadVersionId, config);
-      await refresh();
-    } catch {
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Export Error',
-        dialogText: 'Failed to start the export.',
-        onOk: () => dialogContext.setErrorDialog({ open: false }),
-        onClose: () => dialogContext.setErrorDialog({ open: false })
-      });
-    }
+  const handleCreateExport = (downloadId: string) => {
+    createExportMutation.mutate(downloadId);
   };
 
   /**
-   * Opens the custom-CSV config dialog for a download and loads its feature types into the picker.
-   * `refresh` (not `load`) so reopening for a different download replaces the previously loaded types
-   * instead of serving the first download's cached set.
+   * Opens the custom-CSV config dialog for a download; its feature types load into the picker, keyed by download, so
+   * the picker never shows another download's types.
    *
    * @param {string} downloadId - Download request id to configure an export for.
    */
   const handleConfigureExport = (downloadId: string) => {
     setConfigDownloadId(downloadId);
-    featureTypesLoader.refresh(downloadId);
   };
 
   /**
@@ -130,7 +145,7 @@ export const useDownloadExportActions = () => {
    *
    * @param {IExportConfigFormValues} values - Form values for the custom CSV export recipe.
    */
-  const handleCreateConfigExport = async (values: IExportConfigFormValues) => {
+  const handleCreateConfigExport = (values: IExportConfigFormValues) => {
     if (configDownloadId === null) {
       return;
     }
@@ -139,22 +154,12 @@ export const useDownloadExportActions = () => {
       dialogContext.setSnackbar({ open: true, snackbarMessage: 'Download version not found.' });
       return;
     }
-    setIsSubmittingConfig(true);
-    try {
-      const payload: CreateExportPayload = buildExportConfig(values);
-      await biohubApi.downloadExport.createExport(configDownloadId, downloadVersionId, payload);
-      setConfigDownloadId(null);
-      await refresh();
-    } catch (error) {
-      dialogContext.setSnackbar({ open: true, snackbarMessage: (error as APIError).message });
-    } finally {
-      setIsSubmittingConfig(false);
-    }
+    createConfigExportMutation.mutate({ downloadId: configDownloadId, downloadVersionId, values });
   };
 
   /**
-   * Closes the config dialog without submitting. Leaves the loaded feature types in place — reopening
-   * for the same download then reuses them, and reopening for a different one triggers a fresh refresh.
+   * Closes the config dialog without submitting. The loaded feature types stay cached, so reopening for the same
+   * download reuses them.
    */
   const handleCancelConfig = () => {
     setConfigDownloadId(null);
@@ -232,13 +237,13 @@ export const useDownloadExportActions = () => {
   return {
     page,
     setPage,
-    isLoading: downloadsDataLoader.isLoading,
+    isLoading: downloadsQuery.isFetching,
     downloads,
     lastPage,
     refresh,
-    featureTypes: featureTypesLoader.data ?? [],
+    featureTypes: featureTypesQuery.data ?? [],
     isConfigDialogOpen: configDownloadId !== null,
-    isSubmittingConfig,
+    isSubmittingConfig: createConfigExportMutation.isPending,
     handleCreateExport,
     handleConfigureExport,
     handleCreateConfigExport,

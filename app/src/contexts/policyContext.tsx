@@ -1,12 +1,11 @@
-import { useApi } from 'hooks/useApi';
-import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { IPolicy } from 'interfaces/usePoliciesApi.interface';
-import React, { PropsWithChildren, useEffect, useMemo } from 'react';
+import React, { PropsWithChildren, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 
 export interface IPolicyContext {
   policyId: string;
-  policyDataLoader: DataLoader<[string], IPolicy, unknown>;
+  /** Key of the policy detail query; components read it with `usePolicyQuery` and patch it with `setQueryData`. */
+  policyQueryKey: ReturnType<typeof policyQueryKeys.detail>;
 }
 
 export const PolicyContext = React.createContext<IPolicyContext | undefined>(undefined);
@@ -27,28 +26,14 @@ const usePolicyIdFromRoute = (): string => {
 };
 
 /**
- * Provides policy route context for admin policy detail pages.
+ * Provides the route's policy id, and the key its detail is cached under, to admin policy detail pages.
  *
  * @param {PropsWithChildren} props
  * @returns {*} Provider element.
  */
 export const AdminPolicyContextProvider = ({ children }: PropsWithChildren) => {
-  const api = useApi();
   const policyId = usePolicyIdFromRoute();
-  const policyDataLoader = useDataLoader((id: string) => api.policies.getPolicy(id));
-
-  useEffect(() => {
-    policyDataLoader.refresh(policyId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [policyId]);
-
-  const value = useMemo(
-    () => ({
-      policyId,
-      policyDataLoader
-    }),
-    [policyId, policyDataLoader]
-  );
+  const value = useMemo(() => ({ policyId, policyQueryKey: policyQueryKeys.detail(policyId) }), [policyId]);
 
   return <PolicyContext.Provider value={value}>{children}</PolicyContext.Provider>;
 };

@@ -1,113 +1,73 @@
-import { mapSearchPropertyToExpressionBuilderProperty } from 'utils/expression';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   ExpressionBuilderProperty,
   ExpressionBuilderSearchOption
 } from 'components/expression-builder/ExpressionBuilder.interface';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo } from 'react';
+import { mapSearchPropertyToExpressionBuilderProperty } from 'utils/expression';
+import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
 
 interface RecommendedFiltersState {
   species: ExpressionBuilderSearchOption[];
   properties: ExpressionBuilderProperty[];
 }
 
-interface RecommendedFiltersInput {
-  species?: string;
-  properties?: {
-    filters: ISearchPropertyFilters;
-    pagination?: { page: number; limit: number };
-  };
-}
-
 /**
- * Fetches recommended filters for the search UI.
+ * Loads the property and species suggestions for the expression builder's search text.
  *
- * Use this inside `ExpressionBuilder` to load property and species suggestions
- * for the current search text. The caller owns input debouncing; stale
- * responses are ignored when a newer refresh starts.
+ * Both are keyed on the text, so a newer text supersedes an older one. The previous suggestions stay on screen while
+ * the next load, and while the text is empty. A failed part is reported and shown as empty; the other part is
+ * unaffected.
  *
- * @returns {{ recommended: RecommendedFiltersState; handleRefresh: (input: RecommendedFiltersInput) => void }} Current recommendations and refresh callback.
+ * @param {string} keyword The trimmed, debounced search text; empty loads nothing.
+ * @param {boolean} enabled Whether the builder is on screen.
+ * @returns {{ recommended: RecommendedFiltersState }} The current suggestions.
  */
-export const useRecommendedFilters = () => {
+export const useRecommendedFilters = (keyword: string, enabled: boolean) => {
   const api = useApi();
-  const dialogContext = useDialogContext();
-  const searchPropertiesRef = useRef(api.search.searchProperties);
-  const searchSpeciesRef = useRef(api.taxonomy.searchSpecies);
-  const setSnackbarRef = useRef(dialogContext.setSnackbar);
-  const activeRefreshIdRef = useRef(0);
-  const [recommended, setRecommended] = useState<RecommendedFiltersState>({
-    species: [],
-    properties: []
+  const { setSnackbar } = useDialogContext();
+  const canSearch = enabled && keyword.length > 0;
+
+  const speciesQuery = useQuery({
+    queryKey: searchQueryKeys.recommendedSpecies(keyword),
+    queryFn: ({ signal }) => api.taxonomy.searchSpecies(keyword, undefined, { signal }),
+    enabled: canSearch,
+    placeholderData: keepPreviousData
+  });
+  const propertiesQuery = useQuery({
+    queryKey: searchQueryKeys.recommendedProperties(keyword),
+    queryFn: ({ signal }) => api.search.searchProperties({ keyword }, { page: 1, limit: 25 }, { signal }),
+    enabled: canSearch,
+    placeholderData: keepPreviousData
   });
 
+  const { error: speciesError } = speciesQuery;
   useEffect(() => {
-    searchPropertiesRef.current = api.search.searchProperties;
-    searchSpeciesRef.current = api.taxonomy.searchSpecies;
-    setSnackbarRef.current = dialogContext.setSnackbar;
-  });
-
-  const refreshNow = useCallback(async (input: RecommendedFiltersInput, refreshId: number) => {
-    const loadSpecies = async (): Promise<ExpressionBuilderSearchOption[]> => {
-      if (!input.species) {
-        return [];
-      }
-
-      try {
-        const response = await searchSpeciesRef.current(input.species);
-
-        return response.searchResponse.map((species) => ({
-          label: species.scientificName,
-          value: species.tsn
-        }));
-      } catch (err) {
-        setSnackbarRef.current({
-          open: true,
-          snackbarMessage: `Failed to load species: ${(err as Error).message}`
-        });
-
-        return [];
-      }
-    };
-
-    const loadProperties = async (): Promise<ExpressionBuilderProperty[]> => {
-      if (!input.properties) {
-        return [];
-      }
-
-      try {
-        const response = await searchPropertiesRef.current(input.properties.filters, input.properties.pagination);
-        const allProperties = Object.values(response.properties).flat();
-
-        return allProperties.map(mapSearchPropertyToExpressionBuilderProperty);
-      } catch (err) {
-        setSnackbarRef.current({
-          open: true,
-          snackbarMessage: `Failed to load properties: ${(err as Error).message}`
-        });
-
-        return [];
-      }
-    };
-
-    const [species, properties] = await Promise.all([loadSpecies(), loadProperties()]);
-
-    if (refreshId === activeRefreshIdRef.current) {
-      setRecommended({ species, properties });
+    if (speciesError) {
+      setSnackbar({ open: true, snackbarMessage: `Failed to load species: ${speciesError.message}` });
     }
-  }, []);
+  }, [setSnackbar, speciesError]);
 
-  const handleRefresh = useCallback(
-    (input: RecommendedFiltersInput) => {
-      const refreshId = ++activeRefreshIdRef.current;
-      refreshNow(input, refreshId);
-    },
-    [refreshNow]
+  const { error: propertiesError } = propertiesQuery;
+  useEffect(() => {
+    if (propertiesError) {
+      setSnackbar({ open: true, snackbarMessage: `Failed to load properties: ${propertiesError.message}` });
+    }
+  }, [propertiesError, setSnackbar]);
+
+  const recommended = useMemo<RecommendedFiltersState>(
+    () => ({
+      species:
+        speciesQuery.data?.searchResponse.map((species) => ({ label: species.scientificName, value: species.tsn })) ??
+        [],
+      properties: Object.values(propertiesQuery.data?.properties ?? {})
+        .flat()
+        .map(mapSearchPropertyToExpressionBuilderProperty)
+    }),
+    [propertiesQuery.data, speciesQuery.data]
   );
 
-  return {
-    recommended,
-    handleRefresh
-  };
+  return { recommended };
 };

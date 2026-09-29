@@ -351,7 +351,8 @@ describe('TicketTimeline', () => {
     await waitFor(() => expect(screen.getByText('Uploaded')).toBeVisible());
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledWith(
       upload.submission_id,
-      upload.submission_upload_id
+      upload.submission_upload_id,
+      { signal: expect.any(AbortSignal) }
     );
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
   });

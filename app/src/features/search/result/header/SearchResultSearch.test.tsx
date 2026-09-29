@@ -4,6 +4,7 @@ import { SearchResultSearch } from './SearchResultSearch';
 
 const searchPropertiesMock = vi.hoisted(() => vi.fn());
 const searchSpeciesMock = vi.hoisted(() => vi.fn());
+const expectSignal = { signal: expect.any(AbortSignal) };
 let user: ReturnType<typeof userEvent.setup>;
 
 const setupUser = () =>
@@ -215,7 +216,7 @@ describe('SearchResultSearch', () => {
         await Promise.resolve();
       });
 
-      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'name' }, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'name' }, { page: 1, limit: 25 }, expectSignal);
       await addPropertyFilter('Species name');
       await selectOption(screen.getByRole('combobox', { name: 'Operator' }), 'contains, case-insensitive');
       fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'wolf' } });
@@ -255,7 +256,7 @@ describe('SearchResultSearch', () => {
       fireEvent.change(searchInput, { target: { value: 'wolf' } });
 
       expect(searchPropertiesMock).toHaveBeenCalledTimes(1);
-      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 }, expectSignal);
       expect(searchSpeciesMock).not.toHaveBeenCalled();
 
       act(() => {
@@ -271,10 +272,10 @@ describe('SearchResultSearch', () => {
         await Promise.resolve();
       });
 
-      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'wolf' }, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'wolf' }, { page: 1, limit: 25 }, expectSignal);
       expect(searchPropertiesMock).toHaveBeenCalledTimes(2);
       expect(searchSpeciesMock).toHaveBeenCalledTimes(1);
-      expect(searchSpeciesMock).toHaveBeenCalledWith('wolf');
+      expect(searchSpeciesMock).toHaveBeenCalledWith('wolf', undefined, expectSignal);
     } finally {
       vi.useRealTimers();
     }
@@ -353,8 +354,8 @@ describe('SearchResultSearch', () => {
         await Promise.resolve();
       });
 
-      expect(searchSpeciesMock).toHaveBeenCalledWith('ducks');
-      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'ducks' }, { page: 1, limit: 25 });
+      expect(searchSpeciesMock).toHaveBeenCalledWith('ducks', undefined, expectSignal);
+      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'ducks' }, { page: 1, limit: 25 }, expectSignal);
 
       await act(async () => {
         resolveSpecies({ searchResponse: [] });
@@ -383,7 +384,7 @@ describe('SearchResultSearch', () => {
       });
 
       expect(searchPropertiesMock).toHaveBeenCalledTimes(1);
-      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 }, expectSignal);
       expect(searchPropertiesMock.mock.calls.some(([filters]) => filters.keyword === 'species')).toBe(false);
       expect(searchPropertiesMock.mock.calls.some(([filters]) => filters.keyword === 'description')).toBe(false);
 
