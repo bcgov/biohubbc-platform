@@ -225,11 +225,10 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
       setOpenAddUserDialog(false);
 
       // Different users are added together. Rows naming the same user are sent one after another, since the server
-      // reads or creates the user and two concurrent requests for one user would race that read.
-      const rowsByUser = groupBy(
-        values.systemUsers,
-        (systemUser) => `${systemUser.identitySource}:${systemUser.userGuid}`
-      );
+      // reads or creates the user and two concurrent requests for one user would race that read. The server finds a
+      // user by GUID alone, ignoring case, so rows are grouped the same way.
+      const rowsByUser = groupBy(values.systemUsers, (systemUser) => systemUser.userGuid.toLowerCase());
+      const addedUserCount = Object.keys(rowsByUser).length;
       const results = await Promise.allSettled(
         Object.values(rowsByUser).map((rows) =>
           rows.reduce<Promise<unknown>>(
@@ -260,7 +259,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         open: true,
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {values.systemUsers.length} system {values.systemUsers.length > 1 ? 'users' : 'user'} added.
+            {addedUserCount} system {addedUserCount > 1 ? 'users' : 'user'} added.
           </Typography>
         )
       });

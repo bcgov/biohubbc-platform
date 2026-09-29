@@ -91,12 +91,12 @@ describe('ManageUsersPage', () => {
     });
   });
 
-  it("adds different users together, and one user's rows one after another", async () => {
+  it('adds different users together, and rows sharing a GUID in any case one after another', async () => {
     const pending: (() => void)[] = [];
     mockUseApi.admin.addSystemUser.mockImplementation(
       () => new Promise<boolean>((resolve) => pending.push(() => resolve(true)))
     );
-    mocks.newUsers = [newUser('a', 1), newUser('b', 1), newUser('a', 2)];
+    mocks.newUsers = [newUser('a', 1), newUser('b', 1), { ...newUser('A', 2), identitySource: 'BCEIDBASIC' }];
     renderContainer();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add Users' }));
@@ -110,7 +110,7 @@ describe('ManageUsersPage', () => {
 
     pending[0]();
     await waitFor(() => expect(mockUseApi.admin.addSystemUser).toHaveBeenCalledTimes(3));
-    expect(mockUseApi.admin.addSystemUser.mock.calls[2]).toEqual(['user-a', 'a', 'IDIR', 2]);
+    expect(mockUseApi.admin.addSystemUser.mock.calls[2]).toEqual(['user-A', 'A', 'BCEIDBASIC', 2]);
   });
 
   it('lists the users that were added when another fails, and reports the failure', async () => {
@@ -127,5 +127,18 @@ describe('ManageUsersPage', () => {
     await waitFor(() => expect(mocks.setErrorDialog).toHaveBeenCalledWith(expect.objectContaining({ open: true })));
     await waitFor(() => expect(mockUseApi.user.getUsersList).toHaveBeenCalledTimes(2));
     expect(mocks.setSnackbar).not.toHaveBeenCalled();
+  });
+
+  it('counts the users added, not the rows, in the success message', async () => {
+    mockUseApi.admin.addSystemUser.mockResolvedValue(true);
+    mocks.newUsers = [newUser('a', 1), newUser('a', 2)];
+    renderContainer();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Users' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save users' }));
+
+    await waitFor(() => expect(mocks.setSnackbar).toHaveBeenCalledOnce());
+    render(mocks.setSnackbar.mock.calls[0][0].snackbarMessage);
+    expect(screen.getByText('1 system user added.')).toBeVisible();
   });
 });
