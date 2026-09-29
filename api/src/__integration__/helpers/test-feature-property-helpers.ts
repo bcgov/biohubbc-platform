@@ -227,6 +227,71 @@ export async function createAssignedFeatureProperty(
   return { featurePropertyId, assignments };
 }
 
+/** A `feature_property_type` name whose values are stored in one of the typed property tables. */
+export type TypedPropertyTypeName = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'code' | 'spatial';
+
+/**
+ * Insert a pending submission feature: it has no effective date, so it is absent from published closure until
+ * activated.
+ *
+ * @param {IDBConnection} connection Open connection.
+ * @param {number} submissionId Owning submission.
+ * @param {string} submissionUploadId Owning upload.
+ * @param {string} featureTypeName Seeded feature type.
+ * @param {number | null} [parentId] Parent feature, if any.
+ * @returns {Promise<number>} The new submission_feature_id.
+ */
+export async function insertPendingFeature(
+  connection: IDBConnection,
+  submissionId: number,
+  submissionUploadId: string,
+  featureTypeName: string,
+  parentId: number | null = null
+): Promise<number> {
+  const result = await connection.sql(SQL`
+    INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
+    VALUES (${submissionId}, ${submissionUploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}), ${parentId}, '{}'::jsonb, 2, NULL)
+    RETURNING submission_feature_id;
+  `);
+  return result.rows[0].submission_feature_id;
+}
+
+/**
+ * Store a property value for a feature in the typed table of its property type.
+ *
+ * @param {IDBConnection} connection Open connection.
+ * @param {TypedPropertyTypeName} propertyType Property type, which selects the storage table.
+ * @param {number} featureId Feature carrying the value.
+ * @param {number} assignmentId Assignment the value is stored under.
+ * @param {unknown[]} value Value columns: `[value]`, `[date, time]` for datetime, `[taxon_id]` for taxon,
+ *   `[contributor_codeset_code_id]` for code, or `[geojson]` for spatial.
+ * @returns {Promise<void>}
+ */
+export async function addPropertyValue(
+  connection: IDBConnection,
+  propertyType: TypedPropertyTypeName,
+  featureId: number,
+  assignmentId: number,
+  ...value: unknown[]
+): Promise<void> {
+  const statements: Record<TypedPropertyTypeName, string> = {
+    string:
+      'INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    number:
+      'INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    boolean:
+      'INSERT INTO submission_feature_property_boolean (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    datetime:
+      'INSERT INTO submission_feature_property_timestamp (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value) VALUES ($1, $2, $3, $4)',
+    taxon:
+      'INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id) VALUES ($1, $2, $3)',
+    code: 'INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id) VALUES ($1, $2, $3)',
+    spatial:
+      'INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, ST_GeomFromGeoJSON($3))'
+  };
+  await connection.query(statements[propertyType], [featureId, assignmentId, ...value]);
+}
+
 /**
  * Fetch grouped error rows for an upload, ordered by code.
  *

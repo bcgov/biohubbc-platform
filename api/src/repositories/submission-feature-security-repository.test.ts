@@ -56,7 +56,7 @@ describe('SubmissionFeatureSecurityRepository', () => {
 
     it('evaluates every rule over the upload in one statement and attributes assignments to the event', async () => {
       const knex = sinon.stub().resolves({ rows: [{ matched_feature_count: 4, inserted_count: 3 }], rowCount: 1 });
-      const setting = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const setting = sinon.stub().resolves({ rows: [{ jit: 'on' }], rowCount: 1 });
       const repository = new SubmissionFeatureSecurityRepository(getMockDBConnection({ knex, sql: setting }));
 
       const result = await repository.insertScreenedSubmissionFeatureSecurity({
@@ -79,8 +79,14 @@ describe('SubmissionFeatureSecurityRepository', () => {
       expect(sql).not.to.include('submission_feature_closure');
       expect(bindings.filter((binding: unknown) => binding === 1101 || binding === 1102)).to.eql([1101, 1102]);
       expect(bindings.at(-1)).to.equal(9001);
-      expect(setting.firstCall.args[0].text).to.equal('SET LOCAL jit = off');
-      sinon.assert.callOrder(setting, knex);
+      expect(setting.getCalls().map((call) => call.args[0].text)).to.eql([
+        "SELECT current_setting('jit') AS jit",
+        "SELECT set_config('jit', 'off', true)",
+        "SELECT set_config('jit', $1, true)"
+      ]);
+      expect(setting.thirdCall.args[0].values).to.eql(['on']);
+      expect(setting.secondCall.calledBefore(knex.firstCall)).to.be.true;
+      expect(knex.firstCall.calledBefore(setting.thirdCall)).to.be.true;
       expect(result).to.eql({ matched_feature_count: 4, inserted_count: 3 });
     });
   });

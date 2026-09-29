@@ -256,10 +256,10 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
    * assignments retain their provenance; reactivated assignments receive the screening provenance and clear review
    * provenance. All rules are evaluated and written in one statement, so the matched count is distinct across rules.
    *
-   * JIT compilation is turned off for the rest of the transaction first. The statement carries each rule's evidence
-   * walks, so its estimated cost clears `jit_above_cost` with only a few rules and PostgreSQL would compile thousands of
-   * expressions (about a second for 44 rules) before evaluating an upload that typically takes milliseconds; its work
-   * is index probes, which compilation does not speed up.
+   * JIT compilation is off for this statement and the transaction's previous setting is restored after it. The statement
+   * carries each rule's evidence walks, so its estimated cost clears `jit_above_cost` with only a few rules and
+   * PostgreSQL would compile thousands of expressions (about a second for 44 rules) before evaluating an upload that
+   * typically takes milliseconds; its work is index probes, which compilation does not speed up.
    *
    * @param {NormalizedInsertScreenedSubmissionFeatureSecurity} input Upload boundary, rule expressions, and screening event.
    * @returns {Promise<SubmissionFeatureSecurityScreeningResult>} Distinct matched features and inserted or reactivated assignments.
@@ -305,8 +305,10 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
       [matches, input.submissionUploadSecurityId]
     );
 
-    await this.connection.sql(SQL`SET LOCAL jit = off`);
+    const jit = await this.connection.sql<{ jit: string }>(SQL`SELECT current_setting('jit') AS jit`);
+    await this.connection.sql(SQL`SELECT set_config('jit', 'off', true)`);
     const response = await this.connection.knex(query, SubmissionFeatureSecurityScreeningResult);
+    await this.connection.sql(SQL`SELECT set_config('jit', ${jit.rows[0].jit}, true)`);
     return response.rows[0];
   }
 

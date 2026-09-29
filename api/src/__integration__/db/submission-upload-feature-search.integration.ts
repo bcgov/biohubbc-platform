@@ -9,9 +9,11 @@ import { optimizeExpression } from '../../utils/expression-optimization';
 import { decodeSearchFeatureCursor } from '../../utils/pagination';
 import { allOf, anyOf, predicate } from '../helpers/test-expression-helpers';
 import {
+  addPropertyValue,
   createAssignedFeatureProperty,
   createBlueprintFeatureTypeProperty,
   createTestUpload,
+  insertPendingFeature,
   insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
@@ -82,33 +84,7 @@ describe('Submission upload expression evaluation (integration)', function () {
     parentId: number | null = null,
     uploadId: string = submissionUploadId
   ): Promise<number> {
-    const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
-      VALUES (${submissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}), ${parentId}, '{}'::jsonb, 2, NULL)
-      RETURNING submission_feature_id;
-    `);
-    return result.rows[0].submission_feature_id;
-  }
-
-  /**
-   * Index a value for a feature.
-   *
-   * @param {'string' | 'number'} propertyType Property type name, which selects the storage table.
-   * @param {number} featureId Feature carrying the value.
-   * @param {number} assignmentId Assignment the value is stored under.
-   * @param {string | number} value Stored value.
-   * @returns {Promise<void>}
-   */
-  async function addValue(
-    propertyType: 'string' | 'number',
-    featureId: number,
-    assignmentId: number,
-    value: string | number
-  ): Promise<void> {
-    await connection.query(
-      `INSERT INTO submission_feature_property_${propertyType} (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)`,
-      [featureId, assignmentId, value]
-    );
+    return insertPendingFeature(connection, submissionId, uploadId, featureTypeName, parentId);
   }
 
   /**
@@ -134,8 +110,8 @@ describe('Submission upload expression evaluation (integration)', function () {
     const animalId = await insertFeature('animal');
     const captureId = await insertFeature('capture');
     const observationId = await insertFeature('species_observation');
-    await addValue('string', animalId, species.assignments.animal, 'owl');
-    await addValue('string', observationId, species.assignments.species_observation, 'owl');
+    await addPropertyValue(connection, 'string', animalId, species.assignments.animal, 'owl');
+    await addPropertyValue(connection, 'string', observationId, species.assignments.species_observation, 'owl');
     const animalToCapture = await createBlueprintFeatureTypeProperty(connection, 'animal', 'capture');
     const captureToAnimal = await createBlueprintFeatureTypeProperty(connection, 'capture', 'animal');
     const observationToObservation = await createBlueprintFeatureTypeProperty(
@@ -175,9 +151,9 @@ describe('Submission upload expression evaluation (integration)', function () {
     const redAndBlueId = await insertFeature('species_observation', surveyId);
     const blueId = await insertFeature('species_observation', surveyId);
     await insertFeature('species_observation', surveyId);
-    await addValue('string', redAndBlueId, colour.assignments.species_observation, 'red');
-    await addValue('string', redAndBlueId, colour.assignments.species_observation, 'blue');
-    await addValue('string', blueId, colour.assignments.species_observation, 'blue');
+    await addPropertyValue(connection, 'string', redAndBlueId, colour.assignments.species_observation, 'red');
+    await addPropertyValue(connection, 'string', redAndBlueId, colour.assignments.species_observation, 'blue');
+    await addPropertyValue(connection, 'string', blueId, colour.assignments.species_observation, 'blue');
 
     // The survey matches through the blue observation below it; the observation without a colour has no evidence.
     expect(await evaluate(allOf(predicate(colour.featurePropertyId, 'NotEquals', 'red')))).to.eql([surveyId, blueId]);
@@ -189,8 +165,8 @@ describe('Submission upload expression evaluation (integration)', function () {
     const surveyId = await insertFeature('survey');
     const stratumId = await insertFeature('stratum', surveyId);
     const deploymentId = await insertFeature('telemetry_deployment', stratumId);
-    await addValue('string', stratumId, region.assignments.stratum, 'east');
-    await addValue('string', deploymentId, species.assignments.telemetry_deployment, 'owl');
+    await addPropertyValue(connection, 'string', stratumId, region.assignments.stratum, 'east');
+    await addPropertyValue(connection, 'string', deploymentId, species.assignments.telemetry_deployment, 'owl');
     await connection.sql(SQL`UPDATE feature_type SET record_end_date = now() WHERE name = 'stratum'`);
 
     expect(await evaluate(allOf(predicate(region.featurePropertyId, 'Equals', 'east')))).to.eql([
@@ -209,10 +185,10 @@ describe('Submission upload expression evaluation (integration)', function () {
     const lowId = await insertFeature('species_observation', surveyId);
     const insideId = await insertFeature('species_observation', surveyId);
     const straddlingId = await insertFeature('species_observation', surveyId);
-    await addValue('number', lowId, count.assignments.species_observation, 3);
-    await addValue('number', insideId, count.assignments.species_observation, 7);
-    await addValue('number', straddlingId, count.assignments.species_observation, 3);
-    await addValue('number', straddlingId, count.assignments.species_observation, 12);
+    await addPropertyValue(connection, 'number', lowId, count.assignments.species_observation, 3);
+    await addPropertyValue(connection, 'number', insideId, count.assignments.species_observation, 7);
+    await addPropertyValue(connection, 'number', straddlingId, count.assignments.species_observation, 3);
+    await addPropertyValue(connection, 'number', straddlingId, count.assignments.species_observation, 12);
 
     expect(
       await evaluate(
@@ -229,9 +205,9 @@ describe('Submission upload expression evaluation (integration)', function () {
     const fernId = await insertFeature('telemetry_deployment', surveyId);
     const elkId = await insertFeature('telemetry_deployment', surveyId);
     await insertFeature('telemetry', elkId);
-    await addValue('string', owlId, species.assignments.telemetry_deployment, 'owl');
-    await addValue('string', fernId, species.assignments.telemetry_deployment, 'fern');
-    await addValue('string', elkId, species.assignments.telemetry_deployment, 'elk');
+    await addPropertyValue(connection, 'string', owlId, species.assignments.telemetry_deployment, 'owl');
+    await addPropertyValue(connection, 'string', fernId, species.assignments.telemetry_deployment, 'fern');
+    await addPropertyValue(connection, 'string', elkId, species.assignments.telemetry_deployment, 'elk');
 
     expect(
       await evaluate(
@@ -254,10 +230,10 @@ describe('Submission upload expression evaluation (integration)', function () {
     const secondObservationId = await insertFeature('species_observation', surveyId);
     const animalId = await insertFeature('animal');
     const captureId = await insertFeature('capture', animalId);
-    await addValue('number', firstObservationId, count.assignments.species_observation, 77);
-    await addValue('number', secondObservationId, count.assignments.species_observation, 100);
-    await addValue('number', animalId, count.assignments.animal, 77);
-    await addValue('number', captureId, count.assignments.capture, 100);
+    await addPropertyValue(connection, 'number', firstObservationId, count.assignments.species_observation, 77);
+    await addPropertyValue(connection, 'number', secondObservationId, count.assignments.species_observation, 100);
+    await addPropertyValue(connection, 'number', animalId, count.assignments.animal, 77);
+    await addPropertyValue(connection, 'number', captureId, count.assignments.capture, 100);
 
     // The survey collects 77 and 100 from two observations. The animal and capture each hold one value and reach the
     // other. Neither observation reaches the other value, because siblings are not related.
@@ -274,7 +250,7 @@ describe('Submission upload expression evaluation (integration)', function () {
     const outerSiteId = await insertFeature('sample_site', surveyId);
     const innerSiteId = await insertFeature('sample_site', outerSiteId);
     const observationId = await insertFeature('species_observation', innerSiteId);
-    await addValue('string', innerSiteId, species.assignments.sample_site, 'owl');
+    await addPropertyValue(connection, 'string', innerSiteId, species.assignments.sample_site, 'owl');
 
     expect(await evaluate(allOf(predicate(species.featurePropertyId, 'Equals', 'owl')))).to.eql([
       surveyId,
@@ -290,8 +266,8 @@ describe('Submission upload expression evaluation (integration)', function () {
     const surveyId = await insertFeature('survey');
     await insertFeature('species_observation', otherSurveyId);
     const referringId = await insertFeature('species_observation');
-    await addValue('string', otherSurveyId, region.assignments.survey, 'north');
-    await addValue('string', surveyId, region.assignments.survey, 'north');
+    await addPropertyValue(connection, 'string', otherSurveyId, region.assignments.survey, 'north');
+    await addPropertyValue(connection, 'string', surveyId, region.assignments.survey, 'north');
     const observationToSurvey = await createBlueprintFeatureTypeProperty(connection, 'species_observation', 'survey');
     await insertSubmissionFeaturePropertyFeature(
       connection,
@@ -326,10 +302,10 @@ describe('Submission upload expression evaluation (integration)', function () {
     await insertFeature('species_observation', outsideGrandchildId);
 
     for (const observationId of [firstObservationId, secondObservationId]) {
-      await addValue('string', observationId, species.assignments.species_observation, 'owl');
+      await addPropertyValue(connection, 'string', observationId, species.assignments.species_observation, 'owl');
     }
     for (const surveyId of [thirdSurveyId, fourthSurveyId]) {
-      await addValue('string', surveyId, species.assignments.survey, 'owl');
+      await addPropertyValue(connection, 'string', surveyId, species.assignments.survey, 'owl');
     }
 
     // Each walk ends at the first feature outside the upload, so no upload feature beyond it is reached.
@@ -348,8 +324,8 @@ describe('Submission upload expression evaluation (integration)', function () {
     const nickname = await createAssignedFeatureProperty(connection, 'string', ['species_observation']);
     const owlId = await insertFeature('species_observation');
     const nicknamedId = await insertFeature('species_observation');
-    await addValue('string', owlId, species.assignments.species_observation, 'owl');
-    await addValue('string', nicknamedId, nickname.assignments.species_observation, 'owl');
+    await addPropertyValue(connection, 'string', owlId, species.assignments.species_observation, 'owl');
+    await addPropertyValue(connection, 'string', nicknamedId, nickname.assignments.species_observation, 'owl');
 
     expect(await evaluate(allOf(predicate(species.featurePropertyId, 'Equals', 'owl')))).to.eql([owlId]);
   });
@@ -357,7 +333,7 @@ describe('Submission upload expression evaluation (integration)', function () {
   it('returns nothing when the submission does not own the upload', async () => {
     const region = await createAssignedFeatureProperty(connection, 'string', ['survey']);
     const surveyId = await insertFeature('survey');
-    await addValue('string', surveyId, region.assignments.survey, 'north');
+    await addPropertyValue(connection, 'string', surveyId, region.assignments.survey, 'north');
     const otherSubmissionId = await createTestSubmission(connection);
     const expression = allOf(predicate(region.featurePropertyId, 'Equals', 'north'));
 
@@ -377,7 +353,7 @@ describe('Submission upload expression evaluation (integration)', function () {
           await insertFeature('telemetry', deploymentId)
         ];
         await insertFeature('telemetry_deployment', surveyId);
-        await addValue('string', deploymentId, species.assignments.telemetry_deployment, 'owl');
+        await addPropertyValue(connection, 'string', deploymentId, species.assignments.telemetry_deployment, 'owl');
         const filters = { expression: allOf(predicate(species.featurePropertyId, 'Equals', 'owl')) };
         const expected = [surveyId, deploymentId, ...pointIds];
         if (order === 'desc') {
@@ -413,7 +389,7 @@ describe('Submission upload expression evaluation (integration)', function () {
     let pgMessage = '';
 
     try {
-      await addValue('string', observationId, region.assignments.survey, 'north');
+      await addPropertyValue(connection, 'string', observationId, region.assignments.survey, 'north');
     } catch (error) {
       // The connection wrapper surfaces the PostgreSQL error as `errors[0]`.
       pgMessage = (error as { errors?: { message: string }[] }).errors?.[0]?.message ?? '';

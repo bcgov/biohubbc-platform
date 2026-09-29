@@ -10,17 +10,16 @@ import { SubmissionFeatureClosureService } from '../../services/submission-featu
 import { optimizeExpression } from '../../utils/expression-optimization';
 import { allOf, anyOf, predicate } from '../helpers/test-expression-helpers';
 import {
+  addPropertyValue,
   createAssignedFeatureProperty,
   createBlueprintFeatureTypeProperty,
   createCodesetCode,
   createTaxon,
   createTestUpload,
+  insertPendingFeature,
   insertSubmissionFeaturePropertyFeature
 } from '../helpers/test-feature-property-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
-
-/** Property type names as stored in `feature_property_type`, each selecting a typed storage table. */
-type ParityPropertyType = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'code' | 'spatial';
 
 /** Ids the parity expressions refer to. */
 interface ParityFixture {
@@ -141,46 +140,15 @@ describe('Submission upload expression evaluation parity with published evaluati
    * @returns {Promise<number>} The new submission_feature_id.
    */
   async function insertFeature(featureTypeName: string, parentId: number | null = null): Promise<number> {
-    const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
-      VALUES (${submissionId}, ${submissionUploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}), ${parentId}, '{}'::jsonb, 2, NULL)
-      RETURNING submission_feature_id;
-    `);
-    fixtureFeatureIds.push(result.rows[0].submission_feature_id);
-    return result.rows[0].submission_feature_id;
-  }
-
-  /**
-   * Index a value for a feature in the storage table of its property type.
-   *
-   * @param {ParityPropertyType} propertyType Property type name.
-   * @param {number} featureId Feature carrying the value.
-   * @param {number} assignmentId Assignment the value is stored under.
-   * @param {unknown[]} value Stored value columns: `[value]`, `[date, time]`, `[taxon_id]`, `[code_id]` or `[geojson]`.
-   * @returns {Promise<void>}
-   */
-  async function addValue(
-    propertyType: ParityPropertyType,
-    featureId: number,
-    assignmentId: number,
-    ...value: unknown[]
-  ): Promise<void> {
-    const statements: Record<ParityPropertyType, string> = {
-      string:
-        'INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
-      number:
-        'INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
-      boolean:
-        'INSERT INTO submission_feature_property_boolean (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
-      datetime:
-        'INSERT INTO submission_feature_property_timestamp (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value) VALUES ($1, $2, $3, $4)',
-      taxon:
-        'INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id) VALUES ($1, $2, $3)',
-      code: 'INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id) VALUES ($1, $2, $3)',
-      spatial:
-        'INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, ST_GeomFromGeoJSON($3))'
-    };
-    await connection.query(statements[propertyType], [featureId, assignmentId, ...value]);
+    const featureId = await insertPendingFeature(
+      connection,
+      submissionId,
+      submissionUploadId,
+      featureTypeName,
+      parentId
+    );
+    fixtureFeatureIds.push(featureId);
+    return featureId;
   }
 
   /**
@@ -247,34 +215,52 @@ describe('Submission upload expression evaluation parity with published evaluati
     const animalId = await insertFeature('animal', surveyId);
     const captureId = await insertFeature('capture', animalId);
 
-    await addValue('string', surveyId, region.assignments.survey, 'north');
-    await addValue('string', stratumId, region.assignments.stratum, 'east');
-    await addValue('spatial', surveyId, area.assignments.survey, JSON.stringify(REGION_POLYGON));
-    await addValue('string', owlDeploymentId, species.assignments.telemetry_deployment, 'owl');
-    await addValue('string', elkDeploymentId, species.assignments.telemetry_deployment, 'elk');
-    await addValue('boolean', owlDeploymentId, active.assignments.telemetry_deployment, true);
-    await addValue('boolean', elkDeploymentId, active.assignments.telemetry_deployment, false);
-    await addValue('number', firstPointId, count.assignments.telemetry, 3);
-    await addValue('number', secondPointId, count.assignments.telemetry, 7);
-    await addValue('number', thirdPointId, count.assignments.telemetry, 12);
-    await addValue('datetime', firstPointId, seen.assignments.telemetry, '2024-05-01', '10:00:00');
-    await addValue('datetime', secondPointId, seen.assignments.telemetry, '2024-05-02', '08:30:00');
-    await addValue('datetime', thirdPointId, seen.assignments.telemetry, '2024-06-15', null);
-    await addValue('spatial', firstPointId, location.assignments.telemetry, JSON.stringify(point(-122, 50)));
-    await addValue('spatial', secondPointId, location.assignments.telemetry, JSON.stringify(point(-110, 60)));
-    await addValue('spatial', thirdPointId, location.assignments.telemetry, JSON.stringify(point(-121, 51)));
-    await addValue('string', speciesObservationId, colour.assignments.species_observation, 'red');
-    await addValue('string', speciesObservationId, colour.assignments.species_observation, 'blue');
-    await addValue('string', genusObservationId, colour.assignments.species_observation, 'blue');
-    await addValue('number', speciesObservationId, count.assignments.species_observation, 77);
-    await addValue('number', speciesObservationId, count.assignments.species_observation, 100);
-    await addValue('number', genusObservationId, count.assignments.species_observation, 100);
-    await addValue('number', captureId, count.assignments.capture, 77);
-    await addValue('taxon', speciesObservationId, taxon.assignments.species_observation, speciesId);
-    await addValue('taxon', genusObservationId, taxon.assignments.species_observation, genusId);
-    await addValue('taxon', animalId, taxon.assignments.animal, speciesId);
-    await addValue('code', innerSiteId, habitat.assignments.sample_site, wetland);
-    await addValue('code', outerSiteId, habitat.assignments.sample_site, forest);
+    await addPropertyValue(connection, 'string', surveyId, region.assignments.survey, 'north');
+    await addPropertyValue(connection, 'string', stratumId, region.assignments.stratum, 'east');
+    await addPropertyValue(connection, 'spatial', surveyId, area.assignments.survey, JSON.stringify(REGION_POLYGON));
+    await addPropertyValue(connection, 'string', owlDeploymentId, species.assignments.telemetry_deployment, 'owl');
+    await addPropertyValue(connection, 'string', elkDeploymentId, species.assignments.telemetry_deployment, 'elk');
+    await addPropertyValue(connection, 'boolean', owlDeploymentId, active.assignments.telemetry_deployment, true);
+    await addPropertyValue(connection, 'boolean', elkDeploymentId, active.assignments.telemetry_deployment, false);
+    await addPropertyValue(connection, 'number', firstPointId, count.assignments.telemetry, 3);
+    await addPropertyValue(connection, 'number', secondPointId, count.assignments.telemetry, 7);
+    await addPropertyValue(connection, 'number', thirdPointId, count.assignments.telemetry, 12);
+    await addPropertyValue(connection, 'datetime', firstPointId, seen.assignments.telemetry, '2024-05-01', '10:00:00');
+    await addPropertyValue(connection, 'datetime', secondPointId, seen.assignments.telemetry, '2024-05-02', '08:30:00');
+    await addPropertyValue(connection, 'datetime', thirdPointId, seen.assignments.telemetry, '2024-06-15', null);
+    await addPropertyValue(
+      connection,
+      'spatial',
+      firstPointId,
+      location.assignments.telemetry,
+      JSON.stringify(point(-122, 50))
+    );
+    await addPropertyValue(
+      connection,
+      'spatial',
+      secondPointId,
+      location.assignments.telemetry,
+      JSON.stringify(point(-110, 60))
+    );
+    await addPropertyValue(
+      connection,
+      'spatial',
+      thirdPointId,
+      location.assignments.telemetry,
+      JSON.stringify(point(-121, 51))
+    );
+    await addPropertyValue(connection, 'string', speciesObservationId, colour.assignments.species_observation, 'red');
+    await addPropertyValue(connection, 'string', speciesObservationId, colour.assignments.species_observation, 'blue');
+    await addPropertyValue(connection, 'string', genusObservationId, colour.assignments.species_observation, 'blue');
+    await addPropertyValue(connection, 'number', speciesObservationId, count.assignments.species_observation, 77);
+    await addPropertyValue(connection, 'number', speciesObservationId, count.assignments.species_observation, 100);
+    await addPropertyValue(connection, 'number', genusObservationId, count.assignments.species_observation, 100);
+    await addPropertyValue(connection, 'number', captureId, count.assignments.capture, 77);
+    await addPropertyValue(connection, 'taxon', speciesObservationId, taxon.assignments.species_observation, speciesId);
+    await addPropertyValue(connection, 'taxon', genusObservationId, taxon.assignments.species_observation, genusId);
+    await addPropertyValue(connection, 'taxon', animalId, taxon.assignments.animal, speciesId);
+    await addPropertyValue(connection, 'code', innerSiteId, habitat.assignments.sample_site, wetland);
+    await addPropertyValue(connection, 'code', outerSiteId, habitat.assignments.sample_site, forest);
 
     const siteToDeployment = await createBlueprintFeatureTypeProperty(
       connection,

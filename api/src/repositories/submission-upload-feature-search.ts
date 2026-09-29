@@ -436,7 +436,9 @@ function buildUploadChildrenAndReferrersSql(sourceAlias: 'evidence' | 'walk'): s
  * Projects matched feature IDs onto the upload features they identify, as the `anchor_sf` rows callers order and page.
  *
  * Each ID is resolved by a fenced primary-key lookup and the upload boundary is applied to the result, so resolving the
- * matches costs one probe per match even when stale statistics underestimate them.
+ * matches costs one probe per match even when stale statistics underestimate them. The evidence and every walk step
+ * already hold to the boundary; checking it again here guarantees the evaluator only returns, and screening only
+ * assigns, current features of the upload, whatever path produced the ID.
  *
  * @param {Knex.QueryBuilder} matches Query returning unique matching `submission_feature_id` values.
  * @param {SubmissionUploadScope} scope Upload being evaluated.
