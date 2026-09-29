@@ -114,7 +114,7 @@ export const SelectedFeatureRulesContainer = (props: SelectedFeatureRulesContain
     <SelectedFeatureRulesPanel
       rows={rulesQuery.data?.rules ?? []}
       rowCount={rulesQuery.data?.pagination.total ?? 0}
-      isLoading={rulesQuery.isFetching && !rulesQuery.data}
+      isLoading={rulesQuery.isFetching && (!rulesQuery.data || rulesQuery.isPlaceholderData)}
       error={rulesQuery.isFetching ? null : rulesQuery.error}
       searchTerm={grid.searchTerm}
       onSearch={grid.handleSearch}

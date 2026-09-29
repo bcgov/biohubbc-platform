@@ -22,7 +22,7 @@ import { decodeExpressionFromUrl, encodeExpressionToUrl } from 'utils/expression
  */
 export const useSearchResultExpression = () => {
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
-  const dialogContext = useDialogContext();
+  const { setSnackbar } = useDialogContext();
 
   // Track the raw encoded value so we only show the error snackbar once per invalid value.
   const lastInvalidExprRef = useRef<string | null>(null);
@@ -49,7 +49,7 @@ export const useSearchResultExpression = () => {
     if (rawExpr && expressionTree === null) {
       if (lastInvalidExprRef.current !== rawExpr) {
         lastInvalidExprRef.current = rawExpr;
-        dialogContext.setSnackbar({
+        setSnackbar({
           open: true,
           snackbarMessage: 'Could not load saved search filters'
         });
@@ -58,7 +58,7 @@ export const useSearchResultExpression = () => {
       // Reset the guard when the expr param changes to a valid or absent value.
       lastInvalidExprRef.current = null;
     }
-  }, [rawExpr, expressionTree, dialogContext]);
+  }, [rawExpr, expressionTree, setSnackbar]);
 
   /**
    * Applies a new expression tree to the search result page.
