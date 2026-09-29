@@ -13,6 +13,15 @@ const userList = (filters: SubmissionFilters, pagination: ApiPaginationRequestOp
   [QUERY_KEY_ROOT.SUBMISSION, 'user-list', { filters, pagination }] as const;
 
 /**
+ * Key of the submissions administrators see on their dashboard in one review state.
+ *
+ * @param {'unreviewed' | 'reviewed' | 'published'} reviewState The dashboard list.
+ * @returns The admin dashboard list key.
+ */
+const adminList = (reviewState: 'unreviewed' | 'reviewed' | 'published') =>
+  [QUERY_KEY_ROOT.SUBMISSION, 'admin-list', reviewState] as const;
+
+/**
  * Key prefix of everything cached for one submission.
  *
  * @param {number} submissionId The submission.
@@ -27,6 +36,14 @@ const submission = (submissionId: number) => [QUERY_KEY_ROOT.SUBMISSION, submiss
  * @returns The submission record key.
  */
 const record = (submissionId: number) => [...submission(submissionId), 'record'] as const;
+
+/**
+ * Key of one submission's upload status: malware scans, processing state and file count.
+ *
+ * @param {number} submissionId The submission.
+ * @returns The upload status key.
+ */
+const uploadStatus = (submissionId: number) => [...submission(submissionId), 'upload-status'] as const;
 
 /**
  * Key of one page of a submission's features as administrators review them.
@@ -88,8 +105,10 @@ const featureProperties = (
  */
 export const submissionQueryKeys = {
   userList,
+  adminList,
   submission,
   record,
+  uploadStatus,
   adminFeatures,
   features,
   feature,

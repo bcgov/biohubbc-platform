@@ -2,6 +2,14 @@ import { QUERY_KEY_ROOT } from 'constants/query-keys';
 import { ISystemUsersQueryParams } from 'interfaces/useUserApi.interface';
 
 /**
+ * Key of the signed-in user's own BioHub record.
+ *
+ * @param {string} subject The token subject that identifies the signed-in user.
+ * @returns The signed-in user key.
+ */
+const self = (subject: string) => [QUERY_KEY_ROOT.USER, 'self', subject] as const;
+
+/**
  * Key of the system roles a user can hold.
  *
  * @returns The roles key.
@@ -34,4 +42,4 @@ const available = (search: string) => [QUERY_KEY_ROOT.USER, 'available', { searc
 /**
  * Query keys for system users.
  */
-export const userQueryKeys = { available, roles, lists, list };
+export const userQueryKeys = { available, self, roles, lists, list };

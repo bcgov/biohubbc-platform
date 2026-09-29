@@ -125,7 +125,7 @@ describe('DownloadVersionPage', () => {
     expect(getByText('Failed to load rows')).toBeVisible();
     expect(getByRole('tab', { name: 'Features' })).toBeVisible();
     expect(getByRole('tab', { name: 'Exports' })).toBeVisible();
-    expect(mockGetDownloadVersion).toHaveBeenCalledWith(DOWNLOAD_ID, VERSION_ID);
+    expect(mockGetDownloadVersion).toHaveBeenCalledWith(DOWNLOAD_ID, VERSION_ID, { signal: expect.any(AbortSignal) });
   });
 
   it('lists only this version exports on the Exports tab', async () => {

@@ -16,7 +16,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ISecurityReasonWithFeatureCount } from 'interfaces/useSecurityApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { IAddReasonFormValues } from './AddReasonForm';
 import { AddReasonFormInitialValues, ReasonDialog } from './ReasonDialog';
 
@@ -83,18 +83,21 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
    * @param {string} text
    * @param {unknown} error
    */
-  const showLoadError = (title: string, text: string, error: unknown) => {
-    const apiError = error as APIError;
-    dialogContext.setErrorDialog({
-      open: true,
-      dialogTitle: title,
-      dialogText: text,
-      dialogError: apiError.message,
-      dialogErrorDetails: apiError.errors,
-      onClose: () => dialogContext.setErrorDialog({ open: false }),
-      onOk: () => dialogContext.setErrorDialog({ open: false })
-    });
-  };
+  const showLoadError = useCallback(
+    (title: string, text: string, error: unknown) => {
+      const apiError = error as APIError;
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: title,
+        dialogText: text,
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => dialogContext.setErrorDialog({ open: false }),
+        onOk: () => dialogContext.setErrorDialog({ open: false })
+      });
+    },
+    [dialogContext]
+  );
 
   /**
    * Open confirmation dialog to delete a security reason.

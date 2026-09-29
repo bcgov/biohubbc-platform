@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { IApiKeyView, ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
 
 /**
@@ -24,10 +24,11 @@ export const useApiKeysApi = (axios: AxiosInstance) => {
   /**
    * List all active API keys for the current user.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<IApiKeyView[]>}
    */
-  const listApiKeys = async (): Promise<IApiKeyView[]> => {
-    const { data } = await axios.get<IApiKeyView[]>('/api/api-key');
+  const listApiKeys = async (options?: Pick<AxiosRequestConfig, 'signal'>): Promise<IApiKeyView[]> => {
+    const { data } = await axios.get<IApiKeyView[]>('/api/api-key', options);
     return data;
   };
 

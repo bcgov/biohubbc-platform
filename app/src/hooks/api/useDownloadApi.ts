@@ -47,10 +47,14 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    * download page — status, header name, description, and lifecycle timestamps.
    *
    * @param {string} downloadId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {Promise<DownloadDetail>}
    */
-  const getDownload = async (downloadId: string): Promise<DownloadDetail> => {
-    const { data } = await axios.get<DownloadDetail>(`/api/download/${downloadId}`);
+  const getDownload = async (
+    downloadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadDetail> => {
+    const { data } = await axios.get<DownloadDetail>(`/api/download/${downloadId}`, options);
     return data;
   };
 
@@ -79,10 +83,18 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    *
    * @param {string} downloadId - The parent download ID.
    * @param {string} downloadVersionId - The download version ID.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {Promise<DownloadVersion>} The requested download version.
    */
-  const getDownloadVersion = async (downloadId: string, downloadVersionId: string): Promise<DownloadVersion> => {
-    const { data } = await axios.get<DownloadVersion>(`/api/download/${downloadId}/version/${downloadVersionId}`);
+  const getDownloadVersion = async (
+    downloadId: string,
+    downloadVersionId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadVersion> => {
+    const { data } = await axios.get<DownloadVersion>(
+      `/api/download/${downloadId}/version/${downloadVersionId}`,
+      options
+    );
     return data;
   };
 

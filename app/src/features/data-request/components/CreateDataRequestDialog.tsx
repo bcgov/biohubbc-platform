@@ -1,11 +1,11 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { SearchOption } from 'components/search/SearchAutocomplete.interface';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 import { getUserLabel } from 'utils/Utils';
 import { CreateDataRequestDialogYup } from './CreateDataRequestDialogYup';
 import { CreateDataRequestForm, ICreateDataRequestFormValues } from './form/CreateDataRequestForm';
@@ -37,26 +37,23 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
   const api = useApi();
   const dialogContext = useDialogContext();
 
-  const availableUsersLoader = useDataLoader(
-    (search?: string) => api.teams.getAvailableUsers(search),
-    (error) => {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    }
-  );
+  const [userSearch, setUserSearch] = useState('');
 
+  const availableUsersQuery = useQuery({
+    queryKey: userQueryKeys.available(userSearch),
+    queryFn: ({ signal }) => api.teams.getAvailableUsers(userSearch, { signal }),
+    enabled: open,
+    placeholderData: keepPreviousData
+  });
+
+  const { error: availableUsersError } = availableUsersQuery;
   useEffect(() => {
-    if (!open) {
-      return;
+    if (availableUsersError) {
+      dialogContext.setSnackbar({ open: true, snackbarMessage: availableUsersError.message });
     }
+  }, [availableUsersError, dialogContext]);
 
-    availableUsersLoader.load();
-  }, [open, availableUsersLoader]);
-
-  const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
+  const availableUsers = useMemo(() => availableUsersQuery.data?.users ?? [], [availableUsersQuery.data?.users]);
   const userOptions = useMemo<SearchOption[]>(
     () =>
       availableUsers.map((user) => ({
@@ -66,9 +63,7 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
     [availableUsers]
   );
 
-  const debouncedAvailableUserRefresh = useDebounce((search: string) => {
-    availableUsersLoader.refresh(search);
-  }, 300);
+  const debouncedUserSearch = useDebounce(setUserSearch, 300);
 
   return (
     <EditDialog<ICreateDataRequestFormValues>
@@ -81,9 +76,9 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
           <CreateDataRequestForm
             options={userOptions}
             availableUsers={availableUsers}
-            isLoadingUsers={availableUsersLoader.isLoading}
+            isLoadingUsers={availableUsersQuery.isFetching}
             isSubmitting={isSubmitting}
-            onSearchUsers={debouncedAvailableUserRefresh}
+            onSearchUsers={debouncedUserSearch}
           />
         ),
         initialValues: {

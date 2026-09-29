@@ -1,11 +1,12 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { SubmissionDetails } from './SubmissionDetails';
 import { SubmissionDetailTab, SubmissionHeader } from './header/SubmissionHeader';
 
@@ -14,17 +15,16 @@ export const SubmissionDetailPageContent = ({ submissionId }: { submissionId: nu
   const location = useLocation();
   const api = useApi();
   const [activeTab, setActiveTab] = useState<SubmissionDetailTab>('details');
-  const submissionDataLoader = useDataLoader((id: number) => api.submissions.getSubmissionRecordWithSecurity(id));
+  const submissionQuery = useQuery({
+    queryKey: submissionQueryKeys.record(submissionId),
+    queryFn: ({ signal }) => api.submissions.getSubmissionRecordWithSecurity(submissionId, { signal })
+  });
 
-  useEffect(() => {
-    submissionDataLoader.load(submissionId);
-  }, [submissionId, submissionDataLoader]);
-
-  const submission = submissionDataLoader.data;
+  const submission = submissionQuery.data;
 
   return (
     <LoadingGuard
-      isLoading={submissionDataLoader.isLoading && !submission}
+      isLoading={submissionQuery.isPending}
       isLoadingFallback={<SkeletonPage />}
       isLoadingFallbackDelay={300}
       hasNoData={!submission}

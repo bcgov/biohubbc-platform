@@ -25,6 +25,14 @@ const list = (pagination: ApiPaginationRequestOptions) => [...lists(), { paginat
 const download = (downloadId: string) => [QUERY_KEY_ROOT.DOWNLOAD, downloadId] as const;
 
 /**
+ * Key of one download's detail record.
+ *
+ * @param {string} downloadId The download.
+ * @returns The download detail key.
+ */
+const detail = (downloadId: string) => [...download(downloadId), 'detail'] as const;
+
+/**
  * Key of the feature types, and their exportable columns, a download materialized.
  *
  * @param {string} downloadId The download.
@@ -43,6 +51,16 @@ const versions = (downloadId: string, pagination: ApiPaginationRequestOptions) =
   [...download(downloadId), 'versions', { pagination }] as const;
 
 /**
+ * Key of one download version's record.
+ *
+ * @param {string} downloadId The download.
+ * @param {string} downloadVersionId The version.
+ * @returns The download version key.
+ */
+const version = (downloadId: string, downloadVersionId: string) =>
+  [...download(downloadId), 'version', downloadVersionId, 'detail'] as const;
+
+/**
  * Key of one page of the exports made from one download version.
  *
  * @param {string} downloadId The download.
@@ -57,4 +75,4 @@ const versionExports = (downloadId: string, downloadVersionId: string, paginatio
  * Query keys for downloads, ordered from broad to narrow so that each prefix names the set of queries a change
  * invalidates.
  */
-export const downloadQueryKeys = { lists, list, download, featureTypes, versions, versionExports };
+export const downloadQueryKeys = { lists, list, download, detail, featureTypes, versions, version, versionExports };

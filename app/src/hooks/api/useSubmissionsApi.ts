@@ -61,10 +61,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have not completed security review.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getUnreviewedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/unreviewed`);
+  const getUnreviewedSubmissionsForAdmins = async (
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/unreviewed`, options);
 
     return data;
   };
@@ -72,10 +75,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getReviewedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/reviewed`);
+  const getReviewedSubmissionsForAdmins = async (
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/reviewed`, options);
 
     return data;
   };
@@ -83,10 +89,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review and published.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getPublishedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/published`);
+  const getPublishedSubmissionsForAdmins = async (
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/published`, options);
 
     return data;
   };

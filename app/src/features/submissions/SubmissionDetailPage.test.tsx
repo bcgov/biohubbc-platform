@@ -154,14 +154,18 @@ describe('SubmissionDetailPage', () => {
           </Routes>
         </MemoryRouter>
       );
-      await waitFor(() => expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledWith(1));
+      await waitFor(() =>
+        expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledWith(1, { signal: expect.any(AbortSignal) })
+      );
       if (!pending) {
         await act(async () => resolveFirst(mockSubmission));
         await findByRole('heading', { name: 'Test Submission' });
       }
 
       fireEvent.click(getByText('Next submission'));
-      await waitFor(() => expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledWith(2));
+      await waitFor(() =>
+        expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledWith(2, { signal: expect.any(AbortSignal) })
+      );
       expect(queryByRole('heading', { name: 'Test Submission' })).not.toBeInTheDocument();
 
       await act(async () => resolveSecond({ ...mockSubmission, submission_id: 2, name: 'Second Submission' }));
