@@ -4,9 +4,9 @@ import { useLocation } from 'react-router';
 /**
  * Convenience wrapper for `useLocation` that parses `location.search` into an object of query string values.
  *
- * @return {*}
+ * @return {*} The parsed query string values of the current location.
  */
-export const useQuery = () => {
+export const useUrlQueryParams = () => {
   const location = useLocation();
   return qs.parse(location.search.replace('?', '')) as any;
 };
