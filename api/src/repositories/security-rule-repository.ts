@@ -58,11 +58,13 @@ export class SecurityRuleRepository extends BaseRepository {
   }
 
   /**
-   * Fetch one rule and its category lifecycle fields for assignment validation.
-   * @param {number} securityRuleId Rule identifier.
-   * @returns {Promise<SecurityRuleAndCategory | undefined>} Rule and category, if they exist.
+   * Fetch rules and their category lifecycle fields for assignment validation, in one query.
+   *
+   * @param {number[]} securityRuleIds Rule identifiers.
+   * @returns {Promise<SecurityRuleAndCategory[]>} The requested rules that exist, with their categories.
+   * @memberof SecurityRuleRepository
    */
-  async getSecurityRuleWithCategory(securityRuleId: number): Promise<SecurityRuleAndCategory | undefined> {
+  async getSecurityRulesWithCategory(securityRuleIds: number[]): Promise<SecurityRuleAndCategory[]> {
     const knex = getKnex();
 
     const query = knex('security_rule as sr')
@@ -81,9 +83,9 @@ export class SecurityRuleRepository extends BaseRepository {
         'sc.record_effective_date as category_record_effective_date',
         'sc.record_end_date as category_record_end_date'
       )
-      .where('sr.security_rule_id', securityRuleId);
+      .whereIn('sr.security_rule_id', securityRuleIds);
     const response = await this.connection.knex(query, SecurityRuleAndCategory);
-    return response.rows[0];
+    return response.rows;
   }
 
   /**

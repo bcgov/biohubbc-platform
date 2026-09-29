@@ -35,6 +35,25 @@ describe('SecurityRuleRepository', () => {
     });
   });
 
+  describe('getSecurityRulesWithCategory', () => {
+    it('reads every requested rule with its category in one query', async () => {
+      const rows = [
+        { security_rule_id: 1, record_end_date: null, category_record_end_date: null },
+        { security_rule_id: 2, record_end_date: '2026-02-01', category_record_end_date: null }
+      ];
+      const knex = sinon.stub().resolves({ rowCount: 2, rows });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getSecurityRulesWithCategory([1, 2]);
+
+      expect(knex).to.have.been.calledOnce;
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"sr"."security_rule_id" in ($1, $2)');
+      expect(bindings).to.eql([1, 2]);
+      expect(result).to.eql(rows);
+    });
+  });
+
   describe('getSecurityRulesWithFeatureCount', () => {
     it('counts only non-soft-deleted applications', async () => {
       const mockRow = {

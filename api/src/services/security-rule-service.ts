@@ -10,6 +10,7 @@ import {
 } from '../models/security-rule';
 import { SecurityCategoryRepository } from '../repositories/security-category-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
+import { getUnique } from '../utils/unique';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
@@ -45,18 +46,26 @@ export class SecurityRuleService extends DBService {
   }
 
   /**
-   * Assert that each requested rule and its category have not been deleted.
+   * Assert that each requested rule and its category have not been deleted, reading every rule in one query.
    * Rules opted out of automatic screening remain valid for manual assignments.
+   *
    * @param {number[]} securityRuleIds Rules requested for assignment.
    * @returns {Promise<void>} Resolves when every requested rule is available.
    * @throws {ApiValidationError} When a rule is missing or its rule/category is deleted.
+   * @memberof SecurityRuleService
    */
   async assertSecurityRulesValid(securityRuleIds: number[]): Promise<void> {
-    for (const securityRuleId of new Set(securityRuleIds)) {
-      const rule = await this.securityRuleRepository.getSecurityRuleWithCategory(securityRuleId);
-      if (rule?.record_end_date !== null || rule.category_record_end_date !== null) {
-        throw new ApiValidationError('One or more security rules are unavailable.', [{ securityRuleIds }]);
-      }
+    const requestedIds = getUnique(securityRuleIds);
+    if (!requestedIds.length) {
+      return;
+    }
+
+    const rules = await this.securityRuleRepository.getSecurityRulesWithCategory(requestedIds);
+    const availableRules = rules.filter(
+      (rule) => rule.record_end_date === null && rule.category_record_end_date === null
+    );
+    if (availableRules.length !== requestedIds.length) {
+      throw new ApiValidationError('One or more security rules are unavailable.', [{ securityRuleIds }]);
     }
   }
 
