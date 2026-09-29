@@ -1,16 +1,15 @@
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
 import { SubmissionFeatureLayout } from 'features/submissions/page/features/components/SubmissionFeatureLayout';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse } from 'interfaces/useFeaturesApi.interface';
-import { useEffect, useMemo } from 'react';
-import { Navigate, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { useMemo } from 'react';
+import { Navigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { buildSubmissionFeaturePath, buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
@@ -24,64 +23,47 @@ interface SubmissionReviewFeaturePageContentProps {
 
 /**
  * Load and display review-scoped feature detail.
+ *
+ * Rendered with a `key` per feature, so the properties grid starts fresh for each feature.
+ *
  * @param {SubmissionReviewFeaturePageContentProps} props Review and feature identifiers.
  * @returns {JSX.Element} Feature detail content.
  */
 export const SubmissionReviewFeaturePageContent = (props: SubmissionReviewFeaturePageContentProps) => {
-  const navigate = useNavigate();
   const location = useLocation();
   const api = useApi();
   const { submissionId, submissionUploadId, submissionUploadReviewId, submissionFeatureId } = props;
 
-  const featureDataLoader = useDataLoader(
-    (id: number, uploadId: string, featureId: number) => api.admin.getSubmissionUploadFeature(id, uploadId, featureId),
-    (error: unknown) => {
-      const status = (error as APIError)?.status;
-      if (status === 401 || status === 403) {
-        navigate('/forbidden', { replace: true });
-      }
-    }
-  );
-  const reviewDataLoader = useDataLoader(
-    (currentSubmissionId: number, currentSubmissionUploadId: string, currentSubmissionUploadReviewId: string) =>
-      api.admin.getSubmissionUploadReview(
-        currentSubmissionId,
-        currentSubmissionUploadId,
-        currentSubmissionUploadReviewId
-      )
-  );
+  const featureQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureDetail(props, submissionFeatureId),
+    queryFn: ({ signal }) =>
+      api.admin.getSubmissionUploadFeature(submissionId, submissionUploadId, submissionFeatureId, { signal })
+  });
+  const reviewQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.reviewDetail(props),
+    queryFn: ({ signal }) =>
+      api.admin.getSubmissionUploadReview(submissionId, submissionUploadId, submissionUploadReviewId, { signal })
+  });
 
-  useEffect(() => {
-    featureDataLoader.refresh(submissionId, submissionUploadId, submissionFeatureId);
-    reviewDataLoader.refresh(submissionId, submissionUploadId, submissionUploadReviewId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId, submissionFeatureId, submissionUploadId, submissionUploadReviewId]);
+  const feature = featureQuery.data?.feature;
+  const review = reviewQuery.data;
+  const isLoading = featureQuery.isLoading || reviewQuery.isLoading;
 
-  const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
-  const review = reviewDataLoader.data;
-  const isLoading = featureDataLoader.isLoading || (reviewDataLoader.isLoading && !review);
-
-  const {
-    response: submissionFeaturePropertiesResponse,
-    rows: submissionFeaturePropertyRows,
-    rowCount: submissionFeaturePropertyRowCount,
-    isLoading: isSubmissionFeaturePropertiesLoading,
-    paginationModel: submissionFeaturePropertiesPaginationModel,
-    handlePaginationChange: handleSubmissionFeaturePropertiesPaginationChange,
-    sortModel: submissionFeaturePropertiesSortModel,
-    handleSortChange: handleSubmissionFeaturePropertiesSortChange,
-    searchTerm: submissionFeaturePropertiesSearchTerm,
-    handleSearch: handleSubmissionFeaturePropertiesSearch
-  } = useServerPaginatedDataGrid<IFeaturePropertyRow, ISubmissionFeaturePropertiesResponse>({
-    fetcher: (search: string, pagination: ApiPaginationRequestOptions) =>
-      api.admin.getSubmissionUploadFeatureProperties(submissionId, submissionUploadId, submissionFeatureId, {
-        search,
-        ...pagination
-      }),
-    extractData: (response) => response.properties,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'property', sort: 'asc' },
-    defaultPageSize: 10
+  const propertyGrid = useServerPaginatedGridState({ defaultSort: { field: 'property', sort: 'asc' } });
+  const propertyParams = { search: propertyGrid.debouncedSearchTerm, ...propertyGrid.apiPagination };
+  const propertiesQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureProperties(props, submissionFeatureId, propertyParams),
+    queryFn: ({ signal }) =>
+      api.admin.getSubmissionUploadFeatureProperties(
+        submissionId,
+        submissionUploadId,
+        submissionFeatureId,
+        propertyParams,
+        {
+          signal
+        }
+      ),
+    placeholderData: keepPreviousData
   });
 
   const pathResolvers = useMemo<SubmissionPropertyValuePathResolvers>(
@@ -102,6 +84,11 @@ export const SubmissionReviewFeaturePageContent = (props: SubmissionReviewFeatur
     }),
     [location.search, submissionId, submissionUploadId, submissionUploadReviewId]
   );
+
+  const featureErrorStatus = (featureQuery.error as APIError | null)?.status;
+  if (featureErrorStatus === 401 || featureErrorStatus === 403) {
+    return <Navigate to="/forbidden" replace />;
+  }
 
   if (review?.scope && review.scope !== 'validation') {
     return <Navigate to="/page-not-found" replace />;
@@ -134,15 +121,15 @@ export const SubmissionReviewFeaturePageContent = (props: SubmissionReviewFeatur
       <SubmissionFeaturePropertiesSection
         submissionId={submissionId}
         pathResolvers={pathResolvers}
-        rows={submissionFeaturePropertyRows}
-        rowCount={submissionFeaturePropertyRowCount}
-        isLoading={isSubmissionFeaturePropertiesLoading && !submissionFeaturePropertiesResponse}
-        paginationModel={submissionFeaturePropertiesPaginationModel}
-        setPaginationModel={handleSubmissionFeaturePropertiesPaginationChange}
-        sortModel={submissionFeaturePropertiesSortModel}
-        setSortModel={handleSubmissionFeaturePropertiesSortChange}
-        searchTerm={submissionFeaturePropertiesSearchTerm}
-        onSearch={handleSubmissionFeaturePropertiesSearch}
+        rows={propertiesQuery.data?.properties ?? []}
+        rowCount={propertiesQuery.data?.pagination.total ?? 0}
+        isLoading={propertiesQuery.isFetching && !propertiesQuery.data}
+        paginationModel={propertyGrid.paginationModel}
+        setPaginationModel={propertyGrid.handlePaginationChange}
+        sortModel={propertyGrid.sortModel}
+        setSortModel={propertyGrid.handleSortChange}
+        searchTerm={propertyGrid.searchTerm}
+        onSearch={propertyGrid.handleSearch}
       />
     </SubmissionFeatureLayout>
   );

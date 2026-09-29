@@ -1,9 +1,12 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { useEffect, useRef, useState } from 'react';
+import { ISubmissionUploadReviewSelectedFeatureRule } from 'interfaces/useAdminApi.interface';
+import { useChangeSecurityRuleAssignmentMutation } from '../../hooks/useChangeSecurityRuleAssignmentMutation';
+import { useResetSecurityAssignmentsMutation } from '../../hooks/useResetSecurityAssignmentsMutation';
 import { SelectedFeatureRulesPanel } from './SelectedFeatureRulesPanel';
 
 interface SelectedFeatureRulesContainerProps {
@@ -12,130 +15,71 @@ interface SelectedFeatureRulesContainerProps {
   submissionUploadReviewId: string;
   selectedFeatureIds: number[];
   expression?: ExpressionTreeExpression;
-  refreshRevision: number;
-  onRuleChanged: () => void;
-  onChanged: () => void;
 }
 
 /**
  * Loads authoritative rule state and applies security changes for the current review scope.
- * @param {SelectedFeatureRulesContainerProps} props Review scope and refresh callbacks.
+ *
+ * The scope (selected features, or the applied expression without a selection) is part of the rules query
+ * key, and the same scope is sent with every change, so a change always applies to the rules on screen.
+ *
+ * @param {SelectedFeatureRulesContainerProps} props Review scope.
  * @returns {JSX.Element} Rule assignment controls.
  */
 export const SelectedFeatureRulesContainer = (props: SelectedFeatureRulesContainerProps) => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const [loadError, setLoadError] = useState<unknown>();
-  // The shared grid retains its refresh callback; read the current review scope when it fetches.
-  const scopeRef = useRef(props);
-  scopeRef.current = props;
-  const ruleGrid = useServerPaginatedDataGrid({
-    fetcher: async (search, pagination) => {
-      setLoadError(undefined);
-      const scope = scopeRef.current;
-      try {
-        return await api.admin.getSubmissionUploadReviewSelectedFeatureRules(
-          scope.submissionId,
-          scope.submissionUploadId,
-          scope.submissionUploadReviewId,
-          scope.selectedFeatureIds,
-          { keyword: search, expression: scope.expression },
-          pagination
-        );
-      } catch (error) {
-        setLoadError(error);
-        throw error;
-      }
-    },
-    extractData: (response) => response.rules,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'applied', sort: 'desc' }
+  const grid = useServerPaginatedGridState({ defaultSort: { field: 'applied', sort: 'desc' } });
+  const changeRuleMutation = useChangeSecurityRuleAssignmentMutation(props);
+  const resetMutation = useResetSecurityAssignmentsMutation(props);
+
+  const rulesQueryKey = submissionUploadQueryKeys.selectedFeatureRules(props, {
+    featureIds: props.selectedFeatureIds,
+    expression: props.expression,
+    keyword: grid.debouncedSearchTerm,
+    pagination: grid.apiPagination
   });
-
-  const optimisticRules = useOptimisticDataLoader({ data: ruleGrid.response, setData: ruleGrid.setData });
-  const latestRuleGrid = useRef(ruleGrid);
-  latestRuleGrid.current = ruleGrid;
-
-  const { refresh: refreshRules } = ruleGrid;
-
-  useEffect(() => {
-    refreshRules();
-  }, [
-    props.submissionId,
-    props.submissionUploadId,
-    props.submissionUploadReviewId,
-    props.selectedFeatureIds,
-    props.expression,
-    props.refreshRevision,
-    refreshRules
-  ]);
-
-  /**
-   * Optimistically changes one rule in place, rolls back on error, and refreshes feature-security state on success.
-   * @param {(typeof ruleGrid.rows)[number]} rule Rule and current applied state.
-   * @returns {Promise<void>} Resolves after refreshing or reporting an error.
-   */
-  const changeRule = async (rule: (typeof ruleGrid.rows)[number]): Promise<void> => {
-    try {
-      const mutation = rule.applied
-        ? api.admin.deleteSubmissionUploadReviewSecurityRuleAssignments
-        : api.admin.insertSubmissionUploadReviewSecurityRuleAssignments;
-      // Do not refresh assignments after a toggle: applied-first sorting would move the touched rule.
-      // Update it optimistically in place and refresh only the features table on success.
-      await optimisticRules.refresh((currentData) => ({
-        optimisticState: {
-          ...currentData,
-          rules: currentData.rules.map((row) =>
-            row.security_rule_id === rule.security_rule_id ? { ...row, applied: !rule.applied } : row
-          )
-        },
-        mutation: () =>
-          mutation(
-            props.submissionId,
-            props.submissionUploadId,
-            props.submissionUploadReviewId,
-            props.selectedFeatureIds,
-            rule.security_rule_id,
-            props.expression
-          ),
-        onRollback: (_error, { optimisticState }) => {
-          // Roll back only this change, preserving newer rule changes or a newly loaded scope.
-          const currentGrid = latestRuleGrid.current;
-          const response = currentGrid.response;
-          const optimisticRule = optimisticState.rules.find((row) => row.security_rule_id === rule.security_rule_id);
-          if (response) {
-            currentGrid.setData({
-              ...response,
-              rules: response.rules.map((row) => (row === optimisticRule ? rule : row))
-            });
-          }
-        }
-      }));
-      props.onRuleChanged();
-    } catch (error) {
-      dialogContext.setSnackbar({ open: true, snackbarMessage: (error as Error).message });
-    }
-  };
-
-  /**
-   * Resets direct assignments for the current scope and reloads authoritative state.
-   * @returns {Promise<void>} Resolves after refreshing or reporting an error.
-   */
-  const resetSecurity = async (): Promise<void> => {
-    dialogContext.setYesNoDialog({ open: false });
-    try {
-      await api.admin.deleteSubmissionUploadReviewSecurityAssignments(
+  const rulesQuery = useQuery({
+    queryKey: rulesQueryKey,
+    queryFn: ({ signal }) =>
+      api.admin.getSubmissionUploadReviewSelectedFeatureRules(
         props.submissionId,
         props.submissionUploadId,
         props.submissionUploadReviewId,
         props.selectedFeatureIds,
-        props.expression
-      );
-      ruleGrid.refresh();
-      props.onChanged();
-    } catch (error) {
-      dialogContext.setSnackbar({ open: true, snackbarMessage: (error as Error).message });
-    }
+        { keyword: grid.debouncedSearchTerm, expression: props.expression },
+        grid.apiPagination,
+        { signal }
+      ),
+    placeholderData: keepPreviousData
+  });
+
+  /**
+   * Applies or removes one rule for the current scope, flipping it in place until the server answers.
+   *
+   * @param {ISubmissionUploadReviewSelectedFeatureRule} rule Rule and current applied state.
+   * @returns {void} Starts the change; the mutation reports a failure.
+   */
+  const changeRule = (rule: ISubmissionUploadReviewSelectedFeatureRule): void => {
+    changeRuleMutation.mutate({
+      rule,
+      selectedFeatureIds: props.selectedFeatureIds,
+      expression: props.expression,
+      rulesQueryKey
+    });
+  };
+
+  /**
+   * Resets direct assignments for the current scope.
+   *
+   * @returns {void} Starts the reset; a snackbar reports a failure.
+   */
+  const resetSecurity = (): void => {
+    dialogContext.setYesNoDialog({ open: false });
+    resetMutation.mutate(
+      { selectedFeatureIds: props.selectedFeatureIds, expression: props.expression },
+      { onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message }) }
+    );
   };
 
   /**
@@ -161,17 +105,17 @@ export const SelectedFeatureRulesContainer = (props: SelectedFeatureRulesContain
 
   return (
     <SelectedFeatureRulesPanel
-      rows={ruleGrid.rows}
-      rowCount={ruleGrid.rowCount}
-      isLoading={ruleGrid.isLoading && !ruleGrid.response}
-      error={loadError}
-      searchTerm={ruleGrid.searchTerm}
-      onSearch={ruleGrid.handleSearch}
-      paginationModel={ruleGrid.paginationModel}
-      onPaginationModelChange={ruleGrid.handlePaginationChange}
+      rows={rulesQuery.data?.rules ?? []}
+      rowCount={rulesQuery.data?.pagination.total ?? 0}
+      isLoading={rulesQuery.isFetching && !rulesQuery.data}
+      error={rulesQuery.isFetching ? null : rulesQuery.error}
+      searchTerm={grid.searchTerm}
+      onSearch={grid.handleSearch}
+      paginationModel={grid.paginationModel}
+      onPaginationModelChange={grid.handlePaginationChange}
       onChangeRule={changeRule}
       onReset={openResetDialog}
-      onRetry={ruleGrid.refresh}
+      onRetry={() => void rulesQuery.refetch()}
     />
   );
 };

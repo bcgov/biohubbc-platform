@@ -30,6 +30,7 @@ export const SubmissionReviewFeaturePage = () => {
 
   return (
     <SubmissionReviewFeaturePageContent
+      key={submissionFeatureId}
       submissionId={submissionId}
       submissionUploadId={params.submissionUploadId}
       submissionUploadReviewId={params.submissionUploadReviewId}

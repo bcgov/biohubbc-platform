@@ -74,9 +74,10 @@ export const useSearchResultExpression = () => {
    * applies, where the URL change itself triggers the search.
    *
    * @param {ExpressionTreeExpression | null} expression - Expression to apply, or `null` to clear filters.
+   * @returns {boolean} True when the URL changed; false when the expression was already applied.
    */
   const handleExpressionApply = useCallback(
-    (expression: ExpressionTreeExpression | null) => {
+    (expression: ExpressionTreeExpression | null): boolean => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
       newParams.delete(URL_PARAMS.PAGE);
       newParams.delete(URL_PARAMS.CURSOR);
@@ -95,10 +96,11 @@ export const useSearchResultExpression = () => {
       // same-URL case so Apply still refreshes without double-requesting normal applies.
       if (newParams.toString() === searchParams.toString()) {
         setExpressionApplyRevision((current) => current + 1);
-        return;
+        return false;
       }
 
       setRawSearchParams(newParams);
+      return true;
     },
     [searchParams, setRawSearchParams]
   );

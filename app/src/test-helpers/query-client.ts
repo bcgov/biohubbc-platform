@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryKey } from '@tanstack/react-query';
 import { QUERY_CLIENT_DEFAULT_OPTIONS } from 'constants/query';
 
 /**
@@ -16,4 +16,15 @@ export const createTestQueryClient = (): QueryClient => {
       mutations: { ...QUERY_CLIENT_DEFAULT_OPTIONS.mutations, gcTime: Infinity }
     }
   });
+};
+
+/**
+ * Spies on a client's `invalidateQueries` and reports which keys it was asked to invalidate.
+ *
+ * @param {QueryClient} queryClient The client to spy on.
+ * @returns {() => (QueryKey | undefined)[]} Reads the invalidated keys so far, in call order.
+ */
+export const spyOnInvalidatedQueryKeys = (queryClient: QueryClient): (() => (QueryKey | undefined)[]) => {
+  const spy = vi.spyOn(queryClient, 'invalidateQueries');
+  return () => spy.mock.calls.map(([filters]) => filters?.queryKey);
 };

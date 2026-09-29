@@ -1,9 +1,11 @@
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PropertyValueDisplay } from 'components/property/PropertyValueDisplay';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { IFeaturePropertyRow } from 'interfaces/useFeaturesApi.interface';
 import { useMemo } from 'react';
 import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
@@ -23,17 +25,18 @@ interface SecurityFeaturePropertiesTableProps {
  */
 export const SecurityFeaturePropertiesTable = (props: SecurityFeaturePropertiesTableProps) => {
   const api = useApi();
-  const propertyGrid = useServerPaginatedDataGrid({
-    fetcher: (_search, pagination) =>
+  const propertyGrid = useServerPaginatedGridState({ defaultSort: { field: 'property', sort: 'asc' } });
+  const propertiesQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureProperties(props, props.submissionFeatureId, propertyGrid.apiPagination),
+    queryFn: ({ signal }) =>
       api.admin.getSubmissionUploadFeatureProperties(
         props.submissionId,
         props.submissionUploadId,
         props.submissionFeatureId,
-        pagination
+        propertyGrid.apiPagination,
+        { signal }
       ),
-    extractData: (response) => response.properties,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'property', sort: 'asc' }
+    placeholderData: keepPreviousData
   });
   const paths = useMemo(() => buildSubmissionPropertyValuePathResolvers('/submission', ''), []);
   const columns = useMemo<GridColDef<IFeaturePropertyRow>[]>(
@@ -61,16 +64,16 @@ export const SecurityFeaturePropertiesTable = (props: SecurityFeaturePropertiesT
   return (
     <CustomDataGrid
       autoHeight
-      rows={propertyGrid.rows}
+      rows={propertiesQuery.data?.properties ?? []}
       columns={columns}
       getRowId={(row) => row.id}
-      loading={propertyGrid.isLoading && !propertyGrid.response}
+      loading={propertiesQuery.isFetching && !propertiesQuery.data}
       noRowsMessage="No properties"
       paginationMode="server"
       paginationModel={propertyGrid.paginationModel}
       onPaginationModelChange={propertyGrid.handlePaginationChange}
       pageSizeOptions={[10, 25, 50]}
-      rowCount={propertyGrid.rowCount}
+      rowCount={propertiesQuery.data?.pagination.total ?? 0}
       sortingMode="server"
       sortModel={propertyGrid.sortModel}
       onSortModelChange={propertyGrid.handleSortChange}

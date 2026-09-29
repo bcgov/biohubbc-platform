@@ -20,7 +20,8 @@ import {
 } from 'components/map/geometry-tile-layers';
 import { MapFrame } from 'components/map/MapFrame';
 import { useSubmissionUploadTileSession } from '../../../components/map/useSubmissionUploadTileSession';
-import { ISubmissionUploadFeatureGeometryExtent } from 'interfaces/useAdminApi.interface';
+import { skipToken, useQuery } from '@tanstack/react-query';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext } from 'hooks/useContext';
 import type { FilterSpecification, SourceSpecification } from 'maplibre-gl';
@@ -56,39 +57,22 @@ export const SubmissionUploadReviewMap = (props: SubmissionUploadReviewMapProps)
     retry,
     onTileError
   } = useSubmissionUploadTileSession(props.submissionId, props.submissionUploadId);
-  const [extent, setExtent] = useState<ISubmissionUploadFeatureGeometryExtent & { key: string; error?: boolean }>();
-  const [extentRevision, setExtentRevision] = useState(0);
-  const currentExtent = extent?.key === featureKey ? extent : undefined;
-
-  useEffect(() => {
-    if (props.submissionFeatureId === null) {
-      return;
-    }
-    const controller = new AbortController();
-    const submissionFeatureId = props.submissionFeatureId;
-
-    /** Load the selected feature's extent, ignoring responses after cancellation. */
-    const loadExtent = async (): Promise<void> => {
-      try {
-        const response = await api.admin.getSubmissionUploadFeatureGeometryExtent(
-          props.submissionId,
-          props.submissionUploadId,
-          submissionFeatureId,
-          { signal: controller.signal }
-        );
-        if (!controller.signal.aborted) {
-          setExtent({ ...response, key: featureKey });
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setExtent({ key: featureKey, bbox: null, geometry_count: 0, error: true });
-        }
-      }
-    };
-
-    void loadExtent();
-    return () => controller.abort();
-  }, [api, props.submissionId, props.submissionUploadId, props.submissionFeatureId, featureKey, extentRevision]);
+  const { submissionFeatureId } = props;
+  // Keyed on the feature, with no placeholder: an extent is only ever shown for the feature it describes.
+  const extentQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureGeometryExtent(props, submissionFeatureId),
+    queryFn:
+      submissionFeatureId === null
+        ? skipToken
+        : ({ signal }) =>
+            api.admin.getSubmissionUploadFeatureGeometryExtent(
+              props.submissionId,
+              props.submissionUploadId,
+              submissionFeatureId,
+              { signal }
+            )
+  });
+  const currentExtent = extentQuery.data;
 
   // Loading is an initial-map concern; switching the selected feature must not cover the retained map.
   const isLoading = !hasMapLoaded && status === 'loading';
@@ -167,7 +151,7 @@ export const SubmissionUploadReviewMap = (props: SubmissionUploadReviewMapProps)
   }, [currentExtent, featureKey, hasMapLoaded]);
 
   // Hide only after the selected feature is confirmed non-spatial; loading and errors are not empty results.
-  const hideMap = props.submissionFeatureId !== null && currentExtent?.geometry_count === 0 && !currentExtent.error;
+  const hideMap = submissionFeatureId !== null && currentExtent?.geometry_count === 0;
 
   return (
     <Box sx={{ display: hideMap ? 'none' : 'block' }}>
@@ -197,7 +181,7 @@ export const SubmissionUploadReviewMap = (props: SubmissionUploadReviewMapProps)
             <SkeletonMap />
           </Box>
         )}
-        {(status === 'error' || currentExtent?.error) && (
+        {(status === 'error' || extentQuery.isError) && (
           <Box
             data-testid="submission-upload-review-map-error"
             sx={{
@@ -222,8 +206,8 @@ export const SubmissionUploadReviewMap = (props: SubmissionUploadReviewMapProps)
                 if (status === 'error') {
                   retry();
                 }
-                if (currentExtent?.error) {
-                  setExtentRevision((revision) => revision + 1);
+                if (extentQuery.isError) {
+                  void extentQuery.refetch();
                 }
               }}>
               Try again
