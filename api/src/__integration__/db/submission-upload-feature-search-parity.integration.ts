@@ -129,7 +129,7 @@ describe('Submission upload expression evaluation parity with published evaluati
   });
   afterEach(async () => {
     await connection.rollback();
-    connection.release();
+    await connection.release();
   });
 
   /**

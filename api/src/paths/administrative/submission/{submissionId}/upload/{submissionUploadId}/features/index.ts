@@ -120,7 +120,7 @@ export function getSubmissionUploadFeatures(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

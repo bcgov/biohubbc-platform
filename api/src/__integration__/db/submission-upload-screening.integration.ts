@@ -70,7 +70,7 @@ describe('Submission upload security screening (integration)', function () {
   });
   afterEach(async () => {
     await connection.rollback();
-    connection.release();
+    await connection.release();
   });
 
   /**

@@ -93,7 +93,7 @@ describe('Submission upload security review (integration)', function () {
   afterEach(async () => {
     sinon.restore();
     await connection.rollback();
-    connection.release();
+    await connection.release();
   });
 
   async function insertFeature(uploadId: string, parent: number | null = null): Promise<number> {

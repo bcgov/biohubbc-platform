@@ -232,7 +232,7 @@ describe('Submission upload expression evaluation benchmark', function () {
         );
       } finally {
         await connection.rollback();
-        connection.release();
+        await connection.release();
       }
     });
   }

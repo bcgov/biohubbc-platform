@@ -68,7 +68,7 @@ describe('Submission upload expression evaluation (integration)', function () {
   });
   afterEach(async () => {
     await connection.rollback();
-    connection.release();
+    await connection.release();
   });
 
   /**
