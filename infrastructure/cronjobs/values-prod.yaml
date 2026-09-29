@@ -1,0 +1,12 @@
+environment:
+  licensePlate: a0ec71
+  name: prod
+  id: deploy
+  ts: ''
+app:
+  database:
+    host: biohub-platform-db-prod-primary
+    adminSecretName: biohub-platform-db-prod-pguser-postgres
+    dbNameSecretName: biohub-platform-db-prod-pguser-biohub-platform-db-prod
+  materializedViewRefresh:
+    disabled: true

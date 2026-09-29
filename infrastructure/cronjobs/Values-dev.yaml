@@ -1,0 +1,9 @@
+environment:
+  licensePlate: a0ec71
+  name: dev
+  ts: ''
+app:
+  database:
+    useCrunchy: false
+  materializedViewRefresh:
+    disabled: true

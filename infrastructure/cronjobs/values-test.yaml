@@ -1,0 +1,13 @@
+environment:
+  licensePlate: a0ec71
+  name: test
+  id: deploy
+  ts: ''
+app:
+  database:
+    host: biohub-platform-db-test-primary
+    port: 5432
+    dbNameSecretName: biohub-platform-db-test-pguser-biohub-platform-db-test
+    adminSecretName: biohub-platform-db-test-pguser-postgres
+  materializedViewRefresh:
+    disabled: true
