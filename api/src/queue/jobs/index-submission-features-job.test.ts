@@ -237,35 +237,33 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(toIndexingStub.called).to.be.false;
   });
 
-  it('processes multiple jobs in sequence', async () => {
-    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub)
-      .onFirstCall()
-      .resolves({
-        submission_upload_id: 'upload-1',
-        submission_id: 1,
-        upload_id: 'artifact-1',
-        status: 'reconciled',
-        ticket_id: '11111111-1111-1111-1111-111111111111',
-        blueprint_id: 1
-      })
-      .onSecondCall()
-      .resolves({
-        submission_upload_id: 'upload-2',
-        submission_id: 2,
-        upload_id: 'artifact-2',
-        status: 'reconciled',
-        ticket_id: '22222222-2222-2222-2222-222222222222',
-        blueprint_id: 1
-      });
+  it('processes every job in a batch', async () => {
+    const getUploadWithLock = SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub;
+    getUploadWithLock.withArgs('upload-1').resolves({
+      submission_upload_id: 'upload-1',
+      submission_id: 1,
+      upload_id: 'artifact-1',
+      status: 'reconciled',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
+    });
+    getUploadWithLock.withArgs('upload-2').resolves({
+      submission_upload_id: 'upload-2',
+      submission_id: 2,
+      upload_id: 'artifact-2',
+      status: 'reconciled',
+      ticket_id: '22222222-2222-2222-2222-222222222222',
+      blueprint_id: 1
+    });
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
 
     await indexSubmissionFeaturesJobHandler([createMockJob('upload-1', 'job-1'), createMockJob('upload-2', 'job-2')]);
 
-    expect(indexStub.callCount).to.equal(2);
-    expect(indexStub.firstCall.calledWith(1, 'upload-1')).to.be.true;
-    expect(indexStub.secondCall.calledWith(2, 'upload-2')).to.be.true;
+    expect(indexStub).to.have.been.calledTwice;
+    expect(indexStub).to.have.been.calledWith(1, 'upload-1');
+    expect(indexStub).to.have.been.calledWith(2, 'upload-2');
   });
 
   it('should handle empty jobs array', async () => {

@@ -208,7 +208,7 @@ async function runIndexSubmissionFeaturesStage(submissionUploadId: string, jobId
 /**
  * Primary pg-boss worker handler for `index-submission-features`.
  *
- * For each dequeued job:
+ * The jobs in a batch run concurrently, each in its own transaction. For each job:
  * - log job context
  * - run the indexing stage orchestrator
  * - on unexpected failure, rethrow so pg-boss retry policy applies. Terminal
@@ -218,32 +218,34 @@ async function runIndexSubmissionFeaturesStage(submissionUploadId: string, jobId
  * @returns {Promise<void>}
  */
 export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (jobs) => {
-  for (const job of jobs) {
-    const { submissionUploadId } = job.data;
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { submissionUploadId } = job.data;
 
-    defaultLog.info({
-      label: 'indexSubmissionFeaturesJobHandler',
-      message: 'Processing index submission features job',
-      jobId: job.id,
-      submissionUploadId
-    });
-
-    try {
-      await runIndexSubmissionFeaturesStage(submissionUploadId, job.id);
-    } catch (error) {
-      defaultLog.error({
+      defaultLog.info({
         label: 'indexSubmissionFeaturesJobHandler',
-        message: 'Index submission features job failed',
+        message: 'Processing index submission features job',
         jobId: job.id,
-        submissionUploadId,
-        error
+        submissionUploadId
       });
 
-      // Rethrow so pg-boss can apply configured retries.
-      // Final terminal status ('failed') is persisted by the DLQ handler once retries are exhausted.
-      throw error;
-    }
-  }
+      try {
+        await runIndexSubmissionFeaturesStage(submissionUploadId, job.id);
+      } catch (error) {
+        defaultLog.error({
+          label: 'indexSubmissionFeaturesJobHandler',
+          message: 'Index submission features job failed',
+          jobId: job.id,
+          submissionUploadId,
+          error
+        });
+
+        // Rethrow so pg-boss can apply configured retries.
+        // Final terminal status ('failed') is persisted by the DLQ handler once retries are exhausted.
+        throw error;
+      }
+    })
+  );
 };
 
 /**
@@ -251,6 +253,7 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
  *
  * This handler runs after queue retries are exhausted. It persists terminal
  * `failed` lifecycle state and emits operational logs with final job metadata.
+ * The jobs in a batch are handled concurrently, each in its own transaction.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs Failed jobs moved to the DLQ.
  * @returns {Promise<void>}
@@ -258,23 +261,25 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
 export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (
   jobs
 ) => {
-  for (const job of jobs) {
-    const { submissionUploadId } = job.data;
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { submissionUploadId } = job.data;
 
-    // Cast to access output field available on failed jobs
-    const jobOutput = (job as PgBoss.JobWithMetadata<IIndexSubmissionFeaturesJobData>).output;
+      // Cast to access output field available on failed jobs
+      const jobOutput = (job as PgBoss.JobWithMetadata<IIndexSubmissionFeaturesJobData>).output;
 
-    await withConnection(async (connection) => {
-      const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.transitionSubmissionUploadToFailed(submissionUploadId);
-    });
+      await withConnection(async (connection) => {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        await submissionUploadService.transitionSubmissionUploadToFailed(submissionUploadId);
+      });
 
-    defaultLog.warn({
-      label: 'indexSubmissionFeaturesFailedHandler',
-      message: 'Index submission features job failed after all retries',
-      jobId: job.id,
-      submissionUploadId,
-      output: jobOutput ?? 'Job failed after all retries'
-    });
-  }
+      defaultLog.warn({
+        label: 'indexSubmissionFeaturesFailedHandler',
+        message: 'Index submission features job failed after all retries',
+        jobId: job.id,
+        submissionUploadId,
+        output: jobOutput ?? 'Job failed after all retries'
+      });
+    })
+  );
 };

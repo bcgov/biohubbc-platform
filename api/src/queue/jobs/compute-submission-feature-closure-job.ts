@@ -40,64 +40,69 @@ export interface IComputeSubmissionFeatureClosureJobData {
  * applies its retry policy — the recompute is idempotent (it deletes the submission's prior closure
  * rows before reinserting), so a retry is safe.
  *
+ * The jobs in a batch run concurrently, each in its own transaction; jobs for the same submission
+ * queue on the active-state lock.
+ *
  * @param {PgBoss.Job<IComputeSubmissionFeatureClosureJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
 export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
   IComputeSubmissionFeatureClosureJobData
 > = async (jobs) => {
-  for (const job of jobs) {
-    const { submissionUploadId } = job.data;
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { submissionUploadId } = job.data;
 
-    defaultLog.info({
-      label: 'computeSubmissionFeatureClosureJobHandler',
-      message: 'Processing compute submission feature closure job',
-      jobId: job.id,
-      submissionUploadId
-    });
-
-    try {
-      await withConnection(async (connection) => {
-        const submissionUploadService = new SubmissionUploadService(connection);
-        const upload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
-        const submissionId = upload.submission_id;
-        // The recompute is DELETE-all + recursive-CTE INSERT in one transaction. Wait for every
-        // feature-state writer so the rebuilt closure includes each committed activation.
-        await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
-          SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
-          submissionId,
-          SUBMISSION_ACTIVE_STATE_LOCK_SEED
-        ]);
-
-        const submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
-        const result = await submissionFeatureClosureService.computeClosureForSubmission(submissionId);
-
-        // Anchor writers may have skipped this submission while closure was invalidated. Queue the
-        // existing derived-cache refresh only after the resolved graph has been rebuilt successfully.
-        const securityScopeService = new SecurityScopeService(connection);
-        await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
-
-        defaultLog.info({
-          label: 'computeSubmissionFeatureClosureJobHandler',
-          message: 'Compute submission feature closure job completed successfully',
-          jobId: job.id,
-          submissionId,
-          submissionUploadId,
-          insertedCount: result.insertedCount
-        });
-      });
-    } catch (error) {
-      defaultLog.error({
+      defaultLog.info({
         label: 'computeSubmissionFeatureClosureJobHandler',
-        message: 'Compute submission feature closure job failed',
+        message: 'Processing compute submission feature closure job',
         jobId: job.id,
-        submissionUploadId,
-        error
+        submissionUploadId
       });
 
-      throw error; // pg-boss will handle retry based on configuration
-    }
-  }
+      try {
+        await withConnection(async (connection) => {
+          const submissionUploadService = new SubmissionUploadService(connection);
+          const upload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
+          const submissionId = upload.submission_id;
+          // The recompute is DELETE-all + recursive-CTE INSERT in one transaction. Wait for every
+          // feature-state writer so the rebuilt closure includes each committed activation.
+          await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))", [
+            SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+            submissionId,
+            SUBMISSION_ACTIVE_STATE_LOCK_SEED
+          ]);
+
+          const submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
+          const result = await submissionFeatureClosureService.computeClosureForSubmission(submissionId);
+
+          // Anchor writers may have skipped this submission while closure was invalidated. Queue the
+          // existing derived-cache refresh only after the resolved graph has been rebuilt successfully.
+          const securityScopeService = new SecurityScopeService(connection);
+          await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+
+          defaultLog.info({
+            label: 'computeSubmissionFeatureClosureJobHandler',
+            message: 'Compute submission feature closure job completed successfully',
+            jobId: job.id,
+            submissionId,
+            submissionUploadId,
+            insertedCount: result.insertedCount
+          });
+        });
+      } catch (error) {
+        defaultLog.error({
+          label: 'computeSubmissionFeatureClosureJobHandler',
+          message: 'Compute submission feature closure job failed',
+          jobId: job.id,
+          submissionUploadId,
+          error
+        });
+
+        throw error; // pg-boss will handle retry based on configuration
+      }
+    })
+  );
 };
 
 /**
@@ -114,7 +119,7 @@ export const computeSubmissionFeatureClosureJobHandler: PgBoss.WorkHandler<
  */
 export const computeSubmissionFeatureClosureFailedHandler: PgBoss.WorkHandler<
   IComputeSubmissionFeatureClosureJobData
-> = async (jobs) => {
+> = (jobs) => {
   for (const job of jobs) {
     const { submissionUploadId } = job.data;
 
@@ -129,4 +134,6 @@ export const computeSubmissionFeatureClosureFailedHandler: PgBoss.WorkHandler<
       output: jobOutput ?? 'Job failed after all retries'
     });
   }
+
+  return Promise.resolve();
 };

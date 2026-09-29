@@ -67,6 +67,44 @@ describe('submissionUploadSecurityJobHandler', () => {
     expect(query.secondCall.calledBefore(screenStub.firstCall)).to.be.true;
   });
 
+  it('starts every job in a batch without waiting for the one before it', async () => {
+    const getConnection = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
+      const conn = getMockDBConnection();
+      conn.open = sinon.stub().resolves();
+      conn.commit = sinon.stub().resolves();
+      conn.release = sinon.stub();
+      conn.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
+      return conn;
+    });
+
+    let finishFirstScreen: (() => void) | undefined;
+    const screenStub = sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload');
+    screenStub.withArgs('upload-1').returns(
+      new Promise<void>((resolve) => {
+        finishFirstScreen = () => resolve();
+      })
+    );
+    screenStub.withArgs('upload-2').resolves();
+
+    let batchSettled = false;
+    const batch = submissionUploadSecurityJobHandler([
+      createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' }, 'job-1'),
+      createMockJob({ submissionId: 2, submissionUploadId: 'upload-2' }, 'job-2')
+    ]).then(() => {
+      batchSettled = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(screenStub).to.have.been.calledWith('upload-2', 2, 'job-2');
+    expect(batchSettled).to.be.false;
+
+    finishFirstScreen?.();
+    await batch;
+
+    expect(screenStub).to.have.been.calledTwice;
+    expect(getConnection).to.have.been.calledTwice;
+  });
+
   it('skips screening when advisory lock is not acquired (concurrent job)', async () => {
     const mockConn = getMockDBConnection();
     mockConn.open = sinon.stub().resolves();
