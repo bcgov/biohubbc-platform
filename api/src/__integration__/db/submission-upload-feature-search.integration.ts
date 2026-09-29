@@ -386,19 +386,18 @@ describe('Submission upload expression evaluation (integration)', function () {
         const search = new SearchFeatureService(connection);
         const options = { limit: 2, sort, order };
 
-        const pages = [await search.searchSubmissionUploadFeatures(submissionId, submissionUploadId, filters, options)];
-        while (pages[pages.length - 1].pagination.next_cursor) {
-          const boundary = decodeSearchFeatureCursor(pages[pages.length - 1].pagination.next_cursor!);
-          pages.push(
-            await search.searchSubmissionUploadFeatures(submissionId, submissionUploadId, filters, {
-              ...options,
-              boundary
-            })
-          );
+        let latest = await search.searchSubmissionUploadFeatures(submissionId, submissionUploadId, filters, options);
+        const pages = [latest];
+        while (latest.pagination.next_cursor) {
+          latest = await search.searchSubmissionUploadFeatures(submissionId, submissionUploadId, filters, {
+            ...options,
+            boundary: decodeSearchFeatureCursor(latest.pagination.next_cursor)
+          });
+          pages.push(latest);
         }
         const back = await search.searchSubmissionUploadFeatures(submissionId, submissionUploadId, filters, {
           ...options,
-          boundary: decodeSearchFeatureCursor(pages[pages.length - 1].pagination.previous_cursor!)
+          boundary: decodeSearchFeatureCursor(latest.pagination.previous_cursor!)
         });
 
         expect(pages.flatMap((page) => page.features.map((row) => row.submission_feature_id))).to.eql(expected);
@@ -423,83 +422,83 @@ describe('Submission upload expression evaluation (integration)', function () {
     expect(pgMessage).to.include('does not belong to the feature type');
   });
 
+  /**
+   * Build a telemetry-shaped upload in its own submission: one survey with a region, five deployments (two of them
+   * owls) and `pointsPerDeployment` telemetry points each, one percent of them flagged.
+   *
+   * @param {number} pointsPerDeployment Telemetry points under each deployment.
+   * @param {{ region: number; species: number; fix: number }} assignments Assignment ids by property.
+   * @returns {Promise<{ submissionId: number; uploadId: string }>} The fixture's submission and upload.
+   */
+  async function buildTelemetryUpload(
+    pointsPerDeployment: number,
+    assignments: { region: number; species: number; fix: number }
+  ): Promise<{ submissionId: number; uploadId: string }> {
+    const fixtureSubmissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, fixtureSubmissionId);
+    const survey = await connection.sql(SQL`
+      INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, data, data_byte_size, record_effective_date)
+      VALUES (${fixtureSubmissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = 'survey'), '{}'::jsonb, 2, NULL)
+      RETURNING submission_feature_id;
+    `);
+    const surveyId = survey.rows[0].submission_feature_id;
+    const deployments = await connection.sql(SQL`
+      INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
+      SELECT ${fixtureSubmissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'), ${surveyId}, '{}'::jsonb, 2, NULL
+      FROM generate_series(1, 5)
+      RETURNING submission_feature_id;
+    `);
+    const deploymentIds: number[] = deployments.rows.map((row) => row.submission_feature_id);
+    const points = await connection.sql(SQL`
+      INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
+      SELECT ${fixtureSubmissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry'), deployment_id, '{}'::jsonb, 2, NULL
+      FROM unnest(${deploymentIds}::integer[]) AS deployment_id CROSS JOIN generate_series(1, ${pointsPerDeployment})
+      RETURNING submission_feature_id;
+    `);
+    const pointIds: number[] = points.rows.map((row) => row.submission_feature_id);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+      VALUES (${surveyId}, ${assignments.region}, 'north')
+    `);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+      SELECT deployment_id, ${assignments.species}, CASE WHEN ordinality <= 2 THEN 'owl' ELSE 'elk' END
+      FROM unnest(${deploymentIds}::integer[]) WITH ORDINALITY AS deployment(deployment_id, ordinality)
+    `);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+      SELECT point_id, ${assignments.fix}, CASE WHEN ordinality % 100 = 0 THEN 'bad' ELSE 'good' END
+      FROM unnest(${pointIds}::integer[]) WITH ORDINALITY AS point(point_id, ordinality)
+    `);
+    return { submissionId: fixtureSubmissionId, uploadId };
+  }
+
+  /**
+   * Analyze the count query for an expression over one upload.
+   *
+   * @param {{ submissionId: number; uploadId: string }} upload Upload to evaluate.
+   * @param {ExpressionTree} expression Public expression tree.
+   * @returns {Promise<PlanNode>} Root node of the analyzed plan.
+   */
+  async function analyzeCount(
+    upload: { submissionId: number; uploadId: string },
+    expression: ExpressionTree
+  ): Promise<PlanNode> {
+    const knex = getKnex();
+    const normalized = optimizeExpression(
+      await new ExpressionTreeNormalizationService(connection).normalize(expression)
+    );
+    const matches = buildSubmissionUploadFeatureIdsSubquery(upload.submissionId, upload.uploadId, normalized);
+    const { sql, bindings } = knex
+      .from(matches.as('matches'))
+      .select(knex.raw('count(*)::integer AS count'))
+      .toSQL()
+      .toNative();
+    const result = await connection.query(`EXPLAIN (ANALYZE, TIMING OFF, FORMAT JSON) ${sql}`, bindings as unknown[]);
+    return result.rows[0]['QUERY PLAN'][0].Plan;
+  }
+
   describe('growth', () => {
-    /**
-     * Build a telemetry-shaped upload in its own submission: one survey with a region, five deployments (two of them
-     * owls) and `pointsPerDeployment` telemetry points each, one percent of them flagged.
-     *
-     * @param {number} pointsPerDeployment Telemetry points under each deployment.
-     * @param {{ region: number; species: number; fix: number }} assignments Assignment ids by property.
-     * @returns {Promise<{ submissionId: number; uploadId: string }>} The fixture's submission and upload.
-     */
-    async function buildTelemetryUpload(
-      pointsPerDeployment: number,
-      assignments: { region: number; species: number; fix: number }
-    ): Promise<{ submissionId: number; uploadId: string }> {
-      const fixtureSubmissionId = await createTestSubmission(connection);
-      const uploadId = await createTestUpload(connection, fixtureSubmissionId);
-      const survey = await connection.sql(SQL`
-        INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, data, data_byte_size, record_effective_date)
-        VALUES (${fixtureSubmissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = 'survey'), '{}'::jsonb, 2, NULL)
-        RETURNING submission_feature_id;
-      `);
-      const surveyId = survey.rows[0].submission_feature_id;
-      const deployments = await connection.sql(SQL`
-        INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
-        SELECT ${fixtureSubmissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'), ${surveyId}, '{}'::jsonb, 2, NULL
-        FROM generate_series(1, 5)
-        RETURNING submission_feature_id;
-      `);
-      const deploymentIds: number[] = deployments.rows.map((row) => row.submission_feature_id);
-      const points = await connection.sql(SQL`
-        INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
-        SELECT ${fixtureSubmissionId}, ${uploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry'), deployment_id, '{}'::jsonb, 2, NULL
-        FROM unnest(${deploymentIds}::integer[]) AS deployment_id CROSS JOIN generate_series(1, ${pointsPerDeployment})
-        RETURNING submission_feature_id;
-      `);
-      const pointIds: number[] = points.rows.map((row) => row.submission_feature_id);
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
-        VALUES (${surveyId}, ${assignments.region}, 'north')
-      `);
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
-        SELECT deployment_id, ${assignments.species}, CASE WHEN ordinality <= 2 THEN 'owl' ELSE 'elk' END
-        FROM unnest(${deploymentIds}::integer[]) WITH ORDINALITY AS deployment(deployment_id, ordinality)
-      `);
-      await connection.sql(SQL`
-        INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
-        SELECT point_id, ${assignments.fix}, CASE WHEN ordinality % 100 = 0 THEN 'bad' ELSE 'good' END
-        FROM unnest(${pointIds}::integer[]) WITH ORDINALITY AS point(point_id, ordinality)
-      `);
-      return { submissionId: fixtureSubmissionId, uploadId };
-    }
-
-    /**
-     * Analyze the count query for an expression over one upload.
-     *
-     * @param {{ submissionId: number; uploadId: string }} upload Upload to evaluate.
-     * @param {ExpressionTree} expression Public expression tree.
-     * @returns {Promise<PlanNode>} Root node of the analyzed plan.
-     */
-    async function analyzeCount(
-      upload: { submissionId: number; uploadId: string },
-      expression: ExpressionTree
-    ): Promise<PlanNode> {
-      const knex = getKnex();
-      const normalized = optimizeExpression(
-        await new ExpressionTreeNormalizationService(connection).normalize(expression)
-      );
-      const matches = buildSubmissionUploadFeatureIdsSubquery(upload.submissionId, upload.uploadId, normalized);
-      const { sql, bindings } = knex
-        .from(matches.as('matches'))
-        .select(knex.raw('count(*)::integer AS count'))
-        .toSQL()
-        .toNative();
-      const result = await connection.query(`EXPLAIN (ANALYZE, TIMING OFF, FORMAT JSON) ${sql}`, bindings as unknown[]);
-      return result.rows[0]['QUERY PLAN'][0].Plan;
-    }
-
     it('grows linearly with the upload, with no CTE rescanned per feature', async () => {
       const region = await createAssignedFeatureProperty(connection, 'string', ['survey']);
       const species = await createAssignedFeatureProperty(connection, 'string', ['telemetry_deployment']);
