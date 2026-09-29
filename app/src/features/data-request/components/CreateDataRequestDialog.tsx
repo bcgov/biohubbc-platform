@@ -35,7 +35,7 @@ interface ICreateDataRequestDialogProps {
 export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) => {
   const { open, isSubmitting, initialReason, onCancel, onSave } = props;
   const api = useApi();
-  const dialogContext = useDialogContext();
+  const { setSnackbar } = useDialogContext();
 
   const [userSearch, setUserSearch] = useState('');
 
@@ -49,9 +49,9 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
   const { error: availableUsersError } = availableUsersQuery;
   useEffect(() => {
     if (availableUsersError) {
-      dialogContext.setSnackbar({ open: true, snackbarMessage: availableUsersError.message });
+      setSnackbar({ open: true, snackbarMessage: availableUsersError.message });
     }
-  }, [availableUsersError, dialogContext]);
+  }, [availableUsersError, setSnackbar]);
 
   const availableUsers = useMemo(() => availableUsersQuery.data?.users ?? [], [availableUsersQuery.data?.users]);
   const userOptions = useMemo<SearchOption[]>(

@@ -29,7 +29,7 @@ interface ITicketTeamDialogProps {
 export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
   const { open, teamId, members, onClose } = props;
   const api = useApi();
-  const dialogContext = useDialogContext();
+  const { setSnackbar } = useDialogContext();
   const addMemberMutation = useAddTeamMemberMutation();
   const removeMemberMutation = useRemoveTeamMemberMutation();
   const { mutate: addMember } = addMemberMutation;
@@ -46,9 +46,9 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
   const { error: availableUsersError } = availableUsersQuery;
   useEffect(() => {
     if (availableUsersError) {
-      dialogContext.setSnackbar({ open: true, snackbarMessage: availableUsersError.message });
+      setSnackbar({ open: true, snackbarMessage: availableUsersError.message });
     }
-  }, [availableUsersError, dialogContext]);
+  }, [availableUsersError, setSnackbar]);
 
   const debouncedUserSearch = useDebounce(setUserSearch, 300);
 

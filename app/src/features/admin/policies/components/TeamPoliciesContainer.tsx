@@ -56,6 +56,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
+  const { setErrorDialog } = dialogContext;
 
   const [isSaving, setIsSaving] = useState(false);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
@@ -63,21 +64,21 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
   const showApiErrorDialog = useCallback(
     (title: string, text: string, error: unknown) => {
       const apiError = error as APIError;
-      dialogContext.setErrorDialog({
+      setErrorDialog({
         open: true,
         dialogTitle: title,
         dialogText: text,
         dialogError: apiError.message,
         dialogErrorDetails: apiError.errors,
         onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
+          setErrorDialog({ open: false });
         },
         onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
+          setErrorDialog({ open: false });
         }
       });
     },
-    [dialogContext]
+    [setErrorDialog]
   );
 
   /**

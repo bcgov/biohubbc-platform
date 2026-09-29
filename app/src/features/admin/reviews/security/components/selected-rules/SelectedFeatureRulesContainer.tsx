@@ -57,10 +57,17 @@ export const SelectedFeatureRulesContainer = (props: SelectedFeatureRulesContain
   /**
    * Applies or removes one rule for the current scope, flipping it in place until the server answers.
    *
+   * Rows kept on screen while another scope, search or page loads are ignored: their applied state belongs to the
+   * previous key, so sending it with the current scope would apply or remove the rule on the wrong features.
+   *
    * @param {ISubmissionUploadReviewSelectedFeatureRule} rule Rule and current applied state.
    * @returns {void} Starts the change; the mutation reports a failure.
    */
   const changeRule = (rule: ISubmissionUploadReviewSelectedFeatureRule): void => {
+    if (rulesQuery.isPlaceholderData) {
+      return;
+    }
+
     changeRuleMutation.mutate({
       rule,
       selectedFeatureIds: props.selectedFeatureIds,

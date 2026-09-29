@@ -1,5 +1,5 @@
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { toApiPagination } from 'utils/pagination';
 import useDebounce from './useDebounce';
@@ -72,8 +72,6 @@ export const useServerPaginatedGridState = (
     setDebouncedSearchTerm(term);
     setPaginationModel((previous) => ({ ...previous, page: 0 }));
   }, debounceMs);
-
-  useEffect(() => () => applySearch.cancel(), [applySearch]);
 
   const handleSearch = useCallback(
     (term: string) => {

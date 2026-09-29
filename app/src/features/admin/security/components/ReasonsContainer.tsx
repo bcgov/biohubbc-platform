@@ -58,6 +58,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
+  const { setErrorDialog } = dialogContext;
 
   /**
    * Refresh reasons and categories tables after a reason mutation.
@@ -86,17 +87,17 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
   const showLoadError = useCallback(
     (title: string, text: string, error: unknown) => {
       const apiError = error as APIError;
-      dialogContext.setErrorDialog({
+      setErrorDialog({
         open: true,
         dialogTitle: title,
         dialogText: text,
         dialogError: apiError.message,
         dialogErrorDetails: apiError.errors,
-        onClose: () => dialogContext.setErrorDialog({ open: false }),
-        onOk: () => dialogContext.setErrorDialog({ open: false })
+        onClose: () => setErrorDialog({ open: false }),
+        onOk: () => setErrorDialog({ open: false })
       });
     },
-    [dialogContext]
+    [setErrorDialog]
   );
 
   /**

@@ -29,7 +29,7 @@ interface ICreateTicketReferenceDialogProps {
 export const CreateTicketReferenceDialog = (props: ICreateTicketReferenceDialogProps) => {
   const { open, onClose, onSubmit } = props;
   const api = useApi();
-  const dialogContext = useDialogContext();
+  const { setSnackbar } = useDialogContext();
   const { ticketId } = useTicketContext();
   const [ticketSearch, setTicketSearch] = useState('');
   const ticketOptionsParams = {
@@ -50,9 +50,9 @@ export const CreateTicketReferenceDialog = (props: ICreateTicketReferenceDialogP
   const { error: ticketOptionsError } = ticketOptionsQuery;
   useEffect(() => {
     if (ticketOptionsError) {
-      dialogContext.setSnackbar({ open: true, snackbarMessage: ticketOptionsError.message });
+      setSnackbar({ open: true, snackbarMessage: ticketOptionsError.message });
     }
-  }, [dialogContext, ticketOptionsError]);
+  }, [setSnackbar, ticketOptionsError]);
 
   const handleTicketSearch = useDebounce(setTicketSearch, 300);
 
@@ -62,7 +62,7 @@ export const CreateTicketReferenceDialog = (props: ICreateTicketReferenceDialogP
       onSubmit?.(createdReferences);
       onClose();
     },
-    onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+    onError: (error) => setSnackbar({ open: true, snackbarMessage: error.message })
   });
 
   const ticketOptions: ICustomMultiAutocompleteOption[] = useMemo(

@@ -296,6 +296,22 @@ describe('SelectedFeatureRulesContainer', () => {
     expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied');
   });
 
+  it('ignores a toggle of a row kept on screen from the previous scope while the new scope loads', async () => {
+    const newScope = deferred<ReturnType<typeof response>>();
+    const { rerender } = render(<SelectedFeatureRulesContainer {...baseProps} />, { queryClient });
+    await screen.findByRole('button', { name: 'Sensitive' });
+
+    mocks.getRules.mockReturnValueOnce(newScope.promise);
+    rerender(<SelectedFeatureRulesContainer {...baseProps} selectedFeatureIds={[20]} />);
+    await waitFor(() => expect(mocks.getRules).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Sensitive' }));
+    await act(async () => newScope.resolve(response(rule(4, 'Sensitive', true))));
+
+    expect(mocks.apply).not.toHaveBeenCalled();
+    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied');
+  });
+
   it('leaves a newly loaded scope alone when a toggle in the old scope fails', async () => {
     const request = deferred<void>();
     mocks.apply.mockReturnValueOnce(request.promise);

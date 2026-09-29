@@ -49,6 +49,7 @@ interface UseExpressionBuilderPropertiesResult {
  *
  * @param {string | undefined} recommendedSearchTerm Debounced top-level search text used to refresh suggested properties and species.
  * @param {Set<string>} usedPropertyKeys Canonical property keys already present in the draft expression, used to hide duplicate suggestion chips.
+ * @param {boolean} [enabled=true] Whether the builder is on screen; while false, nothing is loaded.
  * @returns {UseExpressionBuilderPropertiesResult} Property options, known property metadata, suggestion lists, and handlers used by the expression builder.
  */
 export const useExpressionBuilderProperties = (
@@ -192,8 +193,6 @@ export const useExpressionBuilderProperties = (
   );
 
   const debouncedSetPropertyKeyword = useDebounce(setPropertyKeyword, 300);
-
-  useEffect(() => () => debouncedSetPropertyKeyword.cancel(), [debouncedSetPropertyKeyword]);
 
   /**
    * Sets the keyword property pickers show options for.
