@@ -4,11 +4,85 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { SubmissionFeatureSecurityRepository } from './submission-feature-security-repository';
 
 chai.use(sinonChai);
 
+/**
+ * Build a normalized single-predicate string equality expression.
+ *
+ * @param {string} value Value the predicate compares against.
+ * @returns {NormalizedExpressionTree} Normalized expression tree.
+ */
+function equalsExpression(value: string): NormalizedExpressionTree {
+  return {
+    type: 'expression',
+    operator: 'AND',
+    clauses: [
+      {
+        type: 'predicate',
+        feature_property_id: 5,
+        blueprint_feature_type_property_id: null,
+        operator: 'Equals',
+        value,
+        feature_property_type_id: 1,
+        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING,
+        internal_predicate: { type: 'string', operator: 'Equals', value }
+      }
+    ]
+  };
+}
+
 describe('SubmissionFeatureSecurityRepository', () => {
+  describe('insertScreenedSubmissionFeatureSecurity', () => {
+    afterEach(() => sinon.restore());
+
+    it('returns zero counts without querying when no rule is screened', async () => {
+      const knex = sinon.stub();
+      const repository = new SubmissionFeatureSecurityRepository(getMockDBConnection({ knex }));
+
+      const result = await repository.insertScreenedSubmissionFeatureSecurity({
+        submissionId: 1,
+        submissionUploadId: 'upload-id',
+        rules: [],
+        submissionUploadSecurityId: 9001
+      });
+
+      expect(result).to.eql({ matched_feature_count: 0, inserted_count: 0 });
+      expect(knex).not.to.have.been.called;
+    });
+
+    it('evaluates every rule over the upload in one statement and attributes assignments to the event', async () => {
+      const knex = sinon.stub().resolves({ rows: [{ matched_feature_count: 4, inserted_count: 3 }], rowCount: 1 });
+      const repository = new SubmissionFeatureSecurityRepository(getMockDBConnection({ knex }));
+
+      const result = await repository.insertScreenedSubmissionFeatureSecurity({
+        submissionId: 1,
+        submissionUploadId: 'upload-id',
+        rules: [
+          { securityRuleId: 1101, expression: equalsExpression('first') },
+          { securityRuleId: 1102, expression: equalsExpression('second') }
+        ],
+        submissionUploadSecurityId: 9001
+      });
+
+      expect(knex).to.have.been.calledOnce;
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql.match(/\) AS anchor_sf/g)).to.have.lengthOf(2);
+      expect(sql).to.include('union all');
+      expect(sql).to.include('ON CONFLICT (submission_feature_id, security_rule_id)');
+      expect(sql).to.include('submission_upload_security_id = EXCLUDED.submission_upload_security_id');
+      expect(sql).to.include('submission_upload_review_id = NULL');
+      expect(sql).to.include('count(DISTINCT submission_feature_id) FROM matches');
+      expect(sql).not.to.include('submission_feature_closure');
+      expect(bindings.filter((binding: unknown) => binding === 1101 || binding === 1102)).to.eql([1101, 1102]);
+      expect(bindings.at(-1)).to.equal(9001);
+      expect(result).to.eql({ matched_feature_count: 4, inserted_count: 3 });
+    });
+  });
+
   describe('predecessor security copy', () => {
     afterEach(() => sinon.restore());
 

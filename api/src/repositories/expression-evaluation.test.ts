@@ -89,12 +89,14 @@ describe('expression-evaluation', () => {
         ).toString();
         expect(published).to.include('submission_feature_closure');
         expect(published).to.include('submission_feature_security');
-        expect(published).not.to.include('upload_relationships');
-        expect(upload).to.include('upload_relationships');
+        expect(published).not.to.include('upload_evidence');
+        expect(upload).to.include('"upload_evidence" as materialized');
+        expect(upload).to.include('"upload_ancestors"');
+        expect(upload).to.include('"upload_descendants"');
         expect(upload).not.to.include('submission_feature_closure');
         expect(upload).not.to.include('submission_feature_security');
         if (index > 0) {
-          expect(upload).to.include('count(DISTINCT grouped_search_evidence.matched_value) = 2');
+          expect(upload).to.include('count(DISTINCT upload_grouped_evidence.matched_value) = 2');
         }
       });
     }

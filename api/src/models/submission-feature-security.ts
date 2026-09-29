@@ -106,6 +106,28 @@ export interface NormalizedInsertSubmissionFeatureSecurity {
   submissionUploadReviewId: string;
 }
 
+/** A security rule and the optimized expression that selects the upload features it applies to. */
+export interface NormalizedSecurityRuleExpression {
+  securityRuleId: number;
+  expression: NormalizedExpressionTree;
+}
+
+/** Upload boundary, screened rules, and the screening event recorded as provenance. */
+export interface NormalizedInsertScreenedSubmissionFeatureSecurity {
+  submissionId: number;
+  submissionUploadId: string;
+  rules: NormalizedSecurityRuleExpression[];
+  submissionUploadSecurityId: number;
+}
+
+/** Distinct upload features matched by any screened rule, and the assignments the screening created or reactivated. */
+export const SubmissionFeatureSecurityScreeningResult = z.object({
+  matched_feature_count: z.number(),
+  inserted_count: z.number()
+});
+
+export type SubmissionFeatureSecurityScreeningResult = z.infer<typeof SubmissionFeatureSecurityScreeningResult>;
+
 /** Inputs for removing only the requested rules within an upload feature scope. */
 export interface DeleteSubmissionFeatureSecurityRules {
   submissionId: number;

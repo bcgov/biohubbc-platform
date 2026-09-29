@@ -14,6 +14,46 @@ describe('SecurityRuleRepository', () => {
     sinon.restore();
   });
 
+  describe('getScreenableSecurityRules', () => {
+    it('returns active rules with their current expression ids', async () => {
+      const rows = [
+        { security_rule_id: 1, name: 'rule-a', expression_ids: ['2b7d1f7c-5d0f-4a46-a2c9-6f1f3a5d8e10'] },
+        { security_rule_id: 2, name: 'rule-b', expression_ids: [] }
+      ];
+      const sql = sinon.stub().resolves({ rowCount: 2, rows });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ sql }));
+
+      const result = await repo.getScreenableSecurityRules();
+
+      const text = sql.firstCall.args[0].text as string;
+      expect(text).to.include('sr.is_active = true');
+      expect(text).to.include('sr.record_end_date IS NULL');
+      expect(text).to.include('sc.record_end_date IS NULL');
+      expect(text).to.include('sre.record_end_date IS NULL');
+      expect(text).to.include('e.record_end_date IS NULL');
+      expect(result).to.eql(rows);
+    });
+  });
+
+  describe('getSecurityRulesWithCategory', () => {
+    it('reads every requested rule with its category in one query', async () => {
+      const rows = [
+        { security_rule_id: 1, record_end_date: null, category_record_end_date: null },
+        { security_rule_id: 2, record_end_date: '2026-02-01', category_record_end_date: null }
+      ];
+      const knex = sinon.stub().resolves({ rowCount: 2, rows });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getSecurityRulesWithCategory([1, 2]);
+
+      expect(knex).to.have.been.calledOnce;
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"sr"."security_rule_id" in ($1, $2)');
+      expect(bindings).to.eql([1, 2]);
+      expect(result).to.eql(rows);
+    });
+  });
+
   describe('getSecurityRulesWithFeatureCount', () => {
     it('counts only non-soft-deleted applications', async () => {
       const mockRow = {

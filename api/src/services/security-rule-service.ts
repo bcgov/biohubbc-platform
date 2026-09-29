@@ -3,13 +3,14 @@ import { ApiConflictError, ApiValidationError } from '../errors/api-error';
 import {
   CreateSecurityRule,
   SecurityRule,
-  SecurityRuleRecord,
+  SecurityRuleWithExpressions,
   SecurityRuleWithFeatureCount,
   SecuritySearchFilters,
   UpdateSecurityRule
 } from '../models/security-rule';
 import { SecurityCategoryRepository } from '../repositories/security-category-repository';
 import { SecurityRuleRepository } from '../repositories/security-rule-repository';
+import { getUnique } from '../utils/unique';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
@@ -31,32 +32,40 @@ export class SecurityRuleService extends DBService {
   }
 
   /**
-   * Gets security rules eligible for automatic screening.
+   * Gets security rules eligible for automatic screening, each with the ids of its active expressions.
    *
-   * A rule is screenable when it is not soft-deleted (`record_end_date IS NULL`) and
-   * `is_active = true`. Admins can opt individual rules out of
+   * A rule is screenable when it and its category are not soft-deleted (`record_end_date IS NULL`)
+   * and `is_active = true`. Admins can opt individual rules out of
    * screening without soft-deleting them.
    *
-   * @return {Promise<SecurityRuleRecord[]>}
+   * @return {Promise<SecurityRuleWithExpressions[]>} Screenable rules; `expression_ids` is empty for a rule with no active expression.
    * @memberof SecurityRuleService
    */
-  async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
+  async getScreenableSecurityRules(): Promise<SecurityRuleWithExpressions[]> {
     return this.securityRuleRepository.getScreenableSecurityRules();
   }
 
   /**
-   * Assert that each requested rule and its category have not been deleted.
+   * Assert that each requested rule and its category have not been deleted, reading every rule in one query.
    * Rules opted out of automatic screening remain valid for manual assignments.
+   *
    * @param {number[]} securityRuleIds Rules requested for assignment.
    * @returns {Promise<void>} Resolves when every requested rule is available.
    * @throws {ApiValidationError} When a rule is missing or its rule/category is deleted.
+   * @memberof SecurityRuleService
    */
   async assertSecurityRulesValid(securityRuleIds: number[]): Promise<void> {
-    for (const securityRuleId of new Set(securityRuleIds)) {
-      const rule = await this.securityRuleRepository.getSecurityRuleWithCategory(securityRuleId);
-      if (rule?.record_end_date !== null || rule.category_record_end_date !== null) {
-        throw new ApiValidationError('One or more security rules are unavailable.', [{ securityRuleIds }]);
-      }
+    const requestedIds = getUnique(securityRuleIds);
+    if (!requestedIds.length) {
+      return;
+    }
+
+    const rules = await this.securityRuleRepository.getSecurityRulesWithCategory(requestedIds);
+    const availableRules = rules.filter(
+      (rule) => rule.record_end_date === null && rule.category_record_end_date === null
+    );
+    if (availableRules.length !== requestedIds.length) {
+      throw new ApiValidationError('One or more security rules are unavailable.', [{ securityRuleIds }]);
     }
   }
 

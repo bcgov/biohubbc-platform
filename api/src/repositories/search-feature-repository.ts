@@ -72,6 +72,9 @@ export class SearchFeatureRepository extends BaseRepository {
         'security.provenance',
         knex.raw('security.provenance IS NOT NULL AS is_secured')
       )
+      // Security is resolved per result row. Each ancestor step and each assignment lookup is keyed inside an
+      // OFFSET 0 fence, with the upload boundary applied to the step's result, so a row costs a few index probes
+      // however large the upload and however stale its statistics.
       .joinRaw(
         `LEFT JOIN LATERAL (
         WITH RECURSIVE ancestors AS (
@@ -79,16 +82,27 @@ export class SearchFeatureRepository extends BaseRepository {
           UNION
           SELECT parent.submission_feature_id
           FROM ancestors
-          JOIN submission_feature child ON child.submission_feature_id = ancestors.target_id
-          JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
-            AND parent.submission_upload_id = ?::uuid AND parent.record_end_date IS NULL
+          CROSS JOIN LATERAL (
+            SELECT parent.submission_feature_id, parent.submission_upload_id, parent.record_end_date
+            FROM submission_feature child
+            JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
+            WHERE child.submission_feature_id = ancestors.target_id
+            OFFSET 0
+          ) parent
+          WHERE parent.submission_upload_id = ?::uuid AND parent.record_end_date IS NULL
         )
-        SELECT CASE WHEN bool_or(sfs.submission_feature_id = sf.submission_feature_id)
+        SELECT CASE WHEN bool_or(assignment.submission_feature_id = sf.submission_feature_id)
           THEN 'direct' ELSE 'inherited' END AS provenance
-        FROM ancestors JOIN submission_feature_security sfs ON sfs.submission_feature_id = ancestors.target_id
-        JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id AND sr.record_end_date IS NULL
-        JOIN security_category sc ON sc.security_category_id = sr.security_category_id AND sc.record_end_date IS NULL
-        WHERE sfs.record_effective_date <= now() AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+        FROM ancestors
+        CROSS JOIN LATERAL (
+          SELECT sfs.submission_feature_id
+          FROM submission_feature_security sfs
+          JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id AND sr.record_end_date IS NULL
+          JOIN security_category sc ON sc.security_category_id = sr.security_category_id AND sc.record_end_date IS NULL
+          WHERE sfs.submission_feature_id = ancestors.target_id
+            AND sfs.record_effective_date <= now() AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+          OFFSET 0
+        ) assignment
         HAVING count(*) > 0
       ) security ON true`,
         [submissionUploadId]

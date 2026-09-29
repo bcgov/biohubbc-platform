@@ -12,6 +12,7 @@ import {
 import { authorizeRequestHandler } from '../../../../../../../../../../request-handlers/security/authorization';
 import { SubmissionUploadReviewSecurityService } from '../../../../../../../../../../services/upload/submission-upload-review-security-service';
 import { makePaginationOptionsFromBody } from '../../../../../../../../../../utils/pagination';
+import { registerRequestCancellation } from '../../../../../../../../../../utils/request-cancellation';
 import { validateSearchExpressionTree } from '../../../../../../../../../../utils/search-feature-validation';
 
 export const POST: Operation = [
@@ -59,7 +60,8 @@ POST.apiDoc = {
  */
 export function getSubmissionUploadReviewSecurityAssignments(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const cancellation = registerRequestCancellation(res);
+    const connection = getDBConnection(req.keycloak_token, { signal: cancellation.signal });
     try {
       await connection.open();
       const submissionUploadReviewSecurityService = new SubmissionUploadReviewSecurityService(connection);
@@ -77,10 +79,12 @@ export function getSubmissionUploadReviewSecurityAssignments(): RequestHandler {
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {
+      cancellation.unregister();
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      cancellation.unregister();
+      await connection.release();
     }
   };
 }

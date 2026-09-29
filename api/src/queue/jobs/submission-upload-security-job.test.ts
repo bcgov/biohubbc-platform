@@ -46,6 +46,65 @@ describe('submissionUploadSecurityJobHandler', () => {
     expect(mockConn.commit).to.have.been.calledOnce;
   });
 
+  it('turns JIT off for the transaction after taking the lock and before screening', async () => {
+    const mockConn = getMockDBConnection();
+    mockConn.open = sinon.stub().resolves();
+    mockConn.commit = sinon.stub().resolves();
+    mockConn.release = sinon.stub();
+    const query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
+    mockConn.query = query;
+
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockConn);
+
+    const screenStub = sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload').resolves();
+
+    await submissionUploadSecurityJobHandler([createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' })]);
+
+    expect(query.getCalls().map((call) => call.args[0])).to.eql([
+      'SELECT pg_try_advisory_xact_lock(hashtextextended($1::text, 2)) AS locked',
+      'SET LOCAL jit = off'
+    ]);
+    expect(query.secondCall.calledBefore(screenStub.firstCall)).to.be.true;
+  });
+
+  it('starts every job in a batch without waiting for the one before it', async () => {
+    const getConnection = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
+      const conn = getMockDBConnection();
+      conn.open = sinon.stub().resolves();
+      conn.commit = sinon.stub().resolves();
+      conn.release = sinon.stub();
+      conn.query = sinon.stub().resolves(mockQueryResult([{ locked: true }]));
+      return conn;
+    });
+
+    let finishFirstScreen: (() => void) | undefined;
+    const screenStub = sinon.stub(SubmissionUploadSecurityService.prototype, 'screenSubmissionUpload');
+    screenStub.withArgs('upload-1').returns(
+      new Promise<void>((resolve) => {
+        finishFirstScreen = () => resolve();
+      })
+    );
+    screenStub.withArgs('upload-2').resolves();
+
+    let batchSettled = false;
+    const batch = submissionUploadSecurityJobHandler([
+      createMockJob({ submissionId: 1, submissionUploadId: 'upload-1' }, 'job-1'),
+      createMockJob({ submissionId: 2, submissionUploadId: 'upload-2' }, 'job-2')
+    ]).then(() => {
+      batchSettled = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(screenStub).to.have.been.calledWith('upload-2', 2, 'job-2');
+    expect(batchSettled).to.be.false;
+
+    finishFirstScreen?.();
+    await batch;
+
+    expect(screenStub).to.have.been.calledTwice;
+    expect(getConnection).to.have.been.calledTwice;
+  });
+
   it('skips screening when advisory lock is not acquired (concurrent job)', async () => {
     const mockConn = getMockDBConnection();
     mockConn.open = sinon.stub().resolves();

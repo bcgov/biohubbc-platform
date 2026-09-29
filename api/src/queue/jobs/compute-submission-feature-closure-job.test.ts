@@ -8,10 +8,10 @@ import * as db from '../../database/db';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
+import { publisherDependencies } from '../publisher';
 import {
   IComputeSubmissionFeatureClosureJobData,
   computeSubmissionFeatureClosureFailedHandler,
-  computeSubmissionFeatureClosureJobDependencies,
   computeSubmissionFeatureClosureJobHandler
 } from './compute-submission-feature-closure-job';
 
@@ -44,7 +44,7 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       data
     } as PgBoss.Job<IComputeSubmissionFeatureClosureJobData>);
 
-  it('should recompute the closure for the submission, publish screening job, and commit', async () => {
+  it('should recompute the closure for the submission, refresh scope anchors, and commit', async () => {
     const mockDBConnection = getMockDBConnection();
     mockDBConnection.open = sinon.stub().resolves();
     mockDBConnection.commit = sinon.stub().resolves();
@@ -56,10 +56,8 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     const recomputeStub = sinon
       .stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission')
       .resolves({ insertedCount: 42 });
-
-    const publishStub = sinon
-      .stub(computeSubmissionFeatureClosureJobDependencies, 'publishSubmissionUploadSecurityJob')
-      .resolves({ status: 'published', jobId: 'screen-job-1' });
+    const send = sinon.stub().resolves('job-id');
+    sinon.stub(publisherDependencies, 'getPgBoss').returns({ send, createQueue: sinon.stub().resolves() } as any);
 
     await computeSubmissionFeatureClosureJobHandler([createMockJob({ submissionUploadId: 'upload-uuid-1' })]);
 
@@ -69,10 +67,9 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
       "SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2::text, $3))",
       ['submission-feature-active-state', 1, 3]
     );
-    expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, {
-      submissionId: 1,
-      submissionUploadId: 'upload-uuid-1'
-    });
+    // Indexing is the only trigger for security screening, so a rebuild (including the one approval queues)
+    // publishes no job of its own.
+    expect(send).not.to.have.been.called;
     expect(mockDBConnection.commit).to.have.been.calledOnce;
   });
 
@@ -86,9 +83,6 @@ describe('computeSubmissionFeatureClosureJobHandler', () => {
     mockDBConnection.query = sinon.stub().resolves(mockQueryResult([]));
 
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
-    sinon
-      .stub(computeSubmissionFeatureClosureJobDependencies, 'publishSubmissionUploadSecurityJob')
-      .resolves({ status: 'published', jobId: 'j1' });
 
     const testError = new Error('Closure recompute failed');
     sinon.stub(SubmissionFeatureClosureService.prototype, 'computeClosureForSubmission').rejects(testError);
