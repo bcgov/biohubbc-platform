@@ -120,7 +120,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
    */
   const handleDeleteClick = (teamPolicy: ITeamPolicyDetails) => {
     const handleConfirmDelete = () => {
-      handleDelete(teamPolicy);
+      void handleDelete(teamPolicy);
       dialogContext.setYesNoDialog({ open: false });
     };
 

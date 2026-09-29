@@ -121,7 +121,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       open: true,
       onYes: () => {
         dialogContext.setYesNoDialog({ open: false });
-        deleteReason(reason);
+        void deleteReason(reason);
       }
     });
   };

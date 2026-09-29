@@ -223,7 +223,7 @@ export const useDownloadExportActions = () => {
    *
    * @param {string} _exportId - Export id reserved for the future rebuild request.
    */
-  const handleRebuildExport = async (_exportId: string) => {
+  const handleRebuildExport = (_exportId: string) => {
     dialogContext.setErrorDialog({
       open: true,
       dialogTitle: 'Nothing to download',
