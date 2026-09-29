@@ -33,7 +33,28 @@ const download = (downloadId: string) => [QUERY_KEY_ROOT.DOWNLOAD, downloadId] a
 const featureTypes = (downloadId: string) => [...download(downloadId), 'feature-types'] as const;
 
 /**
+ * Key of one page of a download's versions.
+ *
+ * @param {string} downloadId The download.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort sent.
+ * @returns The download versions key.
+ */
+const versions = (downloadId: string, pagination: ApiPaginationRequestOptions) =>
+  [...download(downloadId), 'versions', { pagination }] as const;
+
+/**
+ * Key of one page of the exports made from one download version.
+ *
+ * @param {string} downloadId The download.
+ * @param {string} downloadVersionId The version.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort sent.
+ * @returns The version exports key.
+ */
+const versionExports = (downloadId: string, downloadVersionId: string, pagination: ApiPaginationRequestOptions) =>
+  [...download(downloadId), 'version', downloadVersionId, 'exports', { pagination }] as const;
+
+/**
  * Query keys for downloads, ordered from broad to narrow so that each prefix names the set of queries a change
  * invalidates.
  */
-export const downloadQueryKeys = { lists, list, download, featureTypes };
+export const downloadQueryKeys = { lists, list, download, featureTypes, versions, versionExports };

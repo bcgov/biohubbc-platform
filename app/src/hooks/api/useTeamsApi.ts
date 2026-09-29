@@ -22,14 +22,16 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    *
    * @param {ApiSearchParams} [searchParams] - Optional search parameters.
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITeamsResponse>}
    */
   const getTeams = async (
     searchParams?: ApiSearchParams,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ITeamsResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/teams', { params });
+    const { data } = await axios.get('/api/administrative/teams', { params, ...options });
 
     return data;
   };

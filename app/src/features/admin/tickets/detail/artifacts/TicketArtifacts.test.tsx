@@ -128,13 +128,17 @@ describe('TicketArtifacts', () => {
     expect(screen.queryByText(ticketArtifact.object_key)).not.toBeInTheDocument();
     expect(screen.getByText('February 25, 2026')).toBeVisible();
     expect(screen.queryByText(ticketArtifact.artifact_id)).not.toBeInTheDocument();
-    expect(getTicketArtifacts).toHaveBeenCalledWith(ticketId, {
-      search: '',
-      page: 1,
-      limit: 10,
-      sort: 'create_date',
-      order: 'desc'
-    });
+    expect(getTicketArtifacts).toHaveBeenCalledWith(
+      ticketId,
+      {
+        search: '',
+        page: 1,
+        limit: 10,
+        sort: 'create_date',
+        order: 'desc'
+      },
+      { signal: expect.any(AbortSignal) }
+    );
   });
 
   it('searches ticket artifacts by text input', async () => {
@@ -145,13 +149,17 @@ describe('TicketArtifacts', () => {
     await user.type(screen.getByPlaceholderText('Search files'), 'field note');
 
     await waitFor(() => {
-      expect(getTicketArtifacts).toHaveBeenCalledWith(ticketId, {
-        search: 'field note',
-        page: 1,
-        limit: 10,
-        sort: 'create_date',
-        order: 'desc'
-      });
+      expect(getTicketArtifacts).toHaveBeenCalledWith(
+        ticketId,
+        {
+          search: 'field note',
+          page: 1,
+          limit: 10,
+          sort: 'create_date',
+          order: 'desc'
+        },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 

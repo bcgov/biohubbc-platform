@@ -1,16 +1,18 @@
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { DOWNLOAD_TABLE_STATUS_CHIP_COLORS } from 'constants/download';
 import dayjs from 'dayjs';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { DownloadStatus, DownloadVersion } from 'interfaces/useDownloadApi.interface';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
 import { DownloadVersionExportButton } from '../DownloadVersionExportButton';
 
 interface DownloadVersionsTableProps {
@@ -26,16 +28,16 @@ interface DownloadVersionsTableProps {
 export const DownloadVersionsTable = ({ downloadId }: DownloadVersionsTableProps) => {
   const api = useApi();
   const navigate = useNavigate();
-  const versions = useServerPaginatedDataGrid({
-    fetcher: (_search, pagination) =>
-      api.download.listDownloadVersions(downloadId, {
-        ...pagination,
-        sort: pagination.sort ?? 'create_date',
-        order: pagination.order ?? 'desc'
-      }),
-    extractData: (response) => response.versions,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'create_date', sort: 'desc' }
+  const versionsGrid = useServerPaginatedGridState({ defaultSort: { field: 'create_date', sort: 'desc' } });
+  const versionsPagination = {
+    ...versionsGrid.apiPagination,
+    sort: versionsGrid.apiPagination.sort ?? 'create_date',
+    order: versionsGrid.apiPagination.order ?? 'desc'
+  };
+  const versionsQuery = useQuery({
+    queryKey: downloadQueryKeys.versions(downloadId, versionsPagination),
+    queryFn: ({ signal }) => api.download.listDownloadVersions(downloadId, versionsPagination, { signal }),
+    placeholderData: keepPreviousData
   });
   const columns = useMemo<GridColDef<DownloadVersion>[]>(
     () => [
@@ -96,21 +98,21 @@ export const DownloadVersionsTable = ({ downloadId }: DownloadVersionsTableProps
         <>
           Versions{' '}
           <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-            ({versions.rowCount})
+            ({versionsQuery.data?.pagination.total ?? 0})
           </Typography>
         </>
       }>
       <ServerPaginatedDataGrid<DownloadVersion>
         dataTestId="download-versions-table"
-        rows={versions.rows}
+        rows={versionsQuery.data?.versions ?? []}
         columns={columns}
         getRowId={(row) => row.download_version_id}
         noRowsMessage="No versions"
-        rowCount={versions.rowCount}
-        paginationModel={versions.paginationModel}
-        setPaginationModel={versions.handlePaginationChange}
-        sortModel={versions.sortModel}
-        setSortModel={versions.handleSortChange}
+        rowCount={versionsQuery.data?.pagination.total ?? 0}
+        paginationModel={versionsGrid.paginationModel}
+        setPaginationModel={versionsGrid.handlePaginationChange}
+        sortModel={versionsGrid.sortModel}
+        setSortModel={versionsGrid.handleSortChange}
         onRowClick={(version) => navigate(`/download/${downloadId}/version/${version.download_version_id}`)}
       />
     </PageSection>

@@ -27,14 +27,16 @@ const usePoliciesApi = (axios: AxiosInstance) => {
    *
    * @param {ApiSearchParams} [searchParams] - Optional search parameters.
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IPoliciesResponse>}
    */
   const getPolicies = async (
     searchParams?: ApiSearchParams,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IPoliciesResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/policies', { params });
+    const { data } = await axios.get('/api/administrative/policies', { params, ...options });
 
     return data;
   };
@@ -78,13 +80,18 @@ const usePoliciesApi = (axios: AxiosInstance) => {
    *
    * @param {string} policyId
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IPolicyTeamsResponse>}
    */
   const getPolicyTeams = async (
     policyId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IPolicyTeamsResponse> => {
-    const { data } = await axios.get(`/api/administrative/policies/${policyId}/teams`, { params: pagination });
+    const { data } = await axios.get(`/api/administrative/policies/${policyId}/teams`, {
+      params: pagination,
+      ...options
+    });
 
     return data;
   };

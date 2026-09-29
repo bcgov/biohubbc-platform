@@ -205,15 +205,18 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    *
    * @param {string} ticketId
    * @param {IGetTicketArtifactsQueryParams} [params]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<IGetTicketArtifactsResponse>}
    */
   const getTicketArtifacts = async (
     ticketId: string,
-    params?: IGetTicketArtifactsQueryParams
+    params?: IGetTicketArtifactsQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IGetTicketArtifactsResponse> => {
     const { data } = await axios.get(`/api/administrative/tickets/${ticketId}/artifact`, {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -331,12 +334,17 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get tickets accessible to the current user via team membership.
    *
    * @param {ITicketsQueryParams} [params]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForUser = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForUser = async (
+    params?: ITicketsQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/tickets', {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;

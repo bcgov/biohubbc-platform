@@ -139,7 +139,8 @@ describe('DownloadVersionPage', () => {
     expect(mockListDownloadVersionExports).toHaveBeenCalledWith(
       DOWNLOAD_ID,
       VERSION_ID,
-      expect.objectContaining({ page: 1, limit: 10, sort: 'started_at', order: 'desc' })
+      expect.objectContaining({ page: 1, limit: 10, sort: 'started_at', order: 'desc' }),
+      { signal: expect.any(AbortSignal) }
     );
   });
 

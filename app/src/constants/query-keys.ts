@@ -8,10 +8,12 @@ export const QUERY_KEY_ROOT = {
   CODE: 'code',
   DOWNLOAD: 'download',
   POLICY: 'policy',
+  SECURITY: 'security',
   SEARCH: 'search',
   SUBMISSION: 'submission',
   SUBMISSION_UPLOAD: 'submission-upload',
   TEAM: 'team',
+  TEAM_POLICY: 'team-policy',
   TICKET: 'ticket',
   USER: 'user'
 } as const;

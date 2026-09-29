@@ -1,7 +1,8 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { DownloadRecord, DownloadListResponse } from 'interfaces/useDownloadApi.interface';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { useNavigate } from 'react-router-dom';
+import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
 import { PortalListPageLayout } from './components/PortalListPageLayout';
 import { PortalDownloadsContainer } from './list/PortalDownloadsContainer';
 
@@ -13,22 +14,22 @@ import { PortalDownloadsContainer } from './list/PortalDownloadsContainer';
 export const PortalDownloadPage = () => {
   const api = useApi();
   const navigate = useNavigate();
-  const downloads = useServerPaginatedDataGrid<DownloadRecord, DownloadListResponse>({
-    fetcher: (_search, pagination) => api.download.getDownloads(pagination),
-    extractData: (response) => response.downloads,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'create_date', sort: 'desc' }
+  const downloadsGrid = useServerPaginatedGridState({ defaultSort: { field: 'create_date', sort: 'desc' } });
+  const downloadsQuery = useQuery({
+    queryKey: downloadQueryKeys.list(downloadsGrid.apiPagination),
+    queryFn: ({ signal }) => api.download.getDownloads(downloadsGrid.apiPagination, { signal }),
+    placeholderData: keepPreviousData
   });
 
   return (
     <PortalListPageLayout>
       <PortalDownloadsContainer
-        rows={downloads.rows}
-        rowCount={downloads.rowCount}
-        paginationModel={downloads.paginationModel}
-        setPaginationModel={downloads.handlePaginationChange}
-        sortModel={downloads.sortModel}
-        setSortModel={downloads.handleSortChange}
+        rows={downloadsQuery.data?.downloads ?? []}
+        rowCount={downloadsQuery.data?.pagination.total ?? 0}
+        paginationModel={downloadsGrid.paginationModel}
+        setPaginationModel={downloadsGrid.handlePaginationChange}
+        sortModel={downloadsGrid.sortModel}
+        setSortModel={downloadsGrid.handleSortChange}
         onRowClick={(downloadId) => navigate(`/download/${downloadId}`)}
       />
     </PortalListPageLayout>

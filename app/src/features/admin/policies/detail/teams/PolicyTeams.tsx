@@ -1,11 +1,12 @@
 import { GridColDef } from '@mui/x-data-grid';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IPolicyTeamsResponse } from 'interfaces/usePoliciesApi.interface';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { useMemo } from 'react';
+import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 
 interface PolicyTeamsProps {
   policyId: string;
@@ -20,11 +21,11 @@ interface PolicyTeamsProps {
 export const PolicyTeams = ({ policyId }: PolicyTeamsProps) => {
   const api = useApi();
 
-  const teams = useServerPaginatedDataGrid<ITeamPolicyDetails, IPolicyTeamsResponse>({
-    fetcher: (_search, pagination) => api.policies.getPolicyTeams(policyId, pagination),
-    extractData: (response) => response.teams,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'team_name', sort: 'asc' }
+  const teamsGrid = useServerPaginatedGridState({ defaultSort: { field: 'team_name', sort: 'asc' } });
+  const teamsQuery = useQuery({
+    queryKey: policyQueryKeys.teams(policyId, teamsGrid.apiPagination),
+    queryFn: ({ signal }) => api.policies.getPolicyTeams(policyId, teamsGrid.apiPagination, { signal }),
+    placeholderData: keepPreviousData
   });
 
   const columns = useMemo<GridColDef<ITeamPolicyDetails>[]>(
@@ -49,15 +50,15 @@ export const PolicyTeams = ({ policyId }: PolicyTeamsProps) => {
     <PageSection id="policy-teams" label="Teams">
       <ServerPaginatedDataGrid<ITeamPolicyDetails>
         dataTestId="policy-teams-table"
-        rows={teams.rows}
+        rows={teamsQuery.data?.teams ?? []}
         columns={columns}
         getRowId={(row) => row.team_policy_id}
         noRowsMessage="No Teams"
-        rowCount={teams.rowCount}
-        paginationModel={teams.paginationModel}
-        setPaginationModel={teams.handlePaginationChange}
-        sortModel={teams.sortModel}
-        setSortModel={teams.handleSortChange}
+        rowCount={teamsQuery.data?.pagination.total ?? 0}
+        paginationModel={teamsGrid.paginationModel}
+        setPaginationModel={teamsGrid.handlePaginationChange}
+        sortModel={teamsGrid.sortModel}
+        setSortModel={teamsGrid.handleSortChange}
       />
     </PageSection>
   );

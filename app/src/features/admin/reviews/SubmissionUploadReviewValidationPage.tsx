@@ -2,20 +2,22 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { keepPreviousData, skipToken, useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { SubmissionFeatureTable } from 'features/submissions/components/SubmissionFeatureTable';
 import { SubmissionUploadMap } from './components/map/SubmissionUploadMap';
 import { SubmissionUploadReconciliationTable } from './components/SubmissionUploadReconciliationTable';
 import { SubmissionUploadReviewHeader } from './components/SubmissionUploadReviewHeader';
+import { useUpdateSubmissionUploadReviewStatusMutation } from './hooks/useUpdateSubmissionUploadReviewStatusMutation';
+import { submissionUploadQueryKeys } from './submission-upload-query-keys';
 
 interface SubmissionUploadReviewValidationPageProps {
   review: ISubmissionUploadReviewDetail;
@@ -26,50 +28,58 @@ interface SubmissionUploadReviewValidationPageProps {
  *
  * Displays the review metadata, reconciliation overview, a map of the upload's active
  * spatial features, and a server-paginated table containing the features belonging to
- * the reviewed submission upload.
+ * the reviewed submission upload. `review` is the cached review detail, so a status change
+ * written to that query re-renders the header.
  *
  * @param {SubmissionUploadReviewValidationPageProps} props - Validation review page properties.
  * @returns {JSX.Element} The submission upload validation review page.
  */
 export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadReviewValidationPageProps) => {
-  const { review: initialReview } = props;
+  const { review } = props;
   const navigate = useNavigate();
-  const { submissionId, submissionUploadId, submissionUploadReviewId } = useParams<{
+  const {
+    submissionId = '',
+    submissionUploadId = '',
+    submissionUploadReviewId = ''
+  } = useParams<{
     submissionId: string;
     submissionUploadId: string;
     submissionUploadReviewId: string;
   }>();
   const api = useApi();
   const dialogContext = useDialogContext();
-  const [currentReview, setCurrentReview] = useState(initialReview);
-  const reconciliationDataLoader = useDataLoader((currentSubmissionId: number, uploadId: string) =>
-    api.admin.getSubmissionUploadReconciliationCounts(currentSubmissionId, uploadId)
-  );
-  const featureGrid = useServerPaginatedDataGrid({
-    fetcher: (_search, pagination) =>
-      api.admin.getSubmissionUploadFeatures(Number(submissionId), submissionUploadId!, pagination),
-    extractData: (response) =>
-      response.features.map((feature) => ({
-        submission_feature_id: feature.submission_feature_id,
-        feature_type_name: feature.feature_type_name
-      })),
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'submission_feature_id', sort: 'asc' }
+  const scope = { submissionId: Number(submissionId), submissionUploadId };
+  const hasUploadParams = Boolean(submissionId && submissionUploadId);
+  const updateStatusMutation = useUpdateSubmissionUploadReviewStatusMutation({ ...scope, submissionUploadReviewId });
+
+  const reconciliationQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.reconciliationCounts(scope),
+    queryFn: hasUploadParams
+      ? ({ signal }) =>
+          api.admin.getSubmissionUploadReconciliationCounts(scope.submissionId, scope.submissionUploadId, { signal })
+      : skipToken
   });
 
-  useEffect(() => {
-    if (submissionId && submissionUploadId) {
-      reconciliationDataLoader.load(Number(submissionId), submissionUploadId);
-    }
-  }, [reconciliationDataLoader, submissionId, submissionUploadId]);
+  const featureGrid = useServerPaginatedGridState({ defaultSort: { field: 'submission_feature_id', sort: 'asc' } });
+  const featuresQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureList(scope, featureGrid.apiPagination),
+    queryFn: ({ signal }) =>
+      api.admin.getSubmissionUploadFeatures(scope.submissionId, scope.submissionUploadId, featureGrid.apiPagination, {
+        signal
+      }),
+    placeholderData: keepPreviousData
+  });
+  const featureRows = useMemo(
+    () =>
+      featuresQuery.data?.features.map((feature) => ({
+        submission_feature_id: feature.submission_feature_id,
+        feature_type_name: feature.feature_type_name
+      })) ?? [],
+    [featuresQuery.data]
+  );
 
-  useEffect(() => {
-    setCurrentReview(initialReview);
-  }, [initialReview]);
-
-  const review = currentReview;
-  const reconciliationCounts = reconciliationDataLoader.data;
-  const isLoading = reconciliationDataLoader.isLoading && !reconciliationCounts;
+  const reconciliationCounts = reconciliationQuery.data;
+  const isLoading = reconciliationQuery.isLoading;
 
   if (review?.scope && review.scope !== 'validation') {
     return <Navigate to="/page-not-found" replace />;
@@ -85,32 +95,19 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
   };
 
   /**
-   * Toggle the current review between completed and in-progress status.
+   * Toggle the current review between completed and in-progress status, reporting a failure.
    *
-   * @returns {Promise<void>} Resolves after the review status update finishes.
+   * @returns {void}
    */
-  const updateReviewStatus = async () => {
+  const updateReviewStatus = () => {
     if (!submissionId || !submissionUploadId || !submissionUploadReviewId || !review) {
       return;
     }
 
     closeConfirmationDialog();
-    const status = review.status === 'completed' ? 'in_progress' : 'completed';
-
-    try {
-      const updatedReview = await api.admin.updateSubmissionUploadReview(
-        Number(submissionId),
-        submissionUploadId,
-        submissionUploadReviewId,
-        status
-      );
-      setCurrentReview(updatedReview);
-    } catch (error) {
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: (error as Error).message
-      });
-    }
+    updateStatusMutation.mutate(review.status === 'completed' ? 'in_progress' : 'completed', {
+      onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+    });
   };
 
   /**
@@ -168,12 +165,12 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
             <Stack spacing={4}>
               <SubmissionUploadReconciliationTable counts={reconciliationCounts} />
               <PageSection id="review-map" label="Map">
-                <SubmissionUploadMap submissionId={Number(submissionId)} submissionUploadId={submissionUploadId!} />
+                <SubmissionUploadMap submissionId={Number(submissionId)} submissionUploadId={submissionUploadId} />
               </PageSection>
               <SubmissionFeatureTable
-                rows={featureGrid.rows}
-                rowCount={featureGrid.rowCount}
-                isLoading={featureGrid.isLoading && !featureGrid.response}
+                rows={featureRows}
+                rowCount={featuresQuery.data?.pagination.total ?? 0}
+                isLoading={featuresQuery.isFetching && !featuresQuery.data}
                 onRowClick={(params) => handleFeatureRowClick(params.row.submission_feature_id)}
                 paginationModel={featureGrid.paginationModel}
                 onPaginationModelChange={featureGrid.handlePaginationChange}

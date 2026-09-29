@@ -191,6 +191,24 @@ const featureGeometryExtent = (scope: SubmissionUploadKeyScope, submissionFeatur
   [...feature(scope, submissionFeatureId), 'geometry-extent'] as const;
 
 /**
+ * Key of the reconciliation outcome counts stored for an upload.
+ *
+ * @param {SubmissionUploadKeyScope} scope The upload.
+ * @returns The reconciliation counts key.
+ */
+const reconciliationCounts = (scope: SubmissionUploadKeyScope) => [...upload(scope), 'reconciliation-counts'] as const;
+
+/**
+ * Key of one page of an upload's features, as its validation review lists them.
+ *
+ * @param {SubmissionUploadKeyScope} scope The upload.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The feature list key.
+ */
+const featureList = (scope: SubmissionUploadKeyScope, pagination: ApiPaginationRequestOptions) =>
+  [...upload(scope), 'features', 'list', { pagination }] as const;
+
+/**
  * Key of an upload's processing status history as it stood when the upload held a given status. The history only
  * grows as the status moves on, so a history loaded for the current status stays current.
  *
@@ -221,5 +239,7 @@ export const submissionUploadQueryKeys = {
   featureDetail,
   featureProperties,
   featureGeometryExtent,
-  statusHistory
+  statusHistory,
+  reconciliationCounts,
+  featureList
 };

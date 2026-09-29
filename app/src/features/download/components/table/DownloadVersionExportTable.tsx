@@ -1,14 +1,16 @@
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { DOWNLOAD_TABLE_STATUS_CHIP_COLORS } from 'constants/download';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { DownloadExport, DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 import { useMemo } from 'react';
 import { getRelativeTimeLabel } from 'utils/date';
+import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
 import { DownloadVersionExportDownloadButton } from '../DownloadVersionExportDownloadButton';
 
 interface DownloadVersionExportTableProps {
@@ -24,16 +26,17 @@ interface DownloadVersionExportTableProps {
  */
 export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: DownloadVersionExportTableProps) => {
   const api = useApi();
-  const exports = useServerPaginatedDataGrid({
-    fetcher: (_search, pagination) =>
-      api.downloadExport.listDownloadVersionExports(downloadId, downloadVersionId, {
-        ...pagination,
-        sort: pagination.sort ?? 'started_at',
-        order: pagination.order ?? 'desc'
-      }),
-    extractData: (response) => response.exports,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'started_at', sort: 'desc' }
+  const exportsGrid = useServerPaginatedGridState({ defaultSort: { field: 'started_at', sort: 'desc' } });
+  const exportsPagination = {
+    ...exportsGrid.apiPagination,
+    sort: exportsGrid.apiPagination.sort ?? 'started_at',
+    order: exportsGrid.apiPagination.order ?? 'desc'
+  };
+  const exportsQuery = useQuery({
+    queryKey: downloadQueryKeys.versionExports(downloadId, downloadVersionId, exportsPagination),
+    queryFn: ({ signal }) =>
+      api.downloadExport.listDownloadVersionExports(downloadId, downloadVersionId, exportsPagination, { signal }),
+    placeholderData: keepPreviousData
   });
   const columns = useMemo<GridColDef<DownloadExport>[]>(
     () => [
@@ -143,21 +146,21 @@ export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: Do
         <>
           Exports{' '}
           <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-            ({exports.rowCount})
+            ({exportsQuery.data?.pagination.total ?? 0})
           </Typography>
         </>
       }>
       <ServerPaginatedDataGrid<DownloadExport>
         dataTestId="download-exports-table"
-        rows={exports.rows}
+        rows={exportsQuery.data?.exports ?? []}
         columns={columns}
         getRowId={(row) => row.download_version_export_id}
         noRowsMessage="No exports"
-        rowCount={exports.rowCount}
-        paginationModel={exports.paginationModel}
-        setPaginationModel={exports.handlePaginationChange}
-        sortModel={exports.sortModel}
-        setSortModel={exports.handleSortChange}
+        rowCount={exportsQuery.data?.pagination.total ?? 0}
+        paginationModel={exportsGrid.paginationModel}
+        setPaginationModel={exportsGrid.handlePaginationChange}
+        sortModel={exportsGrid.sortModel}
+        setSortModel={exportsGrid.handleSortChange}
       />
     </PageSection>
   );

@@ -1,5 +1,16 @@
 import { QUERY_KEY_ROOT } from 'constants/query-keys';
+import { SubmissionFilters } from 'interfaces/useSubmissionsApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
+
+/**
+ * Key of one page of the current user's submissions.
+ *
+ * @param {SubmissionFilters} filters The search sent.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The user's submissions key.
+ */
+const userList = (filters: SubmissionFilters, pagination: ApiPaginationRequestOptions) =>
+  [QUERY_KEY_ROOT.SUBMISSION, 'user-list', { filters, pagination }] as const;
 
 /**
  * Key prefix of everything cached for one submission.
@@ -28,7 +39,60 @@ const adminFeatures = (submissionId: number, pagination: ApiPaginationRequestOpt
   [...submission(submissionId), 'admin-features', { pagination }] as const;
 
 /**
+ * Key of one page of a submission's features as its submitter or the public sees them.
+ *
+ * @param {number} submissionId The submission.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The submission features key.
+ */
+const features = (submissionId: number, pagination: ApiPaginationRequestOptions) =>
+  [...submission(submissionId), 'features', { pagination }] as const;
+
+/**
+ * Key prefix of everything cached for one submission feature.
+ *
+ * @param {number} submissionId The submission.
+ * @param {number} submissionFeatureId The feature.
+ * @returns The feature key prefix.
+ */
+const feature = (submissionId: number, submissionFeatureId: number) =>
+  [...submission(submissionId), 'feature', submissionFeatureId] as const;
+
+/**
+ * Key of one submission feature's detail.
+ *
+ * @param {number} submissionId The submission.
+ * @param {number} submissionFeatureId The feature.
+ * @returns The feature detail key.
+ */
+const featureDetail = (submissionId: number, submissionFeatureId: number) =>
+  [...feature(submissionId, submissionFeatureId), 'detail'] as const;
+
+/**
+ * Key of one page of a submission feature's properties.
+ *
+ * @param {number} submissionId The submission.
+ * @param {number} submissionFeatureId The feature.
+ * @param {ApiPaginationRequestOptions & { search?: string }} params The search, page and sort sent.
+ * @returns The feature properties key.
+ */
+const featureProperties = (
+  submissionId: number,
+  submissionFeatureId: number,
+  params: ApiPaginationRequestOptions & { search?: string }
+) => [...feature(submissionId, submissionFeatureId), 'properties', params] as const;
+
+/**
  * Query keys for submissions, ordered from broad to narrow so that each prefix names the set of queries a change
  * invalidates.
  */
-export const submissionQueryKeys = { submission, record, adminFeatures };
+export const submissionQueryKeys = {
+  userList,
+  submission,
+  record,
+  adminFeatures,
+  features,
+  feature,
+  featureDetail,
+  featureProperties
+};

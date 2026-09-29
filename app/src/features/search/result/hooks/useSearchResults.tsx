@@ -1,9 +1,10 @@
-import { hashKey, skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useEffect } from 'react';
 import { CursorPagination } from 'types/pagination';
+import { keepPreviousDataWithin } from 'utils/query-client';
 import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
 import { useSearchPagination } from './useSearchPagination';
 
@@ -50,10 +51,7 @@ export const useSearchResults = (
         ? ({ signal }) =>
             api.search.searchFeatures(featureTypeName, expressionTree, cursorPagination, { signal, submissionIds })
         : skipToken,
-    placeholderData: (previous, previousQuery) =>
-      previousQuery && hashKey(previousQuery.queryKey.slice(0, scopeKey.length)) === hashKey(scopeKey)
-        ? previous
-        : undefined
+    placeholderData: keepPreviousDataWithin(scopeKey)
   });
 
   useEffect(() => {

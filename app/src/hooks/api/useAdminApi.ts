@@ -51,14 +51,17 @@ const useAdminApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionUploadReconciliationCounts>} Stored reconciliation outcome counts.
    */
   const getSubmissionUploadReconciliationCounts = async (
     submissionId: number,
-    submissionUploadId: string
+    submissionUploadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionUploadReconciliationCounts> => {
     const { data } = await axios.get(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/reconciliation`
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/reconciliation`,
+      options
     );
 
     return data;
@@ -116,18 +119,21 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
    * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated features belonging to the upload.
    */
   const getSubmissionUploadFeatures = async (
     submissionId: number,
     submissionUploadId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureForReviewResponse> => {
     const { data } = await axios.get(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/features`,
       {
         params: pagination,
-        paramsSerializer: (params) => qs.stringify(params)
+        paramsSerializer: (params) => qs.stringify(params),
+        ...options
       }
     );
 

@@ -1,4 +1,4 @@
-import { QueryClient, QueryKey } from '@tanstack/react-query';
+import { hashKey, Query, QueryClient, QueryKey } from '@tanstack/react-query';
 import { QUERY_CLIENT_DEFAULT_OPTIONS } from 'constants/query';
 
 /**
@@ -29,3 +29,18 @@ export const cancelQueryForOptimisticUpdate = async (
   await queryClient.cancelQueries({ queryKey, exact: true });
   return cancelledLoad;
 };
+
+/**
+ * Builds a `placeholderData` option that keeps the previous page on screen while the next one loads, but only when
+ * the previous query shares the given key prefix: paging through one feature's properties keeps its rows, while moving
+ * to another feature shows the loading state rather than the old feature's rows.
+ *
+ * @param {QueryKey} scopeKey The key prefix that identifies whose data the query holds.
+ * @returns A `placeholderData` function for `useQuery`.
+ */
+export const keepPreviousDataWithin =
+  (scopeKey: QueryKey) =>
+  <TData>(previousData: TData | undefined, previousQuery: Query<TData, Error, TData, QueryKey> | undefined) =>
+    previousQuery && hashKey(previousQuery.queryKey.slice(0, scopeKey.length)) === hashKey(scopeKey)
+      ? previousData
+      : undefined;

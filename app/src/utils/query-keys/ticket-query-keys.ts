@@ -1,5 +1,5 @@
 import { QUERY_KEY_ROOT } from 'constants/query-keys';
-import { ITicketsQueryParams } from 'interfaces/useTicketsApi.interface';
+import { IGetTicketArtifactsQueryParams, ITicketsQueryParams } from 'interfaces/useTicketsApi.interface';
 
 /** Which endpoints a ticket is read through: the administrative ones, or the requesting user's own. */
 export type TicketAccessScope = 'admin' | 'user';
@@ -39,7 +39,25 @@ const list = (scope: TicketAccessScope, params: ITicketsQueryParams) => [...list
 const detail = (scope: TicketAccessScope, ticketId: string) => [...all(scope), 'detail', ticketId] as const;
 
 /**
+ * Key prefix of every page of a ticket's files.
+ *
+ * @param {string} ticketId The ticket.
+ * @returns The ticket artifacts key prefix.
+ */
+const artifactsAll = (ticketId: string) => [QUERY_KEY_ROOT.TICKET, 'artifacts', ticketId] as const;
+
+/**
+ * Key of one page of a ticket's files; files are read through the administrative endpoints only.
+ *
+ * @param {string} ticketId The ticket.
+ * @param {IGetTicketArtifactsQueryParams} params The search, page and sort sent.
+ * @returns The ticket artifacts key.
+ */
+const artifacts = (ticketId: string, params: IGetTicketArtifactsQueryParams) =>
+  [...artifactsAll(ticketId), params] as const;
+
+/**
  * Query keys for tickets, ordered from broad to narrow so that each prefix names the set of queries a
  * change invalidates.
  */
-export const ticketQueryKeys = { all, lists, list, detail };
+export const ticketQueryKeys = { all, lists, list, detail, artifactsAll, artifacts };

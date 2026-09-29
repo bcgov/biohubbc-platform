@@ -395,7 +395,11 @@ describe('PolicyDetailPage', () => {
     expect(getByText('Team Alpha')).toBeVisible();
 
     await waitFor(() => {
-      expect(getPolicyTeams).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'team_name', order: 'asc' });
+      expect(getPolicyTeams).toHaveBeenCalledWith(
+        'policy-1',
+        { page: 1, limit: 10, sort: 'team_name', order: 'asc' },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 

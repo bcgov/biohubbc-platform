@@ -59,14 +59,17 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    *
    * @param {string} downloadId
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<DownloadVersionListResponse>}
    */
   const listDownloadVersions = async (
     downloadId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<DownloadVersionListResponse> => {
     const { data } = await axios.get<DownloadVersionListResponse>(`/api/download/${downloadId}/version`, {
-      params: pagination
+      params: pagination,
+      ...options
     });
     return data;
   };

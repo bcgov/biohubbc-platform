@@ -121,7 +121,8 @@ describe('DownloadPage', () => {
     expect(queryByText('Started')).not.toBeInTheDocument();
     expect(mockListDownloadVersions).toHaveBeenCalledWith(
       DOWNLOAD_ID,
-      expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' })
+      expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' }),
+      { signal: expect.any(AbortSignal) }
     );
   });
 

@@ -206,7 +206,8 @@ describe('ManagePoliciesPage', () => {
             limit: 10,
             sort: 'name',
             order: 'asc'
-          })
+          }),
+          { signal: expect.any(AbortSignal) }
         );
       });
     });
@@ -223,7 +224,8 @@ describe('ManagePoliciesPage', () => {
             limit: 10,
             sort: 'name',
             order: 'asc'
-          })
+          }),
+          { signal: expect.any(AbortSignal) }
         );
       });
     });
@@ -240,7 +242,8 @@ describe('ManagePoliciesPage', () => {
             limit: 10,
             sort: 'team_name',
             order: 'asc'
-          })
+          }),
+          { signal: expect.any(AbortSignal) }
         );
       });
     });

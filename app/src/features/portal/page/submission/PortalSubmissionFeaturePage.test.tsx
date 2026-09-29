@@ -86,7 +86,9 @@ describe('PortalSubmissionFeaturePage', () => {
 
     expect(await findByText('Properties')).toBeVisible();
     await waitFor(() => {
-      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object));
+      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object), {
+        signal: expect.any(AbortSignal)
+      });
     });
     expect(await findByText('Wolf')).toBeVisible();
   });

@@ -4,7 +4,7 @@ import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface'
 import { useParams } from 'react-router-dom';
 import { SubmissionUploadReviewHeader } from '../components/SubmissionUploadReviewHeader';
 import { SecurityReviewFeaturesTab } from './components/content/features-tab/SecurityReviewFeaturesTab';
-import { useUpdateSubmissionUploadReviewStatusMutation } from './hooks/useUpdateSubmissionUploadReviewStatusMutation';
+import { useUpdateSubmissionUploadReviewStatusMutation } from '../hooks/useUpdateSubmissionUploadReviewStatusMutation';
 
 interface SubmissionUploadReviewSecurityPageProps {
   review: ISubmissionUploadReviewDetail;
