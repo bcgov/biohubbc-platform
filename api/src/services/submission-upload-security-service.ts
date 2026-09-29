@@ -49,12 +49,12 @@ export class SubmissionUploadSecurityService extends DBService {
   /**
    * Run automatic security screening for a single `submission_upload`.
    *
-   * Creates a security review and linked screening event, then evaluates each screenable rule's active expressions
-   * against the upload's current features and assigns the rule to every match, with the event as provenance. A rule
-   * without an active expression is skipped and matches nothing. Evaluation follows upload-local relationships, so
-   * it needs neither approval nor published closure, and applies no user or team access filtering. Re-screening an
-   * upload leaves current assignments, and their provenance, unchanged. The review and event are completed with a
-   * summary of the run, all in the caller's transaction.
+   * Creates a security review and linked screening event, reads every screenable rule's active expressions concurrently
+   * on the caller's connection, then evaluates them against the upload's current features in one statement and assigns
+   * each rule to every match, with the event as provenance. A rule without an active expression is skipped and matches
+   * nothing. Evaluation follows upload-local relationships, so it needs neither approval nor published closure, and
+   * applies no user or team access filtering. Re-screening an upload leaves current assignments, and their provenance,
+   * unchanged. The review and event are completed with a summary of the run, all in the caller's transaction.
    *
    * @param {string} submissionUploadId UUID of the upload to screen.
    * @param {number} submissionId Submission ID that owns the upload.
@@ -85,15 +85,14 @@ export class SubmissionUploadSecurityService extends DBService {
     );
 
     const rules = await this.securityRuleService.getScreenableSecurityRules();
-    const ruleExpressions: NormalizedSecurityRuleExpression[] = [];
-    for (const rule of rules) {
-      if (rule.expression_ids.length) {
-        ruleExpressions.push({
+    const ruleExpressions: NormalizedSecurityRuleExpression[] = await Promise.all(
+      rules
+        .filter((rule) => rule.expression_ids.length)
+        .map(async (rule) => ({
           securityRuleId: rule.security_rule_id,
           expression: await this.readSecurityRuleExpression(rule.expression_ids)
-        });
-      }
-    }
+        }))
+    );
 
     const result = await this.submissionFeatureSecurityRepository.insertScreenedSubmissionFeatureSecurity({
       submissionId,
@@ -140,10 +139,9 @@ export class SubmissionUploadSecurityService extends DBService {
    * @memberof SubmissionUploadSecurityService
    */
   private async readSecurityRuleExpression(expressionIds: string[]): Promise<NormalizedExpressionTree> {
-    const trees: ExpressionTree[] = [];
-    for (const expressionId of expressionIds) {
-      trees.push(await this.expressionTreeService.readExpressionTree(expressionId));
-    }
+    const trees = await Promise.all(
+      expressionIds.map((expressionId) => this.expressionTreeService.readExpressionTree(expressionId))
+    );
 
     const expression: ExpressionTree =
       trees.length === 1 ? trees[0] : { type: 'expression', operator: 'OR', clauses: trees };
