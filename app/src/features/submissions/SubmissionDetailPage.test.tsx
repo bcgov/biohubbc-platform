@@ -10,7 +10,6 @@ vi.mock('features/search/result/hooks/useSearchResults');
 vi.mock('features/search/result/hooks/useSearchResultExpression', () => ({
   useSearchResultExpression: () => ({
     expressionTree: null,
-    expressionApplyRevision: 0,
     handleExpressionApply: vi.fn()
   })
 }));
