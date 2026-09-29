@@ -576,7 +576,9 @@ describe('SearchResultMapContainer', () => {
       mocks.createMartinSession.mockResolvedValueOnce(buildSession({ token: 'token-1' }));
 
       renderContainer();
-      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+      // The stub counts a mount in a passive effect, which can run after the map is in the document; waiting on the
+      // count itself makes the baseline below the mount the assertions compare against.
+      await waitFor(() => expect(mocks.slippyMapMounts.count).toBe(1));
 
       let resolveMint: (session: IMartinSession) => void = () => undefined;
       mocks.createMartinSession.mockImplementationOnce(
