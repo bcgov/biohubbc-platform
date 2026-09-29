@@ -4,7 +4,6 @@ import Stack from '@mui/material/Stack';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { PageSection } from 'components/section/PageSection';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
-import { useTicketContext } from 'hooks/useContext';
 import { useState } from 'react';
 import { TicketArtifacts } from './detail/artifacts/TicketArtifacts';
 import { TicketComment } from './detail/comment/TicketComment';
@@ -13,6 +12,7 @@ import { TicketSidebar } from './detail/sidebar/TicketSidebar';
 import { TicketSkeleton } from './detail/skeleton/TicketSkeleton';
 import { TicketTimeline } from './detail/timeline/TicketTimeline';
 import { useTicketComment } from './hooks/useTicketComment';
+import { useTicketQuery } from './hooks/useTicketQuery';
 
 /**
  * Admin ticket detail page for viewing timeline activity and changing ticket status.
@@ -20,11 +20,11 @@ import { useTicketComment } from './hooks/useTicketComment';
  * @returns {JSX.Element}
  */
 export const TicketDetailPage = () => {
-  const { ticketDataLoader } = useTicketContext();
+  const ticketQuery = useTicketQuery();
   const { comment, setComment, isSavingComment, isUploadingAttachment, handleAddComment, handleUploadAttachment } =
     useTicketComment();
-  const ticket = ticketDataLoader.data;
-  const isLoading = ticketDataLoader.isLoading;
+  const ticket = ticketQuery.data;
+  const isLoading = ticketQuery.isFetching;
   const [activeTab, setActiveTab] = useState<TicketDetailTab>('timeline');
 
   return (

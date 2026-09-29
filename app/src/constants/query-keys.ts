@@ -5,5 +5,8 @@
  * other's queries. Each builder module starts its keys with its own root from here.
  */
 export const QUERY_KEY_ROOT = {
-  SUBMISSION_UPLOAD: 'submission-upload'
+  SUBMISSION_UPLOAD: 'submission-upload',
+  TEAM: 'team',
+  TICKET: 'ticket',
+  USER: 'user'
 } as const;

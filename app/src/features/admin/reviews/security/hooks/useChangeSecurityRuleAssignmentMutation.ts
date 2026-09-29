@@ -10,6 +10,7 @@ import {
   submissionUploadQueryKeys,
   SubmissionUploadReviewKeyScope
 } from 'features/admin/reviews/submission-upload-query-keys';
+import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
 
 /** One Apply/Applied toggle on the review's rules grid. */
 export interface ChangeSecurityRuleAssignmentVariables {
@@ -89,9 +90,7 @@ export const useChangeSecurityRuleAssignmentMutation = (scope: SubmissionUploadR
       );
     },
     onMutate: async ({ rule, rulesQueryKey }) => {
-      // A load already in flight would overwrite the optimistic row with state from before the toggle.
-      const cancelledLoad = queryClient.isFetching({ queryKey: rulesQueryKey, exact: true }) > 0;
-      await queryClient.cancelQueries({ queryKey: rulesQueryKey, exact: true });
+      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, rulesQueryKey);
       const response = queryClient.setQueryData<ISubmissionUploadReviewSelectedFeatureRuleResponse>(
         rulesQueryKey,
         (current) => setRuleApplied(current, (row) => row.security_rule_id === rule.security_rule_id, !rule.applied)

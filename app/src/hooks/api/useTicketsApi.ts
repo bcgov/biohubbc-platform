@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICompleteTicketUploadRequest,
   ICreateTicketCommentRequest,
@@ -41,12 +41,17 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get tickets using optional filters and pagination options.
    *
    * @param {ITicketsQueryParams} [params]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForAdmin = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForAdmin = async (
+    params?: ITicketsQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/administrative/tickets', {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -56,10 +61,14 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
-    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
+  const getTicketForAdmin = async (
+    ticketId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`, options);
 
     return data;
   };
@@ -334,10 +343,14 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
-    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
+  const getTicketForUser = async (
+    ticketId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`, options);
 
     return data;
   };

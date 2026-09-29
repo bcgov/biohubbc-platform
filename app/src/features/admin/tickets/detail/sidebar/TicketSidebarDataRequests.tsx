@@ -1,5 +1,6 @@
 import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
+import { useQueryClient } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import {
   CreateDataRequestDialog,
@@ -9,7 +10,9 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useMemo, useState } from 'react';
+import { useTicketQuery } from '../../hooks/useTicketQuery';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
 
@@ -21,8 +24,9 @@ import { TicketSidebarSection } from './TicketSidebarSection';
 export const TicketSidebarDataRequests = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
-  const ticket = ticketDataLoader.data;
+  const queryClient = useQueryClient();
+  const { ticketId, ticketQueryKey } = useTicketContext();
+  const ticket = useTicketQuery().data;
   const { biohubUserWrapper } = useAuthStateContext();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -46,14 +50,10 @@ export const TicketSidebarDataRequests = () => {
         reason: values.reason,
         system_user_ids: values.system_user_ids
       });
-      const latestTicket = ticketDataLoader.data;
-
-      if (latestTicket) {
-        ticketDataLoader.setData({
-          ...latestTicket,
-          data_requests: [...latestTicket.data_requests, createdDataRequest]
-        });
-      }
+      queryClient.setQueryData<ITicketExtended>(
+        ticketQueryKey,
+        (current) => current && { ...current, data_requests: [...current.data_requests, createdDataRequest] }
+      );
 
       setIsCreateDialogOpen(false);
     } catch (error) {
@@ -88,7 +88,7 @@ export const TicketSidebarDataRequests = () => {
       <CreateDataRequestDialog
         open={isCreateDialogOpen}
         isSubmitting={isSubmitting}
-        initialReason={ticketDataLoader.data?.description ?? ''}
+        initialReason={ticket?.description ?? ''}
         onCancel={() => setIsCreateDialogOpen(false)}
         onSave={handleCreateDataRequest}
       />

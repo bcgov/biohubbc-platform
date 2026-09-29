@@ -1,13 +1,18 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useTicketContext } from 'hooks/useContext';
-import { ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
+import { ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
 
 /**
- * Cached ticket comment mutations shared by ticket comment flows.
+ * Writes to the cached ticket's comments, shared by ticket comment flows.
+ *
+ * Each write applies to the ticket as cached when it runs, and leaves the cache unchanged while the ticket
+ * has not loaded.
  *
  * @returns Comment cache mutation helpers.
  */
 export const useTicketCommentCache = () => {
-  const { ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketQueryKey } = useTicketContext();
 
   /**
    * Append a comment to the cached ticket details.
@@ -18,16 +23,10 @@ export const useTicketCommentCache = () => {
    * @returns {void}
    */
   const appendCachedComment = (newComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: [...latestTicket.comments, newComment]
-    });
+    queryClient.setQueryData<ITicketExtended>(
+      ticketQueryKey,
+      (ticket) => ticket && { ...ticket, comments: [...ticket.comments, newComment] }
+    );
   };
 
   /**
@@ -39,16 +38,14 @@ export const useTicketCommentCache = () => {
    * @returns {void}
    */
   const removeCachedComment = (ticketCommentId: string) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
-    });
+    queryClient.setQueryData<ITicketExtended>(
+      ticketQueryKey,
+      (ticket) =>
+        ticket && {
+          ...ticket,
+          comments: ticket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
+        }
+    );
   };
 
   /**
@@ -61,23 +58,17 @@ export const useTicketCommentCache = () => {
    * @returns {void}
    */
   const replaceCachedComment = (ticketCommentId: string, replacementComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
+    queryClient.setQueryData<ITicketExtended>(ticketQueryKey, (ticket) => {
+      if (!ticket?.comments.some((comment) => comment.ticket_comment_id === ticketCommentId)) {
+        return ticket;
+      }
 
-    if (!latestTicket) {
-      return;
-    }
-
-    const hasCachedComment = latestTicket.comments.some((comment) => comment.ticket_comment_id === ticketCommentId);
-
-    if (!hasCachedComment) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.map((comment) =>
-        comment.ticket_comment_id === ticketCommentId ? replacementComment : comment
-      )
+      return {
+        ...ticket,
+        comments: ticket.comments.map((comment) =>
+          comment.ticket_comment_id === ticketCommentId ? replacementComment : comment
+        )
+      };
     });
   };
 

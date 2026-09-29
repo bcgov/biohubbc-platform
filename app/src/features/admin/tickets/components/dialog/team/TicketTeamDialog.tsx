@@ -1,62 +1,58 @@
-import { TeamForm } from 'components/form/TeamForm';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { OkDialog } from 'components/dialog/OkDialog';
+import { TeamForm } from 'components/form/TeamForm';
 import { SearchOption } from 'components/search/SearchAutocomplete.interface';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 import { getUserLabel } from 'utils/Utils';
+import { useAddTeamMemberMutation } from '../../../hooks/useAddTeamMemberMutation';
+import { useRemoveTeamMemberMutation } from '../../../hooks/useRemoveTeamMemberMutation';
 
 interface ITicketTeamDialogProps {
   open: boolean;
   teamId: string;
   members: ITeamMember[];
   onClose: () => void;
-  onMemberAdd: (member: ITeamMember) => void;
-  onMemberRemove: (teamMemberId: string) => void;
 }
 
 /**
- * Dialog for managing ticket participants.
+ * Dialog for managing ticket participants. Additions and removals are written to the team members query, which the
+ * sidebar reads too.
  *
  * @param {ITicketTeamDialogProps} props
  * @return {*}
  */
 export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
-  const { open, teamId, members, onClose, onMemberAdd, onMemberRemove } = props;
+  const { open, teamId, members, onClose } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const addMemberMutation = useAddTeamMemberMutation();
+  const removeMemberMutation = useRemoveTeamMemberMutation();
+  const { mutate: addMember } = addMemberMutation;
+  const { mutate: removeMember } = removeMemberMutation;
+  const [userSearch, setUserSearch] = useState('');
 
-  const showApiError = useCallback(
-    (error: unknown) => {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    },
-    [dialogContext]
-  );
+  const availableUsersQuery = useQuery({
+    queryKey: userQueryKeys.available(userSearch),
+    queryFn: ({ signal }) => api.teams.getAvailableUsers(userSearch, { signal }),
+    enabled: open,
+    placeholderData: keepPreviousData
+  });
 
-  const availableUsersLoader = useDataLoader((search?: string) => api.teams.getAvailableUsers(search), showApiError);
-
+  const { error: availableUsersError } = availableUsersQuery;
   useEffect(() => {
-    if (!open) {
-      return;
+    if (availableUsersError) {
+      dialogContext.setSnackbar({ open: true, snackbarMessage: availableUsersError.message });
     }
+  }, [availableUsersError, dialogContext]);
 
-    availableUsersLoader.load();
-  }, [open, availableUsersLoader]);
+  const debouncedUserSearch = useDebounce(setUserSearch, 300);
 
-  const debouncedAvailableUserRefresh = useDebounce((search: string) => {
-    availableUsersLoader.refresh(search);
-  }, 300);
-
-  const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
+  const availableUsers = useMemo(() => availableUsersQuery.data?.users ?? [], [availableUsersQuery.data?.users]);
   const userOptions = useMemo<SearchOption[]>(
     () =>
       availableUsers.map((user) => ({
@@ -69,7 +65,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
   const memberSystemUserIds = useMemo(() => new Set(members.map((member) => member.system_user_id)), [members]);
 
   const handleSelectUser = useCallback(
-    async (option: SearchOption | null) => {
+    (option: SearchOption | null) => {
       if (!option) {
         return;
       }
@@ -81,56 +77,20 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
         return;
       }
 
-      const selectedUser = availableUsers.find((user) => user.system_user_id === selectedUserId) ?? {
+      const user = availableUsers.find((availableUser) => availableUser.system_user_id === selectedUserId) ?? {
         system_user_id: selectedUserId,
         user_identifier: option.label,
         display_name: null
       };
 
-      const optimisticTeamMemberId = `optimistic-${selectedUserId}-${Date.now()}`;
-      const optimisticMember: ITeamMember = {
-        team_member_id: optimisticTeamMemberId,
-        system_user_id: selectedUser.system_user_id,
-        user_identifier: selectedUser.user_identifier,
-        display_name: selectedUser.display_name
-      };
-
-      try {
-        setIsSubmitting(true);
-        onMemberAdd(optimisticMember);
-
-        const createdMember = await api.teams.createTeamMember(teamId, selectedUserId);
-
-        onMemberRemove(optimisticTeamMemberId);
-        onMemberAdd(createdMember);
-      } catch (error) {
-        onMemberRemove(optimisticTeamMemberId);
-        showApiError(error);
-      } finally {
-        setIsSubmitting(false);
-      }
+      addMember({ teamId, user });
     },
-    [api.teams, availableUsers, memberSystemUserIds, onMemberAdd, onMemberRemove, showApiError, teamId]
+    [addMember, availableUsers, memberSystemUserIds, teamId]
   );
 
   const handleRemoveUser = useCallback(
-    async (userId: string) => {
-      const removedMember = members.find((member) => member.team_member_id === userId);
-
-      try {
-        setIsSubmitting(true);
-        onMemberRemove(userId);
-        await api.teams.deleteTeamMember(teamId, userId);
-      } catch (error) {
-        if (removedMember) {
-          onMemberAdd(removedMember);
-        }
-        showApiError(error);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [api.teams, members, onMemberAdd, onMemberRemove, showApiError, teamId]
+    (teamMemberId: string) => removeMember({ teamId, teamMemberId }),
+    [removeMember, teamId]
   );
 
   const users = useMemo(
@@ -141,6 +101,8 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
       })),
     [members]
   );
+
+  const isSubmitting = addMemberMutation.isPending || removeMemberMutation.isPending;
 
   return (
     <OkDialog
@@ -154,10 +116,10 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
       dialogContent={
         <TeamForm
           options={userOptions}
-          isLoading={availableUsersLoader.isLoading}
+          isLoading={availableUsersQuery.isFetching}
           users={users}
           isSubmitting={isSubmitting}
-          onSearch={debouncedAvailableUserRefresh}
+          onSearch={debouncedUserSearch}
           onSelectUser={handleSelectUser}
           onRemoveUser={handleRemoveUser}
         />

@@ -1,16 +1,14 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { ITicketContext } from 'contexts/ticketContext';
-import { useTicketContext } from 'hooks/useContext';
-import { DataLoader } from 'hooks/useDataLoader';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketDetailPage } from './TicketDetailPage';
 import { useTicketComment } from './hooks/useTicketComment';
+import { useTicketQuery } from './hooks/useTicketQuery';
 
-vi.mock('hooks/useContext', () => ({
-  useTicketContext: vi.fn()
+vi.mock('./hooks/useTicketQuery', () => ({
+  useTicketQuery: vi.fn()
 }));
 
 vi.mock('./hooks/useTicketComment', () => ({
@@ -91,7 +89,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const mockUseTicketContext = useTicketContext as Mock;
+const mockUseTicketQuery = useTicketQuery as Mock;
 const mockUseTicketComment = useTicketComment as Mock;
 
 const baseTicket: ITicketExtended = {
@@ -163,23 +161,14 @@ const setComment = vi.fn();
 const onAddComment = vi.fn().mockResolvedValue(undefined);
 const onUploadAttachment = vi.fn().mockResolvedValue(undefined);
 
-const makeTicketContext = (ticket: ITicketExtended | undefined, isLoading = false): ITicketContext => {
-  const ticketDataLoader: DataLoader<[string], ITicketExtended, unknown> = {
-    data: ticket,
-    error: undefined,
-    isLoading,
-    isReady: true,
-    load: vi.fn(),
-    refresh: vi.fn(),
-    clear: vi.fn(),
-    setData: vi.fn()
-  };
-
-  return {
-    ticketId: '11111111-1111-1111-1111-111111111111',
-    ticketDataLoader
-  };
-};
+/**
+ * Builds the ticket query state the page reads.
+ *
+ * @param {ITicketExtended | undefined} ticket The cached ticket, if loaded.
+ * @param {boolean} [isFetching] Whether a load is running.
+ * @returns The query state.
+ */
+const makeTicketQuery = (ticket: ITicketExtended | undefined, isFetching = false) => ({ data: ticket, isFetching });
 
 describe('TicketDetailPage', () => {
   beforeEach(() => {
@@ -195,7 +184,7 @@ describe('TicketDetailPage', () => {
   });
 
   it('renders header, timeline, sidebar, and comment for open tickets', () => {
-    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket, false));
     render(<TicketDetailPage />);
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
@@ -204,7 +193,7 @@ describe('TicketDetailPage', () => {
   });
 
   it('passes ticket data to timeline', () => {
-    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket, false));
     render(<TicketDetailPage />);
 
     const timeline = screen.getByTestId('ticket-timeline');
@@ -218,21 +207,21 @@ describe('TicketDetailPage', () => {
   });
 
   it('hides comment input for closed tickets', () => {
-    mockUseTicketContext.mockReturnValue(makeTicketContext({ ...baseTicket, status: 'closed' }, false));
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery({ ...baseTicket, status: 'closed' }, false));
     render(<TicketDetailPage />);
 
     expect(screen.queryByTestId('ticket-comment')).not.toBeInTheDocument();
   });
 
   it('shows the loading skeleton when loading and no ticket is available', () => {
-    mockUseTicketContext.mockReturnValue(makeTicketContext(undefined, true));
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(undefined, true));
     render(<TicketDetailPage />);
 
     expect(screen.getByTestId('ticket-skeleton')).toBeVisible();
   });
 
-  it('wires context and comment hook state into content rendering', () => {
-    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
+  it('wires query and comment hook state into content rendering', () => {
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket, false));
     mockUseTicketComment.mockReturnValue({
       comment: 'Hook comment',
       setComment,
@@ -250,7 +239,7 @@ describe('TicketDetailPage', () => {
   });
 
   it('switches from timeline to artifacts tab content', async () => {
-    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket));
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket));
 
     render(<TicketDetailPage />);
 

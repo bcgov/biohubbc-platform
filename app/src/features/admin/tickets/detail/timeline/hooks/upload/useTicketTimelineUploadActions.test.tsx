@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from 'test-helpers/test-utils';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
@@ -56,12 +56,7 @@ describe('useTicketTimelineUploadActions', () => {
       setSnackbar,
       setYesNoDialog: vi.fn()
     });
-    (useTicketContext as Mock).mockReturnValue({
-      ticketDataLoader: {
-        data: null,
-        setData: vi.fn()
-      }
-    });
+    (useTicketContext as Mock).mockReturnValue({ ticketQueryKey: ['ticket', 'admin', 'detail', 'ticket-id'] });
   });
 
   it('creates an in-progress security review and navigates to the returned review', async () => {

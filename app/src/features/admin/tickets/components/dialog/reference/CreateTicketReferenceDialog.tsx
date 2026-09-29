@@ -1,16 +1,16 @@
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import useDebounce from 'hooks/useDebounce';
 import {
   ICreateTicketReferenceRequest,
   ITicketReference,
   TicketRelationshipType
 } from 'interfaces/useTicketsApi.interface';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { TicketReferenceFormYupSchema } from './CreateDialogYup';
 import { ICreateTicketReferenceFormValues, TicketReferenceForm } from './form/TicketReferenceForm';
 
@@ -31,78 +31,69 @@ export const CreateTicketReferenceDialog = (props: ICreateTicketReferenceDialogP
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId } = useTicketContext();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ticketSearch, setTicketSearch] = useState('');
+  const ticketOptionsParams = {
+    search: ticketSearch || undefined,
+    page: 1,
+    limit: 50,
+    sort: 'create_date',
+    order: 'desc' as const
+  };
 
-  const ticketOptionsLoader = useDataLoader(
-    (search?: string) =>
-      api.tickets.getTicketsForAdmin({ search, page: 1, limit: 50, sort: 'create_date', order: 'desc' }),
-    (error) => {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    }
-  );
+  const ticketOptionsQuery = useQuery({
+    queryKey: ticketQueryKeys.list('admin', ticketOptionsParams),
+    queryFn: ({ signal }) => api.tickets.getTicketsForAdmin(ticketOptionsParams, { signal }),
+    enabled: open,
+    placeholderData: keepPreviousData
+  });
 
+  const { error: ticketOptionsError } = ticketOptionsQuery;
   useEffect(() => {
-    if (!open) {
-      return;
+    if (ticketOptionsError) {
+      dialogContext.setSnackbar({ open: true, snackbarMessage: ticketOptionsError.message });
     }
+  }, [dialogContext, ticketOptionsError]);
 
-    ticketOptionsLoader.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  const handleTicketSearch = useDebounce(setTicketSearch, 300);
 
-  const debouncedTicketRefresh = useDebounce((search: string) => {
-    ticketOptionsLoader.refresh(search);
-  }, 300);
-
-  const handleTicketSearch = useCallback(
-    (search: string) => {
-      debouncedTicketRefresh(search);
+  const createReferenceMutation = useMutation({
+    mutationFn: (request: ICreateTicketReferenceRequest) => api.tickets.createTicketReference(ticketId, request),
+    onSuccess: (createdReferences) => {
+      onSubmit?.(createdReferences);
+      onClose();
     },
-    [debouncedTicketRefresh]
-  );
+    onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+  });
 
   const ticketOptions: ICustomMultiAutocompleteOption[] = useMemo(
     () =>
-      (ticketOptionsLoader.data?.tickets ?? [])
+      (ticketOptionsQuery.data?.tickets ?? [])
         .filter((ticket) => ticket.ticket_id !== ticketId)
         .map((ticket) => ({
           value: ticket.ticket_id,
           label: `#${ticket.ticket_slug} ${ticket.subject}`
         })),
-    [ticketOptionsLoader.data?.tickets, ticketId]
+    [ticketOptionsQuery.data?.tickets, ticketId]
   );
 
-  const handleSubmit = async (values: ICreateTicketReferenceFormValues) => {
-    const request: ICreateTicketReferenceRequest = {
+  /**
+   * Creates a reference to each chosen ticket; the dialog closes on success and stays open on failure.
+   *
+   * @param {ICreateTicketReferenceFormValues} values The relationship and target tickets.
+   * @return {void}
+   */
+  const handleSubmit = (values: ICreateTicketReferenceFormValues) => {
+    createReferenceMutation.mutate({
       references: values.target_ticket_ids.map((targetTicketId) => ({
         target_ticket_id: targetTicketId,
         relationship: values.relationship as TicketRelationshipType
       }))
-    };
-
-    try {
-      setIsSubmitting(true);
-      const createdReferences = await api.tickets.createTicketReference(ticketId, request);
-      onSubmit?.(createdReferences);
-      onClose();
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
   return (
     <EditDialog<ICreateTicketReferenceFormValues>
-      isLoading={isSubmitting}
+      isLoading={createReferenceMutation.isPending}
       dialogTitle="Create Reference"
       dialogSaveButtonLabel="Create"
       open={open}

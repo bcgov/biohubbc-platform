@@ -1,7 +1,6 @@
-import { waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router-dom';
-import { render } from 'test-helpers/test-utils';
+import { render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketsPage } from './TicketsPage';
 
@@ -48,13 +47,10 @@ describe('TicketsPage', () => {
     );
 
     await waitFor(() => {
-      expect(mockGetTickets).toHaveBeenCalledWith({
-        search: '',
-        page: 1,
-        limit: 10,
-        sort: 'create_date',
-        order: 'desc'
-      });
+      expect(mockGetTickets).toHaveBeenCalledWith(
+        { search: '', page: 1, limit: 10, sort: 'create_date', order: 'desc' },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 

@@ -1,8 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import {
   ICreateSubmissionUploadReviewRequest,
+  ITicketExtended,
   IUpdateSubmissionUploadDecisionRequest,
   SubmissionUploadReviewScope,
   TicketSubmissionUploadResponse
@@ -20,7 +22,8 @@ type SubmissionUploadDecisionUpdate = IUpdateSubmissionUploadDecisionRequest['de
 export const useTicketTimelineUploadActions = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketQueryKey } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const navigate = useNavigate();
 
@@ -28,18 +31,16 @@ export const useTicketTimelineUploadActions = () => {
     submissionUploadId: string,
     updateUpload: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
   ): void => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      submission_uploads: latestTicket.submission_uploads.map((upload) =>
-        upload.submission_upload_id === submissionUploadId ? updateUpload(upload) : upload
-      )
-    });
+    queryClient.setQueryData<ITicketExtended>(
+      ticketQueryKey,
+      (ticket) =>
+        ticket && {
+          ...ticket,
+          submission_uploads: ticket.submission_uploads.map((upload) =>
+            upload.submission_upload_id === submissionUploadId ? updateUpload(upload) : upload
+          )
+        }
+    );
   };
 
   /**

@@ -1,99 +1,66 @@
-import { APIError } from 'hooks/api/useAxios';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { useApi } from 'hooks/useApi';
-import { ITicketReference } from 'interfaces/useTicketsApi.interface';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTicketContext } from 'hooks/useContext';
+import { ITicketExtended, ITicketReference } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
+import { useDeleteTicketReferenceMutation } from './useDeleteTicketReferenceMutation';
 
 /**
- * Dialog state and submit behavior for creating ticket references.
+ * Dialog state and cache writes for creating and deleting ticket references.
  *
  * @return {*}
  */
 export const useTicketReference = () => {
-  const api = useApi();
-  const { ticketId, ticketDataLoader } = useTicketContext();
-  const dialogContext = useDialogContext();
-
-  const [isSubmittingReference, setIsSubmittingReference] = useState(false);
+  const queryClient = useQueryClient();
+  const { ticketQueryKey } = useTicketContext();
+  const deleteReferenceMutation = useDeleteTicketReferenceMutation();
   const [isCreateReferenceDialogOpen, setIsCreateReferenceDialogOpen] = useState(false);
 
+  /**
+   * Opens the create-reference dialog.
+   *
+   * @return {void}
+   */
   const openCreateReferenceDialog = () => setIsCreateReferenceDialogOpen(true);
 
+  /**
+   * Closes the create-reference dialog.
+   *
+   * @return {void}
+   */
   const closeCreateReferenceDialog = () => {
     setIsCreateReferenceDialogOpen(false);
   };
 
+  /**
+   * Appends the references the dialog created to the cached ticket and closes the dialog.
+   *
+   * @param {ITicketReference[]} createdReferences References returned by the create request.
+   * @return {void}
+   */
   const handleCreateReferenceSubmit = (createdReferences: ITicketReference[]) => {
     if (!createdReferences.length) {
       return;
     }
 
-    const latestTicket = ticketDataLoader.data;
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      references: [...latestTicket.references, ...createdReferences]
-    });
+    queryClient.setQueryData<ITicketExtended>(
+      ticketQueryKey,
+      (ticket) => ticket && { ...ticket, references: [...ticket.references, ...createdReferences] }
+    );
     setIsCreateReferenceDialogOpen(false);
   };
 
-  const handleDeleteReference = async (ticketReferenceId: string) => {
-    const currentTicket = ticketDataLoader.data;
-
-    if (!currentTicket) {
-      return;
-    }
-
-    const removedReferenceIndex = currentTicket.references.findIndex(
-      (reference) => reference.ticket_reference_id === ticketReferenceId
-    );
-    const removedReference = removedReferenceIndex > -1 ? currentTicket.references[removedReferenceIndex] : undefined;
-
-    if (!removedReference) {
-      return;
-    }
-
-    try {
-      setIsSubmittingReference(true);
-
-      const latestTicketForDelete = ticketDataLoader.data;
-      if (latestTicketForDelete) {
-        ticketDataLoader.setData({
-          ...latestTicketForDelete,
-          references: latestTicketForDelete.references.filter(
-            (reference) => reference.ticket_reference_id !== ticketReferenceId
-          )
-        });
-      }
-
-      await api.tickets.deleteTicketReference(ticketId, ticketReferenceId);
-    } catch (caughtError) {
-      const latestTicketForDeleteRollback = ticketDataLoader.data;
-      if (latestTicketForDeleteRollback) {
-        const nextReferences = [...latestTicketForDeleteRollback.references];
-        nextReferences.splice(Math.max(0, removedReferenceIndex), 0, removedReference);
-
-        ticketDataLoader.setData({
-          ...latestTicketForDeleteRollback,
-          references: nextReferences
-        });
-      }
-
-      const apiError = caughtError as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsSubmittingReference(false);
-    }
+  /**
+   * Deletes a reference, hiding it until the request completes; the mutation restores and reports a failure.
+   *
+   * @param {string} ticketReferenceId Reference to delete.
+   * @return {void}
+   */
+  const handleDeleteReference = (ticketReferenceId: string) => {
+    deleteReferenceMutation.mutate(ticketReferenceId);
   };
 
   return {
-    isSubmittingReference,
+    isSubmittingReference: deleteReferenceMutation.isPending,
     isCreateReferenceDialogOpen,
     openCreateReferenceDialog,
     closeCreateReferenceDialog,

@@ -1,8 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
@@ -17,7 +19,8 @@ export const useTicketTimelineDataRequestActions = () => {
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
-  const { ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketQueryKey } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
@@ -44,17 +47,18 @@ export const useTicketTimelineDataRequestActions = () => {
         status: policyStatus
       });
 
-      const latestTicket = ticketDataLoader.data;
-      if (!latestTicket) {
-        return;
-      }
-
-      ticketDataLoader.setData({
-        ...latestTicket,
-        data_requests: latestTicket.data_requests.map((dataRequest) =>
-          dataRequest.data_request_id === dataRequestId ? { ...dataRequest, status: updatedPolicy.status } : dataRequest
-        )
-      });
+      queryClient.setQueryData<ITicketExtended>(
+        ticketQueryKey,
+        (ticket) =>
+          ticket && {
+            ...ticket,
+            data_requests: ticket.data_requests.map((dataRequest) =>
+              dataRequest.data_request_id === dataRequestId
+                ? { ...dataRequest, status: updatedPolicy.status }
+                : dataRequest
+            )
+          }
+      );
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({
@@ -235,17 +239,18 @@ export const useTicketTimelineDataRequestActions = () => {
         ...updatedPolicy
       });
 
-      const latestTicket = ticketDataLoader.data;
-      if (latestTicket) {
-        ticketDataLoader.setData({
-          ...latestTicket,
-          data_requests: latestTicket.data_requests.map((dataRequest) =>
-            dataRequest.policy_id === updatedPolicy.policy_id
-              ? { ...dataRequest, status: updatedPolicy.status }
-              : dataRequest
-          )
-        });
-      }
+      queryClient.setQueryData<ITicketExtended>(
+        ticketQueryKey,
+        (ticket) =>
+          ticket && {
+            ...ticket,
+            data_requests: ticket.data_requests.map((dataRequest) =>
+              dataRequest.policy_id === updatedPolicy.policy_id
+                ? { ...dataRequest, status: updatedPolicy.status }
+                : dataRequest
+            )
+          }
+      );
 
       dialogContext.setSnackbar({
         open: true,

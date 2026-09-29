@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryKey } from '@tanstack/react-query';
 import { QUERY_CLIENT_DEFAULT_OPTIONS } from 'constants/query';
 
 /**
@@ -8,4 +8,24 @@ import { QUERY_CLIENT_DEFAULT_OPTIONS } from 'constants/query';
  */
 export const createAppQueryClient = (): QueryClient => {
   return new QueryClient({ defaultOptions: QUERY_CLIENT_DEFAULT_OPTIONS });
+};
+
+/**
+ * Cancels a load of one query ahead of an optimistic update, so the load cannot land afterwards and overwrite
+ * the update with state from before the mutation.
+ *
+ * A cancelled load reverts the query to what it held before, which may be older than what the load would have
+ * returned. When this reports that a load was cancelled, the mutation invalidates the query once it settles.
+ *
+ * @param {QueryClient} queryClient The client holding the query.
+ * @param {QueryKey} queryKey The exact key the optimistic update writes to.
+ * @returns {Promise<boolean>} Whether a load was in flight and has been cancelled.
+ */
+export const cancelQueryForOptimisticUpdate = async (
+  queryClient: QueryClient,
+  queryKey: QueryKey
+): Promise<boolean> => {
+  const cancelledLoad = queryClient.isFetching({ queryKey, exact: true }) > 0;
+  await queryClient.cancelQueries({ queryKey, exact: true });
+  return cancelledLoad;
 };
