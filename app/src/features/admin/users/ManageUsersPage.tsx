@@ -12,6 +12,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
+import groupBy from 'lodash-es/groupBy';
 import { useCallback, useMemo, useState } from 'react';
 import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 import ActiveUsersList from './ActiveUsersList';
@@ -223,31 +224,46 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
     async (values: IAddSystemUsersForm) => {
       setOpenAddUserDialog(false);
 
-      try {
-        await Promise.all(
-          values.systemUsers.map((systemUser) =>
-            biohubApi.admin.addSystemUser(
-              systemUser.userIdentifier,
-              systemUser.userGuid,
-              systemUser.identitySource,
-              systemUser.systemRole
-            )
+      // Different users are added together. Rows naming the same user are sent one after another, since the server
+      // reads or creates the user and two concurrent requests for one user would race that read.
+      const rowsByUser = groupBy(
+        values.systemUsers,
+        (systemUser) => `${systemUser.identitySource}:${systemUser.userGuid}`
+      );
+      const results = await Promise.allSettled(
+        Object.values(rowsByUser).map((rows) =>
+          rows.reduce<Promise<unknown>>(
+            (previous, systemUser) =>
+              previous.then(() =>
+                biohubApi.admin.addSystemUser(
+                  systemUser.userIdentifier,
+                  systemUser.userGuid,
+                  systemUser.identitySource,
+                  systemUser.systemRole
+                )
+              ),
+            Promise.resolve()
           )
-        );
+        )
+      );
 
-        refreshUsers();
+      // Users added before a failure are listed whether or not every request succeeded.
+      refreshUsers();
 
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: (
-            <Typography variant="body2" component="div">
-              {values.systemUsers.length} system {values.systemUsers.length > 1 ? 'users' : 'user'} added.
-            </Typography>
-          )
-        });
-      } catch (caughtError) {
-        showApiErrorDialog(caughtError, AddSystemUserI18N.addUserErrorTitle, AddSystemUserI18N.addUserErrorText);
+      const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failure) {
+        showApiErrorDialog(failure.reason, AddSystemUserI18N.addUserErrorTitle, AddSystemUserI18N.addUserErrorText);
+        return;
       }
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            {values.systemUsers.length} system {values.systemUsers.length > 1 ? 'users' : 'user'} added.
+          </Typography>
+        )
+      });
     },
     [biohubApi.admin, dialogContext, showApiErrorDialog, refreshUsers]
   );

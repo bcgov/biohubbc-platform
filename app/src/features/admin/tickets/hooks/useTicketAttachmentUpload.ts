@@ -1,4 +1,5 @@
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { TICKET_ATTACHMENT_UPLOAD_CONCURRENCY } from 'constants/attachments';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
@@ -95,19 +96,40 @@ export const useTicketAttachmentUpload = () => {
     isUploadInFlight() ? Promise.resolve(null) : uploadFile(file);
 
   /**
-   * Upload several selected files as ticket attachments at once. Each file is validated and uploaded on its own, so one
-   * failure does not stop the others. A selection made while another upload from this hook is in flight is ignored.
+   * Upload several selected files as ticket attachments, up to `TICKET_ATTACHMENT_UPLOAD_CONCURRENCY` at a time. Each
+   * file is validated and uploaded on its own, so one failure does not stop the others. A selection made while another
+   * upload from this hook is in flight is ignored.
    *
    * @param {File[]} files Files selected by the user.
-   * @returns {Promise<ITicketArtifact[]>} The artifacts that uploaded; empty when none did or another upload is running.
+   * @returns {Promise<ITicketArtifact[]>} The artifacts that uploaded, in the order they finished; empty when none did
+   * or another upload is running.
    */
   const uploadTicketAttachments = async (files: File[]): Promise<ITicketArtifact[]> => {
     if (isUploadInFlight()) {
       return [];
     }
 
-    const artifacts = await Promise.all(files.map(uploadFile));
-    return artifacts.filter((artifact): artifact is ITicketArtifact => artifact !== null);
+    const queue = [...files];
+    const uploaded: ITicketArtifact[] = [];
+
+    // Each worker takes the next file once its current upload settles, until the queue is empty.
+    const uploadNext = async (): Promise<void> => {
+      const file = queue.shift();
+      if (!file) {
+        return;
+      }
+
+      const artifact = await uploadFile(file);
+      if (artifact) {
+        uploaded.push(artifact);
+      }
+
+      return uploadNext();
+    };
+
+    await Promise.all(Array.from({ length: Math.min(TICKET_ATTACHMENT_UPLOAD_CONCURRENCY, files.length) }, uploadNext));
+
+    return uploaded;
   };
 
   return {

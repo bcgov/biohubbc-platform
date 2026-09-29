@@ -230,6 +230,32 @@ describe('TicketArtifacts', () => {
     await waitFor(() => expect(getTicketArtifacts).toHaveBeenCalledTimes(2));
   });
 
+  it('uploads at most three selected files at a time, starting the next as one completes', async () => {
+    const user = userEvent.setup();
+    const completions: ((artifact: ITicketArtifact) => void)[] = [];
+    createTicketUpload.mockImplementation((_ticketId: string, request: { file_name: string }) =>
+      Promise.resolve({
+        upload_id: `upload-${request.file_name}`,
+        presigned_upload_url: `https://object-store.example/${request.file_name}`
+      })
+    );
+    completeTicketUpload.mockImplementation(() => new Promise<ITicketArtifact>((resolve) => completions.push(resolve)));
+
+    render(<TicketArtifacts />);
+
+    await user.upload(
+      screen.getByLabelText('Upload file input'),
+      ['one', 'two', 'three', 'four'].map((name) => new File([name], `${name}.txt`, { type: 'text/plain' }))
+    );
+
+    await waitFor(() => expect(completeTicketUpload).toHaveBeenCalledTimes(3));
+    expect(createTicketUpload).toHaveBeenCalledTimes(3);
+
+    await act(async () => completions[0](ticketArtifact));
+
+    await waitFor(() => expect(createTicketUpload).toHaveBeenCalledTimes(4));
+  });
+
   it('downloads a ticket artifact from the artifact key link using the signed download URL', async () => {
     const user = userEvent.setup();
     const artifactWindow = {
