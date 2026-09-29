@@ -56,7 +56,8 @@ describe('SubmissionFeatureSecurityRepository', () => {
 
     it('evaluates every rule over the upload in one statement and attributes assignments to the event', async () => {
       const knex = sinon.stub().resolves({ rows: [{ matched_feature_count: 4, inserted_count: 3 }], rowCount: 1 });
-      const repository = new SubmissionFeatureSecurityRepository(getMockDBConnection({ knex }));
+      const setting = sinon.stub().resolves({ rows: [{ jit: 'on' }], rowCount: 1 });
+      const repository = new SubmissionFeatureSecurityRepository(getMockDBConnection({ knex, sql: setting }));
 
       const result = await repository.insertScreenedSubmissionFeatureSecurity({
         submissionId: 1,
@@ -69,7 +70,7 @@ describe('SubmissionFeatureSecurityRepository', () => {
       });
 
       const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
-      expect(sql.match(/with recursive "upload_features"/g)).to.have.lengthOf(2);
+      expect(sql.match(/\) AS anchor_sf/g)).to.have.lengthOf(2);
       expect(sql).to.include('union all');
       expect(sql).to.include('ON CONFLICT (submission_feature_id, security_rule_id)');
       expect(sql).to.include('submission_upload_security_id = EXCLUDED.submission_upload_security_id');
@@ -78,6 +79,14 @@ describe('SubmissionFeatureSecurityRepository', () => {
       expect(sql).not.to.include('submission_feature_closure');
       expect(bindings.filter((binding: unknown) => binding === 1101 || binding === 1102)).to.eql([1101, 1102]);
       expect(bindings.at(-1)).to.equal(9001);
+      expect(setting.getCalls().map((call) => call.args[0].text)).to.eql([
+        "SELECT current_setting('jit') AS jit",
+        "SELECT set_config('jit', 'off', true)",
+        "SELECT set_config('jit', $1, true)"
+      ]);
+      expect(setting.thirdCall.args[0].values).to.eql(['on']);
+      expect(setting.secondCall.calledBefore(knex.firstCall)).to.be.true;
+      expect(knex.firstCall.calledBefore(setting.thirdCall)).to.be.true;
       expect(result).to.eql({ matched_feature_count: 4, inserted_count: 3 });
     });
   });

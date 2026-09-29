@@ -36,6 +36,45 @@ export function buildPredicateAssignmentIdsQuery(
 }
 
 /**
+ * Restricts typed property rows to the Blueprint assignments one semantic property is stored under, at any lifecycle.
+ *
+ * The assignment ids are collected once into an array, so a query probing property rows per feature compares
+ * against a constant rather than joining the assignment table on every probe.
+ *
+ * @param {Knex.QueryBuilder} query - Query containing the typed property row alias `p`.
+ * @param {NormalizedExpressionTreePredicate} property - Predicate containing the resolved property identity.
+ * @param {Knex} knex - Knex instance used to build the metadata query.
+ * @return {Knex.QueryBuilder} Query limited to rows stored under one of the property's assignments.
+ */
+export function applyPredicateAssignmentFilter(
+  query: Knex.QueryBuilder,
+  property: NormalizedExpressionTreePredicate,
+  knex: Knex
+): Knex.QueryBuilder {
+  return query.whereRaw('p.blueprint_feature_type_property_id = ANY(ARRAY(?))', [
+    buildPredicateAssignmentIdsQuery(property, knex)
+  ]);
+}
+
+/**
+ * Resolves the feature types of the Blueprint assignments one semantic property is stored under, at any lifecycle.
+ *
+ * A typed property row is only stored under an assignment of its own feature's type (enforced by
+ * `tr_validate_submission_feature_property_assignment`), so only features of these types can carry a value for the
+ * property.
+ *
+ * @param {NormalizedExpressionTreePredicate} property - Predicate containing the resolved property identity.
+ * @param {Knex} knex - Knex instance used to build the metadata query.
+ * @return {Knex.QueryBuilder} Query returning distinct feature_type_id rows.
+ */
+export function buildPredicateAssignmentFeatureTypeIdsQuery(
+  property: NormalizedExpressionTreePredicate,
+  knex: Knex
+): Knex.QueryBuilder {
+  return buildPredicateAssignmentIdsQuery(property, knex).clearSelect().distinct('bft.feature_type_id');
+}
+
+/**
  * Returns the predicates that must be applied to the same typed-property row.
  *
  * @example

@@ -154,6 +154,8 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
    * Get direct and inherited rules affecting upload features.
    * Review-time features are unpublished and absent from submission_feature_closure,
    * so ancestry follows upload-local parent_submission_feature_id links, including self.
+   * Each ancestor step is a keyed lookup inside an OFFSET 0 fence with the upload boundary applied to its
+   * result, so the walk costs a few index probes per selected feature however large the upload.
    * Name and rule ID provide stable pagination.
    *
    * @param {string} submissionUploadId Upload boundary.
@@ -178,9 +180,14 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
         UNION
         SELECT ancestors.source_id, parent.submission_feature_id
         FROM ancestors
-        JOIN submission_feature child ON child.submission_feature_id = ancestors.target_id
-        JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
-          AND parent.submission_upload_id = ${submissionUploadId}::uuid AND parent.record_end_date IS NULL
+        CROSS JOIN LATERAL (
+          SELECT parent.submission_feature_id, parent.submission_upload_id, parent.record_end_date
+          FROM submission_feature child
+          JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
+          WHERE child.submission_feature_id = ancestors.target_id
+          OFFSET 0
+        ) parent
+        WHERE parent.submission_upload_id = ${submissionUploadId}::uuid AND parent.record_end_date IS NULL
       ), coverage AS (
         SELECT ancestors.source_id AS submission_feature_id, sfs.security_rule_id,
           bool_or(sfs.submission_feature_id = ancestors.source_id) AS direct
@@ -249,6 +256,11 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
    * assignments retain their provenance; reactivated assignments receive the screening provenance and clear review
    * provenance. All rules are evaluated and written in one statement, so the matched count is distinct across rules.
    *
+   * JIT compilation is off for this statement and the transaction's previous setting is restored after it. The statement
+   * carries each rule's evidence walks, so its estimated cost clears `jit_above_cost` with only a few rules and
+   * PostgreSQL would compile thousands of expressions (about a second for 44 rules) before evaluating an upload that
+   * typically takes milliseconds; its work is index probes, which compilation does not speed up.
+   *
    * @param {NormalizedInsertScreenedSubmissionFeatureSecurity} input Upload boundary, rule expressions, and screening event.
    * @returns {Promise<SubmissionFeatureSecurityScreeningResult>} Distinct matched features and inserted or reactivated assignments.
    * @memberof SubmissionFeatureSecurityRepository
@@ -293,7 +305,10 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
       [matches, input.submissionUploadSecurityId]
     );
 
+    const jit = await this.connection.sql<{ jit: string }>(SQL`SELECT current_setting('jit') AS jit`);
+    await this.connection.sql(SQL`SELECT set_config('jit', 'off', true)`);
     const response = await this.connection.knex(query, SubmissionFeatureSecurityScreeningResult);
+    await this.connection.sql(SQL`SELECT set_config('jit', ${jit.rows[0].jit}, true)`);
     return response.rows[0];
   }
 
