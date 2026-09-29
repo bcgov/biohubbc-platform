@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
@@ -39,22 +39,24 @@ export const useTicketAttachmentUpload = () => {
     }
   });
 
+  const uploadsInFlight = useIsMutating({ mutationKey: uploadMutationKey });
+
   /**
-   * Upload a selected file as a ticket attachment.
+   * Whether an upload from this hook is in flight. Read from the client rather than from render state, so a second
+   * selection made in the same tick as the first is seen.
    *
-   * Comment create and edit flows call this before inserting markdown into their respective text fields. The helper
-   * validates the configured file-size limit, initializes the ticket upload, uploads the file to object storage through
-   * the shared object-storage API, completes the ticket upload, and returns the ticket artifact to the caller. A file
-   * chosen while another upload from this hook is in flight is ignored.
+   * @returns {boolean} True while any upload started by this hook is running.
+   */
+  const isUploadInFlight = (): boolean => queryClient.isMutating({ mutationKey: uploadMutationKey }) > 0;
+
+  /**
+   * Validates one file against the configured size limit, then uploads it and completes the ticket upload.
+   * A failure is reported in the snackbar.
    *
    * @param {File} file File selected by the user.
-   * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails or another upload is running.
+   * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation or the upload fails.
    */
-  const uploadTicketAttachment = async (file: File): Promise<ITicketArtifact | null> => {
-    if (queryClient.isMutating({ mutationKey: uploadMutationKey }) > 0) {
-      return null;
-    }
-
+  const uploadFile = async (file: File): Promise<ITicketArtifact | null> => {
     const maxTicketAttachmentFileSize = config.MAX_TICKET_ATTACHMENT_FILE_SIZE;
 
     if (file.size > maxTicketAttachmentFileSize) {
@@ -78,8 +80,39 @@ export const useTicketAttachmentUpload = () => {
     }
   };
 
+  /**
+   * Upload a selected file as a ticket attachment.
+   *
+   * Comment create and edit flows call this before inserting markdown into their respective text fields. The helper
+   * validates the configured file-size limit, initializes the ticket upload, uploads the file to object storage through
+   * the shared object-storage API, completes the ticket upload, and returns the ticket artifact to the caller. A file
+   * chosen while another upload from this hook is in flight is ignored.
+   *
+   * @param {File} file File selected by the user.
+   * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails or another upload is running.
+   */
+  const uploadTicketAttachment = (file: File): Promise<ITicketArtifact | null> =>
+    isUploadInFlight() ? Promise.resolve(null) : uploadFile(file);
+
+  /**
+   * Upload several selected files as ticket attachments at once. Each file is validated and uploaded on its own, so one
+   * failure does not stop the others. A selection made while another upload from this hook is in flight is ignored.
+   *
+   * @param {File[]} files Files selected by the user.
+   * @returns {Promise<ITicketArtifact[]>} The artifacts that uploaded; empty when none did or another upload is running.
+   */
+  const uploadTicketAttachments = async (files: File[]): Promise<ITicketArtifact[]> => {
+    if (isUploadInFlight()) {
+      return [];
+    }
+
+    const artifacts = await Promise.all(files.map(uploadFile));
+    return artifacts.filter((artifact): artifact is ITicketArtifact => artifact !== null);
+  };
+
   return {
-    isUploadingAttachment: uploadMutation.isPending,
-    uploadTicketAttachment
+    isUploadingAttachment: uploadsInFlight > 0,
+    uploadTicketAttachment,
+    uploadTicketAttachments
   };
 };

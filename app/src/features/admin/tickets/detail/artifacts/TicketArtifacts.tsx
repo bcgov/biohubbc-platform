@@ -25,7 +25,7 @@ export const TicketArtifacts = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId } = useTicketContext();
-  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
+  const { isUploadingAttachment, uploadTicketAttachments } = useTicketAttachmentUpload();
   const queryClient = useQueryClient();
   const artifactsGrid = useServerPaginatedGridState({ defaultSort: { field: 'create_date', sort: 'desc' } });
   const artifactsParams = { search: artifactsGrid.debouncedSearchTerm, ...artifactsGrid.apiPagination };
@@ -79,21 +79,16 @@ export const TicketArtifacts = () => {
   /**
    * Uploads artifacts selected from the hidden file input triggered by the PageSection Upload button.
    *
-   * Delegates each selected file to the shared ticket attachment uploader, then refreshes the paginated artifacts grid
-   * when at least one upload succeeds.
+   * Uploads the selected files together through the shared ticket attachment uploader, then refreshes the paginated
+   * artifacts grid when at least one upload succeeds.
+   *
+   * @param {File[]} artifacts Files selected by the user.
+   * @returns {Promise<void>} Resolves once every upload has settled.
    */
   const handleUploadSelection = async (artifacts: File[]) => {
-    let didUpload = false;
+    const uploadedArtifacts = await uploadTicketAttachments(artifacts);
 
-    for (const artifact of artifacts) {
-      const ticketArtifact = await uploadTicketAttachment(artifact);
-
-      if (ticketArtifact) {
-        didUpload = true;
-      }
-    }
-
-    if (didUpload) {
+    if (uploadedArtifacts.length) {
       void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.artifactsAll(ticketId) });
     }
   };

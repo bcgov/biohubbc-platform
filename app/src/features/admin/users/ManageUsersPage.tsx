@@ -224,14 +224,16 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
       setOpenAddUserDialog(false);
 
       try {
-        for (const systemUser of values.systemUsers) {
-          await biohubApi.admin.addSystemUser(
-            systemUser.userIdentifier,
-            systemUser.userGuid,
-            systemUser.identitySource,
-            systemUser.systemRole
-          );
-        }
+        await Promise.all(
+          values.systemUsers.map((systemUser) =>
+            biohubApi.admin.addSystemUser(
+              systemUser.userIdentifier,
+              systemUser.userGuid,
+              systemUser.identitySource,
+              systemUser.systemRole
+            )
+          )
+        );
 
         refreshUsers();
 

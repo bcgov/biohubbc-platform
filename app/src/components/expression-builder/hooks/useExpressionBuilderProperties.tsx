@@ -87,10 +87,9 @@ export const useExpressionBuilderProperties = (
     queryKey: searchQueryKeys.propertyOptions(propertyKeyword, hydratedPropertyKeys),
     queryFn: async ({ signal }) => {
       const collectedPropertiesByKey = new Map<string, ExpressionBuilderProperty>();
-      let page = 1;
-      let lastPage = 1;
 
-      do {
+      // Pages are read one after another because whether the next is needed depends on what this one held.
+      const collectFromPage = async (page: number): Promise<void> => {
         const response = await api.search.searchProperties(
           propertyKeyword ? { keyword: propertyKeyword } : {},
           { page, limit: EXPRESSION_BUILDER_PROPERTY_SEARCH_LIMIT },
@@ -104,13 +103,17 @@ export const useExpressionBuilderProperties = (
             collectedPropertiesByKey.set(getExpressionBuilderPropertyKeyFromProperty(property), property);
           });
 
-        lastPage = response.pagination.last_page;
-        page += 1;
-      } while (
-        hydratedPropertyKeys.some((key) => !collectedPropertiesByKey.has(key)) &&
-        page <= lastPage &&
-        page <= EXPRESSION_BUILDER_PROPERTY_HYDRATION_MAX_PAGES
-      );
+        const nextPage = page + 1;
+        if (
+          hydratedPropertyKeys.some((key) => !collectedPropertiesByKey.has(key)) &&
+          nextPage <= response.pagination.last_page &&
+          nextPage <= EXPRESSION_BUILDER_PROPERTY_HYDRATION_MAX_PAGES
+        ) {
+          return collectFromPage(nextPage);
+        }
+      };
+
+      await collectFromPage(1);
 
       return Array.from(collectedPropertiesByKey.values());
     },

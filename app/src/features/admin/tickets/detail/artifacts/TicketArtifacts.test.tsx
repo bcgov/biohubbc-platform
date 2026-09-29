@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
@@ -202,6 +202,32 @@ describe('TicketArtifacts', () => {
       contentType: 'text/plain'
     });
     expect(getTicketArtifacts).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts every selected upload before any completes, and refreshes the artifacts once', async () => {
+    const user = userEvent.setup();
+    const completions: ((artifact: ITicketArtifact) => void)[] = [];
+    createTicketUpload.mockImplementation((_ticketId: string, request: { file_name: string }) =>
+      Promise.resolve({
+        upload_id: `upload-${request.file_name}`,
+        presigned_upload_url: `https://object-store.example/${request.file_name}`
+      })
+    );
+    completeTicketUpload.mockImplementation(() => new Promise<ITicketArtifact>((resolve) => completions.push(resolve)));
+
+    render(<TicketArtifacts />);
+
+    await user.upload(screen.getByLabelText('Upload file input'), [
+      new File(['first'], 'first.txt', { type: 'text/plain' }),
+      new File(['second'], 'second.txt', { type: 'text/plain' })
+    ]);
+
+    await waitFor(() => expect(completeTicketUpload).toHaveBeenCalledTimes(2));
+    expect(getTicketArtifacts).toHaveBeenCalledOnce();
+
+    await act(async () => completions.forEach((complete) => complete(ticketArtifact)));
+
+    await waitFor(() => expect(getTicketArtifacts).toHaveBeenCalledTimes(2));
   });
 
   it('downloads a ticket artifact from the artifact key link using the signed download URL', async () => {
