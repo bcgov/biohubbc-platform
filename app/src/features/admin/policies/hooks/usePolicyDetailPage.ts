@@ -12,6 +12,13 @@ import {
   PolicyStatus
 } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
+import {
+  holdReloadIfConcurrent,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 import { PolicyDetailTab } from '../detail/header/PolicyHeader';
 import { usePolicyQuery } from './usePolicyQuery';
@@ -26,7 +33,8 @@ interface PolicyMutationScope {
  * State and actions for the policy detail page.
  *
  * The policy, with its statements and expressions, is one cached query; each change writes the saved result into it
- * with `setQueryData`. Expression changes also invalidate the paginated expressions table.
+ * with `setQueryData`, and refreshes the policy's copies on other pages. Expression changes also invalidate the
+ * paginated expressions table.
  *
  * @returns Policy detail page state and handlers.
  */
@@ -73,6 +81,16 @@ export const usePolicyDetailPage = () => {
   const captureScope = (): PolicyMutationScope => ({ policyId, policyQueryKey });
 
   /**
+   * Counts a status or details change into the policy's mutation group, then captures the policy it applies to.
+   *
+   * @returns {PolicyMutationScope} The route's policy and its detail key.
+   */
+  const joinGroupAndCaptureScope = (): PolicyMutationScope => {
+    joinMutationGroup(queryClient, policyQueryKey);
+    return captureScope();
+  };
+
+  /**
    * Writes a change into a cached policy, leaving the cache untouched while the policy has not loaded.
    *
    * @param {QueryKey} key The policy detail key.
@@ -91,6 +109,13 @@ export const usePolicyDetailPage = () => {
     void queryClient.invalidateQueries({ queryKey: policyQueryKeys.expressionsAll(changedPolicyId) });
   };
 
+  /**
+   * Refreshes the policy's copies outside this page after a change.
+   *
+   * @returns {void}
+   */
+  const refreshPolicyElsewhere = () => refreshChangedQueries(queryClient, changedQueryKeys.policyListings());
+
   const expressionsGrid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
   const expressionsQuery = useQuery({
     queryKey: policyQueryKeys.expressions(policyId, expressionsGrid.apiPagination),
@@ -107,6 +132,7 @@ export const usePolicyDetailPage = () => {
     mutationFn: (values: ICreatePolicyStatementRequest) => api.policies.createPolicyStatement(policyId, values),
     onMutate: captureScope,
     onSuccess: (createdStatement, _values, scope) => {
+      refreshPolicyElsewhere();
       patchPolicy(scope.policyQueryKey, (current) => ({
         ...current,
         statements: [...current.statements, createdStatement]
@@ -122,6 +148,7 @@ export const usePolicyDetailPage = () => {
       api.policies.updatePolicyStatement(policyId, statementId, values),
     onMutate: captureScope,
     onSuccess: (updatedStatement, _variables, scope) => {
+      refreshPolicyElsewhere();
       patchPolicy(scope.policyQueryKey, (current) => ({
         ...current,
         statements: current.statements.map((statement) =>
@@ -138,6 +165,7 @@ export const usePolicyDetailPage = () => {
     mutationFn: (statementId: string) => api.policies.deletePolicyStatement(policyId, statementId),
     onMutate: captureScope,
     onSuccess: (_data, statementId, scope) => {
+      refreshPolicyElsewhere();
       patchPolicy(scope.policyQueryKey, (current) => ({
         ...current,
         statements: current.statements.filter((statement) => statement.policy_statement_id !== statementId)
@@ -156,6 +184,7 @@ export const usePolicyDetailPage = () => {
       }),
     onMutate: captureScope,
     onSuccess: (createdExpression, _values, scope) => {
+      refreshPolicyElsewhere();
       patchPolicy(scope.policyQueryKey, (current) => ({
         ...current,
         expressions: [...current.expressions, createdExpression]
@@ -182,6 +211,7 @@ export const usePolicyDetailPage = () => {
       }),
     onMutate: captureScope,
     onSuccess: (updatedExpression, _variables, scope) => {
+      refreshPolicyElsewhere();
       patchPolicy(scope.policyQueryKey, (current) => ({
         ...current,
         expressions: current.expressions.map((expression) =>
@@ -199,6 +229,7 @@ export const usePolicyDetailPage = () => {
     mutationFn: (expressionId: string) => api.policies.deletePolicyExpression(policyId, expressionId),
     onMutate: captureScope,
     onSuccess: (_data, expressionId, scope) => {
+      refreshPolicyElsewhere();
       patchPolicy(scope.policyQueryKey, (current) => ({
         ...current,
         expressions: current.expressions.filter((expression) => expression.policy_expression_id !== expressionId)
@@ -210,29 +241,43 @@ export const usePolicyDetailPage = () => {
   });
 
   const updateStatusMutation = useMutation({
+    // Status and details changes share this key: each response carries the policy's status, and one saved alongside
+    // the other can predate it.
+    mutationKey: policyQueryKey,
     mutationFn: (status: PolicyStatus) => api.policies.updatePolicyStatus(policyId, { status }),
-    onMutate: captureScope,
+    onMutate: joinGroupAndCaptureScope,
     onSuccess: (updatedPolicy, _status, scope) => {
-      patchPolicy(scope.policyQueryKey, (current) => ({ ...current, status: updatedPolicy.status }));
+      refreshPolicyElsewhere();
+      if (!holdReloadIfConcurrent(queryClient, scope.policyQueryKey, scope.policyQueryKey)) {
+        patchPolicy(scope.policyQueryKey, (current) => ({ ...current, status: updatedPolicy.status }));
+      }
       setSnackbar('Updated policy status');
     },
-    onError: setErrorSnackbar
+    onError: setErrorSnackbar,
+    onSettled: (_data, _error, _status, scope) =>
+      settleMutationGroup(queryClient, scope?.policyQueryKey ?? policyQueryKey)
   });
 
   const updateDetailsMutation = useMutation({
+    mutationKey: policyQueryKey,
     mutationFn: (values: IPolicyFormValues) =>
       api.policies.updatePolicy(policyId, {
         name: values.name,
         description: values.description || undefined,
         status: values.status
       }),
-    onMutate: captureScope,
+    onMutate: joinGroupAndCaptureScope,
     onSuccess: (updatedPolicy, _values, scope) => {
-      patchPolicy(scope.policyQueryKey, (current) => ({ ...current, ...updatedPolicy }));
+      refreshPolicyElsewhere();
+      if (!holdReloadIfConcurrent(queryClient, scope.policyQueryKey, scope.policyQueryKey)) {
+        patchPolicy(scope.policyQueryKey, (current) => ({ ...current, ...updatedPolicy }));
+      }
       setIsEditPolicyDialogOpen(false);
       setSnackbar('Updated policy');
     },
-    onError: setErrorSnackbar
+    onError: setErrorSnackbar,
+    onSettled: (_data, _error, _values, scope) =>
+      settleMutationGroup(queryClient, scope?.policyQueryKey ?? policyQueryKey)
   });
 
   const isSavingExpression =

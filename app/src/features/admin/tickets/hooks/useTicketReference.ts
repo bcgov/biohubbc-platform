@@ -2,6 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTicketContext } from 'hooks/useContext';
 import { ITicketExtended, ITicketReference } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
+import { refreshChangedQueries, setSavedQueryData } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useDeleteTicketReferenceMutation } from './useDeleteTicketReferenceMutation';
 
 /**
@@ -32,7 +34,8 @@ export const useTicketReference = () => {
   };
 
   /**
-   * Appends the references the dialog created to the cached ticket and closes the dialog.
+   * Appends the references the dialog created to the cached ticket, refreshes the other cached details of every ticket
+   * they link, and closes the dialog.
    *
    * @param {ITicketReference[]} createdReferences References returned by the create request.
    * @return {void}
@@ -42,10 +45,12 @@ export const useTicketReference = () => {
       return;
     }
 
-    queryClient.setQueryData<ITicketExtended>(
+    void setSavedQueryData<ITicketExtended>(
+      queryClient,
       ticketQueryKey,
       (ticket) => ticket && { ...ticket, references: [...ticket.references, ...createdReferences] }
     );
+    refreshChangedQueries(queryClient, createdReferences.flatMap(changedQueryKeys.ticketReference), ticketQueryKey);
     setIsCreateReferenceDialogOpen(false);
   };
 

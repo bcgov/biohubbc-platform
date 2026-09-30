@@ -1,7 +1,7 @@
 import { mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import Stack from '@mui/material/Stack';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
@@ -26,7 +26,6 @@ export const TicketArtifacts = () => {
   const dialogContext = useDialogContext();
   const { ticketId } = useTicketContext();
   const { isUploadingAttachment, uploadTicketAttachments } = useTicketAttachmentUpload();
-  const queryClient = useQueryClient();
   const artifactsGrid = useServerPaginatedGridState({ defaultSort: { field: 'create_date', sort: 'desc' } });
   const artifactsParams = { search: artifactsGrid.debouncedSearchTerm, ...artifactsGrid.apiPagination };
   const artifactsQuery = useQuery({
@@ -79,18 +78,14 @@ export const TicketArtifacts = () => {
   /**
    * Uploads artifacts selected from the hidden file input triggered by the PageSection Upload button.
    *
-   * Uploads the selected files together through the shared ticket attachment uploader, then refreshes the paginated
-   * artifacts grid when at least one upload succeeds.
+   * Uploads the selected files together through the shared ticket attachment uploader, which reloads the artifacts
+   * grid once they have all settled.
    *
    * @param {File[]} artifacts Files selected by the user.
    * @returns {Promise<void>} Resolves once every upload has settled.
    */
   const handleUploadSelection = async (artifacts: File[]) => {
-    const uploadedArtifacts = await uploadTicketAttachments(artifacts);
-
-    if (uploadedArtifacts.length) {
-      void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.artifactsAll(ticketId) });
-    }
+    await uploadTicketAttachments(artifacts);
   };
 
   return (

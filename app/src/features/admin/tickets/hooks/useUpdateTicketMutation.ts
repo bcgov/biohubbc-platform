@@ -2,11 +2,18 @@ import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicket, ITicketExtended, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  holdReloadIfConcurrent,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 interface UpdateTicketContext {
+  ticketId: string;
   ticketQueryKey: QueryKey;
-  cancelledLoad: boolean;
   /** The edited fields as they were before the edit. */
   previous: IUpdateTicketRequest | undefined;
 }
@@ -28,7 +35,8 @@ const editableFields = (ticket: ITicket): Required<IUpdateTicketRequest> => ({
  * Saves an edit of the route's ticket, showing it before the request completes.
  *
  * On success the server's ticket fields are merged into the cached ticket, keeping its timeline, comments and
- * references. A failure restores each edited field
+ * references, unless other changes to the ticket were saved alongside, in which case it reloads once they settle.
+ * Every other cached copy of the ticket is refreshed. A failure restores each edited field
  * that still holds the edited value, and reports the error.
  *
  * @returns The mutation; call `mutate` with the fields to change.
@@ -40,25 +48,33 @@ export const useUpdateTicketMutation = () => {
   const { ticketId, ticketQueryKey } = useTicketContext();
 
   return useMutation<ITicket, Error, IUpdateTicketRequest, UpdateTicketContext>({
+    // Every change to the ticket shares this key, so reloads of the ticket wait for the last of them.
+    mutationKey: ticketQueryKey,
     mutationFn: (payload) => api.tickets.updateTicket(ticketId, payload),
     onMutate: async (payload) => {
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey);
+      joinMutationGroup(queryClient, ticketQueryKey);
+      await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const current = queryClient.getQueryData<ITicketExtended>(ticketQueryKey);
       queryClient.setQueryData<ITicketExtended>(ticketQueryKey, (ticket) => ticket && { ...ticket, ...payload });
-      return { ticketQueryKey, cancelledLoad, previous: current && editableFields(current) };
+      return { ticketId, ticketQueryKey, previous: current && editableFields(current) };
     },
     onSuccess: (updatedTicket, _payload, context) => {
-      queryClient.setQueryData<ITicketExtended>(
-        context.ticketQueryKey,
-        (ticket) =>
-          ticket && {
-            ...ticket,
-            ...updatedTicket,
-            statuses: ticket.statuses,
-            comments: ticket.comments,
-            references: ticket.references
-          }
-      );
+      // A response saved alongside other changes to the ticket can predate them, so it is written only when no other
+      // change is running; otherwise the ticket reloads once they have all settled.
+      if (!holdReloadIfConcurrent(queryClient, context.ticketQueryKey, context.ticketQueryKey)) {
+        queryClient.setQueryData<ITicketExtended>(
+          context.ticketQueryKey,
+          (ticket) =>
+            ticket && {
+              ...ticket,
+              ...updatedTicket,
+              statuses: ticket.statuses,
+              comments: ticket.comments,
+              references: ticket.references
+            }
+        );
+      }
+      refreshChangedQueries(queryClient, changedQueryKeys.ticket(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, payload, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
@@ -79,10 +95,7 @@ export const useUpdateTicketMutation = () => {
         return restored;
       });
     },
-    onSettled: (_data, _error, _payload, context) => {
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: context.ticketQueryKey, exact: true });
-      }
-    }
+    onSettled: (_data, _error, _variables, context) =>
+      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
   });
 };

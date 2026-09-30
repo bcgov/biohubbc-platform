@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { createTestQueryClient, spyOnInvalidatedQueryKeys } from 'test-helpers/query-client';
 import { act, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
 import { SelectedFeatureRulesContainer } from './SelectedFeatureRulesContainer';
@@ -100,7 +101,7 @@ describe('SelectedFeatureRulesContainer', () => {
   });
 
   it.each([false, true])(
-    'toggles applied=%s in place and invalidates feature security, not the rules grid or the count',
+    'toggles applied=%s in place and refreshes feature security and the submission, not the rules grid or the count',
     async (applied) => {
       mocks.getRules.mockResolvedValue(response(rule(4, 'Sensitive', applied)));
       const invalidatedKeys = spyOnInvalidatedQueryKeys(queryClient);
@@ -108,9 +109,10 @@ describe('SelectedFeatureRulesContainer', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
 
-      await waitFor(() => expect(invalidatedKeys()).toHaveLength(2));
+      await waitFor(() => expect(invalidatedKeys()).toHaveLength(3));
       expect(applied ? mocks.remove : mocks.apply).toHaveBeenCalledWith(15, 'upload', 'review', [10], 4, expression);
       expect(invalidatedKeys()).toEqual([
+        submissionQueryKeys.submission(15),
         submissionUploadQueryKeys.featureSearchResultsAll(feature),
         submissionUploadQueryKeys.featureRulesAll(review)
       ]);
@@ -197,6 +199,33 @@ describe('SelectedFeatureRulesContainer', () => {
     expect(screen.getByRole('button', { name: 'Other' })).toHaveTextContent('Applied');
   });
 
+  it('reloads feature security once, after the last of two overlapping toggles is saved', async () => {
+    mocks.getRules.mockResolvedValue(response(rule(4, 'Sensitive', false), rule(5, 'Other', false)));
+    const first = deferred<void>();
+    const second = deferred<void>();
+    mocks.apply.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const invalidatedKeys = spyOnInvalidatedQueryKeys(queryClient);
+    render(<SelectedFeatureRulesContainer {...baseProps} />, { queryClient });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Other' }));
+    await waitFor(() => expect(mocks.apply).toHaveBeenCalledTimes(2));
+    await act(async () => first.resolve());
+
+    expect(invalidatedKeys()).toEqual([submissionQueryKeys.submission(15)]);
+
+    await act(async () => second.resolve());
+
+    await waitFor(() =>
+      expect(invalidatedKeys()).toEqual([
+        submissionQueryKeys.submission(15),
+        submissionQueryKeys.submission(15),
+        submissionUploadQueryKeys.featureSearchResultsAll(feature),
+        submissionUploadQueryKeys.featureRulesAll(review)
+      ])
+    );
+  });
+
   it('keeps a newer toggle of the same rule when an older one fails', async () => {
     const first = deferred<void>();
     mocks.apply.mockReturnValueOnce(first.promise).mockResolvedValueOnce(undefined);
@@ -247,6 +276,7 @@ describe('SelectedFeatureRulesContainer', () => {
     await waitFor(() => expect(mocks.getRules).toHaveBeenCalledTimes(2));
     expect(mocks.reset).toHaveBeenCalledWith(15, 'upload', 'review', ids, filter);
     expect(invalidatedKeys()).toEqual([
+      submissionQueryKeys.submission(15),
       submissionUploadQueryKeys.securityRules(review),
       submissionUploadQueryKeys.featureSearchResultsAll(feature)
     ]);

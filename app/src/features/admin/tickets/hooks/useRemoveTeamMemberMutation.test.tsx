@@ -37,4 +37,18 @@ describe('useRemoveTeamMemberMutation', () => {
     await waitFor(() => expect(mocks.setSnackbar).toHaveBeenCalledWith({ open: true, snackbarMessage: 'Denied' }));
     expect(queryClient.getQueryData(teamQueryKeys.members('team-1'))).toEqual(members);
   });
+
+  it("drops the cached teams tables once the member is removed, since they show the team's member count", async () => {
+    mocks.deleteTeamMember.mockResolvedValue(undefined);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(teamQueryKeys.members('team-1'), members);
+    const teamsTable = teamQueryKeys.list({ search: '' }, { page: 1, limit: 10, sort: 'name', order: 'asc' });
+    queryClient.setQueryData(teamsTable, { teams: [] });
+    const { result } = renderHook(() => useRemoveTeamMemberMutation(), { queryClient });
+
+    act(() => result.current.mutate({ teamId: 'team-1', teamMemberId: 'b' }));
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(queryClient.getQueryData(teamsTable)).toBeUndefined();
+  });
 });

@@ -3,11 +3,17 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketSystemUserFormValues } from 'features/admin/tickets/components/dialog/system-user/form/TicketSystemUserForm';
 import { ITicketExtended, ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 interface CreateTicketSystemUsersContext {
+  ticketId: string;
   ticketQueryKey: QueryKey;
-  cancelledLoad: boolean;
   /** The placeholder rows as cached. */
   placeholders: ITicketSystemUser[];
 }
@@ -42,7 +48,8 @@ const buildPlaceholders = (
  * Assigns users to the route's ticket, listing them before the request completes.
  *
  * On success each placeholder is replaced by the row the server created, keeping the user details the placeholder
- * showed, since the created rows carry ids only. A failure removes the placeholders and reports the error.
+ * showed, since the created rows carry ids only, and the ticket's other cached details is refreshed. A failure
+ * removes the placeholders and reports the error.
  *
  * @returns The mutation; call `mutate` with the users to assign.
  */
@@ -58,13 +65,16 @@ export const useCreateTicketSystemUsersMutation = () => {
     ITicketSystemUserFormValues['ticketSystemUsers'],
     CreateTicketSystemUsersContext
   >({
+    // Every change to the ticket shares this key, so reloads of the ticket wait for the last of them.
+    mutationKey: ticketQueryKey,
     mutationFn: (drafts) =>
       api.tickets.createTicketSystemUsers(
         ticketId,
         drafts.map((draft) => ({ system_user_id: draft.system_user_id, status: draft.status }))
       ),
     onMutate: async (drafts) => {
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey);
+      joinMutationGroup(queryClient, ticketQueryKey);
+      await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const placeholders = buildPlaceholders(ticketId, drafts);
       const ticket = queryClient.setQueryData<ITicketExtended>(
         ticketQueryKey,
@@ -72,8 +82,8 @@ export const useCreateTicketSystemUsersMutation = () => {
       );
       const placeholderIds = new Set(placeholders.map((row) => row.ticket_system_user_id));
       return {
+        ticketId,
         ticketQueryKey,
-        cancelledLoad,
         placeholders: ticket?.ticket_system_users.filter((row) => placeholderIds.has(row.ticket_system_user_id)) ?? []
       };
     },
@@ -92,6 +102,7 @@ export const useCreateTicketSystemUsersMutation = () => {
             })
           }
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, _drafts, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
@@ -107,10 +118,7 @@ export const useCreateTicketSystemUsersMutation = () => {
           }
       );
     },
-    onSettled: (_data, _error, _variables, context) => {
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: context.ticketQueryKey, exact: true });
-      }
-    }
+    onSettled: (_data, _error, _variables, context) =>
+      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
   });
 };

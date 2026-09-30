@@ -8,6 +8,8 @@ import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
+import { refreshChangedQueries, setSavedQueryData } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
  * Data-request status and policy dialog handlers for the ticket timeline.
@@ -20,7 +22,7 @@ export const useTicketTimelineDataRequestActions = () => {
   const dialogContext = useDialogContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const queryClient = useQueryClient();
-  const { ticketQueryKey } = useTicketContext();
+  const { ticketId, ticketQueryKey } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
@@ -47,7 +49,8 @@ export const useTicketTimelineDataRequestActions = () => {
         status: policyStatus
       });
 
-      queryClient.setQueryData<ITicketExtended>(
+      await setSavedQueryData<ITicketExtended>(
+        queryClient,
         ticketQueryKey,
         (ticket) =>
           ticket && {
@@ -59,6 +62,7 @@ export const useTicketTimelineDataRequestActions = () => {
             )
           }
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({
@@ -239,7 +243,8 @@ export const useTicketTimelineDataRequestActions = () => {
         ...updatedPolicy
       });
 
-      queryClient.setQueryData<ITicketExtended>(
+      await setSavedQueryData<ITicketExtended>(
+        queryClient,
         ticketQueryKey,
         (ticket) =>
           ticket && {
@@ -251,6 +256,7 @@ export const useTicketTimelineDataRequestActions = () => {
             )
           }
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
 
       dialogContext.setSnackbar({
         open: true,

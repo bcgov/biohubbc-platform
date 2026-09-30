@@ -1,6 +1,8 @@
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TICKET_ATTACHMENT_UPLOAD_CONCURRENCY } from 'constants/attachments';
 import { useApi } from 'hooks/useApi';
+import { holdReload, joinMutationGroup, settleMutationGroup } from 'utils/query-client';
+import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useId } from 'react';
@@ -37,7 +39,12 @@ export const useTicketAttachmentUpload = () => {
       });
 
       return api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, { status: 'uploaded' });
-    }
+    },
+    onMutate: () => joinMutationGroup(queryClient, uploadMutationKey),
+    // Whether uploaded from the Files tab or attached to a comment, the file joins the ticket's files. Files uploaded
+    // together reload the list once, after the last of them, so it never shows some of them without the rest.
+    onSuccess: () => holdReload(queryClient, uploadMutationKey, ticketQueryKeys.artifactsAll(ticketId), false),
+    onSettled: () => settleMutationGroup(queryClient, uploadMutationKey)
   });
 
   const uploadsInFlight = useIsMutating({ mutationKey: uploadMutationKey });

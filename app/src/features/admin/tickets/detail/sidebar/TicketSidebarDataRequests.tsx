@@ -15,6 +15,8 @@ import { useMemo, useState } from 'react';
 import { useTicketQuery } from '../../hooks/useTicketQuery';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
+import { refreshChangedQueries, setSavedQueryData } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
  * Data request sidebar section and create dialog.
@@ -37,6 +39,13 @@ export const TicketSidebarDataRequests = () => {
     return [...requests].sort((a, b) => (a.create_date ?? '').localeCompare(b.create_date ?? ''));
   }, [ticket?.data_requests]);
 
+  /**
+   * Creates a data request on the ticket, adds it to the cached ticket and closes the dialog; a failure keeps the
+   * dialog open and shows the error.
+   *
+   * @param {CreateDataRequestDialogValues} values Reason and users to request data for.
+   * @returns {Promise<void>} Resolves once the request has settled.
+   */
   const handleCreateDataRequest = async (values: CreateDataRequestDialogValues) => {
     const requestedBy = biohubUserWrapper.systemUserId;
     if (requestedBy === undefined) {
@@ -50,10 +59,12 @@ export const TicketSidebarDataRequests = () => {
         reason: values.reason,
         system_user_ids: values.system_user_ids
       });
-      queryClient.setQueryData<ITicketExtended>(
+      await setSavedQueryData<ITicketExtended>(
+        queryClient,
         ticketQueryKey,
         (current) => current && { ...current, data_requests: [...current.data_requests, createdDataRequest] }
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
 
       setIsCreateDialogOpen(false);
     } catch (error) {

@@ -12,7 +12,14 @@ import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { IGetTicketsResponse, ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  holdReloadIfConcurrent,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { CreateTicketDialog } from './components/dialog/create/CreateTicketDialog';
 import { EditTicketDialog } from './components/dialog/edit/EditTicketDialog';
@@ -23,7 +30,8 @@ import { TicketsContainer } from './list/TicketsContainer';
  * Admin tickets page with administrative tabs and ticket pagination.
  *
  * Creating, editing and closing a ticket write the result into the page on screen, so the row stays where it is;
- * deleting one reloads the list.
+ * deleting one reloads the list. Each change also refreshes the ticket's other cached copies: its detail pages, the
+ * portal's lists and this list's other pages.
  *
  * @return {*}
  */
@@ -65,7 +73,7 @@ export const TicketsPage = () => {
   const deleteTicketMutation = useMutation({
     mutationFn: (ticket: ITicket) => api.tickets.deleteTicket(ticket.ticket_id),
     onSuccess: (_data, ticket) => {
-      void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      refreshChangedQueries(queryClient, changedQueryKeys.ticket(ticket.ticket_id));
       dialogContext.setSnackbar({
         open: true,
         snackbarMessage: (
@@ -81,10 +89,13 @@ export const TicketsPage = () => {
   const { mutate: deleteTicket } = deleteTicketMutation;
 
   const toggleStatusMutation = useMutation({
+    // Every status toggle in the list shares this key, so a reload of the list waits for the last of them.
+    mutationKey: ticketQueryKeys.lists('admin'),
     mutationFn: ({ ticket, nextStatus }: { ticket: ITicket; nextStatus: TicketStatus; listKey: QueryKey }) =>
       api.tickets.updateTicketStatus(ticket.ticket_id, nextStatus),
     onMutate: async ({ ticket, nextStatus, listKey }) => {
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, listKey);
+      joinMutationGroup(queryClient, ticketQueryKeys.lists('admin'));
+      await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
       const response = queryClient.setQueryData<IGetTicketsResponse>(
         listKey,
         (current) =>
@@ -96,19 +107,20 @@ export const TicketsPage = () => {
           }
       );
       const optimisticRow = response?.tickets.find((row) => row.ticket_id === ticket.ticket_id);
-      return { cancelledLoad, optimisticRow };
+      return { optimisticRow };
     },
-    onSuccess: (updatedTicket, { ticket, nextStatus, listKey }) => {
+    onSuccess: (updatedTicket, { ticket, nextStatus, listKey }, context) => {
+      // The response is written only to the row this toggle wrote: a newer toggle of the row replaced it, and its
+      // own response describes the ticket as it is now.
       queryClient.setQueryData<IGetTicketsResponse>(
         listKey,
         (current) =>
           current && {
             ...current,
-            tickets: current.tickets.map((row) =>
-              row.ticket_id === ticket.ticket_id ? { ...row, ...updatedTicket } : row
-            )
+            tickets: current.tickets.map((row) => (row === context.optimisticRow ? { ...row, ...updatedTicket } : row))
           }
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.ticket(ticket.ticket_id), ticketQueryKeys.lists('admin'));
       dialogContext.setSnackbar({
         open: true,
         snackbarMessage: (
@@ -132,11 +144,7 @@ export const TicketsPage = () => {
           }
       );
     },
-    onSettled: (_data, _error, { listKey }, context) => {
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: listKey, exact: true });
-      }
-    }
+    onSettled: () => settleMutationGroup(queryClient, ticketQueryKeys.lists('admin'))
   });
   const { mutate: toggleStatus } = toggleStatusMutation;
 
@@ -152,24 +160,36 @@ export const TicketsPage = () => {
             pagination: { ...current.pagination, total: current.pagination.total + 1 }
           }
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.ticketLists(), ticketQueryKeys.lists('admin'));
       setIsCreateDialogOpen(false);
     },
     onError: showApiErrorSnackbar
   });
 
   const editTicketMutation = useMutation({
+    mutationKey: ticketQueryKeys.lists('admin'),
+    onMutate: () => joinMutationGroup(queryClient, ticketQueryKeys.lists('admin')),
     mutationFn: ({ ticketId, payload }: { ticketId: string; payload: IUpdateTicketRequest; listKey: QueryKey }) =>
       api.tickets.updateTicket(ticketId, payload),
     onSuccess: (updatedTicket, { listKey }) => {
-      queryClient.setQueryData<IGetTicketsResponse>(
-        listKey,
-        (current) =>
-          current && {
-            ...current,
-            tickets: current.tickets.map((row) =>
-              row.ticket_id === updatedTicket.ticket_id ? { ...row, ...updatedTicket } : row
-            )
-          }
+      // The whole row is written from the response, which can predate a status toggle saved alongside; the list
+      // then reloads once they have all settled instead.
+      if (!holdReloadIfConcurrent(queryClient, ticketQueryKeys.lists('admin'), listKey)) {
+        queryClient.setQueryData<IGetTicketsResponse>(
+          listKey,
+          (current) =>
+            current && {
+              ...current,
+              tickets: current.tickets.map((row) =>
+                row.ticket_id === updatedTicket.ticket_id ? { ...row, ...updatedTicket } : row
+              )
+            }
+        );
+      }
+      refreshChangedQueries(
+        queryClient,
+        changedQueryKeys.ticket(updatedTicket.ticket_id),
+        ticketQueryKeys.lists('admin')
       );
       setIsEditDialogOpen(false);
       setSelectedTicket(undefined);
@@ -178,7 +198,8 @@ export const TicketsPage = () => {
         snackbarMessage: 'Updated ticket'
       });
     },
-    onError: showApiErrorSnackbar
+    onError: showApiErrorSnackbar,
+    onSettled: () => settleMutationGroup(queryClient, ticketQueryKeys.lists('admin'))
   });
 
   const handleDeleteTicket = useCallback(

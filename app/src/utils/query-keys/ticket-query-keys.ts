@@ -30,13 +30,21 @@ const lists = (scope: TicketAccessScope) => [...all(scope), 'list'] as const;
 const list = (scope: TicketAccessScope, params: ITicketsQueryParams) => [...lists(scope), params] as const;
 
 /**
+ * Key prefix of every ticket's detail read through one scope's endpoints.
+ *
+ * @param {TicketAccessScope} scope The endpoints the tickets are read through.
+ * @returns The ticket details key prefix.
+ */
+const details = (scope: TicketAccessScope) => [...all(scope), 'detail'] as const;
+
+/**
  * Key of one ticket's detail: its comments, statuses, references, uploads, data requests and assignees.
  *
  * @param {TicketAccessScope} scope The endpoints the ticket is read through.
  * @param {string} ticketId The ticket.
  * @returns The ticket detail key.
  */
-const detail = (scope: TicketAccessScope, ticketId: string) => [...all(scope), 'detail', ticketId] as const;
+const detail = (scope: TicketAccessScope, ticketId: string) => [...details(scope), ticketId] as const;
 
 /**
  * Key prefix of every page of a ticket's files.
@@ -60,4 +68,4 @@ const artifacts = (ticketId: string, params: IGetTicketArtifactsQueryParams) =>
  * Query keys for tickets, ordered from broad to narrow so that each prefix names the set of queries a
  * change invalidates.
  */
-export const ticketQueryKeys = { all, lists, list, detail, artifactsAll, artifacts };
+export const ticketQueryKeys = { all, lists, list, details, detail, artifactsAll, artifacts };

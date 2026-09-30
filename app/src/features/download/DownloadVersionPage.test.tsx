@@ -172,4 +172,15 @@ describe('DownloadVersionPage', () => {
       );
     });
   });
+
+  it("reloads this version's exports after an export starts, leaving the download and version records alone", async () => {
+    const { findByRole, findByText } = renderPage();
+    fireEvent.click(await findByRole('tab', { name: 'Exports' }));
+    await findByText('33333333-4444-5555-6666-777777777777');
+
+    fireEvent.click(await findByRole('button', { name: 'Export' }));
+
+    await waitFor(() => expect(mockListDownloadVersionExports).toHaveBeenCalledTimes(2));
+    expect([mockGetDownload, mockGetDownloadVersion].map((load) => load.mock.calls.length)).toEqual([1, 1]);
+  });
 });

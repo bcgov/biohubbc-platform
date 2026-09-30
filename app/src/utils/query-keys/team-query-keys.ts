@@ -29,4 +29,11 @@ const members = (teamId: string) => [QUERY_KEY_ROOT.TEAM, teamId, 'members'] as 
 /**
  * Query keys for teams.
  */
-export const teamQueryKeys = { lists, list, members };
+/**
+ * Mutation key shared by every change to a team's membership, so the reloads they need wait for the last of them.
+ *
+ * @returns The membership changes mutation key.
+ */
+const membershipChanges = () => [QUERY_KEY_ROOT.TEAM, 'membership-changes'] as const;
+
+export const teamQueryKeys = { lists, list, members, membershipChanges };

@@ -1,4 +1,6 @@
 import Box from '@mui/material/Box';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
@@ -37,18 +39,12 @@ export const ManageSecurityPage = () => {
   });
 
   /**
-   * Reloads every page of the categories table.
+   * Reloads both tables after a category or reason changes, since reasons show their category, and refreshes the
+   * reviews that show reasons as rules.
    *
    * @returns {void}
    */
-  const refreshCategories = () => void queryClient.invalidateQueries({ queryKey: securityQueryKeys.categoriesAll() });
-
-  /**
-   * Reloads every page of the reasons table.
-   *
-   * @returns {void}
-   */
-  const refreshReasons = () => void queryClient.invalidateQueries({ queryKey: securityQueryKeys.reasonsAll() });
+  const refreshSecurity = () => refreshChangedQueries(queryClient, changedQueryKeys.securityReason());
 
   return (
     <>
@@ -61,7 +57,7 @@ export const ManageSecurityPage = () => {
           setPaginationModel={categoriesGrid.handlePaginationChange}
           sortModel={categoriesGrid.sortModel}
           setSortModel={categoriesGrid.handleSortChange}
-          refresh={refreshCategories}
+          refresh={refreshSecurity}
           searchTerm={categoriesGrid.searchTerm}
           onSearch={categoriesGrid.handleSearch}
         />
@@ -74,8 +70,7 @@ export const ManageSecurityPage = () => {
             setPaginationModel={reasonsGrid.handlePaginationChange}
             sortModel={reasonsGrid.sortModel}
             setSortModel={reasonsGrid.handleSortChange}
-            refresh={refreshReasons}
-            refreshCategories={refreshCategories}
+            refresh={refreshSecurity}
             searchTerm={reasonsGrid.searchTerm}
             onSearch={reasonsGrid.handleSearch}
           />

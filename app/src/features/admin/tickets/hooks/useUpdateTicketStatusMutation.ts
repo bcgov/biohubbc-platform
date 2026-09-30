@@ -2,7 +2,14 @@ import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicket, ITicketExtended, ITicketStatusLog, TicketStatus } from 'interfaces/useTicketsApi.interface';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  holdReloadIfConcurrent,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /** A close or reopen of the route's ticket. */
 export interface UpdateTicketStatusVariables {
@@ -12,8 +19,8 @@ export interface UpdateTicketStatusVariables {
 }
 
 interface UpdateTicketStatusContext {
+  ticketId: string;
   ticketQueryKey: QueryKey;
-  cancelledLoad: boolean;
   /** The timeline entry written optimistically, as cached. */
   optimisticStatus: ITicketStatusLog | undefined;
 }
@@ -30,8 +37,9 @@ const previousStatus = (status: TicketStatus): TicketStatus => (status === 'open
  * Closes or reopens the route's ticket, showing the new status and its timeline entry before the request completes.
  *
  * On success the server's ticket fields are merged into the cached ticket, keeping its timeline, comments and
- * references. A failure removes
- * the optimistic timeline entry and restores the status, unless something has changed the status since.
+ * references, unless other changes to the ticket were saved alongside, in which case it reloads once they settle.
+ * Every other cached copy of the ticket is refreshed. A failure removes the optimistic timeline entry and restores the
+ * status, unless something has changed the status since.
  *
  * @returns The mutation; call `mutate` with {@link UpdateTicketStatusVariables}.
  */
@@ -42,9 +50,12 @@ export const useUpdateTicketStatusMutation = () => {
   const { ticketId, ticketQueryKey } = useTicketContext();
 
   return useMutation<ITicket, Error, UpdateTicketStatusVariables, UpdateTicketStatusContext>({
+    // Every change to the ticket shares this key, so reloads of the ticket wait for the last of them.
+    mutationKey: ticketQueryKey,
     mutationFn: ({ status }) => api.tickets.updateTicketStatus(ticketId, status),
     onMutate: async ({ status, userIdentifier }) => {
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey);
+      joinMutationGroup(queryClient, ticketQueryKey);
+      await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const optimisticStatus: ITicketStatusLog | undefined = userIdentifier
         ? {
             ticket_status_id: `optimistic-status-${Date.now()}`,
@@ -64,25 +75,30 @@ export const useUpdateTicketStatusMutation = () => {
           }
       );
       return {
+        ticketId,
         ticketQueryKey,
-        cancelledLoad,
         optimisticStatus: ticket?.statuses.find(
           (entry) => entry.ticket_status_id === optimisticStatus?.ticket_status_id
         )
       };
     },
     onSuccess: (updatedTicket, _variables, context) => {
-      queryClient.setQueryData<ITicketExtended>(
-        context.ticketQueryKey,
-        (current) =>
-          current && {
-            ...current,
-            ...updatedTicket,
-            statuses: current.statuses,
-            comments: current.comments,
-            references: current.references
-          }
-      );
+      // A response saved alongside other changes to the ticket can predate them, so it is written only when no other
+      // change is running; otherwise the ticket reloads once they have all settled.
+      if (!holdReloadIfConcurrent(queryClient, context.ticketQueryKey, context.ticketQueryKey)) {
+        queryClient.setQueryData<ITicketExtended>(
+          context.ticketQueryKey,
+          (current) =>
+            current && {
+              ...current,
+              ...updatedTicket,
+              statuses: current.statuses,
+              comments: current.comments,
+              references: current.references
+            }
+        );
+      }
+      refreshChangedQueries(queryClient, changedQueryKeys.ticket(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, { status }, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
@@ -99,10 +115,7 @@ export const useUpdateTicketStatusMutation = () => {
           }
       );
     },
-    onSettled: (_data, _error, _variables, context) => {
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: context.ticketQueryKey, exact: true });
-      }
-    }
+    onSettled: (_data, _error, _variables, context) =>
+      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
   });
 };

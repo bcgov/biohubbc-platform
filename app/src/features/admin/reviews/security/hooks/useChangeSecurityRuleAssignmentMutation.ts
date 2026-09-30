@@ -10,7 +10,14 @@ import {
   submissionUploadQueryKeys,
   SubmissionUploadReviewKeyScope
 } from 'features/admin/reviews/submission-upload-query-keys';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  holdReload,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /** One Apply/Applied toggle on the review's rules grid. */
 export interface ChangeSecurityRuleAssignmentVariables {
@@ -27,8 +34,6 @@ export interface ChangeSecurityRuleAssignmentVariables {
 interface ChangeSecurityRuleAssignmentContext {
   /** The optimistic row as cached; a later toggle or load of the row replaces this object. */
   optimisticRule: ISubmissionUploadReviewSelectedFeatureRule | undefined;
-  /** Whether a load of the rules grid was cancelled to make way for the optimistic row. */
-  cancelledLoad: boolean;
 }
 
 /**
@@ -59,8 +64,10 @@ const setRuleApplied = (
  *
  * The rules grid is sorted applied-first, so it is not refetched after a successful toggle: the touched row
  * would jump to another position under the user's cursor. The optimistic row is the reconciled state. What
- * the toggle changes elsewhere, the features' security classification and each feature's own rule list, is
- * invalidated. The feature count is left alone, since security does not change which features match.
+ * the toggle changes elsewhere, the features' security classification and each feature's own rule list, reloads
+ * once the review's last security change settles: a reload started while another toggle is still being saved would
+ * show the features without it. A load of the grid the toggle cancelled is repeated then too. The feature count is
+ * left alone, since security does not change which features match.
  *
  * A failed toggle restores only its own row, and only while the cache still holds the very row object it
  * wrote. A newer toggle of the same rule, or a load of the grid, replaces that object, so neither is undone;
@@ -76,6 +83,8 @@ export const useChangeSecurityRuleAssignmentMutation = (scope: SubmissionUploadR
   const { setSnackbar } = useDialogContext();
 
   return useMutation<void, Error, ChangeSecurityRuleAssignmentVariables, ChangeSecurityRuleAssignmentContext>({
+    // Every security change in the review shares this key, so the reloads they need wait for the last of them.
+    mutationKey: submissionUploadQueryKeys.securityRules(scope),
     mutationFn: ({ rule, selectedFeatureIds, expression }) => {
       const request = rule.applied
         ? api.admin.deleteSubmissionUploadReviewSecurityRuleAssignments
@@ -90,13 +99,14 @@ export const useChangeSecurityRuleAssignmentMutation = (scope: SubmissionUploadR
       );
     },
     onMutate: async ({ rule, rulesQueryKey }) => {
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, rulesQueryKey);
+      joinMutationGroup(queryClient, submissionUploadQueryKeys.securityRules(scope));
+      await cancelQueryForOptimisticUpdate(queryClient, rulesQueryKey, submissionUploadQueryKeys.securityRules(scope));
       const response = queryClient.setQueryData<ISubmissionUploadReviewSelectedFeatureRuleResponse>(
         rulesQueryKey,
         (current) => setRuleApplied(current, (row) => row.security_rule_id === rule.security_rule_id, !rule.applied)
       );
       const optimisticRule = response?.rules.find((row) => row.security_rule_id === rule.security_rule_id);
-      return { optimisticRule, cancelledLoad };
+      return { optimisticRule };
     },
     onError: (error, { rule, rulesQueryKey }, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
@@ -105,14 +115,11 @@ export const useChangeSecurityRuleAssignmentMutation = (scope: SubmissionUploadR
       );
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.featureSearchResultsAll(scope) });
-      void queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.featureRulesAll(scope) });
+      const securityChanges = submissionUploadQueryKeys.securityRules(scope);
+      holdReload(queryClient, securityChanges, submissionUploadQueryKeys.featureSearchResultsAll(scope), false);
+      holdReload(queryClient, securityChanges, submissionUploadQueryKeys.featureRulesAll(scope), false);
+      refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
     },
-    onSettled: (_data, _error, { rulesQueryKey }, context) => {
-      // The cancelled load still has to land, whatever the outcome of the toggle.
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: rulesQueryKey, exact: true });
-      }
-    }
+    onSettled: () => settleMutationGroup(queryClient, submissionUploadQueryKeys.securityRules(scope))
   });
 };

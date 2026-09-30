@@ -1,4 +1,6 @@
 import Box from '@mui/material/Box';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
@@ -52,12 +54,12 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const systemRoles = rolesQuery.data ?? [];
 
   /**
-   * Reloads every page of the users table after a user changes.
+   * Reloads every page of the users table after a user changes, and the user pickers that search the same users.
    *
    * @returns {void}
    */
   const refreshUsers = useCallback(
-    () => void queryClient.invalidateQueries({ queryKey: userQueryKeys.lists() }),
+    () => refreshChangedQueries(queryClient, changedQueryKeys.systemUser()),
     [queryClient]
   );
 

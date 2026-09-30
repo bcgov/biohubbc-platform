@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
@@ -46,7 +48,8 @@ export const useSearchResultDownload = ({
         name: values.name,
         description: values.description,
         expression: expressionTree
-      })
+      }),
+    onSuccess: () => refreshChangedQueries(queryClient, changedQueryKeys.download())
   });
   const { mutate: createDownload } = createDownloadMutation;
 

@@ -61,6 +61,16 @@ const version = (downloadId: string, downloadVersionId: string) =>
   [...download(downloadId), 'version', downloadVersionId, 'detail'] as const;
 
 /**
+ * Key prefix of every page of the exports made from one download version.
+ *
+ * @param {string} downloadId The download.
+ * @param {string} downloadVersionId The version.
+ * @returns The version exports key prefix.
+ */
+const versionExportsAll = (downloadId: string, downloadVersionId: string) =>
+  [...download(downloadId), 'version', downloadVersionId, 'exports'] as const;
+
+/**
  * Key of one page of the exports made from one download version.
  *
  * @param {string} downloadId The download.
@@ -69,10 +79,20 @@ const version = (downloadId: string, downloadVersionId: string) =>
  * @returns The version exports key.
  */
 const versionExports = (downloadId: string, downloadVersionId: string, pagination: ApiPaginationRequestOptions) =>
-  [...download(downloadId), 'version', downloadVersionId, 'exports', { pagination }] as const;
+  [...versionExportsAll(downloadId, downloadVersionId), { pagination }] as const;
 
 /**
  * Query keys for downloads, ordered from broad to narrow so that each prefix names the set of queries a change
  * invalidates.
  */
-export const downloadQueryKeys = { lists, list, download, detail, featureTypes, versions, version, versionExports };
+export const downloadQueryKeys = {
+  lists,
+  list,
+  download,
+  detail,
+  featureTypes,
+  versions,
+  version,
+  versionExportsAll,
+  versionExports
+};

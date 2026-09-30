@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { DialogContext, IDialogContext, defaultSnackbarProps } from 'contexts/dialogContext';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
@@ -7,6 +8,7 @@ import { IPolicy, IPolicyExpression, PolicyStatus } from 'interfaces/usePolicies
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PolicyDetailPage } from './PolicyDetailPage';
@@ -171,7 +173,7 @@ const policy: IPolicy = {
   ]
 };
 
-const renderPage = (dialogContext?: Partial<IDialogContext>) =>
+const renderPage = (dialogContext?: Partial<IDialogContext>, queryClient?: QueryClient) =>
   render(
     <DialogContext.Provider
       value={{
@@ -215,7 +217,8 @@ const renderPage = (dialogContext?: Partial<IDialogContext>) =>
           />
         </Routes>
       </MemoryRouter>
-    </DialogContext.Provider>
+    </DialogContext.Provider>,
+    { queryClient }
   );
 
 describe('PolicyDetailPage', () => {
@@ -414,6 +417,25 @@ describe('PolicyDetailPage', () => {
       expect(updatePolicyStatus).toHaveBeenCalledWith('policy-1', { status: PolicyStatus.DENIED });
     });
     expect(getByRole('button', { name: 'Denied' })).toBeVisible();
+  });
+
+  it("drops the policy's cached listings once its status is saved: the policy and assignment tables and ticket timelines", async () => {
+    const user = userEvent.setup();
+    const queryClient = createTestQueryClient();
+    const listings = [
+      ['policy', 'list', { search: {}, pagination: {} }],
+      ['team-policy', 'list', { search: {}, pagination: {} }],
+      ['ticket', 'admin', 'detail', 'ticket-1']
+    ];
+    listings.forEach((key) => queryClient.setQueryData(key, { cached: true }));
+    const { findByTestId, findByRole } = renderPage(undefined, queryClient);
+
+    await user.click(await findByTestId('policy-status-dropdown'));
+    await user.click(await findByRole('menuitem', { name: 'Denied' }));
+
+    await waitFor(() =>
+      expect(listings.map((key) => queryClient.getQueryData(key))).toEqual([undefined, undefined, undefined])
+    );
   });
 
   it('edits policy metadata from the header edit button', async () => {

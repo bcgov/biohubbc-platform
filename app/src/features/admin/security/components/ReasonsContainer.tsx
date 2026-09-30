@@ -22,10 +22,8 @@ import { AddReasonFormInitialValues, ReasonDialog } from './ReasonDialog';
 
 export interface IReasonsContainerProps extends IServerPaginationProps {
   reasons: ISecurityReasonWithFeatureCount[];
-  /** Callback to refresh the reasons list after create/update/delete */
+  /** Callback after create/update/delete, which refreshes the reasons and categories (whose rule_count it changes) */
   refresh: () => void;
-  /** Callback to refresh categories so rule_count stays in sync */
-  refreshCategories: () => void;
   searchTerm: string;
   onSearch: (term: string) => void;
 }
@@ -51,7 +49,6 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     sortModel,
     setSortModel,
     refresh,
-    refreshCategories,
     searchTerm,
     onSearch
   } = props;
@@ -59,14 +56,6 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
   const { setErrorDialog } = dialogContext;
-
-  /**
-   * Refresh reasons and categories tables after a reason mutation.
-   */
-  const refreshTables = () => {
-    refresh();
-    refreshCategories();
-  };
 
   const [openAddReasonDialog, setOpenAddReasonDialog] = useState(false);
   const [openEditReasonDialog, setOpenEditReasonDialog] = useState(false);
@@ -136,7 +125,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     try {
       await biohubApi.security.deleteSecurityReason(reason.security_rule_id);
       showSnackBar({ snackbarMessage: 'Deleted reason' });
-      refreshTables();
+      refresh();
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setErrorDialog({
@@ -183,7 +172,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       });
 
       setOpenAddReasonDialog(false);
-      refreshTables();
+      refresh();
       showSnackBar({ snackbarMessage: 'Created reason' });
     } catch (error) {
       const apiError = error as APIError;
@@ -224,7 +213,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
 
       setOpenEditReasonDialog(false);
       setEditingReason(null);
-      refreshTables();
+      refresh();
       showSnackBar({ snackbarMessage: 'Updated reason' });
     } catch (error) {
       const apiError = error as APIError;

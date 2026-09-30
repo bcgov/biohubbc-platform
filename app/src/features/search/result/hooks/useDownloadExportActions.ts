@@ -8,6 +8,8 @@ import { useState } from 'react';
 import { buildExportConfig } from '../sidebar/download/export-config-form';
 import { triggerIframeDownload } from 'utils/download';
 import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { IExportConfigFormValues } from '../sidebar/download/ConfigureExportForm';
 
 /**
@@ -77,8 +79,10 @@ export const useDownloadExportActions = () => {
         merge_steps: []
       };
       await biohubApi.downloadExport.createExport(downloadId, downloadVersionId, config);
+      return downloadVersionId;
     },
-    onSuccess: refresh,
+    onSuccess: (downloadVersionId, downloadId) =>
+      refreshChangedQueries(queryClient, changedQueryKeys.downloadExport(downloadId, downloadVersionId)),
     onError: () => {
       dialogContext.setErrorDialog({
         open: true,
@@ -100,8 +104,13 @@ export const useDownloadExportActions = () => {
       downloadVersionId: string;
       values: IExportConfigFormValues;
     }) => biohubApi.downloadExport.createExport(downloadId, downloadVersionId, buildExportConfig(values)),
-    onSuccess: () => {
+    onSuccess: (_data, { downloadId, downloadVersionId }) => {
       setConfigDownloadId(null);
+      refreshChangedQueries(
+        queryClient,
+        changedQueryKeys.downloadExport(downloadId, downloadVersionId),
+        downloadQueryKeys.lists()
+      );
       return refresh();
     },
     onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })

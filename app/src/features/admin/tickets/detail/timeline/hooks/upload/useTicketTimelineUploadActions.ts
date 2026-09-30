@@ -11,6 +11,8 @@ import {
 } from 'interfaces/useTicketsApi.interface';
 import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
+import { refreshChangedQueries, reloadAfterPendingMutations, setSavedQueryData } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 type SubmissionUploadDecisionUpdate = IUpdateSubmissionUploadDecisionRequest['decision'];
 
@@ -23,15 +25,24 @@ export const useTicketTimelineUploadActions = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const queryClient = useQueryClient();
-  const { ticketQueryKey } = useTicketContext();
+  const { ticketId, ticketQueryKey } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const navigate = useNavigate();
 
+  /**
+   * Writes a saved change to one of the ticket's uploads into the cached ticket.
+   *
+   * @param {string} submissionUploadId Submission upload being updated in the ticket cache.
+   * @param {(upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse} updateUpload Builds the
+   * changed upload.
+   * @returns {void}
+   */
   const updateCachedSubmissionUpload = (
     submissionUploadId: string,
     updateUpload: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
   ): void => {
-    queryClient.setQueryData<ITicketExtended>(
+    void setSavedQueryData<ITicketExtended>(
+      queryClient,
       ticketQueryKey,
       (ticket) =>
         ticket && {
@@ -74,7 +85,8 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Persists an upload-level decision and updates the cached upload with the backend response.
+   * Persists an upload-level decision and updates the cached upload with the backend response. The submission, its
+   * other ticket copies and feature searches are refreshed, since a decision changes what is published.
    * Use this only from the confirmation dialog callback, after the reviewer has confirmed the decision.
    *
    * @param {TicketSubmissionUploadResponse} upload Upload receiving the decision.
@@ -95,6 +107,7 @@ export const useTicketTimelineUploadActions = () => {
       );
 
       setCachedUploadDecision(upload.submission_upload_id, updated.decision);
+      refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
     } catch (error) {
       showUploadActionError(error);
     }
@@ -123,6 +136,10 @@ export const useTicketTimelineUploadActions = () => {
         }
       );
 
+      // The ticket's timeline lists the upload's reviews, so every copy of its detail is out of date, including this page's,
+      // which reloads once any change to the ticket still being saved has settled.
+      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
+      reloadAfterPendingMutations(queryClient, ticketQueryKey);
       navigate(
         `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${insertedReview.submission_upload_review_id}`
       );

@@ -2,7 +2,13 @@ import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ITeamMember, ITeamMembersResponse } from 'interfaces/useTeamsApi.interface';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
 
 /** A member to remove from a team. */
@@ -13,7 +19,6 @@ export interface RemoveTeamMemberVariables {
 
 interface RemoveTeamMemberContext {
   membersQueryKey: QueryKey;
-  cancelledLoad: boolean;
   /** The removed member and where they stood, to put them back on failure. */
   removed: { member: ITeamMember; index: number } | undefined;
 }
@@ -21,6 +26,7 @@ interface RemoveTeamMemberContext {
 /**
  * Removes a member from a team, hiding them before the request completes.
  *
+ * On success the teams tables, which show member counts, are refreshed.
  * A failure puts the member back where they stood, unless they have reappeared since, and reports the error.
  * Removals can overlap, so every failure is reported here.
  *
@@ -32,10 +38,13 @@ export const useRemoveTeamMemberMutation = () => {
   const { setSnackbar } = useDialogContext();
 
   return useMutation<void, Error, RemoveTeamMemberVariables, RemoveTeamMemberContext>({
+    // Every membership change shares this key, so reloads of the members wait for the last of them.
+    mutationKey: teamQueryKeys.membershipChanges(),
     mutationFn: ({ teamId, teamMemberId }) => api.teams.deleteTeamMember(teamId, teamMemberId),
     onMutate: async ({ teamId, teamMemberId }) => {
       const membersQueryKey = teamQueryKeys.members(teamId);
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, membersQueryKey);
+      joinMutationGroup(queryClient, teamQueryKeys.membershipChanges());
+      await cancelQueryForOptimisticUpdate(queryClient, membersQueryKey, teamQueryKeys.membershipChanges());
       const members = queryClient.getQueryData<ITeamMembersResponse>(membersQueryKey)?.members ?? [];
       const index = members.findIndex((member) => member.team_member_id === teamMemberId);
       queryClient.setQueryData<ITeamMembersResponse>(
@@ -43,8 +52,9 @@ export const useRemoveTeamMemberMutation = () => {
         (current) =>
           current && { ...current, members: current.members.filter((member) => member.team_member_id !== teamMemberId) }
       );
-      return { membersQueryKey, cancelledLoad, removed: index > -1 ? { member: members[index], index } : undefined };
+      return { membersQueryKey, removed: index > -1 ? { member: members[index], index } : undefined };
     },
+    onSuccess: () => refreshChangedQueries(queryClient, changedQueryKeys.teamMembership()),
     onError: (error, { teamMemberId }, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
       const removed = context?.removed;
@@ -61,10 +71,6 @@ export const useRemoveTeamMemberMutation = () => {
         };
       });
     },
-    onSettled: (_data, _error, _variables, context) => {
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: context.membersQueryKey, exact: true });
-      }
-    }
+    onSettled: () => settleMutationGroup(queryClient, teamQueryKeys.membershipChanges())
   });
 };

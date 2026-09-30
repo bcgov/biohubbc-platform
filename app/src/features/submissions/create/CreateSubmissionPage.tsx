@@ -1,4 +1,5 @@
 import { Box, Button, Container, Paper, Stack } from '@mui/material';
+import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from 'components/header/PageHeader';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
@@ -6,6 +7,8 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { uploadMultipartTar } from 'utils/submission-upload-utils';
 import yup from 'utils/YupSchema';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
@@ -33,6 +36,7 @@ export const SubmissionYupSchema = yup.object().shape({
 export const CreateSubmissionPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const bioHubApi = useApi();
+  const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
   const navigate = useNavigate();
 
@@ -66,6 +70,7 @@ export const CreateSubmissionPage = () => {
         uploadResponse.key,
         parts
       );
+      refreshChangedQueries(queryClient, changedQueryKeys.submissionCreated());
 
       dialogContext.setSnackbar({
         snackbarMessage: `Successfully submitted "${values.name}"`,

@@ -1,6 +1,7 @@
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router-dom';
-import { render, waitFor } from 'test-helpers/test-utils';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { act, fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketsPage } from './TicketsPage';
 
@@ -10,6 +11,7 @@ const mockUseApi = useApi as Mock;
 
 const mockGetTickets = vi.fn();
 const mockCreateTicket = vi.fn();
+const mockUpdateTicketStatus = vi.fn();
 const sampleTicket = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
   ticket_slug: '04900001',
@@ -24,8 +26,20 @@ const sampleTicket = {
 const apiMock = {
   tickets: {
     getTicketsForAdmin: mockGetTickets,
-    createTicket: mockCreateTicket
+    createTicket: mockCreateTicket,
+    updateTicketStatus: mockUpdateTicketStatus
   }
+};
+
+/**
+ * Opens the first row's actions menu and picks a status action.
+ *
+ * @param {string} action The menu item's test id suffix, such as `Closeticket`.
+ * @returns {Promise<void>} Resolves once the action has been clicked.
+ */
+const toggleFirstTicket = async (action: string) => {
+  fireEvent.click((await screen.findAllByTestId('custom-menu-icon-Actions'))[0]);
+  fireEvent.click(await screen.findByTestId(`custom-menu-icon-item-${action}`));
 };
 
 describe('TicketsPage', () => {
@@ -93,5 +107,35 @@ describe('TicketsPage', () => {
     );
 
     expect(await findByText('No tickets')).toBeVisible();
+  });
+
+  it("keeps a row's latest status when an earlier toggle's response arrives last, and drops the ticket's cached details", async () => {
+    const responses: Record<string, (value: unknown) => void> = {};
+    mockUpdateTicketStatus.mockImplementation(
+      (_ticketId: string, status: string) => new Promise((done) => (responses[status] = done))
+    );
+    const queryClient = createTestQueryClient();
+    const cachedDetails = [
+      ['ticket', 'admin', 'detail', sampleTicket.ticket_id],
+      ['ticket', 'user', 'detail', sampleTicket.ticket_id]
+    ];
+    cachedDetails.forEach((key) => queryClient.setQueryData(key, sampleTicket));
+    render(
+      <MemoryRouter>
+        <TicketsPage />
+      </MemoryRouter>,
+      { queryClient }
+    );
+
+    await toggleFirstTicket('Closeticket');
+    await toggleFirstTicket('Reopenticket');
+    await waitFor(() => expect(mockUpdateTicketStatus).toHaveBeenCalledTimes(2));
+
+    await act(async () => responses.open({ ...sampleTicket, status: 'open' }));
+    await act(async () => responses.closed({ ...sampleTicket, status: 'closed' }));
+
+    const row = screen.getByText('#04900001').closest('[role="row"]') as HTMLElement;
+    expect(within(row).getByText('open')).toBeVisible();
+    expect(cachedDetails.map((key) => queryClient.getQueryData(key))).toEqual([undefined, undefined]);
   });
 });

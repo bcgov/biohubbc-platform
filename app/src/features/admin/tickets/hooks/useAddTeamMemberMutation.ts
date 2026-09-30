@@ -2,7 +2,13 @@ import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IAvailableUser, ITeamMember, ITeamMembersResponse } from 'interfaces/useTeamsApi.interface';
-import { cancelQueryForOptimisticUpdate } from 'utils/query-client';
+import {
+  cancelQueryForOptimisticUpdate,
+  joinMutationGroup,
+  refreshChangedQueries,
+  settleMutationGroup
+} from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
 
 /** A user to add to a team. */
@@ -13,7 +19,6 @@ export interface AddTeamMemberVariables {
 
 interface AddTeamMemberContext {
   membersQueryKey: QueryKey;
-  cancelledLoad: boolean;
   /** The placeholder member as cached. */
   placeholder: ITeamMember | undefined;
 }
@@ -21,8 +26,8 @@ interface AddTeamMemberContext {
 /**
  * Adds a user to a team, listing them before the request completes.
  *
- * On success the placeholder is replaced by the member the server created. A failure removes the placeholder and
- * reports the error. Additions can overlap, so every failure is reported here.
+ * On success the placeholder is replaced by the member the server created, and the teams tables, which show member
+ * counts, are refreshed. A failure removes the placeholder and reports the error. Additions can overlap, so every failure is reported here.
  *
  * @returns The mutation; call `mutate` with {@link AddTeamMemberVariables}.
  */
@@ -32,10 +37,13 @@ export const useAddTeamMemberMutation = () => {
   const { setSnackbar } = useDialogContext();
 
   return useMutation<ITeamMember, Error, AddTeamMemberVariables, AddTeamMemberContext>({
+    // Every membership change shares this key, so reloads of the members wait for the last of them.
+    mutationKey: teamQueryKeys.membershipChanges(),
     mutationFn: ({ teamId, user }) => api.teams.createTeamMember(teamId, user.system_user_id),
     onMutate: async ({ teamId, user }) => {
       const membersQueryKey = teamQueryKeys.members(teamId);
-      const cancelledLoad = await cancelQueryForOptimisticUpdate(queryClient, membersQueryKey);
+      joinMutationGroup(queryClient, teamQueryKeys.membershipChanges());
+      await cancelQueryForOptimisticUpdate(queryClient, membersQueryKey, teamQueryKeys.membershipChanges());
       const placeholderId = `optimistic-${user.system_user_id}-${Date.now()}`;
       const response = queryClient.setQueryData<ITeamMembersResponse>(membersQueryKey, (current) => ({
         ...current,
@@ -51,11 +59,11 @@ export const useAddTeamMemberMutation = () => {
       }));
       return {
         membersQueryKey,
-        cancelledLoad,
         placeholder: response?.members.find((member) => member.team_member_id === placeholderId)
       };
     },
     onSuccess: (created, _variables, context) => {
+      refreshChangedQueries(queryClient, changedQueryKeys.teamMembership());
       queryClient.setQueryData<ITeamMembersResponse>(context.membersQueryKey, (current) => {
         if (!current) {
           return current;
@@ -80,10 +88,6 @@ export const useAddTeamMemberMutation = () => {
           current && { ...current, members: current.members.filter((member) => member !== context.placeholder) }
       );
     },
-    onSettled: (_data, _error, _variables, context) => {
-      if (context?.cancelledLoad) {
-        void queryClient.invalidateQueries({ queryKey: context.membersQueryKey, exact: true });
-      }
-    }
+    onSettled: () => settleMutationGroup(queryClient, teamQueryKeys.membershipChanges())
   });
 };

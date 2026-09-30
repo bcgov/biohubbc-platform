@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useApi } from 'hooks/useApi';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import {
@@ -7,7 +9,8 @@ import {
 } from 'features/admin/reviews/submission-upload-query-keys';
 
 /**
- * Completes or reopens a review, writing the updated review into the review detail query.
+ * Completes or reopens a review, writing the updated review into the review detail query and refreshing the ticket
+ * timelines and dashboard lists that show review status.
  *
  * @param {SubmissionUploadReviewKeyScope} scope The review to update.
  * @returns The mutation; call `mutate` with the new status.
@@ -26,6 +29,7 @@ export const useUpdateSubmissionUploadReviewStatusMutation = (scope: SubmissionU
       ),
     onSuccess: (review) => {
       queryClient.setQueryData(submissionUploadQueryKeys.reviewDetail(scope), review);
+      refreshChangedQueries(queryClient, changedQueryKeys.reviewStatus());
     }
   });
 };

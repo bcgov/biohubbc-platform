@@ -3,6 +3,13 @@ import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
+ * Key prefix of every feature search: counts and results for any feature type, submissions and expression.
+ *
+ * @returns The feature searches key prefix.
+ */
+const features = () => [QUERY_KEY_ROOT.SEARCH, 'feature'] as const;
+
+/**
  * Key prefix of a feature search's count and every page of its results: one feature type, optionally limited to
  * some submissions.
  *
@@ -11,7 +18,7 @@ import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from '
  * @returns The feature search key prefix.
  */
 const featureScope = (featureTypeName: string, submissionIds: number[] | undefined) =>
-  [QUERY_KEY_ROOT.SEARCH, 'feature', featureTypeName, { submissionIds: submissionIds ?? null }] as const;
+  [...features(), featureTypeName, { submissionIds: submissionIds ?? null }] as const;
 
 /**
  * Key of the number of features matching an applied expression.
@@ -111,6 +118,7 @@ const taxonOptions = (keyword: string) => [QUERY_KEY_ROOT.SEARCH, 'taxon', 'opti
  * invalidates.
  */
 export const searchQueryKeys = {
+  features,
   featureScope,
   featureCount,
   featureResults,

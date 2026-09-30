@@ -1,15 +1,18 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router';
+import { QueryClient } from '@tanstack/react-query';
+import { createTestQueryClient } from 'test-helpers/query-client';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import ManageUsersPage from './ManageUsersPage';
 
-const renderContainer = () => {
+const renderContainer = (queryClient?: QueryClient) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <ManageUsersPage />
-    </MemoryRouter>
+    </MemoryRouter>,
+    { queryClient }
   );
 };
 
@@ -140,5 +143,22 @@ describe('ManageUsersPage', () => {
     await waitFor(() => expect(mocks.setSnackbar).toHaveBeenCalledOnce());
     render(mocks.setSnackbar.mock.calls[0][0].snackbarMessage);
     expect(screen.getByText('1 system user added.')).toBeVisible();
+  });
+
+  it("drops the signed-in user's cached record after a user change, since their own roles may have changed", async () => {
+    mockUseApi.admin.addSystemUser.mockResolvedValue(true);
+    mocks.newUsers = [newUser('a', 1)];
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(['user', 'self', 'subject-1'], {
+      system_user_id: 1,
+      role_names: ['System Administrator']
+    });
+    renderContainer(queryClient);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Users' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save users' }));
+
+    await waitFor(() => expect(mocks.setSnackbar).toHaveBeenCalledOnce());
+    expect(queryClient.getQueryData(['user', 'self', 'subject-1'])).toBeUndefined();
   });
 });

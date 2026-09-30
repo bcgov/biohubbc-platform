@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
+import { holdReload, joinMutationGroup, refreshChangedQueries, settleMutationGroup } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import {
   submissionUploadQueryKeys,
   SubmissionUploadReviewKeyScope
@@ -14,8 +16,9 @@ export interface RemoveFeatureSecurityRuleVariables {
 /**
  * Removes one direct security rule from one feature.
  *
- * On success every security-rule query for the review and every page of feature results is invalidated.
- * The feature count is left alone, since security does not change which features match.
+ * Once the review's last security change settles, every security-rule query for the review and every page of feature
+ * results reload; the feature count is left alone, since security does not change which features match. The
+ * submission's own pages are refreshed on success.
  *
  * @param {SubmissionUploadReviewKeyScope} scope The review the feature belongs to.
  * @returns The mutation; call `mutate` with {@link RemoveFeatureSecurityRuleVariables}.
@@ -25,6 +28,9 @@ export const useRemoveFeatureSecurityRuleMutation = (scope: SubmissionUploadRevi
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, RemoveFeatureSecurityRuleVariables>({
+    // Every security change in the review shares this key, so the reloads they need wait for the last of them.
+    mutationKey: submissionUploadQueryKeys.securityRules(scope),
+    onMutate: () => joinMutationGroup(queryClient, submissionUploadQueryKeys.securityRules(scope)),
     mutationFn: ({ submissionFeatureId, securityRuleId }) =>
       api.admin.deleteSubmissionUploadReviewSecurityRuleAssignments(
         scope.submissionId,
@@ -34,8 +40,21 @@ export const useRemoveFeatureSecurityRuleMutation = (scope: SubmissionUploadRevi
         securityRuleId
       ),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.securityRules(scope) });
-      void queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.featureSearchResultsAll(scope) });
-    }
+      // Held until the review's last security change settles, so a reload never lands between two changes.
+      holdReload(
+        queryClient,
+        submissionUploadQueryKeys.securityRules(scope),
+        submissionUploadQueryKeys.securityRules(scope),
+        false
+      );
+      holdReload(
+        queryClient,
+        submissionUploadQueryKeys.securityRules(scope),
+        submissionUploadQueryKeys.featureSearchResultsAll(scope),
+        false
+      );
+      refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
+    },
+    onSettled: () => settleMutationGroup(queryClient, submissionUploadQueryKeys.securityRules(scope))
   });
 };

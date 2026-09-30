@@ -13,13 +13,19 @@ const userList = (filters: SubmissionFilters, pagination: ApiPaginationRequestOp
   [QUERY_KEY_ROOT.SUBMISSION, 'user-list', { filters, pagination }] as const;
 
 /**
+ * Key prefix of the submission lists on the administrators' dashboard.
+ *
+ * @returns The admin dashboard lists key prefix.
+ */
+const adminLists = () => [QUERY_KEY_ROOT.SUBMISSION, 'admin-list'] as const;
+
+/**
  * Key of the submissions administrators see on their dashboard in one review state.
  *
  * @param {'unreviewed' | 'reviewed' | 'published'} reviewState The dashboard list.
  * @returns The admin dashboard list key.
  */
-const adminList = (reviewState: 'unreviewed' | 'reviewed' | 'published') =>
-  [QUERY_KEY_ROOT.SUBMISSION, 'admin-list', reviewState] as const;
+const adminList = (reviewState: 'unreviewed' | 'reviewed' | 'published') => [...adminLists(), reviewState] as const;
 
 /**
  * Key prefix of everything cached for one submission.
@@ -105,6 +111,7 @@ const featureProperties = (
  */
 export const submissionQueryKeys = {
   userList,
+  adminLists,
   adminList,
   submission,
   record,

@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
@@ -34,7 +36,10 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
         system_user_ids: values.system_user_ids,
         featureTypes: [featureTypeName],
         expression: expressionTree
-      })
+      }),
+    // A data request opens a ticket for its policy.
+    onSuccess: () =>
+      refreshChangedQueries(queryClient, [...changedQueryKeys.ticketLists(), ...changedQueryKeys.policy()])
   });
   const { mutate: createDataRequest } = createDataRequestMutation;
 

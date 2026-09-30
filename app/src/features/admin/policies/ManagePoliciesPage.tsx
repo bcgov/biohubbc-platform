@@ -1,4 +1,6 @@
 import Box from '@mui/material/Box';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Container from '@mui/material/Container';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from 'components/header/PageHeader';
@@ -15,7 +17,7 @@ import { TeamsContainer } from './components/TeamsContainer';
  * Admin page for managing policies, teams, and team-policy assignments.
  *
  * Each table keeps its page, sort and search as local state and loads the matching page through a query; a
- * container's `refresh` reloads every page of its table after a change.
+ * container's `refresh` refreshes every cached query its change makes out of date, its own table included.
  *
  * @returns {*}
  */
@@ -49,25 +51,29 @@ export const ManagePoliciesPage = () => {
   });
 
   /**
-   * Reloads every page of the policies table.
+   * Refreshes everything a policy change makes out of date: the policies and assignments tables, cached policy pages,
+   * and ticket timelines, which show the status of the data requests (policies) they link to.
    *
    * @returns {void}
    */
-  const refreshPolicies = () => void queryClient.invalidateQueries({ queryKey: policyQueryKeys.lists() });
+  const refreshPolicies = () =>
+    refreshChangedQueries(queryClient, [...changedQueryKeys.policy(), ...changedQueryKeys.ticketDetails()]);
 
   /**
-   * Reloads every page of the teams table.
+   * Refreshes everything a team change makes out of date: the teams and assignments tables, and the teams listed on
+   * cached policy pages.
    *
    * @returns {void}
    */
-  const refreshTeams = () => void queryClient.invalidateQueries({ queryKey: teamQueryKeys.lists() });
+  const refreshTeams = () => refreshChangedQueries(queryClient, changedQueryKeys.team());
 
   /**
-   * Reloads every page of the team-policy assignments table.
+   * Refreshes everything an assignment change makes out of date: the assignments table, and the teams listed on
+   * cached policy pages.
    *
    * @returns {void}
    */
-  const refreshTeamPolicies = () => void queryClient.invalidateQueries({ queryKey: teamPolicyQueryKeys.lists() });
+  const refreshTeamPolicies = () => refreshChangedQueries(queryClient, changedQueryKeys.teamPolicy());
 
   return (
     <>
