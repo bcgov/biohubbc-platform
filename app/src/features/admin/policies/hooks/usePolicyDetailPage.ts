@@ -67,7 +67,7 @@ export const usePolicyDetailPage = () => {
    * @returns {Promise<void>} Resolves after the visible policy has refreshed.
    */
   const refreshPolicy = (changedPolicyId: string): Promise<void> => {
-    refreshChangedQueries(queryClient, changedQueryKeys.policyListings());
+    void refreshChangedQueries(queryClient, changedQueryKeys.policyListings());
     return queryClient.invalidateQueries({ queryKey: policyQueryKeys.detail(changedPolicyId) });
   };
 

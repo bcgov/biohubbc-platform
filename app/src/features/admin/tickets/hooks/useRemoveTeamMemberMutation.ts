@@ -59,7 +59,7 @@ export const useRemoveTeamMemberMutation = () => {
       ) {
         holdReload(queryClient, teamQueryKeys.membershipChanges(), context.membersQueryKey);
       }
-      refreshChangedQueries(queryClient, changedQueryKeys.teamMembership());
+      void refreshChangedQueries(queryClient, changedQueryKeys.teamMembership());
     },
     onError: (error, { teamMemberId }, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });

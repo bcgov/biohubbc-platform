@@ -65,7 +65,7 @@ export const useAddTeamMemberMutation = () => {
       ) {
         holdReload(queryClient, teamQueryKeys.membershipChanges(), context.membersQueryKey);
       }
-      refreshChangedQueries(queryClient, changedQueryKeys.teamMembership());
+      void refreshChangedQueries(queryClient, changedQueryKeys.teamMembership());
       queryClient.setQueryData<ITeamMembersResponse>(context.membersQueryKey, (current) => {
         if (!current) {
           return current;

@@ -64,7 +64,7 @@ export const useTicketTimelineUploadActions = () => {
 
       await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
       await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
-      refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
     } catch (error) {
       showUploadActionError(error);
     }
@@ -95,7 +95,7 @@ export const useTicketTimelineUploadActions = () => {
 
       // The ticket's timeline lists the upload's reviews, so every copy of its detail is out of date, including this page's,
       // which reloads once any change to the ticket still being saved has settled.
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
       await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
       navigate(
         `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${insertedReview.submission_upload_review_id}`

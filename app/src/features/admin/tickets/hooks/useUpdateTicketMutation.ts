@@ -35,7 +35,7 @@ export const useUpdateTicketMutation = () => {
     onSuccess: async (_updatedTicket, _payload, context) => {
       await queryClient.cancelQueries({ queryKey: context.ticketQueryKey, exact: true });
       holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
-      refreshChangedQueries(queryClient, changedQueryKeys.ticket(context.ticketId), context.ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticket(context.ticketId), context.ticketQueryKey);
     },
     onError: (error) => setSnackbar({ open: true, snackbarMessage: error.message })
   });

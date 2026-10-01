@@ -78,7 +78,7 @@ export const useUpdateTicketSystemUserStatusMutation = () => {
       if (currentRow !== context.optimisticRow) {
         holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
       }
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, _variables, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });

@@ -61,7 +61,7 @@ export const TicketSidebarDataRequests = () => {
       });
       await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
       await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
-      refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
 
       setIsCreateDialogOpen(false);
     } catch (error) {

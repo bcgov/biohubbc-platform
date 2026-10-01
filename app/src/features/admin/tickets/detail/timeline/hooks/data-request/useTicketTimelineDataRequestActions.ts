@@ -51,7 +51,7 @@ export const useTicketTimelineDataRequestActions = () => {
 
       await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
       await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
-      refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({
@@ -229,7 +229,7 @@ export const useTicketTimelineDataRequestActions = () => {
 
       await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
       await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
-      refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
 
       dialogContext.setSnackbar({
         open: true,

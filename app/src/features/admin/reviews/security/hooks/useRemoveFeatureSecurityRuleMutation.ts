@@ -53,7 +53,7 @@ export const useRemoveFeatureSecurityRuleMutation = (scope: SubmissionUploadRevi
         submissionUploadQueryKeys.featureSearchResultsAll(scope),
         false
       );
-      refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
+      void refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
     }
   });
 };

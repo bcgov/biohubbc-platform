@@ -143,7 +143,7 @@ export const useChangeSecurityRuleAssignmentMutation = (scope: SubmissionUploadR
       for (const query of otherRuleQueries) {
         holdReload(queryClient, securityChanges, query.queryKey);
       }
-      refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
+      void refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
     }
   });
 };

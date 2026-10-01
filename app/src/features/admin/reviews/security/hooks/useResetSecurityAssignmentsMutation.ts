@@ -56,7 +56,7 @@ export const useResetSecurityAssignmentsMutation = (scope: SubmissionUploadRevie
         submissionUploadQueryKeys.featureSearchResultsAll(scope),
         false
       );
-      refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
+      void refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
     }
   });
 };

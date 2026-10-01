@@ -98,7 +98,7 @@ export const useUpdateTicketStatusMutation = () => {
             }
         );
       }
-      refreshChangedQueries(queryClient, changedQueryKeys.ticket(context.ticketId), context.ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticket(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, { status }, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });

@@ -58,7 +58,7 @@ export const useDeleteTicketReferenceMutation = () => {
       ) {
         holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
       }
-      refreshChangedQueries(
+      void refreshChangedQueries(
         queryClient,
         context.removed
           ? changedQueryKeys.ticketReference(context.removed.reference)

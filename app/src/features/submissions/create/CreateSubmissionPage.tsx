@@ -70,7 +70,7 @@ export const CreateSubmissionPage = () => {
         uploadResponse.key,
         parts
       );
-      refreshChangedQueries(queryClient, changedQueryKeys.submissionCreated());
+      void refreshChangedQueries(queryClient, changedQueryKeys.submissionCreated());
 
       dialogContext.setSnackbar({
         snackbarMessage: `Successfully submitted "${values.name}"`,

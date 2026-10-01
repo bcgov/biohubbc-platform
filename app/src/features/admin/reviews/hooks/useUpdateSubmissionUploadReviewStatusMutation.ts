@@ -32,7 +32,7 @@ export const useUpdateSubmissionUploadReviewStatusMutation = (scope: SubmissionU
       const reviewQueryKey = submissionUploadQueryKeys.reviewDetail(review.submission_upload_review_id);
       await queryClient.cancelQueries({ queryKey: reviewQueryKey, exact: true });
       queryClient.setQueryData(reviewQueryKey, review);
-      refreshChangedQueries(queryClient, changedQueryKeys.reviewStatus());
+      void refreshChangedQueries(queryClient, changedQueryKeys.reviewStatus());
     }
   });
 };

@@ -61,7 +61,7 @@ export const useRemoveTicketSystemUserMutation = () => {
       if (currentRow !== undefined) {
         holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
       }
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, ticketSystemUserId, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });

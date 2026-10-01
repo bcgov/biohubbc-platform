@@ -53,7 +53,7 @@ export const DownloadVersionExportButton = ({
         merge_steps: []
       };
       await api.downloadExport.createExport(downloadId, downloadVersionId, payload);
-      refreshChangedQueries(queryClient, changedQueryKeys.downloadExport(downloadId, downloadVersionId));
+      void refreshChangedQueries(queryClient, changedQueryKeys.downloadExport(downloadId, downloadVersionId));
       dialogContext.setSnackbar({ open: true, snackbarMessage: 'Export started.' });
     } catch {
       dialogContext.setErrorDialog({

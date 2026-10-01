@@ -102,7 +102,7 @@ export const useCreateTicketSystemUsersMutation = () => {
             })
           }
       );
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
     },
     onError: (error, _drafts, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });

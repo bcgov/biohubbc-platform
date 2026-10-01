@@ -77,7 +77,7 @@ export const TicketsPage = () => {
     onSuccess: async (_data, ticket) => {
       await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
       holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
-      refreshChangedQueries(queryClient, [
+      void refreshChangedQueries(queryClient, [
         ...changedQueryKeys.ticketDetail(ticket.ticket_id),
         ticketQueryKeys.lists('user')
       ]);
@@ -143,7 +143,7 @@ export const TicketsPage = () => {
       })) {
         holdReload(queryClient, ticketQueryKeys.lists('admin'), query.queryKey);
       }
-      refreshChangedQueries(queryClient, [
+      void refreshChangedQueries(queryClient, [
         ...changedQueryKeys.ticketDetail(ticket.ticket_id),
         ticketQueryKeys.lists('user')
       ]);
@@ -180,7 +180,7 @@ export const TicketsPage = () => {
       // Discard older reads now; reload all list pages after pending optimistic toggles settle.
       await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
       holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
-      refreshChangedQueries(queryClient, [ticketQueryKeys.lists('user')]);
+      void refreshChangedQueries(queryClient, [ticketQueryKeys.lists('user')]);
       setIsCreateDialogOpen(false);
     },
     onError: showApiErrorSnackbar
@@ -193,7 +193,7 @@ export const TicketsPage = () => {
     onSuccess: async (updatedTicket) => {
       await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
       holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
-      refreshChangedQueries(queryClient, [
+      void refreshChangedQueries(queryClient, [
         ...changedQueryKeys.ticketDetail(updatedTicket.ticket_id),
         ticketQueryKeys.lists('user')
       ]);
