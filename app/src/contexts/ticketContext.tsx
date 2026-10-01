@@ -1,23 +1,25 @@
-import { useApi } from 'hooks/useApi';
-import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
-import React, { PropsWithChildren, useEffect, useMemo } from 'react';
+import React, { PropsWithChildren, useMemo } from 'react';
 import { useParams } from 'react-router';
+import { TicketAccessScope, ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 
 export interface ITicketContext {
   ticketId: string;
-  ticketDataLoader: DataLoader<[string], ITicketExtended, unknown>;
+  /** Endpoints the ticket is read through: administrative routes read any ticket, portal routes the user's own. */
+  ticketScope: TicketAccessScope;
+  /** Key of the ticket detail query; components read it with `useTicketQuery` and patch it with `setQueryData`. */
+  ticketQueryKey: ReturnType<typeof ticketQueryKeys.detail>;
 }
 
 export const TicketContext = React.createContext<ITicketContext | undefined>(undefined);
-type TicketFetcher = (ticketId: string) => Promise<ITicketExtended>;
 
 /**
  * Reads and validates the route-level ticket identifier.
  *
- * This keeps route assumptions centralized so provider logic can focus on data loading.
+ * This keeps route assumptions centralized so provider logic can focus on the ticket it identifies.
  * Throwing here produces an immediate, explicit failure if route config/regression removes
  * the expected `ticketId` param.
+ *
+ * @returns {string} The ticket id from the route.
  */
 const useTicketIdFromRoute = (): string => {
   const { ticketId } = useParams<{ ticketId: string }>();
@@ -30,70 +32,43 @@ const useTicketIdFromRoute = (): string => {
 };
 
 /**
- * Shared hook that derives the `ITicketContext` value from a caller-provided fetcher.
+ * Provides the route's ticket id and the key its detail is cached under.
  *
- * The fetcher differs by caller (admin endpoint vs user endpoint), but context shape and
- * refresh behavior are identical, so this hook keeps that behavior in one place.
+ * @param {PropsWithChildren<{ ticketScope: TicketAccessScope }>} props The endpoints the ticket is read through.
+ * @returns {JSX.Element} The provider.
  */
-const useTicketContextValue = (fetchTicket: TicketFetcher): ITicketContext => {
+const TicketContextProvider = ({ children, ticketScope }: PropsWithChildren<{ ticketScope: TicketAccessScope }>) => {
   const ticketId = useTicketIdFromRoute();
-  const ticketDataLoader = useDataLoader(fetchTicket);
+  const value = useMemo(
+    () => ({ ticketId, ticketScope, ticketQueryKey: ticketQueryKeys.detail(ticketScope, ticketId) }),
+    [ticketId, ticketScope]
+  );
 
-  /**
-   * Always refresh when the route points to a different ticket.
-   *
-   * `useDataLoader` currently returns new method references on render, so adding those
-   * methods to deps causes needless refresh loops. The intended trigger is route change,
-   * therefore `ticketId` is the sole dependency.
-   */
-  useEffect(() => {
-    ticketDataLoader.refresh(ticketId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketId]);
-
-  return useMemo(
-    () => ({
-      ticketId,
-      ticketDataLoader
-    }),
-    [ticketId, ticketDataLoader]
+  // A different record owns different drafts and dialogs; pending saves retain the previous instance.
+  return (
+    <TicketContext.Provider key={ticketId} value={value}>
+      {children}
+    </TicketContext.Provider>
   );
 };
 
 /**
- * Internal reusable provider that wires a caller-specific ticket fetch function into the
- * shared ticket context value.
- */
-const TicketContextProvider = ({ children, fetchTicket }: PropsWithChildren<{ fetchTicket: TicketFetcher }>) => {
-  const value = useTicketContextValue(fetchTicket);
-
-  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
-};
-
-/**
- * Provides ticket route context for admin ticket detail pages.
- * Fetches ticket data using the administrative API endpoint.
+ * Provides ticket route context for admin ticket detail pages, which read the ticket through the administrative API.
  *
  * @param {PropsWithChildren} props
  * @return {*}
  */
 export const AdminTicketContextProvider = ({ children }: PropsWithChildren) => {
-  const api = useApi();
-  const getTicketForAdmin = api.tickets.getTicketForAdmin;
-
-  return <TicketContextProvider fetchTicket={getTicketForAdmin}>{children}</TicketContextProvider>;
+  return <TicketContextProvider ticketScope="admin">{children}</TicketContextProvider>;
 };
 
 /**
- * Provides ticket route context for portal (user-facing) ticket detail pages.
- * Fetches ticket data using the user API endpoint.
+ * Provides ticket route context for portal (user-facing) ticket detail pages, which read the ticket through the
+ * user API.
  *
  * @param {PropsWithChildren} props
  * @return {*}
  */
 export const UserTicketContextProvider = ({ children }: PropsWithChildren) => {
-  const api = useApi();
-  const getTicketForUser = api.tickets.getTicketForUser;
-
-  return <TicketContextProvider fetchTicket={getTicketForUser}>{children}</TicketContextProvider>;
+  return <TicketContextProvider ticketScope="user">{children}</TicketContextProvider>;
 };

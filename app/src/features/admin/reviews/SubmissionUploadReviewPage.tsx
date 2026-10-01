@@ -3,11 +3,11 @@ import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SubmissionUploadReviewSkeleton } from './components/loading/SubmissionUploadReviewSkeleton';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { SubmissionUploadReviewSecurityPage } from './security/SubmissionUploadReviewSecurityPage';
+import { submissionUploadQueryKeys } from './submission-upload-query-keys';
 import { SubmissionUploadReviewValidationPage } from './SubmissionUploadReviewValidationPage';
 
 /**
@@ -17,34 +17,34 @@ import { SubmissionUploadReviewValidationPage } from './SubmissionUploadReviewVa
  */
 export const SubmissionUploadReviewPage = () => {
   const api = useApi();
-  const { submissionId, submissionUploadId, submissionUploadReviewId } = useParams();
-  const reviewDataLoader = useDataLoader(
-    (currentSubmissionId: number, currentSubmissionUploadId: string, currentSubmissionUploadReviewId: string) =>
-      api.admin.getSubmissionUploadReview(
-        currentSubmissionId,
-        currentSubmissionUploadId,
-        currentSubmissionUploadReviewId
-      )
-  );
+  const { submissionId, submissionUploadId = '', submissionUploadReviewId = '' } = useParams();
+  const hasReviewParams = Boolean(submissionId && submissionUploadId && submissionUploadReviewId);
+  const scope = { submissionId: Number(submissionId), submissionUploadId, submissionUploadReviewId };
+  const reviewQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.reviewDetail(scope.submissionUploadReviewId),
+    queryFn: hasReviewParams
+      ? ({ signal }) =>
+          api.admin.getSubmissionUploadReview(
+            scope.submissionId,
+            scope.submissionUploadId,
+            scope.submissionUploadReviewId,
+            { signal }
+          )
+      : skipToken
+  });
 
-  useEffect(() => {
-    if (submissionId && submissionUploadId && submissionUploadReviewId) {
-      reviewDataLoader.load(Number(submissionId), submissionUploadId, submissionUploadReviewId);
-    }
-  }, [reviewDataLoader, submissionId, submissionUploadId, submissionUploadReviewId]);
-
-  if (!submissionId || !submissionUploadId || !submissionUploadReviewId) {
+  if (!hasReviewParams) {
     return <Navigate to="/page-not-found" replace />;
   }
 
-  const review = reviewDataLoader.data;
+  const review = reviewQuery.data;
 
   return (
     <LoadingGuard
-      isLoading={reviewDataLoader.isLoading && !reviewDataLoader.data}
+      isLoading={reviewQuery.isLoading}
       isLoadingFallback={<SubmissionUploadReviewSkeleton />}
       isLoadingFallbackDelay={300}
-      hasNoData={reviewDataLoader.isReady && !reviewDataLoader.data}
+      hasNoData={!reviewQuery.isPending && !review}
       hasNoDataFallback={
         <Box display="flex" justifyContent="center" minHeight={300} p={2}>
           <Typography color="text.secondary">No review found</Typography>

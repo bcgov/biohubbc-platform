@@ -38,6 +38,9 @@ const useDebounce = <T extends (...args: any[]) => void>(callback: T, msDelay = 
     return debounce(func, msDelay) as DebouncedFunc<T>;
   }, [msDelay]);
 
+  // A call still pending when the component unmounts, or the delay changes, is dropped rather than run afterwards.
+  useEffect(() => () => debouncedCallback.cancel(), [debouncedCallback]);
+
   return debouncedCallback;
 };
 

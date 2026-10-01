@@ -10,6 +10,7 @@ import { ISubmissionUploadReviewSelectedFeatureRule } from 'interfaces/useAdminA
 interface SelectedFeatureRulesPanelProps {
   rows: ISubmissionUploadReviewSelectedFeatureRule[];
   rowCount: number;
+  /** Whether the rules for the current scope are loading; rows on screen meanwhile cannot be toggled. */
   isLoading: boolean;
   error: unknown;
   searchTerm: string;
@@ -44,6 +45,7 @@ export const SelectedFeatureRulesPanel = (props: SelectedFeatureRulesPanelProps)
             size="small"
             variant={isApplied ? 'contained' : 'outlined'}
             color={isApplied ? 'success' : 'primary'}
+            disabled={props.isLoading}
             onClick={() => props.onChangeRule(row)}>
             {label}
           </Button>

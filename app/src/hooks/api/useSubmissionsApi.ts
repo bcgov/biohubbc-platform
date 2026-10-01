@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICreateSubmission,
   IGetSubmissionsForUserResponse,
@@ -25,15 +25,18 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
    * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated visible submission features.
    */
   const getSubmissionFeatures = async (
     submissionId: number,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureForReviewResponse> => {
     const { data } = await axios.get(`/api/submission/${submissionId}/feature`, {
       params: pagination,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -43,10 +46,14 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * Fetch submission record with security data by submission id.
    *
    * @param {number} submissionId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*}
    */
-  const getSubmissionRecordWithSecurity = async (submissionId: number): Promise<SubmissionRecordWithSecurity> => {
-    const { data } = await axios.get(`api/submission/${submissionId}`);
+  const getSubmissionRecordWithSecurity = async (
+    submissionId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurity> => {
+    const { data } = await axios.get(`api/submission/${submissionId}`, options);
 
     return data;
   };
@@ -54,10 +61,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have not completed security review.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getUnreviewedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/unreviewed`);
+  const getUnreviewedSubmissionsForAdmins = async (
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/unreviewed`, options);
 
     return data;
   };
@@ -65,10 +75,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getReviewedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/reviewed`);
+  const getReviewedSubmissionsForAdmins = async (
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/reviewed`, options);
 
     return data;
   };
@@ -76,10 +89,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review and published.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getPublishedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/published`);
+  const getPublishedSubmissionsForAdmins = async (
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/published`, options);
 
     return data;
   };
@@ -100,11 +116,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    *
    * @param {SubmissionFilters} [filters]
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<IGetSubmissionsForUserResponse>}
    */
   const getSubmissionsForUser = async (
     filters?: SubmissionFilters,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IGetSubmissionsForUserResponse> => {
     const params = {
       ...filters,
@@ -113,7 +131,8 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
 
     const { data } = await axios.get(`api/submission`, {
       params,
-      paramsSerializer: (queryParams) => qs.stringify(queryParams)
+      paramsSerializer: (queryParams) => qs.stringify(queryParams),
+      ...options
     });
 
     return data;

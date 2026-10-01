@@ -13,16 +13,8 @@ import { IPortalTicketDetailPageContentProps } from './PortalTicketDetailPageCon
  * @returns {JSX.Element}
  */
 export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageContentProps) => {
-  const {
-    ticket,
-    isLoading,
-    comment,
-    setComment,
-    isSavingComment,
-    isUploadingAttachment,
-    onAddComment,
-    onUploadAttachment
-  } = props;
+  const { ticket, comment, setComment, isSavingComment, isUploadingAttachment, onAddComment, onUploadAttachment } =
+    props;
 
   return (
     <>
@@ -40,7 +32,7 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
               alignItems: 'flex-start'
             }}>
             <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
-              <TicketTimeline ticket={ticket} isLoading={isLoading} />
+              <TicketTimeline ticket={ticket} />
               {ticket.status === 'open' ? (
                 <TicketComment
                   comment={comment}

@@ -1,7 +1,4 @@
 import Icon from '@mdi/react';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
@@ -15,7 +12,6 @@ import {
   TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
-import { SubmissionUploadStatusHistoryState } from '../hooks/upload/useSubmissionUploadStatusHistory';
 import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
 import { TicketTimelineCommentItem } from './comment/TicketTimelineCommentItem';
 import { TicketTimelineDataRequestItem } from './data-request/TicketTimelineDataRequestItem';
@@ -24,7 +20,6 @@ import { TicketUploadTimelineItem } from './TicketUploadTimelineItem';
 
 interface ITicketTimelineItemsProps {
   ticket: ITicketExtended;
-  isLoading: boolean;
   updatingDataRequestId: string | null;
   onArtifactLinkClick: (artifact: ITicketArtifact) => Promise<void>;
   onEditComment: (ticketCommentId: string) => void;
@@ -34,8 +29,6 @@ interface ITicketTimelineItemsProps {
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
   canViewSubmissionUploadStatusHistory: boolean;
-  submissionUploadStatusHistoryByUploadId: Record<string, SubmissionUploadStatusHistoryState>;
-  onLoadSubmissionUploadStatusHistory: (upload: TicketSubmissionUploadResponse) => void;
   onCreateSubmissionUploadReview: (
     upload: TicketSubmissionUploadResponse,
     scope: SubmissionUploadReviewScope,
@@ -58,7 +51,6 @@ interface ITicketTimelineItemsProps {
 export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
   const {
     ticket,
-    isLoading,
     updatingDataRequestId,
     onArtifactLinkClick,
     onEditComment,
@@ -68,8 +60,6 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
     canViewSubmissionUploadStatusHistory,
-    submissionUploadStatusHistoryByUploadId,
-    onLoadSubmissionUploadStatusHistory,
     onCreateSubmissionUploadReview,
     onOpenSubmissionUploadReview,
     onConfirmSubmissionUploadDecisionUpdate,
@@ -166,8 +156,6 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                 }) ?? ''
               }
               canViewStatusHistory={canViewSubmissionUploadStatusHistory}
-              statusHistory={submissionUploadStatusHistoryByUploadId[item.upload.submission_upload_id]}
-              onLoadStatusHistory={onLoadSubmissionUploadStatusHistory}
               onCreateReview={onCreateSubmissionUploadReview}
               onOpenReview={onOpenSubmissionUploadReview}
               onAccept={(upload) => onConfirmSubmissionUploadDecisionUpdate(upload, 'approved')}
@@ -231,16 +219,5 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     }
   });
 
-  return (
-    <LoadingGuard
-      isLoading={isLoading}
-      isLoadingFallback={
-        <Stack gap={1.5}>
-          <Skeleton variant="rounded" height={52} />
-          <Skeleton variant="rounded" height={52} />
-        </Stack>
-      }>
-      <CustomTimeline items={timelineItems} />
-    </LoadingGuard>
-  );
+  return <CustomTimeline items={timelineItems} />;
 };

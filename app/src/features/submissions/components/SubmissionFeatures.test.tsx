@@ -155,7 +155,9 @@ describe('SubmissionFeatures URL state', () => {
       '/submission/1/feature/10?feature_type=animal&cursor=NextCursor'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Back to submission' }));
-    await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Animal' })).toHaveAttribute('aria-pressed', 'true'));
+    // The page loaded moments ago is still fresh, so it is shown from the cache rather than requested again.
+    expect(mocks.searchFeatures).toHaveBeenCalledTimes(3);
     expect(mocks.searchFeatures).toHaveBeenLastCalledWith(
       'animal',
       null,

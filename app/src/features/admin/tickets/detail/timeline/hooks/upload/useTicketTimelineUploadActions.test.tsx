@@ -1,4 +1,7 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryObserver } from '@tanstack/react-query';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { useCoordinatedMutation } from 'hooks/useCoordinatedMutation';
+import { act, renderHook, waitFor } from 'test-helpers/test-utils';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
@@ -48,20 +51,51 @@ const upload: TicketSubmissionUploadResponse = {
 describe('useTicketTimelineUploadActions', () => {
   const insertSubmissionUploadReview = vi.fn();
   const setSnackbar = vi.fn();
+  const setYesNoDialog = vi.fn();
+  const updateSubmissionUploadDecision = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useApi as Mock).mockReturnValue({ tickets: { insertSubmissionUploadReview } });
+    (useApi as Mock).mockReturnValue({ tickets: { insertSubmissionUploadReview, updateSubmissionUploadDecision } });
     (useDialogContext as Mock).mockReturnValue({
       setSnackbar,
-      setYesNoDialog: vi.fn()
+      setYesNoDialog
     });
-    (useTicketContext as Mock).mockReturnValue({
-      ticketDataLoader: {
-        data: null,
-        setData: vi.fn()
-      }
+    (useTicketContext as Mock).mockReturnValue({ ticketQueryKey: ['ticket', 'admin', 'detail', 'ticket-id'] });
+  });
+
+  it('refreshes the server ticket after a decision without overwriting a pending optimistic change', async () => {
+    const queryClient = createTestQueryClient();
+    const queryKey = ['ticket', 'admin', 'detail', 'ticket-id'];
+    const original = { status: 'closed', submission_uploads: [upload] };
+    const saved = { ...original, submission_uploads: [{ ...upload, decision: 'approved' }] };
+    queryClient.setQueryData(queryKey, original);
+    const read = vi.fn().mockResolvedValue(saved);
+    const unsubscribe = new QueryObserver(queryClient, { queryKey, queryFn: read, staleTime: Infinity }).subscribe(
+      () => undefined
+    );
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
     });
+    const { result: mutation } = renderHook(
+      () => useCoordinatedMutation({ mutationKey: queryKey, mutationFn: () => pending }),
+      { queryClient }
+    );
+    act(() => mutation.current.mutate());
+    await waitFor(() => expect(mutation.current.isPending).toBe(true));
+    updateSubmissionUploadDecision.mockResolvedValue({ decision: 'approved' });
+    const { result } = renderHook(() => useTicketTimelineUploadActions(), { queryClient });
+
+    act(() => result.current.handleConfirmSubmissionUploadDecisionUpdate(upload, 'approved'));
+    const { onYes } = setYesNoDialog.mock.lastCall![0];
+    await act(async () => onYes());
+    expect(updateSubmissionUploadDecision).toHaveBeenCalledWith(17, submissionUploadId, { decision: 'approved' });
+    expect(read).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(queryKey)).toEqual(original);
+    await act(async () => finish());
+    await waitFor(() => expect(queryClient.getQueryData(queryKey)).toEqual(saved));
+    unsubscribe();
   });
 
   it('creates an in-progress security review and navigates to the returned review', async () => {

@@ -1,6 +1,6 @@
 import { FEATURE_GEOMETRIES_SOURCE_ID } from 'components/map/geometry-tile-layers';
 import type { ITileExtentSession } from 'interfaces/useMartinApi.interface';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
 import { SubmissionUploadReviewMap } from './SubmissionUploadReviewMap';
 
 const mocks = vi.hoisted(() => ({
@@ -114,7 +114,7 @@ describe('SubmissionUploadReviewMap', () => {
     expect(mocks.extent).not.toHaveBeenCalled();
   });
 
-  it('ignores stale extents and preserves manual zoom for the new selection', async () => {
+  it("cancels the previous selection's extent request and preserves manual zoom for the new selection", async () => {
     let resolve!: (value: unknown) => void;
     mocks.extent.mockReturnValueOnce(
       new Promise((done) => {

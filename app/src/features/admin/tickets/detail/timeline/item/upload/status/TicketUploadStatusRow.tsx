@@ -5,9 +5,12 @@ import ButtonBase from '@mui/material/ButtonBase';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Typography from '@mui/material/Typography';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
+import { useApi } from 'hooks/useApi';
+import { useCallback, useId, useState } from 'react';
 import { getSubmissionUploadJobStatusPresentation } from 'utils/submission-upload-status';
-import { ITicketUploadStatusRowProps } from '../TicketUploadTimelineItem.interface';
+import { ITicketUploadStatusRowProps, SubmissionUploadStatusHistoryState } from '../TicketUploadTimelineItem.interface';
 import { TicketUploadStatusHistory } from './TicketUploadStatusHistory';
 
 /**
@@ -16,30 +19,47 @@ import { TicketUploadStatusHistory } from './TicketUploadStatusHistory';
  *
  * The history endpoint is admin-only, so the row is expandable only when `canViewStatusHistory` is
  * set; otherwise it is a static row showing the current status and never requests the history. When
- * expandable, the history is requested whenever the row is expanded, or the upload's status changes
- * while it is expanded, and comes from the timeline-level cache, so re-expanding reuses a loaded
- * response and retries a failed one. Nothing below the current status renders until the row has
- * been expanded.
+ * expandable, the history is loaded while the row is expanded and cached per upload and current
+ * status, so re-expanding reuses a loaded history, a status change loads the grown one, and a failed
+ * request is retried the next time the row is expanded. Nothing below the current status renders
+ * until the row has been expanded.
  *
  * @param {ITicketUploadStatusRowProps} props
  * @return {*}
  */
 export const TicketUploadStatusRow = (props: ITicketUploadStatusRowProps) => {
-  const { upload, canViewStatusHistory, statusHistory, onLoadStatusHistory } = props;
+  const { upload, canViewStatusHistory } = props;
+  const api = useApi();
   const [isExpanded, setIsExpanded] = useState(false);
   const historyRegionId = useId();
+
+  const historyQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.statusHistory(
+      { submissionId: upload.submission_id, submissionUploadId: upload.submission_upload_id },
+      upload.upload_status
+    ),
+    queryFn: ({ signal }) =>
+      api.tickets.getSubmissionUploadProcessingStatusHistory(upload.submission_id, upload.submission_upload_id, {
+        signal
+      }),
+    enabled: canViewStatusHistory && isExpanded,
+    staleTime: Infinity
+  });
+
+  let statusHistory: SubmissionUploadStatusHistoryState | undefined;
+  if (historyQuery.data) {
+    statusHistory = { status: 'loaded', history: historyQuery.data };
+  } else if (historyQuery.error && !historyQuery.isFetching) {
+    statusHistory = { status: 'error', message: historyQuery.error.message };
+  } else if (historyQuery.isFetching) {
+    statusHistory = { status: 'loading' };
+  }
 
   const presentation = getSubmissionUploadJobStatusPresentation(upload.upload_status);
   const showStatusIcon = presentation.isTerminal || !presentation.isKnown;
 
-  useEffect(() => {
-    if (canViewStatusHistory && isExpanded) {
-      onLoadStatusHistory(upload);
-    }
-  }, [canViewStatusHistory, isExpanded, onLoadStatusHistory, upload]);
-
   /**
-   * Flip the expanded state; the effect above requests the history for the expanded row.
+   * Flip the expanded state; the history query loads while the row is expanded.
    *
    * @returns {void}
    */

@@ -1,14 +1,15 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Container from '@mui/material/Container';
-import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import useDebounce from 'hooks/useDebounce';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { useCallback, useEffect, useState } from 'react';
-import { ApiPaginationRequestOptions } from 'types/pagination';
-import { toApiPagination } from 'utils/pagination';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
+import { teamPolicyQueryKeys } from 'utils/query-keys/team-policy-query-keys';
+import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
 import { PoliciesContainer } from './components/PoliciesContainer';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
@@ -16,127 +17,109 @@ import { TeamsContainer } from './components/TeamsContainer';
 /**
  * Admin page for managing policies, teams, and team-policy assignments.
  *
+ * Each table keeps its page, sort and search as local state and loads the matching page through a query; a
+ * container's `refresh` refreshes every cached query its change makes out of date, its own table included.
+ *
  * @returns {*}
  */
 export const ManagePoliciesPage = () => {
   const biohubApi = useApi();
+  const queryClient = useQueryClient();
 
-  const policies = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) => biohubApi.policies.getPolicies({ search }, pagination),
-    extractData: (response) => response.policies,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'name', sort: 'asc' }
+  const policiesGrid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
+  const policiesSearch = { search: policiesGrid.debouncedSearchTerm };
+  const policiesQuery = useQuery({
+    queryKey: policyQueryKeys.list(policiesSearch, policiesGrid.apiPagination),
+    queryFn: ({ signal }) => biohubApi.policies.getPolicies(policiesSearch, policiesGrid.apiPagination, { signal }),
+    placeholderData: keepPreviousData
   });
 
-  const teams = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) => biohubApi.teams.getTeams({ search }, pagination),
-    extractData: (response) => response.teams,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'name', sort: 'asc' }
+  const teamsGrid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
+  const teamsSearch = { search: teamsGrid.debouncedSearchTerm };
+  const teamsQuery = useQuery({
+    queryKey: teamQueryKeys.list(teamsSearch, teamsGrid.apiPagination),
+    queryFn: ({ signal }) => biohubApi.teams.getTeams(teamsSearch, teamsGrid.apiPagination, { signal }),
+    placeholderData: keepPreviousData
   });
 
-  const [teamPoliciesPaginationModel, setTeamPoliciesPaginationModel] = useState<GridPaginationModel>({
-    page: 0,
-    pageSize: 10
+  const teamPoliciesGrid = useServerPaginatedGridState({ defaultSort: { field: 'team_name', sort: 'asc' } });
+  const teamPoliciesSearch = { search: teamPoliciesGrid.debouncedSearchTerm };
+  const teamPoliciesQuery = useQuery({
+    queryKey: teamPolicyQueryKeys.list(teamPoliciesSearch, teamPoliciesGrid.apiPagination),
+    queryFn: ({ signal }) =>
+      biohubApi.teamPolicies.getTeamPolicies(teamPoliciesSearch, teamPoliciesGrid.apiPagination, { signal }),
+    placeholderData: keepPreviousData
   });
-  const [teamPoliciesSortModel, setTeamPoliciesSortModel] = useState<GridSortModel>([
-    { field: 'team_name', sort: 'asc' }
-  ]);
-  const [teamPoliciesSearchTerm, setTeamPoliciesSearchTerm] = useState('');
-  const [debouncedTeamPoliciesSearchTerm, setDebouncedTeamPoliciesSearchTerm] = useState('');
 
-  const teamPoliciesDataLoader = useDataLoader((search: string, pagination: ApiPaginationRequestOptions) =>
-    biohubApi.teamPolicies.getTeamPolicies({ search }, pagination)
-  );
+  /**
+   * Refreshes everything a policy change makes out of date: the policies and assignments tables, cached policy pages,
+   * and ticket timelines, which show the status of the data requests (policies) they link to.
+   *
+   * @returns {void}
+   */
+  const refreshPolicies = () =>
+    refreshChangedQueries(queryClient, [...changedQueryKeys.policy(), ...changedQueryKeys.ticketDetails()]);
 
-  useEffect(() => {
-    const apiPagination = toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel);
-    teamPoliciesDataLoader.load(debouncedTeamPoliciesSearchTerm, apiPagination);
-  }, [debouncedTeamPoliciesSearchTerm, teamPoliciesDataLoader, teamPoliciesPaginationModel, teamPoliciesSortModel]);
+  /**
+   * Refreshes everything a team change makes out of date: the teams and assignments tables, and the teams listed on
+   * cached policy pages.
+   *
+   * @returns {void}
+   */
+  const refreshTeams = () => refreshChangedQueries(queryClient, changedQueryKeys.team());
 
-  const debouncedTeamPoliciesRefresh = useDebounce((searchTerm: string) => {
-    setDebouncedTeamPoliciesSearchTerm(searchTerm);
-    const resetPaginationModel = { ...teamPoliciesPaginationModel, page: 0 };
-    setTeamPoliciesPaginationModel(resetPaginationModel);
-    const apiPagination = toApiPagination(resetPaginationModel, teamPoliciesSortModel);
-    teamPoliciesDataLoader.refresh(searchTerm, apiPagination);
-  }, 300);
-
-  const handleTeamPoliciesPaginationChange = useCallback(
-    (model: GridPaginationModel) => {
-      setTeamPoliciesPaginationModel(model);
-      const apiPagination = toApiPagination(model, teamPoliciesSortModel);
-      teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [teamPoliciesSortModel, debouncedTeamPoliciesSearchTerm]
-  );
-
-  const handleTeamPoliciesSortChange = useCallback(
-    (model: GridSortModel) => {
-      setTeamPoliciesSortModel(model);
-      const apiPagination = toApiPagination(teamPoliciesPaginationModel, model);
-      teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [teamPoliciesPaginationModel, debouncedTeamPoliciesSearchTerm]
-  );
-
-  const refreshTeamPolicies = useCallback(() => {
-    const apiPagination = toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel);
-    teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamPoliciesPaginationModel, teamPoliciesSortModel, debouncedTeamPoliciesSearchTerm]);
-
-  const handleTeamPoliciesSearch = useCallback(
-    (searchTerm: string) => {
-      setTeamPoliciesSearchTerm(searchTerm);
-      debouncedTeamPoliciesRefresh(searchTerm);
-    },
-    [debouncedTeamPoliciesRefresh]
-  );
+  /**
+   * Refreshes everything an assignment change makes out of date: the assignments table, and the teams listed on
+   * cached policy pages.
+   *
+   * @returns {void}
+   */
+  const refreshTeamPolicies = () => refreshChangedQueries(queryClient, changedQueryKeys.teamPolicy());
 
   return (
     <>
       <PageHeader label="Manage Policies" />
       <Box py={4}>
+        <QueryErrorDialog error={policiesQuery.error} label="policies" />
         <PoliciesContainer
-          policies={policies.rows}
-          rowCount={policies.rowCount}
-          paginationModel={policies.paginationModel}
-          setPaginationModel={policies.handlePaginationChange}
-          sortModel={policies.sortModel}
-          setSortModel={policies.handleSortChange}
-          refresh={policies.refresh}
-          searchTerm={policies.searchTerm}
-          onSearch={policies.handleSearch}
+          policies={policiesQuery.data?.policies ?? []}
+          rowCount={policiesQuery.data?.pagination.total ?? 0}
+          paginationModel={policiesGrid.paginationModel}
+          setPaginationModel={policiesGrid.handlePaginationChange}
+          sortModel={policiesGrid.sortModel}
+          setSortModel={policiesGrid.handleSortChange}
+          refresh={refreshPolicies}
+          searchTerm={policiesGrid.searchTerm}
+          onSearch={policiesGrid.handleSearch}
         />
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
+          <QueryErrorDialog error={teamsQuery.error} label="teams" />
           <TeamsContainer
-            teams={teams.rows}
-            rowCount={teams.rowCount}
-            paginationModel={teams.paginationModel}
-            setPaginationModel={teams.handlePaginationChange}
-            sortModel={teams.sortModel}
-            setSortModel={teams.handleSortChange}
-            refresh={teams.refresh}
-            searchTerm={teams.searchTerm}
-            onSearch={teams.handleSearch}
+            teams={teamsQuery.data?.teams ?? []}
+            rowCount={teamsQuery.data?.pagination.total ?? 0}
+            paginationModel={teamsGrid.paginationModel}
+            setPaginationModel={teamsGrid.handlePaginationChange}
+            sortModel={teamsGrid.sortModel}
+            setSortModel={teamsGrid.handleSortChange}
+            refresh={refreshTeams}
+            searchTerm={teamsGrid.searchTerm}
+            onSearch={teamsGrid.handleSearch}
           />
         </Container>
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
+          <QueryErrorDialog error={teamPoliciesQuery.error} label="team-policy assignments" />
           <TeamPoliciesContainer
-            teamPolicies={teamPoliciesDataLoader.data?.team_policies ?? []}
-            rowCount={teamPoliciesDataLoader.data?.pagination.total ?? 0}
-            paginationModel={teamPoliciesPaginationModel}
-            setPaginationModel={handleTeamPoliciesPaginationChange}
-            sortModel={teamPoliciesSortModel}
-            setSortModel={handleTeamPoliciesSortChange}
+            teamPolicies={teamPoliciesQuery.data?.team_policies ?? []}
+            rowCount={teamPoliciesQuery.data?.pagination.total ?? 0}
+            paginationModel={teamPoliciesGrid.paginationModel}
+            setPaginationModel={teamPoliciesGrid.handlePaginationChange}
+            sortModel={teamPoliciesGrid.sortModel}
+            setSortModel={teamPoliciesGrid.handleSortChange}
             refresh={refreshTeamPolicies}
-            searchTerm={teamPoliciesSearchTerm}
-            onSearch={handleTeamPoliciesSearch}
+            searchTerm={teamPoliciesGrid.searchTerm}
+            onSearch={teamPoliciesGrid.handleSearch}
           />
         </Container>
       </Box>

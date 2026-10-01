@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import {
   IGetSystemUsersResponse,
@@ -18,10 +18,11 @@ const useUserApi = (axios: AxiosInstance) => {
   /**
    * Get all roles
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*}  {Promise<IGetRoles[]>}
    */
-  const getRoles = async (): Promise<IGetRoles[]> => {
-    const { data } = await axios.get('/api/user/role/list');
+  const getRoles = async (options?: Pick<AxiosRequestConfig, 'signal'>): Promise<IGetRoles[]> => {
+    const { data } = await axios.get('/api/user/role/list', options);
 
     return data;
   };
@@ -67,12 +68,17 @@ const useUserApi = (axios: AxiosInstance) => {
   /**
    * Get user details for all users.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*}  {Promise<ISystemUser[]>}
    */
-  const getUsersList = async (params?: ISystemUsersQueryParams): Promise<IGetSystemUsersResponse> => {
+  const getUsersList = async (
+    params?: ISystemUsersQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IGetSystemUsersResponse> => {
     const { data } = await axios.get('/api/user/list', {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;

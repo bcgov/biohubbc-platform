@@ -57,3 +57,6 @@ export const TICKET_SYSTEM_USER_STATUS_PRESENTATION: Record<
     icon: mdiCheck
   }
 };
+
+/** Sort applied to ticket lists before the user picks one: newest first. */
+export const TICKETS_LIST_DEFAULT_SORT = { field: 'create_date', sort: 'desc' } as const;

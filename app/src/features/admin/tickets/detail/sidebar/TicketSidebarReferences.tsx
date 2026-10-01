@@ -1,8 +1,8 @@
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { APIError } from 'hooks/api/useAxios';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useTicketContext } from 'hooks/useContext';
+import { useTicketQuery } from '../../hooks/useTicketQuery';
 import { CreateTicketReferenceDialog } from '../../components/dialog/reference/CreateTicketReferenceDialog';
 import { useTicketReference } from '../../hooks/useTicketReference';
 import { formatRelationship } from '../../utils/formatRelationship';
@@ -15,9 +15,8 @@ import { TicketSidebarSection } from './TicketSidebarSection';
  * @return {*}
  */
 export const TicketSidebarReferences = () => {
-  const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
-  const references = ticketDataLoader.data?.references ?? [];
+  const { ticketId } = useTicketContext();
+  const references = useTicketQuery().data?.references ?? [];
   const {
     isSubmittingReference,
     isCreateReferenceDialogOpen,
@@ -52,21 +51,7 @@ export const TicketSidebarReferences = () => {
                   label={`${formatRelationship(reference.relationship)} #${relatedTicketSlug}: ${relatedTicketSubject}`}
                   href={`/admin/tickets/${relatedTicketId}`}
                   isDisabled={isSubmittingReference}
-                  onRemove={() => {
-                    const removeReference = async () => {
-                      try {
-                        await handleDeleteReference(reference.ticket_reference_id);
-                      } catch (caughtError) {
-                        const apiError = caughtError as APIError;
-                        dialogContext.setSnackbar({
-                          open: true,
-                          snackbarMessage: apiError.message
-                        });
-                      }
-                    };
-
-                    removeReference();
-                  }}
+                  onRemove={() => handleDeleteReference(reference.ticket_reference_id)}
                 />
               );
             })}

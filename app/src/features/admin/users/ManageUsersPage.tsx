@@ -1,26 +1,29 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { AddSystemUserI18N, BlockSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import groupBy from 'lodash-es/groupBy';
+import { useCallback, useMemo, useState } from 'react';
+import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 import ActiveUsersList from './ActiveUsersList';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
   AddSystemUsersFormYupSchema,
   IAddSystemUsersForm
 } from './AddSystemUsersForm';
-
-const DEFAULT_PAGE_SIZE = 10;
 
 /**
  * Page to display user management data/functionality.
@@ -34,21 +37,32 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const [activeTab, setActiveTab] = useState<'users'>('users');
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
 
-  const rolesDataLoader = useDataLoader(() => biohubApi.user.getRoles());
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    rolesDataLoader.load();
-  }, [rolesDataLoader]);
-
-  const usersGrid = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) => biohubApi.user.getUsersList({ search, ...pagination }),
-    extractData: (response) => response.users,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'user_identifier', sort: 'asc' },
-    defaultPageSize: DEFAULT_PAGE_SIZE
+  const rolesQuery = useQuery({
+    queryKey: userQueryKeys.roles(),
+    queryFn: ({ signal }) => biohubApi.user.getRoles({ signal })
   });
 
-  const systemRoles = rolesDataLoader.data || [];
+  const usersGrid = useServerPaginatedGridState({ defaultSort: { field: 'user_identifier', sort: 'asc' } });
+  const usersParams = { search: usersGrid.debouncedSearchTerm, ...usersGrid.apiPagination };
+  const usersQuery = useQuery({
+    queryKey: userQueryKeys.list(usersParams),
+    queryFn: ({ signal }) => biohubApi.user.getUsersList(usersParams, { signal }),
+    placeholderData: keepPreviousData
+  });
+
+  const systemRoles = rolesQuery.data ?? [];
+
+  /**
+   * Reloads every page of the users table after a user changes, and the user pickers that search the same users.
+   *
+   * @returns {void}
+   */
+  const refreshUsers = useCallback(
+    () => refreshChangedQueries(queryClient, changedQueryKeys.systemUser()),
+    [queryClient]
+  );
 
   const closeYesNoDialog = useCallback(() => {
     dialogContext.setYesNoDialog({ open: false });
@@ -78,7 +92,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const handleUpdateUserRecordEndDate = useCallback(
     async (user: ISystemUser, recordEndDate: string | null) => {
       await biohubApi.user.updateSystemUser(user.system_user_id, { record_end_date: recordEndDate });
-      usersGrid.refresh();
+      refreshUsers();
 
       dialogContext.setSnackbar({
         open: true,
@@ -89,7 +103,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         )
       });
     },
-    [biohubApi.user, dialogContext, usersGrid]
+    [biohubApi.user, dialogContext, refreshUsers]
   );
 
   const handleBlockUser = useCallback(
@@ -169,7 +183,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
       const handleConfirmRoleChange = async () => {
         try {
           await biohubApi.user.updateSystemUserRoles(user.system_user_id, [roleId]);
-          usersGrid.refresh();
+          refreshUsers();
 
           dialogContext.setSnackbar({
             open: true,
@@ -206,38 +220,54 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         onYes: handleConfirmRoleChange
       });
     },
-    [biohubApi.user, closeYesNoDialog, dialogContext, showApiErrorDialog, usersGrid]
+    [biohubApi.user, closeYesNoDialog, dialogContext, showApiErrorDialog, refreshUsers]
   );
 
   const handleAddSystemUsersSave = useCallback(
     async (values: IAddSystemUsersForm) => {
       setOpenAddUserDialog(false);
 
-      try {
-        for (const systemUser of values.systemUsers) {
-          await biohubApi.admin.addSystemUser(
-            systemUser.userIdentifier,
-            systemUser.userGuid,
-            systemUser.identitySource,
-            systemUser.systemRole
-          );
-        }
-
-        usersGrid.refresh();
-
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: (
-            <Typography variant="body2" component="div">
-              {values.systemUsers.length} system {values.systemUsers.length > 1 ? 'users' : 'user'} added.
-            </Typography>
+      // Different users are added together. Rows naming the same user are sent one after another, since the server
+      // reads or creates the user and two concurrent requests for one user would race that read. The server finds a
+      // user by GUID alone, ignoring case, so rows are grouped the same way.
+      const rowsByUser = groupBy(values.systemUsers, (systemUser) => systemUser.userGuid.toLowerCase());
+      const addedUserCount = Object.keys(rowsByUser).length;
+      const results = await Promise.allSettled(
+        Object.values(rowsByUser).map((rows) =>
+          rows.reduce<Promise<unknown>>(
+            (previous, systemUser) =>
+              previous.then(() =>
+                biohubApi.admin.addSystemUser(
+                  systemUser.userIdentifier,
+                  systemUser.userGuid,
+                  systemUser.identitySource,
+                  systemUser.systemRole
+                )
+              ),
+            Promise.resolve()
           )
-        });
-      } catch (caughtError) {
-        showApiErrorDialog(caughtError, AddSystemUserI18N.addUserErrorTitle, AddSystemUserI18N.addUserErrorText);
+        )
+      );
+
+      // Users added before a failure are listed whether or not every request succeeded.
+      refreshUsers();
+
+      const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failure) {
+        showApiErrorDialog(failure.reason, AddSystemUserI18N.addUserErrorTitle, AddSystemUserI18N.addUserErrorText);
+        return;
       }
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            {addedUserCount} system {addedUserCount > 1 ? 'users' : 'user'} added.
+          </Typography>
+        )
+      });
     },
-    [biohubApi.admin, dialogContext, showApiErrorDialog, usersGrid]
+    [biohubApi.admin, dialogContext, showApiErrorDialog, refreshUsers]
   );
 
   const rowActions = useMemo(
@@ -278,9 +308,11 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
       </Paper>
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+        <QueryErrorDialog error={usersQuery.error} label="users" />
+        <QueryErrorDialog error={rolesQuery.error} label="user roles" />
         <ActiveUsersList
-          rows={usersGrid.rows}
-          rowCount={usersGrid.rowCount}
+          rows={usersQuery.data?.users ?? []}
+          rowCount={usersQuery.data?.pagination.total ?? 0}
           paginationModel={usersGrid.paginationModel}
           setPaginationModel={usersGrid.handlePaginationChange}
           sortModel={usersGrid.sortModel}

@@ -24,6 +24,32 @@ describe('useAdminApi', () => {
     expect(mock.history.post).toHaveLength(0);
   });
 
+  it('forwards the abort signal on the security review reads', async () => {
+    const signal = new AbortController().signal;
+    mock.onGet().reply(200, {});
+    mock.onPost().reply(200, {});
+    const api = useAdminApi(axios);
+    const pagination = { page: 1, limit: 10 };
+
+    await api.getSubmissionUploadReview(16, 'upload-id', 'review-id', { signal });
+    await api.getSubmissionUploadFeature(16, 'upload-id', 12, { signal });
+    await api.getSubmissionUploadFeatureProperties(16, 'upload-id', 12, pagination, { signal });
+    await api.getSubmissionUploadReviewFeatureRules(16, 'upload-id', 'review-id', 12, pagination, { signal });
+    await api.getSubmissionUploadReviewSelectedFeatureRules(16, 'upload-id', 'review-id', [], {}, pagination, {
+      signal
+    });
+
+    expect([...mock.history.get, ...mock.history.post].map((request) => request.signal)).toEqual([
+      signal,
+      signal,
+      signal,
+      signal,
+      signal
+    ]);
+    expect(mock.history.get[2].params).toEqual(pagination);
+    expect(mock.history.get[3].params).toEqual(pagination);
+  });
+
   it('gets paginated submission features from the administrative endpoint', async () => {
     const mockResponse = {
       features: [],

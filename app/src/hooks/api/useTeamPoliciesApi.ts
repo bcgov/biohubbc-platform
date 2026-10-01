@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICreateTeamPoliciesRequest,
   ICreateTeamPoliciesResponse,
@@ -21,14 +21,16 @@ export const useTeamPoliciesApi = (axios: AxiosInstance) => {
    *
    * @param {ApiSearchParams} [searchParams] - Optional search parameters.
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITeamPoliciesResponse>}
    */
   const getTeamPolicies = async (
     searchParams?: ITeamPolicySearchParams,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ITeamPoliciesResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/policies/team', { params });
+    const { data } = await axios.get('/api/administrative/policies/team', { params, ...options });
 
     return data;
   };

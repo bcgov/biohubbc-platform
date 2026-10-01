@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICreateSecurityCategoryRequest,
   ICreateSecurityReasonRequest,
@@ -70,14 +70,16 @@ const useSecurityApi = (axios: AxiosInstance) => {
    *
    * @param {ApiSearchParams} [searchParams]
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISecurityCategoriesResponse>}
    */
   const getSecurityCategories = async (
     searchParams?: ApiSearchParams,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISecurityCategoriesResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/security/categories', { params });
+    const { data } = await axios.get('/api/administrative/security/categories', { params, ...options });
 
     return data;
   };
@@ -87,14 +89,16 @@ const useSecurityApi = (axios: AxiosInstance) => {
    *
    * @param {ApiSearchParams} [searchParams]
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISecurityReasonsResponse>}
    */
   const getSecurityReasons = async (
     searchParams?: ApiSearchParams,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISecurityReasonsResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/security/reasons', { params });
+    const { data } = await axios.get('/api/administrative/security/reasons', { params, ...options });
 
     return data;
   };

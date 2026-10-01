@@ -1,14 +1,14 @@
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { TicketSidebarItem } from 'features/admin/tickets/detail/sidebar/TicketSidebarItem';
 import { TicketSidebarSection } from 'features/admin/tickets/detail/sidebar/TicketSidebarSection';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
-import { useEffect } from 'react';
+import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
 import { getUserLabel } from 'utils/Utils';
 
 interface IPortalTicketSidebarProps {
@@ -26,13 +26,12 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
   const { teamId, ticketSystemUsers } = props;
   const api = useApi();
 
-  const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
+  const teamMembersQuery = useQuery({
+    queryKey: teamQueryKeys.members(teamId),
+    queryFn: ({ signal }) => api.teams.getTeamMembers(teamId, { signal })
+  });
 
-  useEffect(() => {
-    teamMembersLoader.load(teamId);
-  }, [teamId, teamMembersLoader]);
-
-  const members: ITeamMember[] = teamMembersLoader.data?.members ?? [];
+  const members: ITeamMember[] = teamMembersQuery.data?.members ?? [];
   const getTicketSystemUserStatusLabel = (status: ITicketSystemUser['status']) =>
     status.charAt(0).toUpperCase() + status.slice(1);
 
@@ -56,7 +55,7 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
       </TicketSidebarSection>
       <TicketSidebarSection label="Participants">
         <LoadingGuard
-          isLoading={teamMembersLoader.isLoading}
+          isLoading={teamMembersQuery.isFetching}
           isLoadingFallback={
             <Stack spacing={1}>
               <Skeleton variant="text" width="75%" />
