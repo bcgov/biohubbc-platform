@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from 'test-helpers/test-utils';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
@@ -220,22 +220,18 @@ describe('useSearchResultDataRequest', () => {
 
     const { result } = renderHook(() => useSearchResultDataRequest({ featureType: 'observation', expressionTree }));
 
-    let firstSubmit: Promise<void> | undefined;
-    let secondSubmit: Promise<void> | undefined;
-
     act(() => {
-      firstSubmit = result.current.handleCreateDataRequest(payload) as Promise<void>;
-      secondSubmit = result.current.handleCreateDataRequest(payload) as Promise<void>;
+      result.current.handleCreateDataRequest(payload);
+      result.current.handleCreateDataRequest(payload);
     });
 
-    expect(mockCreateDataRequest).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockCreateDataRequest).toHaveBeenCalledTimes(1));
 
     await act(async () => {
       resolveCreate?.();
-      await firstSubmit;
-      await secondSubmit;
     });
 
+    await waitFor(() => expect(result.current.isSubmittingDataRequest).toBe(false));
     expect(mockCreateDataRequest).toHaveBeenCalledTimes(1);
   });
 
@@ -268,9 +264,8 @@ describe('useSearchResultDataRequest', () => {
       useSearchResultDataRequest({ featureType: 'observation', expressionTree })
     );
 
-    let submitPromise: Promise<void> | undefined;
     act(() => {
-      submitPromise = result.current.handleCreateDataRequest(payload) as Promise<void>;
+      result.current.handleCreateDataRequest(payload);
     });
 
     await waitFor(() => {
@@ -281,7 +276,7 @@ describe('useSearchResultDataRequest', () => {
 
     await act(async () => {
       resolveCreate?.();
-      await submitPromise;
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(mockSetSnackbar).not.toHaveBeenCalled();

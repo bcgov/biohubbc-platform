@@ -1,11 +1,12 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Container from '@mui/material/Container';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect } from 'react';
 import { useParams } from 'react-router';
+import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
 import { DownloadDeadEndCard } from './components/DownloadDeadEndCard';
 import { DownloadPageHeader } from './components/header/DownloadPageHeader';
 import { DownloadVersionsTable } from './components/table/DownloadVersionsTable';
@@ -18,31 +19,31 @@ import { DownloadVersionsTable } from './components/table/DownloadVersionsTable'
 export const DownloadPage = () => {
   const { downloadId } = useParams<{ downloadId: string }>();
   const api = useApi();
-  const downloadLoader = useDataLoader((id: string) => api.download.getDownload(id));
+  const downloadQuery = useQuery({
+    queryKey: downloadQueryKeys.detail(downloadId ?? ''),
+    queryFn: downloadId ? ({ signal }) => api.download.getDownload(downloadId, { signal }) : skipToken
+  });
 
-  useEffect(() => {
-    if (downloadId) {
-      downloadLoader.load(downloadId);
-    }
-  }, [downloadId, downloadLoader]);
-
-  const download = downloadLoader.data;
-  const apiError = downloadLoader.error as APIError | undefined;
+  const download = downloadQuery.data;
+  const apiError = downloadQuery.error as APIError | null;
 
   if (apiError?.status === 404 || apiError?.status === 403) {
     return <DownloadDeadEndCard />;
   }
 
   return (
-    <LoadingGuard isLoading={downloadLoader.isLoading && !download} isLoadingFallback={<SkeletonPage />}>
-      {download ? (
-        <>
-          <DownloadPageHeader download={download} />
-          <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
-            <DownloadVersionsTable downloadId={download.download_id} />
-          </Container>
-        </>
-      ) : null}
-    </LoadingGuard>
+    <>
+      <QueryErrorDialog error={downloadQuery.error} label="download" />
+      <LoadingGuard isLoading={downloadQuery.isFetching && !download} isLoadingFallback={<SkeletonPage />}>
+        {download ? (
+          <>
+            <DownloadPageHeader download={download} />
+            <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+              <DownloadVersionsTable downloadId={download.download_id} />
+            </Container>
+          </>
+        ) : null}
+      </LoadingGuard>
+    </>
   );
 };

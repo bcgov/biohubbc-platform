@@ -8,7 +8,6 @@ interface FeatureSecurityDialogProps {
   submissionUploadReviewId: string;
   feature: ISubmissionUploadReviewSecurityFeature | null;
   onClose: () => void;
-  onChanged: () => void;
 }
 
 /**
@@ -29,7 +28,6 @@ export const FeatureSecurityDialog = (props: FeatureSecurityDialogProps) => {
         props.feature ? (
           <FeatureSecurityRulesList
             key={props.feature.submission_feature_id}
-            onChanged={props.onChanged}
             submissionId={props.submissionId}
             submissionUploadId={props.submissionUploadId}
             submissionUploadReviewId={props.submissionUploadReviewId}

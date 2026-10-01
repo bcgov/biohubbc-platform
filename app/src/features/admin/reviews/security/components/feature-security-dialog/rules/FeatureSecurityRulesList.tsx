@@ -4,9 +4,11 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import Typography from '@mui/material/Typography';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { useState } from 'react';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { useRemoveFeatureSecurityRuleMutation } from '../../../hooks/useRemoveFeatureSecurityRuleMutation';
 import { FeatureSecurityRuleCard } from './card/FeatureSecurityRuleCard';
 
 interface FeatureSecurityRulesListProps {
@@ -14,84 +16,72 @@ interface FeatureSecurityRulesListProps {
   submissionUploadId: string;
   submissionUploadReviewId: string;
   submissionFeatureId: number;
-  onChanged: () => void;
 }
 
 /**
  * Loads paginated security rule cards and removes direct assignments from the feature.
- * @param {FeatureSecurityRulesListProps} props Feature context and security change handler.
+ *
+ * @param {FeatureSecurityRulesListProps} props Feature and review identifiers.
  * @returns {React.JSX.Element} Paginated security cards with removal and loading feedback.
  */
 export const FeatureSecurityRulesList = (props: FeatureSecurityRulesListProps) => {
   const api = useApi();
-  const [error, setError] = useState<string>();
-  const [loadError, setLoadError] = useState<string>();
-  const ruleGrid = useServerPaginatedDataGrid({
-    fetcher: async (_search, pagination) => {
-      setLoadError(undefined);
-      try {
-        return await api.admin.getSubmissionUploadReviewFeatureRules(
-          props.submissionId,
-          props.submissionUploadId,
-          props.submissionUploadReviewId,
-          props.submissionFeatureId,
-          pagination
-        );
-      } catch (error) {
-        setLoadError((error as Error).message);
-        throw error;
-      }
-    },
-    extractData: (response) => response.rules,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'name', sort: 'asc' }
-  });
-
-  /**
-   * Removes one direct rule and refreshes the dialog and feature security state.
-   * @param {number} ruleId Rule to remove from this feature.
-   * @returns {Promise<void>} Resolves after refreshing the affected views.
-   */
-  const removeRule = async (ruleId: number): Promise<void> => {
-    setError(undefined);
-    try {
-      await api.admin.deleteSubmissionUploadReviewSecurityRuleAssignments(
+  const grid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
+  const removeRuleMutation = useRemoveFeatureSecurityRuleMutation(props);
+  const rulesQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureRules(props, props.submissionFeatureId, grid.apiPagination),
+    queryFn: ({ signal }) =>
+      api.admin.getSubmissionUploadReviewFeatureRules(
         props.submissionId,
         props.submissionUploadId,
         props.submissionUploadReviewId,
-        [props.submissionFeatureId],
-        ruleId
-      );
-      props.onChanged();
-      if (ruleGrid.rows.length === 1 && ruleGrid.paginationModel.page > 0) {
-        ruleGrid.handlePaginationChange({ ...ruleGrid.paginationModel, page: ruleGrid.paginationModel.page - 1 });
-      } else {
-        ruleGrid.refresh();
+        props.submissionFeatureId,
+        grid.apiPagination,
+        { signal }
+      ),
+    placeholderData: keepPreviousData
+  });
+  const rules = rulesQuery.data?.rules ?? [];
+  const loadError = rulesQuery.isFetching ? null : rulesQuery.error;
+
+  /**
+   * Removes one direct rule, stepping back a page when it was the last rule on the page.
+   *
+   * @param {number} ruleId Rule to remove from this feature.
+   * @returns {void} Starts the removal; the failure is shown above the list.
+   */
+  const removeRule = (ruleId: number): void => {
+    removeRuleMutation.mutate(
+      { submissionFeatureId: props.submissionFeatureId, securityRuleId: ruleId },
+      {
+        onSuccess: () => {
+          if (rules.length === 1 && grid.paginationModel.page > 0) {
+            grid.handlePaginationChange({ ...grid.paginationModel, page: grid.paginationModel.page - 1 });
+          }
+        }
       }
-    } catch (error) {
-      setError((error as Error).message);
-    }
+    );
   };
 
   return (
     <Stack spacing={1}>
-      {ruleGrid.isLoading && !ruleGrid.response && (
+      {rulesQuery.isFetching && !rulesQuery.data && (
         <Stack spacing={2} aria-label="Loading security rules">
           <Skeleton variant="rounded" height={88} />
           <Skeleton variant="rounded" height={88} />
           <Skeleton variant="rounded" height={88} />
         </Stack>
       )}
-      {error && <Alert severity="error">{error}</Alert>}
+      {removeRuleMutation.error && <Alert severity="error">{removeRuleMutation.error.message}</Alert>}
       {loadError ? (
-        <Alert severity="error" action={<Button onClick={() => ruleGrid.refresh()}>Try Again</Button>}>
-          {loadError}
+        <Alert severity="error" action={<Button onClick={() => void rulesQuery.refetch()}>Try Again</Button>}>
+          {loadError.message}
         </Alert>
       ) : null}
-      {!ruleGrid.isLoading && !loadError && !ruleGrid.rows.length && (
+      {!rulesQuery.isFetching && !loadError && !rules.length && (
         <Typography>No security rules affect this feature.</Typography>
       )}
-      {ruleGrid.rows.map((rule) => (
+      {rules.map((rule) => (
         <FeatureSecurityRuleCard
           key={rule.security_rule_id}
           rule={rule}
@@ -100,14 +90,12 @@ export const FeatureSecurityRulesList = (props: FeatureSecurityRulesListProps) =
       ))}
       <TablePagination
         component="div"
-        count={ruleGrid.rowCount}
-        page={ruleGrid.paginationModel.page}
-        rowsPerPage={ruleGrid.paginationModel.pageSize}
+        count={rulesQuery.data?.pagination.total ?? 0}
+        page={grid.paginationModel.page}
+        rowsPerPage={grid.paginationModel.pageSize}
         rowsPerPageOptions={[10, 25, 50]}
-        onPageChange={(_event, page) => ruleGrid.handlePaginationChange({ ...ruleGrid.paginationModel, page })}
-        onRowsPerPageChange={(event) =>
-          ruleGrid.handlePaginationChange({ page: 0, pageSize: Number(event.target.value) })
-        }
+        onPageChange={(_event, page) => grid.handlePaginationChange({ ...grid.paginationModel, page })}
+        onRowsPerPageChange={(event) => grid.handlePaginationChange({ page: 0, pageSize: Number(event.target.value) })}
       />
     </Stack>
   );

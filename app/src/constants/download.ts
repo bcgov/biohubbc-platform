@@ -46,3 +46,6 @@ export const DOWNLOAD_TABLE_STATUS_CHIP_COLORS: Record<
   downloaded: 'default',
   failed: 'error'
 };
+
+/** Downloads per page in the search results' Downloads sidebar. */
+export const DOWNLOAD_SIDEBAR_PAGE_SIZE = 10;

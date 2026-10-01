@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { GalleryDownloadsResponse } from 'interfaces/useGalleryApi.interface';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -14,14 +14,17 @@ export const useGalleryApi = (axios: AxiosInstance) => {
    *
    * @param {string} slug
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination params (page, limit, sort, order).
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {Promise<GalleryDownloadsResponse>}
    */
   const getGalleryDownloadsBySlug = async (
     slug: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<GalleryDownloadsResponse> => {
     const { data } = await axios.get<GalleryDownloadsResponse>(`/api/gallery/slug/${slug}/download`, {
-      params: pagination
+      params: pagination,
+      ...options
     });
     return data;
   };

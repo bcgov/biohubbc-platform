@@ -51,14 +51,17 @@ const useAdminApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionUploadReconciliationCounts>} Stored reconciliation outcome counts.
    */
   const getSubmissionUploadReconciliationCounts = async (
     submissionId: number,
-    submissionUploadId: string
+    submissionUploadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionUploadReconciliationCounts> => {
     const { data } = await axios.get(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/reconciliation`
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/reconciliation`,
+      options
     );
 
     return data;
@@ -70,15 +73,18 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
    * @param {string} submissionUploadReviewId UUID of the submission upload review.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionUploadReviewDetail>} The requested active review.
    */
   const getSubmissionUploadReview = async (
     submissionId: number,
     submissionUploadId: string,
-    submissionUploadReviewId: string
+    submissionUploadReviewId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionUploadReviewDetail> => {
     const { data } = await axios.get(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
+      options
     );
 
     return data;
@@ -113,18 +119,21 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
    * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated features belonging to the upload.
    */
   const getSubmissionUploadFeatures = async (
     submissionId: number,
     submissionUploadId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureForReviewResponse> => {
     const { data } = await axios.get(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/features`,
       {
         params: pagination,
-        paramsSerializer: (params) => qs.stringify(params)
+        paramsSerializer: (params) => qs.stringify(params),
+        ...options
       }
     );
 
@@ -187,6 +196,7 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {string} submissionUploadReviewId - Identifier of the security review.
    * @param {number} submissionFeatureId - Identifier of the feature.
    * @param {ApiPaginationRequestOptions} pagination - Pagination and sorting options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] - Request cancellation.
    * @returns {Promise<ISubmissionUploadReviewFeatureRuleResponse>} Paginated assigned security rules.
    */
   const getSubmissionUploadReviewFeatureRules = async (
@@ -194,11 +204,12 @@ const useAdminApi = (axios: AxiosInstance) => {
     submissionUploadId: string,
     submissionUploadReviewId: string,
     submissionFeatureId: number,
-    pagination: ApiPaginationRequestOptions
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionUploadReviewFeatureRuleResponse> => {
     const { data } = await axios.get(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}/security/features/${submissionFeatureId}/rules`,
-      { params: pagination, paramsSerializer: (params) => qs.stringify(params) }
+      { params: pagination, paramsSerializer: (params) => qs.stringify(params), ...options }
     );
     return data;
   };
@@ -214,6 +225,7 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {number[]} submissionFeatureIds - Selected feature identifiers, or an empty array for all upload features.
    * @param {SubmissionFeatureSecurityRulesFilters} filters - Optional rule-name matching.
    * @param {ApiPaginationRequestOptions} pagination - Pagination and sorting options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] - Request cancellation.
    * @returns {Promise<ISubmissionUploadReviewSelectedFeatureRuleResponse>} Paginated rule assignment states.
    */
   const getSubmissionUploadReviewSelectedFeatureRules = async (
@@ -222,7 +234,8 @@ const useAdminApi = (axios: AxiosInstance) => {
     submissionUploadReviewId: string,
     submissionFeatureIds: number[],
     filters: SubmissionFeatureSecurityRulesFilters,
-    pagination: ApiPaginationRequestOptions
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionUploadReviewSelectedFeatureRuleResponse> => {
     const { data } = await axios.post(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}/security/assignments`,
@@ -231,7 +244,8 @@ const useAdminApi = (axios: AxiosInstance) => {
         expression: filters.expression,
         search: filters.keyword,
         pagination
-      }
+      },
+      options
     );
     return data;
   };
@@ -322,15 +336,18 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
    * @param {number} submissionFeatureId ID of the feature to return.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeatureResponse>} The requested submission feature.
    */
   const getSubmissionUploadFeature = async (
     submissionId: number,
     submissionUploadId: string,
-    submissionFeatureId: number
+    submissionFeatureId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureResponse> => {
     const { data } = await axios.get(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/features/${submissionFeatureId}`
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/features/${submissionFeatureId}`,
+      options
     );
 
     return data;
@@ -342,18 +359,20 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
    * @param {number} submissionFeatureId ID of the feature whose properties should be returned.
-   * @param {ApiPaginationRequestOptions & { search?: string }} options Pagination, sorting, and optional search parameters.
+   * @param {ApiPaginationRequestOptions & { search?: string }} params Pagination, sorting, and optional search parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeaturePropertiesResponse>} Paginated properties for the requested feature.
    */
   const getSubmissionUploadFeatureProperties = async (
     submissionId: number,
     submissionUploadId: string,
     submissionFeatureId: number,
-    options: ApiPaginationRequestOptions & { search?: string }
+    params: ApiPaginationRequestOptions & { search?: string },
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeaturePropertiesResponse> => {
     const { data } = await axios.get(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/features/${submissionFeatureId}/properties`,
-      { params: options, paramsSerializer: (params) => qs.stringify(params) }
+      { params, paramsSerializer: (value) => qs.stringify(value), ...options }
     );
 
     return data;
@@ -364,15 +383,18 @@ const useAdminApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
    * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated submission features.
    */
   const getSubmissionFeatures = async (
     submissionId: number,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureForReviewResponse> => {
     const { data } = await axios.get(`/api/administrative/submission/${submissionId}/features`, {
       params: pagination,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;

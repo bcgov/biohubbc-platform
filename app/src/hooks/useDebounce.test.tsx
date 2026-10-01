@@ -11,6 +11,22 @@ describe('useDebounce', () => {
     vi.clearAllMocks();
   });
 
+  it('drops a pending call when the component unmounts', () => {
+    const mockCallback = vi.fn();
+    const { result, unmount } = renderHook(() => useDebounce(mockCallback, 300));
+
+    act(() => {
+      result.current();
+    });
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(mockCallback).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   describe('debounce timing', () => {
     it('delays callback execution until after delay period', () => {
       // WHY HIGH VALUE: Tests core debounce timing behavior

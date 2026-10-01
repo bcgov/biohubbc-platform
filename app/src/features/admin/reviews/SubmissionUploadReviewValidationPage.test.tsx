@@ -1,18 +1,13 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { render } from 'test-helpers/test-utils';
+import { act, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { SubmissionUploadReviewValidationPage } from './SubmissionUploadReviewValidationPage';
 
 vi.mock('hooks/useApi');
 vi.mock('hooks/useContext');
-vi.mock('hooks/useDataLoader');
-vi.mock('hooks/useServerPaginatedDataGrid');
 vi.mock('./components/SubmissionUploadReviewHeader', () => ({
   SubmissionUploadReviewHeader: ({
     review,
@@ -62,7 +57,8 @@ const validationReview: ISubmissionUploadReviewDetail = {
   status: 'in_progress',
   requested_by: 1
 };
-const loadReconciliationCounts = vi.fn();
+const getReconciliationCounts = vi.fn();
+const getSubmissionUploadFeatures = vi.fn();
 const setYesNoDialog = vi.fn();
 const setSnackbar = vi.fn();
 const updateSubmissionUploadReview = vi.fn();
@@ -73,29 +69,19 @@ describe('SubmissionUploadReviewValidationPage', () => {
     (useDialogContext as Mock).mockReturnValue({ setYesNoDialog, setSnackbar });
     (useApi as Mock).mockReturnValue({
       admin: {
-        getSubmissionUploadReconciliationCounts: vi.fn(),
-        getSubmissionUploadFeatures: vi.fn(),
+        getSubmissionUploadReconciliationCounts: getReconciliationCounts,
+        getSubmissionUploadFeatures,
         updateSubmissionUploadReview
       }
     });
-    const reconciliationLoader = {
-      data: { new: 4, modified: 2, unmodified: 7 },
-      isLoading: false,
-      load: loadReconciliationCounts
-    };
-    (useDataLoader as Mock).mockReturnValue(reconciliationLoader);
-    (useServerPaginatedDataGrid as Mock).mockReturnValue({
-      rows: [{ submission_feature_id: 12, feature_type_name: 'animal' }],
-      rowCount: 1,
-      isLoading: false,
-      paginationModel: { page: 0, pageSize: 10 },
-      handlePaginationChange: vi.fn(),
-      sortModel: [{ field: 'submission_feature_id', sort: 'asc' }],
-      handleSortChange: vi.fn()
+    getReconciliationCounts.mockResolvedValue({ new: 4, modified: 2, unmodified: 7 });
+    getSubmissionUploadFeatures.mockResolvedValue({
+      features: [{ submission_feature_id: 12, feature_type_name: 'animal' }],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
     });
   });
 
-  it('renders the loaded review and its paginated feature list', () => {
+  it('renders the loaded review and its paginated feature list', async () => {
     render(
       <MemoryRouter
         initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
@@ -108,8 +94,9 @@ describe('SubmissionUploadReviewValidationPage', () => {
       </MemoryRouter>
     );
 
-    expect(loadReconciliationCounts).toHaveBeenCalledWith(16, submissionUploadId);
-    expect(screen.getByTestId('review-header')).toHaveTextContent('Validation pass');
+    expect(await screen.findByTestId('review-header')).toHaveTextContent('Validation pass');
+    expect(getReconciliationCounts).toHaveBeenCalledWith(16, submissionUploadId, { signal: expect.any(AbortSignal) });
+    await waitFor(() => expect(screen.getByTestId('feature-table')).toHaveAttribute('data-row-count', '1'));
     expect(screen.getByText('New')).toBeVisible();
     expect(screen.getByText('Unmodified')).toBeVisible();
     expect(screen.getByText('Modified')).toBeVisible();
@@ -117,7 +104,7 @@ describe('SubmissionUploadReviewValidationPage', () => {
     expect(screen.getByTestId('feature-table')).toHaveTextContent('animal');
   });
 
-  it('maps the reviewed upload in its own section between the overview and the feature list', () => {
+  it('maps the reviewed upload in its own section between the overview and the feature list', async () => {
     render(
       <MemoryRouter
         initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
@@ -130,7 +117,7 @@ describe('SubmissionUploadReviewValidationPage', () => {
       </MemoryRouter>
     );
 
-    const map = screen.getByTestId('upload-map');
+    const map = await screen.findByTestId('upload-map');
 
     expect(map).toHaveAttribute('data-submission-id', '16');
     expect(map).toHaveAttribute('data-upload-id', submissionUploadId);
@@ -166,7 +153,7 @@ describe('SubmissionUploadReviewValidationPage', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Change status' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Change status' }));
     expect(setYesNoDialog).toHaveBeenCalledWith(
       expect.objectContaining({
         open: true,
@@ -188,7 +175,7 @@ describe('SubmissionUploadReviewValidationPage', () => {
     );
   });
 
-  it('opens a feature within the current review route', () => {
+  it('opens a feature within the current review route', async () => {
     render(
       <MemoryRouter
         initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
@@ -205,6 +192,7 @@ describe('SubmissionUploadReviewValidationPage', () => {
       </MemoryRouter>
     );
 
+    await waitFor(() => expect(screen.getByTestId('feature-table')).toHaveAttribute('data-row-count', '1'));
     fireEvent.click(screen.getByRole('button', { name: 'Open feature' }));
 
     expect(screen.getByText('Feature detail route')).toBeVisible();

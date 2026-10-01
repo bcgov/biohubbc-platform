@@ -1,120 +1,62 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ISubmissionUploadReviewSecurityFeatureResponse } from 'interfaces/useAdminApi.interface';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { CursorPagination } from 'types/pagination';
-import { isAbortError } from 'utils/request';
 import { useSearchPagination } from 'features/search/result/hooks/useSearchPagination';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 
 /**
  * Loads cursor-paginated expression results and a matching count for one submission upload.
  *
+ * The count is keyed on the expression alone, so paging and security changes (which invalidate only the
+ * results) reuse it. Both keep the previous response on screen while the next one loads.
+ *
  * @param {number} submissionId - Identifier of the submission that owns the upload.
  * @param {string} submissionUploadId - Identifier of the submission upload to search.
  * @param {ExpressionTreeExpression | null} expressionTree - Applied expression tree, or null to load all upload features.
- * @param {number} expressionApplyRevision - Apply counter that refreshes results when the expression is submitted.
- * @param {number} refreshRevision - External refresh counter used to reload feature security classifications.
  * @returns Upload feature rows, response metadata, count, loading state, cursor pagination, and URL search-param controls.
  */
 export const useSubmissionUploadFeatureSearch = (
   submissionId: number,
   submissionUploadId: string,
-  expressionTree: ExpressionTreeExpression | null,
-  expressionApplyRevision: number,
-  refreshRevision: number
+  expressionTree: ExpressionTreeExpression | null
 ) => {
-  const { searchSubmissionUploadFeatures, countSubmissionUploadFeatures } = useApi().admin;
+  const api = useApi();
   const { setSnackbar } = useDialogContext();
   const { searchParams, setSearchParams, cursorPagination } = useSearchPagination();
-  const [response, setResponse] = useState<ISubmissionUploadReviewSecurityFeatureResponse>();
-  const [totalCount, setTotalCount] = useState<number>();
-  const [isLoading, setIsLoading] = useState(true);
+  const scope = { submissionId, submissionUploadId };
 
-  const reportRequestError = useCallback(
-    (error: unknown) => {
-      if (!isAbortError(error)) {
-        setSnackbar({ open: true, snackbarMessage: (error as Error).message });
-      }
-    },
-    [setSnackbar]
-  );
+  const countQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureSearchCount(scope, expressionTree),
+    queryFn: ({ signal }) =>
+      api.admin.countSubmissionUploadFeatures(submissionId, submissionUploadId, expressionTree, { signal }),
+    placeholderData: keepPreviousData
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    /**
-     * Loads the total matching feature count unless this request has been cancelled.
-     *
-     * @returns {Promise<void>} Resolves after updating the count or reporting an error.
-     */
-    const loadCount = async () => {
-      try {
-        const response = await countSubmissionUploadFeatures(submissionId, submissionUploadId, expressionTree, {
-          signal: controller.signal
-        });
-        if (!controller.signal.aborted) {
-          setTotalCount(response.total);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          reportRequestError(error);
-        }
-      }
-    };
-    void loadCount();
-    return () => controller.abort();
-  }, [
-    countSubmissionUploadFeatures,
-    expressionApplyRevision,
-    expressionTree,
-    reportRequestError,
-    submissionId,
-    submissionUploadId
-  ]);
+  const resultsQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureSearchResults(scope, expressionTree, cursorPagination),
+    queryFn: ({ signal }) =>
+      api.admin.searchSubmissionUploadFeatures(submissionId, submissionUploadId, expressionTree, cursorPagination, {
+        signal
+      }),
+    placeholderData: keepPreviousData
+  });
 
   useEffect(() => {
-    const controller = new AbortController();
-    /**
-     * Loads the current feature page while preserving existing results during refresh.
-     *
-     * @returns {Promise<void>} Resolves after updating results and loading state or reporting an error.
-     */
-    const loadResults = async () => {
-      try {
-        setIsLoading(true);
-        const response = await searchSubmissionUploadFeatures(
-          submissionId,
-          submissionUploadId,
-          expressionTree,
-          cursorPagination,
-          { signal: controller.signal }
-        );
-        if (!controller.signal.aborted) {
-          setResponse(response);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          reportRequestError(error);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-    void loadResults();
-    return () => controller.abort();
-  }, [
-    cursorPagination,
-    expressionApplyRevision,
-    expressionTree,
-    refreshRevision,
-    reportRequestError,
-    searchSubmissionUploadFeatures,
-    submissionId,
-    submissionUploadId
-  ]);
+    if (countQuery.error) {
+      setSnackbar({ open: true, snackbarMessage: countQuery.error.message });
+    }
+  }, [countQuery.error, setSnackbar]);
 
+  useEffect(() => {
+    if (resultsQuery.error) {
+      setSnackbar({ open: true, snackbarMessage: resultsQuery.error.message });
+    }
+  }, [resultsQuery.error, setSnackbar]);
+
+  const response = resultsQuery.data;
   const pagination = response?.pagination;
   const cursor: CursorPagination = {
     limit: cursorPagination.limit,
@@ -127,8 +69,8 @@ export const useSubmissionUploadFeatureSearch = (
   return {
     rows: response?.features ?? [],
     response,
-    isLoading,
-    totalCount,
+    isLoading: resultsQuery.isFetching,
+    totalCount: countQuery.data?.total,
     cursor,
     searchParams,
     setSearchParams

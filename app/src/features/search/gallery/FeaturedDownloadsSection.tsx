@@ -1,8 +1,9 @@
 import { Grid, Pagination, Stack, Typography } from '@mui/material';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { galleryQueryKeys } from 'utils/query-keys/gallery-query-keys';
 import { FeaturedDownloadTile } from './FeaturedDownloadTile';
 
 /**
@@ -25,24 +26,20 @@ export const FeaturedDownloadsSection = () => {
   const api = useApi();
   const [page, setPage] = useState(1);
 
-  const galleryDataLoader = useDataLoader((pageToLoad: number) =>
-    api.gallery.getGalleryDownloadsBySlug(HOME_GALLERY_SLUG, { page: pageToLoad, limit: TILES_PER_PAGE })
-  );
+  const pagination = { page, limit: TILES_PER_PAGE };
+  const galleryQuery = useQuery({
+    queryKey: galleryQueryKeys.downloads(HOME_GALLERY_SLUG, pagination),
+    queryFn: ({ signal }) => api.gallery.getGalleryDownloadsBySlug(HOME_GALLERY_SLUG, pagination, { signal }),
+    placeholderData: keepPreviousData
+  });
 
-  // Fetches the current page; `galleryDataLoader.refresh` is an unstable ref, so it's omitted
-  // from the deps — the effect re-runs only when `page` changes (first render fetches page 1).
-  useEffect(() => {
-    galleryDataLoader.refresh(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  const downloads = galleryDataLoader.data?.downloads ?? [];
-  const lastPage = galleryDataLoader.data?.pagination.last_page ?? 0;
+  const downloads = galleryQuery.data?.downloads ?? [];
+  const lastPage = galleryQuery.data?.pagination.last_page ?? 0;
 
   // Fail closed (see component JSDoc): error, pending first load, and empty result all render
   // nothing. `hasNoData` with no `hasNoDataFallback` makes LoadingGuard render nothing in each case.
   return (
-    <LoadingGuard hasNoData={Boolean(galleryDataLoader.error) || downloads.length === 0}>
+    <LoadingGuard hasNoData={Boolean(galleryQuery.error) || downloads.length === 0}>
       <Stack gap={2} mt={5}>
         <Typography variant="h3">Featured Downloads</Typography>
         <Grid container spacing={3}>

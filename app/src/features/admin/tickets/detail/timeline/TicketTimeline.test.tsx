@@ -1,4 +1,4 @@
-import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
@@ -6,7 +6,8 @@ import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketExtended, TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
 import { MemoryRouter } from 'react-router-dom';
-import { render } from 'test-helpers/test-utils';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { act, fireEvent, render, renderHook, screen, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketTimeline } from './TicketTimeline';
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
@@ -44,6 +45,7 @@ vi.mock('@monaco-editor/react', () => ({
 
 const ticketId = '22222222-2222-4222-8222-222222222222';
 const ticketCommentId = '33333333-3333-4333-8333-333333333333';
+const ticketQueryKey = ['ticket', 'admin', 'detail', ticketId];
 const ticketArtifact: ITicketArtifact = {
   ticket_artifact_id: '55555555-5555-4555-8555-555555555555',
   ticket_id: ticketId,
@@ -94,23 +96,34 @@ const makeTicket = (): ITicketExtended => ({
   ticket_system_users: []
 });
 
-const renderTicketTimeline = (ticket: ITicketExtended) =>
-  render(
+/**
+ * Renders the timeline for a ticket that is also the cached ticket detail.
+ *
+ * @param {ITicketExtended} ticket The ticket to render and cache.
+ * @param {QueryClient} queryClient The client holding the cached ticket.
+ * @returns The RTL render result.
+ */
+const renderTicketTimeline = (ticket: ITicketExtended, queryClient: QueryClient) => {
+  queryClient.setQueryData(ticketQueryKey, ticket);
+  return render(
     <MemoryRouter>
-      <TicketTimeline ticket={ticket} isLoading={false} />
-    </MemoryRouter>
+      <TicketTimeline ticket={ticket} />
+    </MemoryRouter>,
+    { queryClient }
   );
+};
 
 describe('TicketTimeline', () => {
   const updateTicketComment = vi.fn();
   const deleteTicketComment = vi.fn();
   const getSubmissionUploadProcessingStatusHistory = vi.fn();
-  const setData = vi.fn();
   const setSnackbar = vi.fn();
+  let queryClient: QueryClient;
   const setYesNoDialog = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = createTestQueryClient();
 
     (useAuthStateContext as Mock).mockReturnValue({
       biohubUserWrapper: { roleNames: [SYSTEM_ROLE.SYSTEM_ADMIN] }
@@ -140,13 +153,7 @@ describe('TicketTimeline', () => {
       setSnackbar,
       setYesNoDialog
     });
-    (useTicketContext as Mock).mockReturnValue({
-      ticketId,
-      ticketDataLoader: {
-        data: makeTicket(),
-        setData
-      }
-    });
+    (useTicketContext as Mock).mockReturnValue({ ticketId, ticketQueryKey });
   });
 
   it('opens edit dialog with existing comment and saves updated text', async () => {
@@ -159,7 +166,7 @@ describe('TicketTimeline', () => {
     };
     updateTicketComment.mockResolvedValue(updatedComment);
 
-    renderTicketTimeline(ticket);
+    renderTicketTimeline(ticket, queryClient);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
@@ -173,7 +180,7 @@ describe('TicketTimeline', () => {
     await waitFor(() => {
       expect(updateTicketComment).toHaveBeenCalledWith(ticketId, ticketCommentId, { comment: authoredComment });
     });
-    expect(setData).toHaveBeenCalledWith({
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual({
       ...ticket,
       comments: [updatedComment]
     });
@@ -181,15 +188,9 @@ describe('TicketTimeline', () => {
 
   it('opens edit dialog for a comment that was just added to cached ticket data', () => {
     const cachedTicket = makeTicket();
-    (useTicketContext as Mock).mockReturnValue({
-      ticketId,
-      ticketDataLoader: {
-        data: cachedTicket,
-        setData
-      }
-    });
+    queryClient.setQueryData(ticketQueryKey, cachedTicket);
 
-    const { result } = renderHook(() => useTicketTimelineCommentActions());
+    const { result } = renderHook(() => useTicketTimelineCommentActions(), { queryClient });
 
     act(() => {
       result.current.handleOpenEditCommentDialog(ticketCommentId);
@@ -206,7 +207,7 @@ describe('TicketTimeline', () => {
       comment: `[notes](/artifact/${ticketArtifact.ticket_artifact_id})`
     };
 
-    renderTicketTimeline(ticket);
+    renderTicketTimeline(ticket, queryClient);
 
     expect(screen.getByRole('button', { name: 'notes' })).toBeVisible();
   });
@@ -225,7 +226,7 @@ describe('TicketTimeline', () => {
       })
     );
 
-    renderTicketTimeline(ticket);
+    renderTicketTimeline(ticket, queryClient);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
@@ -243,7 +244,7 @@ describe('TicketTimeline', () => {
 
     resolveUpdate(updatedComment);
     await waitFor(() => {
-      expect(setData).toHaveBeenCalledWith({
+      expect(queryClient.getQueryData(ticketQueryKey)).toEqual({
         ...ticket,
         comments: [updatedComment]
       });
@@ -255,7 +256,7 @@ describe('TicketTimeline', () => {
     const ticket = makeTicket();
     deleteTicketComment.mockResolvedValue(undefined);
 
-    renderTicketTimeline(ticket);
+    renderTicketTimeline(ticket, queryClient);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
@@ -277,7 +278,7 @@ describe('TicketTimeline', () => {
     await waitFor(() => {
       expect(deleteTicketComment).toHaveBeenCalledWith(ticketId, ticketCommentId);
     });
-    expect(setData).toHaveBeenCalledWith({
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual({
       ...ticket,
       comments: []
     });
@@ -292,7 +293,7 @@ describe('TicketTimeline', () => {
       })
     );
 
-    renderTicketTimeline(makeTicket());
+    renderTicketTimeline(makeTicket(), queryClient);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
@@ -312,7 +313,7 @@ describe('TicketTimeline', () => {
     const ticket = makeTicket();
     deleteTicketComment.mockRejectedValue(new Error('Delete failed'));
 
-    renderTicketTimeline(ticket);
+    renderTicketTimeline(ticket, queryClient);
 
     await user.click(screen.getByRole('button', { name: `ticket-comment-${ticketCommentId}-menu` }));
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
@@ -326,7 +327,23 @@ describe('TicketTimeline', () => {
         snackbarMessage: 'Delete failed'
       });
     });
-    expect(setData).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual(ticket);
+  });
+
+  it('preserves an in-progress review form when refreshed ticket data arrives', async () => {
+    const ticket = { ...makeTicket(), submission_uploads: [makeSubmissionUpload()] };
+    const { rerender } = renderTicketTimeline(ticket, queryClient);
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole('button', { name: 'Review' })[0]);
+    await user.type(screen.getByLabelText(/Name/), 'Unsaved review name');
+
+    rerender(
+      <MemoryRouter>
+        <TicketTimeline ticket={{ ...ticket, subject: 'Updated subject' }} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByDisplayValue('Unsaved review name')).toBeInTheDocument();
   });
 
   it('requests an upload processing history only when its status row is expanded', async () => {
@@ -341,7 +358,7 @@ describe('TicketTimeline', () => {
       }
     ]);
 
-    renderTicketTimeline({ ...makeTicket(), submission_uploads: [upload] });
+    renderTicketTimeline({ ...makeTicket(), submission_uploads: [upload] }, queryClient);
 
     expect(getSubmissionUploadProcessingStatusHistory).not.toHaveBeenCalled();
 
@@ -350,7 +367,8 @@ describe('TicketTimeline', () => {
     await waitFor(() => expect(screen.getByText('Uploaded')).toBeVisible());
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledWith(
       upload.submission_id,
-      upload.submission_upload_id
+      upload.submission_upload_id,
+      { signal: expect.any(AbortSignal) }
     );
     expect(getSubmissionUploadProcessingStatusHistory).toHaveBeenCalledTimes(1);
   });
@@ -361,7 +379,7 @@ describe('TicketTimeline', () => {
       biohubUserWrapper: { roleNames: [] }
     });
 
-    renderTicketTimeline({ ...makeTicket(), submission_uploads: [makeSubmissionUpload()] });
+    renderTicketTimeline({ ...makeTicket(), submission_uploads: [makeSubmissionUpload()] }, queryClient);
 
     expect(screen.getByText('Ingested')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Ingested' })).not.toBeInTheDocument();

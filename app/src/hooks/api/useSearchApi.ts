@@ -84,14 +84,16 @@ export const useSearchApi = (axios: AxiosInstance) => {
    *
    * @param {ISearchPropertyFilters} filters - Search parameters
    * @param {ApiPaginationRequestOptions} pagination
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<SearchPropertyResponse >} Array of matching properties sorted by relevancy
    */
   const searchProperties = async (
     filters: ISearchPropertyFilters,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchPropertyResponse> => {
     const body = { filters, pagination };
-    const { data } = await axios.post<SearchPropertyResponse>('/api/search/property', body);
+    const { data } = await axios.post<SearchPropertyResponse>('/api/search/property', body, options);
 
     return data;
   };
@@ -101,14 +103,16 @@ export const useSearchApi = (axios: AxiosInstance) => {
    *
    * @param {ISearchTaxonFilters} filters - Search parameters
    * @param {ApiPaginationRequestOptions} pagination
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<SearchTaxonResponse>} Matching local taxon records
    */
   const searchTaxon = async (
     filters: ISearchTaxonFilters,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchTaxonResponse> => {
     const body = { filters, pagination };
-    const { data } = await axios.post<SearchTaxonResponse>('/api/search/taxon', body);
+    const { data } = await axios.post<SearchTaxonResponse>('/api/search/taxon', body, options);
 
     return data;
   };
@@ -118,17 +122,20 @@ export const useSearchApi = (axios: AxiosInstance) => {
    *
    * @param {ISearchAllFilters} params
    * @param {ApiPaginationRequestOptions} pagination
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<SearchResponse>}
    */
   const searchAll = async (
     params?: ISearchAllFilters,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchResponse> => {
     const mergedParams = { ...params, ...pagination };
 
     const { data } = await axios.get<SearchResponse>('api/search', {
       params: mergedParams,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -138,12 +145,17 @@ export const useSearchApi = (axios: AxiosInstance) => {
    * Fetch summary counts for features, submissions, and taxonomy based on search terms.
    *
    * @param {ISearchAllFilters} params
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<SearchSummaryResponse>} - Returns counts of matching features, submissions, and taxonomy.
    */
-  const searchSummary = async (params?: ISearchAllFilters): Promise<SearchSummaryResponse> => {
+  const searchSummary = async (
+    params?: ISearchAllFilters,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SearchSummaryResponse> => {
     const { data } = await axios.get<SearchSummaryResponse>('api/search/summary', {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;

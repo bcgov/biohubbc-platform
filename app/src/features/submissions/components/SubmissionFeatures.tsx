@@ -55,12 +55,11 @@ export const SubmissionFeatures = ({ submissionId, featureTypes }: SubmissionFea
 
   const isFeatureTypeReady = Boolean(activeFeatureType) && selectedFeatureType === activeFeatureType;
 
-  const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, properties, isLoading, searchParams, cursor, totalCount, setSearchParams } = useSearchResults(
+  const { expressionTree, handleExpressionApply } = useSearchResultExpression();
+  const { rows, properties, isLoading, searchParams, cursor, totalCount, setSearchParams, reload } = useSearchResults(
     activeFeatureType,
     isFeatureTypeReady,
     expressionTree,
-    expressionApplyRevision,
     submissionIds
   );
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
@@ -90,7 +89,11 @@ export const SubmissionFeatures = ({ submissionId, featureTypes }: SubmissionFea
         <SearchResultSearch
           searchTerm={searchParams.get(URL_PARAMS.SEARCH_QUERY) || ''}
           expressionTree={expressionTree}
-          onExpressionApply={handleExpressionApply}
+          onExpressionApply={(expression) => {
+            if (!handleExpressionApply(expression)) {
+              reload();
+            }
+          }}
         />
       </Box>
 

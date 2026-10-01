@@ -1,7 +1,10 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
+import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { ISubmissionUploadReviewSecurityFeatureResponse } from 'interfaces/useAdminApi.interface';
 import { PropsWithChildren } from 'react';
 import { MemoryRouter } from 'react-router';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { act, renderHook, waitFor } from 'test-helpers/test-utils';
 import { useSubmissionUploadFeatureSearch } from './useSubmissionUploadFeatureSearch';
 
 const mocks = vi.hoisted(() => ({
@@ -23,9 +26,23 @@ vi.mock('hooks/useContext', () => ({
   useDialogContext: () => ({ setSnackbar: mocks.setSnackbar })
 }));
 
+const scope = { submissionId: 15, submissionUploadId: 'upload-id' };
+const expression = { type: 'expression' as const, operator: 'AND' as const, clauses: [] };
+
+/**
+ * Wraps a hook under test in a router at the root URL.
+ *
+ * @param {PropsWithChildren} props The hook's host.
+ * @returns {JSX.Element} The router.
+ */
+const RootRouter = ({ children }: PropsWithChildren) => <MemoryRouter>{children}</MemoryRouter>;
+
 describe('useSubmissionUploadFeatureSearch', () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = createTestQueryClient();
     mocks.searchFeatures.mockResolvedValue({
       features: [],
       pagination: {
@@ -40,8 +57,10 @@ describe('useSubmissionUploadFeatureSearch', () => {
   });
 
   it('uses the search cursor contract and a separate count request', async () => {
-    const wrapper = ({ children }: PropsWithChildren) => <MemoryRouter>{children}</MemoryRouter>;
-    const { result } = renderHook(() => useSubmissionUploadFeatureSearch(15, 'upload-id', null, 0, 0), { wrapper });
+    const { result } = renderHook(() => useSubmissionUploadFeatureSearch(15, 'upload-id', null), {
+      wrapper: RootRouter,
+      queryClient
+    });
 
     await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.totalCount).toBe(42));
@@ -65,17 +84,15 @@ describe('useSubmissionUploadFeatureSearch', () => {
     });
   });
 
-  it('refreshes the current feature page without recounting when security changes', async () => {
-    const wrapper = ({ children }: PropsWithChildren) => <MemoryRouter>{children}</MemoryRouter>;
-    const { rerender } = renderHook(
-      ({ refreshRevision }) => useSubmissionUploadFeatureSearch(15, 'upload-id', null, 0, refreshRevision),
-      { wrapper, initialProps: { refreshRevision: 0 } }
-    );
+  it('refreshes the current feature page without recounting when feature results are invalidated', async () => {
+    renderHook(() => useSubmissionUploadFeatureSearch(15, 'upload-id', null), { wrapper: RootRouter, queryClient });
 
     await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mocks.countFeatures).toHaveBeenCalledTimes(1));
 
-    rerender({ refreshRevision: 1 });
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.featureSearchResultsAll(scope) })
+    );
 
     await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(2));
     expect(mocks.searchFeatures).toHaveBeenLastCalledWith(
@@ -87,7 +104,53 @@ describe('useSubmissionUploadFeatureSearch', () => {
     );
     expect(mocks.countFeatures).toHaveBeenCalledTimes(1);
   });
-  it('keeps the current page visible and preserves cursor, sort, filters, and count during a security refresh', async () => {
+
+  it('recounts and reloads when the whole feature search is invalidated', async () => {
+    renderHook(() => useSubmissionUploadFeatureSearch(15, 'upload-id', null), { wrapper: RootRouter, queryClient });
+    await waitFor(() => expect(mocks.countFeatures).toHaveBeenCalledTimes(1));
+
+    await act(() => queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.featureSearch(scope) }));
+
+    await waitFor(() => expect(mocks.countFeatures).toHaveBeenCalledTimes(2));
+    expect(mocks.searchFeatures).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels the old expression requests without reporting them when the expression changes', async () => {
+    mocks.searchFeatures.mockImplementationOnce(() => new Promise(() => undefined));
+    mocks.countFeatures.mockImplementationOnce(() => new Promise(() => undefined));
+    const { result, rerender } = renderHook(
+      ({ expressionTree }) => useSubmissionUploadFeatureSearch(15, 'upload-id', expressionTree),
+      { wrapper: RootRouter, queryClient, initialProps: { expressionTree: null as typeof expression | null } }
+    );
+    await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledOnce());
+
+    rerender({ expressionTree: expression });
+
+    await waitFor(() => expect(result.current.totalCount).toBe(42));
+    expect(mocks.searchFeatures.mock.calls[0][4].signal.aborted).toBe(true);
+    expect(mocks.countFeatures.mock.calls[0][3].signal.aborted).toBe(true);
+    expect(mocks.searchFeatures).toHaveBeenLastCalledWith(15, 'upload-id', expression, expect.anything(), {
+      signal: expect.any(AbortSignal)
+    });
+    expect(mocks.setSnackbar).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed request once', async () => {
+    mocks.searchFeatures.mockRejectedValueOnce(new Error('Search failed'));
+    const { rerender } = renderHook(() => useSubmissionUploadFeatureSearch(15, 'upload-id', null), {
+      wrapper: RootRouter,
+      queryClient
+    });
+
+    await waitFor(() =>
+      expect(mocks.setSnackbar).toHaveBeenCalledWith({ open: true, snackbarMessage: 'Search failed' })
+    );
+    rerender();
+
+    expect(mocks.setSnackbar).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the current page visible and preserves cursor, sort, filters, and count while feature results reload', async () => {
     const wrapper = ({ children }: PropsWithChildren) => (
       <MemoryRouter initialEntries={['/?cursor=CurrentPageToken&limit=25&sort=create_date&order=desc&q=survey']}>
         {children}
@@ -113,10 +176,10 @@ describe('useSubmissionUploadFeatureSearch', () => {
       }
     };
     mocks.searchFeatures.mockResolvedValueOnce(page);
-    const { result, rerender } = renderHook(
-      ({ refreshRevision }) => useSubmissionUploadFeatureSearch(15, 'upload-id', null, 0, refreshRevision),
-      { wrapper, initialProps: { refreshRevision: 0 } }
-    );
+    const { result } = renderHook(() => useSubmissionUploadFeatureSearch(15, 'upload-id', null), {
+      wrapper,
+      queryClient
+    });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     await waitFor(() => expect(result.current.totalCount).toBe(42));
     const previousCursor = result.current.cursor;
@@ -129,7 +192,9 @@ describe('useSubmissionUploadFeatureSearch', () => {
         })
     );
 
-    rerender({ refreshRevision: 1 });
+    act(() => {
+      void queryClient.invalidateQueries({ queryKey: submissionUploadQueryKeys.featureSearchResultsAll(scope) });
+    });
 
     await waitFor(() => expect(result.current.isLoading).toBe(true));
     expect(result.current.rows).toBe(page.features);
@@ -145,7 +210,7 @@ describe('useSubmissionUploadFeatureSearch', () => {
 
     await act(async () => finishRefresh({ ...page, features: [{ ...page.features[0], provenance: 'direct' }] }));
 
-    expect(result.current.rows[0].provenance).toBe('direct');
+    await waitFor(() => expect(result.current.rows[0].provenance).toBe('direct'));
     expect(result.current.rows.map((row) => row.submission_feature_id)).toEqual([42]);
     expect(result.current.cursor).toEqual(previousCursor);
     expect(result.current.searchParams.toString()).toBe(previousParams);
