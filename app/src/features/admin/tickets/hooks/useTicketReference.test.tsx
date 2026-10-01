@@ -1,18 +1,55 @@
+import { CreateTicketReferenceDialog } from '../components/dialog/reference/CreateTicketReferenceDialog';
+import { ICreateTicketReferenceFormValues } from '../components/dialog/reference/form/TicketReferenceForm';
+import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { QueryClient } from '@tanstack/react-query';
 import { ITicketExtended, ITicketReference } from 'interfaces/useTicketsApi.interface';
 import { createTestQueryClient } from 'test-helpers/query-client';
-import { act, renderHook, waitFor } from 'test-helpers/test-utils';
+import { act, render, renderHook, waitFor } from 'test-helpers/test-utils';
 import { useTicketReference } from './useTicketReference';
 
-const mocks = vi.hoisted(() => ({ deleteTicketReference: vi.fn(), setSnackbar: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  ticketId: 'ticket-a',
+  createTicketReference: vi.fn(),
+  deleteTicketReference: vi.fn(),
+  setSnackbar: vi.fn(),
+  dialog: vi.fn()
+}));
 const ticketQueryKey = ['ticket', 'admin', 'detail', 'ticket-a'];
 vi.mock('hooks/useApi', () => ({
-  useApi: () => ({ tickets: { deleteTicketReference: mocks.deleteTicketReference } })
+  useApi: () => ({
+    tickets: { createTicketReference: mocks.createTicketReference, deleteTicketReference: mocks.deleteTicketReference }
+  })
 }));
 vi.mock('hooks/useContext', () => ({
   useDialogContext: () => ({ setSnackbar: mocks.setSnackbar }),
-  useTicketContext: () => ({ ticketId: 'ticket-a', ticketQueryKey })
+  useTicketContext: () => ({
+    ticketId: mocks.ticketId,
+    ticketQueryKey: ticketQueryKeys.detail('admin', mocks.ticketId)
+  })
 }));
+
+vi.mock('components/dialog/EditDialog', () => ({
+  EditDialog: (props: { onSave: (values: ICreateTicketReferenceFormValues) => void }) => {
+    mocks.dialog(props);
+    return null;
+  }
+}));
+
+/**
+ * Wires the reference dialog to its real cache writer while route context changes.
+ *
+ * @returns The dialog with its submission callback.
+ */
+const ReferenceDialog = () => {
+  const references = useTicketReference();
+  return (
+    <CreateTicketReferenceDialog
+      open={false}
+      onClose={references.closeCreateReferenceDialog}
+      onSubmit={references.handleCreateReferenceSubmit}
+    />
+  );
+};
 
 const reference: ITicketReference = {
   ticket_reference_id: 'reference-1',
@@ -65,12 +102,49 @@ const renderReferences = (references: ITicketReference[]) => {
 describe('useTicketReference', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.ticketId = 'ticket-a';
+  });
+
+  it('keeps a created reference on the original ticket after navigating elsewhere', async () => {
+    const queryClient = createTestQueryClient();
+    const otherKey = ticketQueryKeys.detail('admin', 'unrelated-ticket');
+    queryClient.setQueryData(ticketQueryKey, ticket([]));
+    queryClient.setQueryData(otherKey, { ...ticket([]), ticket_id: 'unrelated-ticket' });
+    let finish!: (references: ITicketReference[]) => void;
+    mocks.createTicketReference.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+    const { rerender } = render(<ReferenceDialog />, { queryClient });
+    const { onSave } = mocks.dialog.mock.lastCall![0];
+    act(() => onSave({ source_ticket_id: 'ticket-a', target_ticket_ids: ['ticket-b'], relationship: 'relates_to' }));
+    await waitFor(() => expect(mocks.createTicketReference).toHaveBeenCalled());
+
+    mocks.ticketId = 'unrelated-ticket';
+    rerender(<ReferenceDialog />);
+    await act(async () => finish([reference]));
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.references).toEqual([reference])
+    );
+    expect(queryClient.getQueryData<ITicketExtended>(otherKey)?.references).toEqual([]);
+  });
+
+  it('does not duplicate a created reference already loaded by a refresh', async () => {
+    const { queryClient, result } = renderReferences([reference]);
+    await act(async () => {
+      await result.current.handleCreateReferenceSubmit([reference]);
+    });
+    expect(queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.references).toEqual([reference]);
   });
 
   it("adds a created reference and drops the linked ticket's cached copies, which list it too", async () => {
     const { queryClient, result } = renderReferences([]);
 
-    act(() => result.current.handleCreateReferenceSubmit([reference]));
+    await act(async () => {
+      await result.current.handleCreateReferenceSubmit([reference]);
+    });
 
     await waitFor(() =>
       expect(queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.references).toEqual([reference])
@@ -96,7 +170,9 @@ describe('useTicketReference', () => {
     const adminList = ['ticket', 'admin', 'list', { page: 1 }];
     queryClient.setQueryData(adminList, { tickets: [] });
 
-    act(() => result.current.handleCreateReferenceSubmit([reference]));
+    await act(async () => {
+      await result.current.handleCreateReferenceSubmit([reference]);
+    });
 
     await waitFor(() =>
       expect(queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.references).toEqual([reference])

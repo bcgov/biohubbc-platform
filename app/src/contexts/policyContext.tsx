@@ -4,7 +4,7 @@ import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 
 export interface IPolicyContext {
   policyId: string;
-  /** Key of the policy detail query; components read it with `usePolicyQuery` and patch it with `setQueryData`. */
+  /** Key of the policy detail query; components read it with `usePolicyQuery` and invalidate it after saved changes. */
   policyQueryKey: ReturnType<typeof policyQueryKeys.detail>;
 }
 
@@ -35,5 +35,10 @@ export const AdminPolicyContextProvider = ({ children }: PropsWithChildren) => {
   const policyId = usePolicyIdFromRoute();
   const value = useMemo(() => ({ policyId, policyQueryKey: policyQueryKeys.detail(policyId) }), [policyId]);
 
-  return <PolicyContext.Provider value={value}>{children}</PolicyContext.Provider>;
+  // A different record owns different drafts and dialogs; pending saves retain the previous instance.
+  return (
+    <PolicyContext.Provider key={policyId} value={value}>
+      {children}
+    </PolicyContext.Provider>
+  );
 };

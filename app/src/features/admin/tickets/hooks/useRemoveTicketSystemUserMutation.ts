@@ -1,13 +1,14 @@
-import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketExtended, ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
+import { refreshChangedQueries } from 'utils/query-client';
 import {
+  useCoordinatedMutation,
+  holdReload,
   cancelQueryForOptimisticUpdate,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+  holdReloadIfConcurrent
+} from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 interface RemoveTicketSystemUserContext {
@@ -31,12 +32,12 @@ export const useRemoveTicketSystemUserMutation = () => {
   const { setSnackbar } = useDialogContext();
   const { ticketId, ticketQueryKey } = useTicketContext();
 
-  return useMutation<void, Error, string, RemoveTicketSystemUserContext>({
+  return useCoordinatedMutation<void, Error, string, RemoveTicketSystemUserContext>({
     // Every change to the ticket shares this key, so reloads of the ticket wait for the last of them.
     mutationKey: ticketQueryKey,
     mutationFn: (ticketSystemUserId) => api.tickets.deleteTicketSystemUser(ticketId, ticketSystemUserId),
     onMutate: async (ticketSystemUserId) => {
-      joinMutationGroup(queryClient, ticketQueryKey);
+      holdReloadIfConcurrent(queryClient, ticketQueryKey, ticketQueryKey);
       await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const rows = queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.ticket_system_users ?? [];
       const index = rows.findIndex((row) => row.ticket_system_user_id === ticketSystemUserId);
@@ -52,8 +53,16 @@ export const useRemoveTicketSystemUserMutation = () => {
       );
       return { ticketId, ticketQueryKey, removed: index > -1 ? { row: rows[index], index } : undefined };
     },
-    onSuccess: (_data, _variables, context) =>
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey),
+    onSuccess: async (_data, variables, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      const currentRow = queryClient
+        .getQueryData<ITicketExtended>(context.ticketQueryKey)
+        ?.ticket_system_users.find((row) => row.ticket_system_user_id === variables);
+      if (currentRow !== undefined) {
+        holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      }
+      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
+    },
     onError: (error, ticketSystemUserId, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
       const removed = context?.removed;
@@ -73,8 +82,6 @@ export const useRemoveTicketSystemUserMutation = () => {
           ]
         };
       });
-    },
-    onSettled: (_data, _error, _variables, context) =>
-      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
+    }
   });
 };

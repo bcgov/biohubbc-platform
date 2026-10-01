@@ -1,6 +1,6 @@
 import { notifyManager } from '@tanstack/react-query';
-import { configure } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { configure } from '@testing-library/react';
 
 // jsdom implements neither of these, and MapLibre calls createObjectURL at import time to set up its web worker.
 // Provided globally so simply importing a map-rendering component does not fail a test that never renders a map.
@@ -19,4 +19,3 @@ configure({ asyncUtilTimeout: 4000 });
 // a test flushing promises then sees a settled query without advancing (possibly fake) timers, and a `waitFor` whose
 // callback mutates the DOM, and so re-runs on every mutation, cannot starve the timer the update is waiting on.
 notifyManager.setScheduler(queueMicrotask);
-

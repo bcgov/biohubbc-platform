@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { TICKETS_LIST_DEFAULT_SORT } from 'constants/ticket';
 import { useApi } from 'hooks/useApi';
@@ -25,6 +26,7 @@ export const PortalTicketPage = () => {
 
   return (
     <PortalListPageLayout>
+      <QueryErrorDialog error={ticketsQuery.error} label="tickets" />
       <PortalTicketsContainer
         rows={ticketsQuery.data?.tickets ?? []}
         rowCount={ticketsQuery.data?.pagination.total ?? 0}

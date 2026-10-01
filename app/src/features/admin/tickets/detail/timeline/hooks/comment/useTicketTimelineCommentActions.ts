@@ -132,7 +132,7 @@ export const useTicketTimelineCommentActions = () => {
         comment: values.comment
       });
 
-      replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
+      await replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
 
       setIsEditCommentDialogOpen(false);
       setSelectedComment(null);
@@ -165,7 +165,7 @@ export const useTicketTimelineCommentActions = () => {
     try {
       isDeletingCommentRef.current = true;
       await api.tickets.deleteTicketComment(ticketId, ticketCommentId);
-      removeCachedComment(ticketCommentId);
+      await removeCachedComment(ticketCommentId);
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({

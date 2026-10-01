@@ -107,7 +107,7 @@ const renderTicketTimeline = (ticket: ITicketExtended, queryClient: QueryClient)
   queryClient.setQueryData(ticketQueryKey, ticket);
   return render(
     <MemoryRouter>
-      <TicketTimeline ticket={ticket} isLoading={false} />
+      <TicketTimeline ticket={ticket} />
     </MemoryRouter>,
     { queryClient }
   );
@@ -328,6 +328,22 @@ describe('TicketTimeline', () => {
       });
     });
     expect(queryClient.getQueryData(ticketQueryKey)).toEqual(ticket);
+  });
+
+  it('preserves an in-progress review form when refreshed ticket data arrives', async () => {
+    const ticket = { ...makeTicket(), submission_uploads: [makeSubmissionUpload()] };
+    const { rerender } = renderTicketTimeline(ticket, queryClient);
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole('button', { name: 'Review' })[0]);
+    await user.type(screen.getByLabelText(/Name/), 'Unsaved review name');
+
+    rerender(
+      <MemoryRouter>
+        <TicketTimeline ticket={{ ...ticket, subject: 'Updated subject' }} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByDisplayValue('Unsaved review name')).toBeInTheDocument();
   });
 
   it('requests an upload processing history only when its status row is expanded', async () => {

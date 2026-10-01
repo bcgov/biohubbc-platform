@@ -1,3 +1,4 @@
+import { QueryObserver } from '@tanstack/react-query';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, renderHook, waitFor } from 'test-helpers/test-utils';
@@ -48,6 +49,41 @@ describe('useUpdateTicketSystemUserStatusMutation', () => {
     expect(cachedStatus(queryClient)).toBe('requested');
   });
 
+  it('restores server state after both overlapping changes fail', async () => {
+    let rejectFirst!: (error: Error) => void;
+    let rejectSecond!: (error: Error) => void;
+    mocks.updateStatus
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirst = reject;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectSecond = reject;
+        })
+      );
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(ticketQueryKey, ticket);
+    const reload = vi.fn().mockResolvedValue(ticket);
+    const unsubscribe = new QueryObserver(queryClient, {
+      queryKey: ticketQueryKey,
+      queryFn: reload,
+      staleTime: Infinity
+    }).subscribe(() => undefined);
+    const { result } = renderHook(() => useUpdateTicketSystemUserStatusMutation(), { queryClient });
+    act(() => result.current.mutate({ ticketSystemUserId: 'tsu-1', status: 'started' }));
+    await waitFor(() => expect(cachedStatus(queryClient)).toBe('started'));
+    act(() => result.current.mutate({ ticketSystemUserId: 'tsu-1', status: 'resolved' }));
+    await waitFor(() => expect(mocks.updateStatus).toHaveBeenCalledTimes(2));
+    await act(async () => rejectFirst(new Error('First failed')));
+    expect(reload).not.toHaveBeenCalled();
+    await act(async () => rejectSecond(new Error('Second failed')));
+    await waitFor(() => expect(cachedStatus(queryClient)).toBe('requested'));
+    expect(reload).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
+
   it('keeps a later change to the same user when an earlier one fails', async () => {
     let rejectFirst!: (error: Error) => void;
     mocks.updateStatus
@@ -55,6 +91,13 @@ describe('useUpdateTicketSystemUserStatusMutation', () => {
       .mockResolvedValue(assignee);
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(ticketQueryKey, ticket);
+    const saved = { ...ticket, ticket_system_users: [{ ...assignee, status: 'resolved' as const }] };
+    const reload = vi.fn().mockResolvedValue(saved);
+    const unsubscribe = new QueryObserver(queryClient, {
+      queryKey: ticketQueryKey,
+      queryFn: reload,
+      staleTime: Infinity
+    }).subscribe(() => undefined);
     const { result } = renderHook(() => useUpdateTicketSystemUserStatusMutation(), { queryClient });
 
     act(() => result.current.mutate({ ticketSystemUserId: 'tsu-1', status: 'started' }));
@@ -64,6 +107,8 @@ describe('useUpdateTicketSystemUserStatusMutation', () => {
     await act(async () => rejectFirst(new Error('Denied')));
 
     await waitFor(() => expect(mocks.setSnackbar).toHaveBeenCalledOnce());
-    expect(cachedStatus(queryClient)).toBe('resolved');
+    await waitFor(() => expect(cachedStatus(queryClient)).toBe('resolved'));
+    expect(reload).toHaveBeenCalledOnce();
+    unsubscribe();
   });
 });

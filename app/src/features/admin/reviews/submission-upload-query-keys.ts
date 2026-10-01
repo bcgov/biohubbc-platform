@@ -26,10 +26,10 @@ export interface SelectedFeatureRulesKeyParams {
 }
 
 /**
- * Key of everything cached for one submission upload.
+ * Key of upload-level data, shared across its reviews.
  *
  * @param {SubmissionUploadKeyScope} scope The upload.
- * @returns The key prefix shared by every query about the upload.
+ * @returns The key prefix shared by upload-level queries.
  */
 const upload = (scope: SubmissionUploadKeyScope) =>
   [QUERY_KEY_ROOT.SUBMISSION_UPLOAD, scope.submissionId, scope.submissionUploadId] as const;
@@ -37,28 +37,37 @@ const upload = (scope: SubmissionUploadKeyScope) =>
 /**
  * Key of everything cached for one review of an upload.
  *
- * @param {SubmissionUploadReviewKeyScope} scope The review.
+ * @param {string} submissionUploadReviewId The globally unique review ID.
  * @returns The key prefix shared by every query about the review.
  */
-const review = (scope: SubmissionUploadReviewKeyScope) =>
-  [...upload(scope), 'review', scope.submissionUploadReviewId] as const;
+const review = (submissionUploadReviewId: string) =>
+  [QUERY_KEY_ROOT.SUBMISSION_UPLOAD_REVIEW, submissionUploadReviewId] as const;
 
 /**
  * Key of one review's detail.
  *
- * @param {SubmissionUploadReviewKeyScope} scope The review.
+ * @param {string} submissionUploadReviewId The globally unique review ID.
  * @returns The review detail key.
  */
-const reviewDetail = (scope: SubmissionUploadReviewKeyScope) => [...review(scope), 'detail'] as const;
+const reviewDetail = (submissionUploadReviewId: string) => [...review(submissionUploadReviewId), 'detail'] as const;
 
 /**
- * Key prefix of every security-rule query for one review: the rules grid for any scope, and each
- * feature's own rules. A change to rule assignments invalidates this prefix, or the narrower one below.
+ * Key prefix of every security-rule query for an upload: the rules grid for any scope, and each
+ * feature's own rules. Reviews read and change the same assignments, so they share this cache and mutation group.
  *
- * @param {SubmissionUploadReviewKeyScope} scope The review.
+ * @param {SubmissionUploadKeyScope} scope The upload.
  * @returns The security-rules key prefix.
  */
-const securityRules = (scope: SubmissionUploadReviewKeyScope) => [...review(scope), 'security-rules'] as const;
+const securityRules = (scope: SubmissionUploadKeyScope) => [...upload(scope), 'security-rules'] as const;
+
+/**
+ * Key prefix of the rules grids for every selection, search and page in one upload.
+ *
+ * @param {SubmissionUploadReviewKeyScope} scope The review.
+ * @returns The selected-feature rules key prefix.
+ */
+const selectedFeatureRulesAll = (scope: SubmissionUploadReviewKeyScope) =>
+  [...securityRules(scope), 'selected'] as const;
 
 /**
  * Key of the rules grid for one applied scope, search and page.
@@ -71,8 +80,7 @@ const securityRules = (scope: SubmissionUploadReviewKeyScope) => [...review(scop
  */
 const selectedFeatureRules = (scope: SubmissionUploadReviewKeyScope, params: SelectedFeatureRulesKeyParams) =>
   [
-    ...securityRules(scope),
-    'selected',
+    ...selectedFeatureRulesAll(scope),
     {
       featureIds: [...params.featureIds].sort((a, b) => a - b),
       expression: params.expression ?? null,
@@ -82,7 +90,7 @@ const selectedFeatureRules = (scope: SubmissionUploadReviewKeyScope, params: Sel
   ] as const;
 
 /**
- * Key prefix of every feature's own rule list in one review.
+ * Key prefix of every feature's own rule list in one upload.
  *
  * @param {SubmissionUploadReviewKeyScope} scope The review.
  * @returns The per-feature rules key prefix.
@@ -228,6 +236,7 @@ export const submissionUploadQueryKeys = {
   review,
   reviewDetail,
   securityRules,
+  selectedFeatureRulesAll,
   selectedFeatureRules,
   featureRulesAll,
   featureRules,

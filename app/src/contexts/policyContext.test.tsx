@@ -1,7 +1,7 @@
 import { usePolicyQuery } from 'features/admin/policies/hooks/usePolicyQuery';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { PropsWithChildren } from 'react';
-import { cleanup, render, renderHook, waitFor } from 'test-helpers/test-utils';
+import { PropsWithChildren, useState } from 'react';
+import { act, cleanup, render, renderHook, waitFor } from 'test-helpers/test-utils';
 import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminPolicyContextProvider, IPolicyContext, PolicyContext } from './policyContext';
@@ -44,6 +44,18 @@ describe('AdminPolicyContextProvider', () => {
     vi.clearAllMocks();
     mockUseParams.mockReturnValue({ policyId: POLICY_ID });
     mockGetPolicy.mockResolvedValue(mockPolicy);
+  });
+
+  it('resets drafts on record navigation and ignores completion from the previous record', () => {
+    const { result, rerender } = renderHook(() => useState(''), { wrapper: PolicyProvider });
+    act(() => result.current[1]('First draft'));
+    const finishPreviousSave = result.current[1];
+    mockUseParams.mockReturnValue({ policyId: 'other-record' });
+    rerender();
+    expect(result.current[0]).toBe('');
+    act(() => result.current[1]('Second draft'));
+    act(() => finishPreviousSave(''));
+    expect(result.current[0]).toBe('Second draft');
   });
 
   it('provides the route policy id and the key its detail is cached under', () => {

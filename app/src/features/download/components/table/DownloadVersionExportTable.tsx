@@ -1,7 +1,9 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
+import { keepPreviousDataWithin } from 'utils/query-client';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { DOWNLOAD_TABLE_STATUS_CHIP_COLORS } from 'constants/download';
@@ -36,7 +38,7 @@ export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: Do
     queryKey: downloadQueryKeys.versionExports(downloadId, downloadVersionId, exportsPagination),
     queryFn: ({ signal }) =>
       api.downloadExport.listDownloadVersionExports(downloadId, downloadVersionId, exportsPagination, { signal }),
-    placeholderData: keepPreviousData
+    placeholderData: keepPreviousDataWithin(downloadQueryKeys.versionExportsAll(downloadId, downloadVersionId))
   });
   const columns = useMemo<GridColDef<DownloadExport>[]>(
     () => [
@@ -150,6 +152,7 @@ export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: Do
           </Typography>
         </>
       }>
+      <QueryErrorDialog error={exportsQuery.error} label="exports" />
       <ServerPaginatedDataGrid<DownloadExport>
         dataTestId="download-exports-table"
         rows={exportsQuery.data?.exports ?? []}

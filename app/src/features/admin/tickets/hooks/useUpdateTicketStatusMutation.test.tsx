@@ -45,6 +45,40 @@ describe('useUpdateTicketStatusMutation', () => {
     vi.clearAllMocks();
   });
 
+  it('reconciles reads started during a save even when their stale response arrives last', async () => {
+    let finishSave!: (value: unknown) => void;
+    mocks.updateTicketStatus.mockReturnValue(
+      new Promise((resolve) => {
+        finishSave = resolve;
+      })
+    );
+    const { queryClient, result } = renderMutation();
+    const saved = { ...ticket, status: 'closed' as const };
+    let finishRead!: (value: ITicketExtended) => void;
+    const reload = vi
+      .fn()
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishRead = resolve;
+        })
+      )
+      .mockResolvedValue(saved);
+    const observer = new QueryObserver(queryClient, { queryKey: ticketQueryKey, queryFn: reload, staleTime: Infinity });
+    const stop = observer.subscribe(() => undefined);
+    act(() => result.current.mutate({ status: 'closed', userIdentifier: 'sarah' }));
+    await waitFor(() => expect(mocks.updateTicketStatus).toHaveBeenCalledOnce());
+    const read = observer.refetch();
+    await act(async () => finishSave(saved));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await act(async () => {
+      finishRead(ticket);
+      await read;
+    });
+    expect(queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.status).toBe('closed');
+    expect(reload).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
   it('shows the new status and its timeline entry, then merges the saved ticket', async () => {
     let resolve!: (value: unknown) => void;
     mocks.updateTicketStatus.mockReturnValue(new Promise((done) => (resolve = done)));

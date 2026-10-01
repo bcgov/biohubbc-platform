@@ -1,7 +1,8 @@
+import { keepPreviousDataWithin } from 'utils/query-client';
 import { mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import Stack from '@mui/material/Stack';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
@@ -31,7 +32,7 @@ export const TicketArtifacts = () => {
   const artifactsQuery = useQuery({
     queryKey: ticketQueryKeys.artifacts(ticketId, artifactsParams),
     queryFn: ({ signal }) => api.tickets.getTicketArtifacts(ticketId, artifactsParams, { signal }),
-    placeholderData: keepPreviousData
+    placeholderData: keepPreviousDataWithin(ticketQueryKeys.artifactsAll(ticketId))
   });
 
   /**

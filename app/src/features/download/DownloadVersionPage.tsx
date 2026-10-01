@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Container from '@mui/material/Container';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
@@ -46,33 +47,37 @@ export const DownloadVersionPage = () => {
   }
 
   return (
-    <LoadingGuard
-      isLoading={(downloadQuery.isFetching || versionQuery.isFetching) && (!download || !version)}
-      isLoadingFallback={<SkeletonPage />}>
-      {download && version ? (
-        <>
-          <DownloadVersionPageHeader
-            download={download}
-            version={version}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-          <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
-            <ComponentSwitch<DownloadVersionTab>
-              switch={activeTab}
-              components={{
-                features: <DownloadVersionFeaturesSection />,
-                exports: (
-                  <DownloadVersionExportTable
-                    downloadId={download.download_id}
-                    downloadVersionId={version.download_version_id}
-                  />
-                )
-              }}
+    <>
+      <QueryErrorDialog error={downloadQuery.error} label="download" />
+      <QueryErrorDialog error={versionQuery.error} label="download version" />
+      <LoadingGuard
+        isLoading={(downloadQuery.isFetching || versionQuery.isFetching) && (!download || !version)}
+        isLoadingFallback={<SkeletonPage />}>
+        {download && version ? (
+          <>
+            <DownloadVersionPageHeader
+              download={download}
+              version={version}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
             />
-          </Container>
-        </>
-      ) : null}
-    </LoadingGuard>
+            <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+              <ComponentSwitch<DownloadVersionTab>
+                switch={activeTab}
+                components={{
+                  features: <DownloadVersionFeaturesSection />,
+                  exports: (
+                    <DownloadVersionExportTable
+                      downloadId={download.download_id}
+                      downloadVersionId={version.download_version_id}
+                    />
+                  )
+                }}
+              />
+            </Container>
+          </>
+        ) : null}
+      </LoadingGuard>
+    </>
   );
 };

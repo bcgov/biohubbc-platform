@@ -67,6 +67,7 @@ export const SubmissionUploadReviewSecurityPage = ({ review }: SubmissionUploadR
       />
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <SecurityReviewFeaturesTab
+          key={submissionUploadReviewId}
           submissionId={Number(submissionId)}
           submissionUploadId={submissionUploadId}
           submissionUploadReviewId={submissionUploadReviewId}

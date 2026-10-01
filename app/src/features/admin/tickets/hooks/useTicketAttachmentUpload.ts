@@ -1,7 +1,7 @@
-import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useQueryClient } from '@tanstack/react-query';
 import { TICKET_ATTACHMENT_UPLOAD_CONCURRENCY } from 'constants/attachments';
 import { useApi } from 'hooks/useApi';
-import { holdReload, joinMutationGroup, settleMutationGroup } from 'utils/query-client';
+import { useCoordinatedMutation, holdReload } from 'hooks/useCoordinatedMutation';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
@@ -21,9 +21,9 @@ export const useTicketAttachmentUpload = () => {
   // Scopes the in-flight check below to this hook instance.
   const uploadMutationKey = ['ticket', 'attachment-upload', useId()];
 
-  const uploadMutation = useMutation({
+  const uploadMutation = useCoordinatedMutation({
     mutationKey: uploadMutationKey,
-    mutationFn: async (file: File): Promise<ITicketArtifact> => {
+    mutationFn: async ({ file, ticketId }: { file: File; ticketId: string }): Promise<ITicketArtifact> => {
       const contentType = file.type || 'application/octet-stream';
 
       const initializedUpload = await api.tickets.createTicketUpload(ticketId, {
@@ -40,11 +40,10 @@ export const useTicketAttachmentUpload = () => {
 
       return api.tickets.completeTicketUpload(ticketId, initializedUpload.upload_id, { status: 'uploaded' });
     },
-    onMutate: () => joinMutationGroup(queryClient, uploadMutationKey),
     // Whether uploaded from the Files tab or attached to a comment, the file joins the ticket's files. Files uploaded
     // together reload the list once, after the last of them, so it never shows some of them without the rest.
-    onSuccess: () => holdReload(queryClient, uploadMutationKey, ticketQueryKeys.artifactsAll(ticketId), false),
-    onSettled: () => settleMutationGroup(queryClient, uploadMutationKey)
+    onSuccess: (_artifact, { ticketId }) =>
+      holdReload(queryClient, uploadMutationKey, ticketQueryKeys.artifactsAll(ticketId), false)
   });
 
   const uploadsInFlight = useIsMutating({ mutationKey: uploadMutationKey });
@@ -62,9 +61,10 @@ export const useTicketAttachmentUpload = () => {
    * A failure is reported in the snackbar.
    *
    * @param {File} file File selected by the user.
+   * @param {string} uploadTicketId The ticket selected when the upload or batch started.
    * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation or the upload fails.
    */
-  const uploadFile = async (file: File): Promise<ITicketArtifact | null> => {
+  const uploadFile = async (file: File, uploadTicketId: string): Promise<ITicketArtifact | null> => {
     const maxTicketAttachmentFileSize = config.MAX_TICKET_ATTACHMENT_FILE_SIZE;
 
     if (file.size > maxTicketAttachmentFileSize) {
@@ -78,7 +78,7 @@ export const useTicketAttachmentUpload = () => {
     }
 
     try {
-      return await uploadMutation.mutateAsync(file);
+      return await uploadMutation.mutateAsync({ file, ticketId: uploadTicketId });
     } catch (error) {
       dialogContext.setSnackbar({
         open: true,
@@ -100,7 +100,7 @@ export const useTicketAttachmentUpload = () => {
    * @returns {Promise<ITicketArtifact | null>} Uploaded artifact, or null when validation/upload fails or another upload is running.
    */
   const uploadTicketAttachment = (file: File): Promise<ITicketArtifact | null> =>
-    isUploadInFlight() ? Promise.resolve(null) : uploadFile(file);
+    isUploadInFlight() ? Promise.resolve(null) : uploadFile(file, ticketId);
 
   /**
    * Upload several selected files as ticket attachments, up to `TICKET_ATTACHMENT_UPLOAD_CONCURRENCY` at a time. Each
@@ -116,6 +116,8 @@ export const useTicketAttachmentUpload = () => {
       return [];
     }
 
+    // Every queued file belongs to the ticket where the selection was made, even after navigation.
+    const uploadTicketId = ticketId;
     const queue = [...files];
     const uploaded: ITicketArtifact[] = [];
 
@@ -126,7 +128,7 @@ export const useTicketAttachmentUpload = () => {
         return;
       }
 
-      const artifact = await uploadFile(file);
+      const artifact = await uploadFile(file, uploadTicketId);
       if (artifact) {
         uploaded.push(artifact);
       }

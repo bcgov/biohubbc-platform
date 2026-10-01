@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
@@ -50,6 +51,7 @@ export const ManageSecurityPage = () => {
     <>
       <PageHeader label="Manage Security" />
       <Box py={4}>
+        <QueryErrorDialog error={categoriesQuery.error} label="security categories" />
         <CategoriesContainer
           categories={categoriesQuery.data?.categories ?? []}
           rowCount={categoriesQuery.data?.pagination.total ?? 0}
@@ -63,6 +65,7 @@ export const ManageSecurityPage = () => {
         />
 
         <Box mt={4}>
+          <QueryErrorDialog error={reasonsQuery.error} label="security reasons" />
           <ReasonsContainer
             reasons={reasonsQuery.data?.reasons ?? []}
             rowCount={reasonsQuery.data?.pagination.total ?? 0}

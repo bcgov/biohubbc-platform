@@ -1,14 +1,13 @@
-import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicket, ITicketExtended, ITicketStatusLog, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { refreshChangedQueries } from 'utils/query-client';
 import {
+  useCoordinatedMutation,
   cancelQueryForOptimisticUpdate,
-  holdReloadIfConcurrent,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+  holdReloadIfConcurrent
+} from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /** A close or reopen of the route's ticket. */
@@ -49,12 +48,12 @@ export const useUpdateTicketStatusMutation = () => {
   const { setSnackbar } = useDialogContext();
   const { ticketId, ticketQueryKey } = useTicketContext();
 
-  return useMutation<ITicket, Error, UpdateTicketStatusVariables, UpdateTicketStatusContext>({
+  return useCoordinatedMutation<ITicket, Error, UpdateTicketStatusVariables, UpdateTicketStatusContext>({
     // Every change to the ticket shares this key, so reloads of the ticket wait for the last of them.
     mutationKey: ticketQueryKey,
     mutationFn: ({ status }) => api.tickets.updateTicketStatus(ticketId, status),
     onMutate: async ({ status, userIdentifier }) => {
-      joinMutationGroup(queryClient, ticketQueryKey);
+      holdReloadIfConcurrent(queryClient, ticketQueryKey, ticketQueryKey);
       await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const optimisticStatus: ITicketStatusLog | undefined = userIdentifier
         ? {
@@ -82,7 +81,8 @@ export const useUpdateTicketStatusMutation = () => {
         )
       };
     },
-    onSuccess: (updatedTicket, _variables, context) => {
+    onSuccess: async (updatedTicket, _variables, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, context.ticketQueryKey, context.ticketQueryKey);
       // A response saved alongside other changes to the ticket can predate them, so it is written only when no other
       // change is running; otherwise the ticket reloads once they have all settled.
       if (!holdReloadIfConcurrent(queryClient, context.ticketQueryKey, context.ticketQueryKey)) {
@@ -114,8 +114,6 @@ export const useUpdateTicketStatusMutation = () => {
             statuses: current.statuses.filter((entry) => entry !== context.optimisticStatus)
           }
       );
-    },
-    onSettled: (_data, _error, _variables, context) =>
-      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
+    }
   });
 };

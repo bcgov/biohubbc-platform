@@ -61,19 +61,31 @@ const ticketLists = () => [ticketQueryKeys.lists('admin'), ticketQueryKeys.lists
 const ticketDetails = () => [ticketQueryKeys.details('admin'), ticketQueryKeys.details('user')];
 
 /**
- * Everything cached about policies, and the team assignments that name them. A data request is a policy.
+ * Reads whose visibility or security state depends on the viewer's current roles and team access.
+ *
+ * @returns The permission-sensitive query prefixes to refresh after an access change.
+ */
+const access = () => [
+  searchQueryKeys.features(),
+  [QUERY_KEY_ROOT.SUBMISSION],
+  [QUERY_KEY_ROOT.DOWNLOAD],
+  ticketQueryKeys.all('user')
+];
+
+/**
+ * Policies, assignments and permission-sensitive reads affected by policy changes. A data request is a policy.
  *
  * @returns The keys to refresh.
  */
-const policy = () => [[QUERY_KEY_ROOT.POLICY], teamPolicyQueryKeys.lists()];
+const policy = () => [[QUERY_KEY_ROOT.POLICY], teamPolicyQueryKeys.lists(), ...access()];
 
 /**
  * The copies of a policy outside its own page: the policies and assignments tables, and the ticket timelines that show
- * the status of the data requests (policies) they link to.
+ * the status of the data requests (policies) they link to, and permission-sensitive reads.
  *
  * @returns The keys to refresh.
  */
-const policyListings = () => [policyQueryKeys.lists(), teamPolicyQueryKeys.lists(), ...ticketDetails()];
+const policyListings = () => [policyQueryKeys.lists(), teamPolicyQueryKeys.lists(), ...ticketDetails(), ...access()];
 
 /**
  * A ticket's data request: the ticket's detail, and the policy pages, since a data request is a policy.
@@ -84,25 +96,30 @@ const policyListings = () => [policyQueryKeys.lists(), teamPolicyQueryKeys.lists
 const dataRequest = (ticketId: string) => [...ticketDetail(ticketId), ...policy()];
 
 /**
- * Everything cached about teams, the team assignments that name them, and the policies that list their teams.
+ * Teams, assignments, policy teams and permission-sensitive reads affected by membership or team changes.
  *
  * @returns The keys to refresh.
  */
-const team = () => [[QUERY_KEY_ROOT.TEAM], teamPolicyQueryKeys.lists(), [QUERY_KEY_ROOT.POLICY]];
+const team = () => [[QUERY_KEY_ROOT.TEAM], teamPolicyQueryKeys.lists(), [QUERY_KEY_ROOT.POLICY], ...access()];
 
 /**
- * The team assignments, and the policies that list their teams.
+ * Team assignments, policy teams and reads affected by the access those assignments grant.
  *
  * @returns The keys to refresh.
  */
-const teamPolicy = () => [teamPolicyQueryKeys.lists(), [QUERY_KEY_ROOT.POLICY]];
+const teamPolicy = () => [teamPolicyQueryKeys.lists(), [QUERY_KEY_ROOT.POLICY], ...access()];
 
 /**
- * Security categories and reasons, and the reviews that show them as rules.
+ * Security categories, reasons, review rules and reads whose visibility depends on active security rules.
  *
  * @returns The keys to refresh.
  */
-const securityReason = () => [[QUERY_KEY_ROOT.SECURITY], [QUERY_KEY_ROOT.SUBMISSION_UPLOAD]];
+const securityReason = () => [
+  [QUERY_KEY_ROOT.SECURITY],
+  [QUERY_KEY_ROOT.SUBMISSION_UPLOAD],
+  [QUERY_KEY_ROOT.SUBMISSION_UPLOAD_REVIEW],
+  ...access()
+];
 
 /**
  * A review's status, which ticket timelines and the dashboard's reviewed and unreviewed lists show.
@@ -121,7 +138,8 @@ const reviewStatus = () => [...ticketDetails(), submissionQueryKeys.adminLists()
 const uploadDecision = (ticketId: string) => [
   ...ticketDetail(ticketId),
   [QUERY_KEY_ROOT.SUBMISSION],
-  searchQueryKeys.features()
+  searchQueryKeys.features(),
+  searchQueryKeys.keyword()
 ];
 
 /**
@@ -130,7 +148,10 @@ const uploadDecision = (ticketId: string) => [
  * @param {number} submissionId The submission reviewed.
  * @returns The keys to refresh.
  */
-const submissionSecurity = (submissionId: number) => [submissionQueryKeys.submission(submissionId)];
+const submissionSecurity = (submissionId: number) => [
+  submissionQueryKeys.submission(submissionId),
+  searchQueryKeys.features()
+];
 
 /**
  * A new submission, which joins the submission lists and opens a ticket.
@@ -145,14 +166,14 @@ const submissionCreated = () => [[QUERY_KEY_ROOT.SUBMISSION], ...ticketLists()];
  *
  * @returns The keys to refresh.
  */
-const systemUser = () => [userQueryKeys.lists(), userQueryKeys.availableAll(), userQueryKeys.selfAll()];
+const systemUser = () => [userQueryKeys.lists(), userQueryKeys.availableAll(), userQueryKeys.selfAll(), ...access()];
 
 /**
- * The teams tables, which show each team's member count.
+ * The teams tables, which show each team's member count, and reads whose visibility depends on membership.
  *
  * @returns The keys to refresh.
  */
-const teamMembership = () => [teamQueryKeys.lists()];
+const teamMembership = () => [teamQueryKeys.lists(), ...access()];
 
 /**
  * The downloads lists, which a new download joins.

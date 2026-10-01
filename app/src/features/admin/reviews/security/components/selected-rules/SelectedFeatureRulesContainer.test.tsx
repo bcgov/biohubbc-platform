@@ -1,3 +1,4 @@
+import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
 import { QueryClient } from '@tanstack/react-query';
 import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
@@ -109,10 +110,11 @@ describe('SelectedFeatureRulesContainer', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
 
-      await waitFor(() => expect(invalidatedKeys()).toHaveLength(3));
+      await waitFor(() => expect(invalidatedKeys()).toHaveLength(4));
       expect(applied ? mocks.remove : mocks.apply).toHaveBeenCalledWith(15, 'upload', 'review', [10], 4, expression);
       expect(invalidatedKeys()).toEqual([
         submissionQueryKeys.submission(15),
+        searchQueryKeys.features(),
         submissionUploadQueryKeys.featureSearchResultsAll(feature),
         submissionUploadQueryKeys.featureRulesAll(review)
       ]);
@@ -120,6 +122,27 @@ describe('SelectedFeatureRulesContainer', () => {
       expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent(applied ? 'Apply' : 'Applied');
     }
   );
+
+  it('reloads a previously cached selection after applying a rule to the whole upload', async () => {
+    const { rerender } = render(<SelectedFeatureRulesContainer {...baseProps} />, { queryClient });
+    await screen.findByRole('button', { name: 'Sensitive' });
+    rerender(<SelectedFeatureRulesContainer {...baseProps} selectedFeatureIds={[]} />);
+    await waitFor(() => expect(mocks.getRules).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sensitive' }));
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+    expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied');
+    expect(mocks.getRules).toHaveBeenCalledTimes(2);
+
+    mocks.getRules.mockResolvedValue(response(rule(4, 'Sensitive', true)));
+    rerender(<SelectedFeatureRulesContainer {...baseProps} />);
+
+    await waitFor(() => expect(mocks.getRules).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied'));
+    fireEvent.click(screen.getByRole('button', { name: 'Sensitive' }));
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith(15, 'upload', 'review', [10], 4, undefined));
+  });
 
   it('sends the applied scope and the abort signal with the rules request', async () => {
     render(<SelectedFeatureRulesContainer {...baseProps} selectedFeatureIds={[]} expression={expression} />, {
@@ -212,18 +235,47 @@ describe('SelectedFeatureRulesContainer', () => {
     await waitFor(() => expect(mocks.apply).toHaveBeenCalledTimes(2));
     await act(async () => first.resolve());
 
-    expect(invalidatedKeys()).toEqual([submissionQueryKeys.submission(15)]);
+    expect(invalidatedKeys()).toEqual([submissionQueryKeys.submission(15), searchQueryKeys.features()]);
 
     await act(async () => second.resolve());
 
     await waitFor(() =>
       expect(invalidatedKeys()).toEqual([
         submissionQueryKeys.submission(15),
+        searchQueryKeys.features(),
         submissionQueryKeys.submission(15),
+        searchQueryKeys.features(),
         submissionUploadQueryKeys.featureSearchResultsAll(feature),
         submissionUploadQueryKeys.featureRulesAll(review)
       ])
     );
+  });
+
+  it('restores server state when both overlapping toggles fail', async () => {
+    const first = deferred<void>();
+    const second = deferred<void>();
+    mocks.apply.mockReturnValueOnce(first.promise);
+    mocks.remove.mockReturnValueOnce(second.promise);
+    render(<SelectedFeatureRulesContainer {...baseProps} />, { queryClient });
+    fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied'));
+    fireEvent.click(screen.getByRole('button', { name: 'Sensitive' }));
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledOnce());
+    await act(async () => first.reject(new Error('Apply failed')));
+    await act(async () => second.reject(new Error('Remove failed')));
+    await waitFor(() => expect(mocks.snackbar).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent(/^Apply$/));
+    expect(mocks.getRules).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares saved assignment state with another review of the same upload', async () => {
+    const { rerender } = render(<SelectedFeatureRulesContainer {...baseProps} />, { queryClient });
+    fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
+    await waitFor(() => expect(mocks.apply).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied'));
+    rerender(<SelectedFeatureRulesContainer {...baseProps} submissionUploadReviewId="other-review" />);
+    expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent('Applied');
+    expect(mocks.getRules).toHaveBeenCalledOnce();
   });
 
   it('keeps a newer toggle of the same rule when an older one fails', async () => {
@@ -235,6 +287,7 @@ describe('SelectedFeatureRulesContainer', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
       await waitFor(() => expect(screen.getByRole('button', { name: 'Sensitive' })).toHaveTextContent(label));
     }
+    mocks.getRules.mockResolvedValue(response(rule(4, 'Sensitive', true)));
     await act(async () => first.reject(new Error('Failed')));
 
     await waitFor(() => expect(mocks.snackbar).toHaveBeenCalledWith({ open: true, snackbarMessage: 'Failed' }));
@@ -277,6 +330,7 @@ describe('SelectedFeatureRulesContainer', () => {
     expect(mocks.reset).toHaveBeenCalledWith(15, 'upload', 'review', ids, filter);
     expect(invalidatedKeys()).toEqual([
       submissionQueryKeys.submission(15),
+      searchQueryKeys.features(),
       submissionUploadQueryKeys.securityRules(review),
       submissionUploadQueryKeys.featureSearchResultsAll(feature)
     ]);

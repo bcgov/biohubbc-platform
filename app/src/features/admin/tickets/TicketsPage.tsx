@@ -1,10 +1,11 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
-import { keepPreviousData, QueryKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, keepPreviousData, QueryKey, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TICKETS_LIST_DEFAULT_SORT } from 'constants/ticket';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -12,13 +13,13 @@ import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { IGetTicketsResponse, ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { refreshChangedQueries } from 'utils/query-client';
 import {
+  useCoordinatedMutation,
   cancelQueryForOptimisticUpdate,
-  holdReloadIfConcurrent,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+  holdReload,
+  hasConcurrentMutations
+} from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { CreateTicketDialog } from './components/dialog/create/CreateTicketDialog';
@@ -29,8 +30,8 @@ import { TicketsContainer } from './list/TicketsContainer';
 /**
  * Admin tickets page with administrative tabs and ticket pagination.
  *
- * Creating, editing and closing a ticket write the result into the page on screen, so the row stays where it is;
- * deleting one reloads the list. Each change also refreshes the ticket's other cached copies: its detail pages, the
+ * Creating and editing refresh the server-sorted list once pending list mutations settle. Status toggles update
+ * optimistically in place. Each change also refreshes the ticket's other cached copies: its detail pages, the
  * portal's lists and this list's other pages.
  *
  * @return {*}
@@ -70,10 +71,16 @@ export const TicketsPage = () => {
     dialogContext.setYesNoDialog({ open: false });
   }, [dialogContext]);
 
-  const deleteTicketMutation = useMutation({
+  const deleteTicketMutation = useCoordinatedMutation({
+    mutationKey: ticketQueryKeys.lists('admin'),
     mutationFn: (ticket: ITicket) => api.tickets.deleteTicket(ticket.ticket_id),
-    onSuccess: (_data, ticket) => {
-      refreshChangedQueries(queryClient, changedQueryKeys.ticket(ticket.ticket_id));
+    onSuccess: async (_data, ticket) => {
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      refreshChangedQueries(queryClient, [
+        ...changedQueryKeys.ticketDetail(ticket.ticket_id),
+        ticketQueryKeys.lists('user')
+      ]);
       dialogContext.setSnackbar({
         open: true,
         snackbarMessage: (
@@ -84,17 +91,21 @@ export const TicketsPage = () => {
       });
     },
     onError: showApiErrorSnackbar,
-    onSettled: closeDeleteTicketDialog
+    onSettled: () => {
+      closeDeleteTicketDialog();
+    }
   });
   const { mutate: deleteTicket } = deleteTicketMutation;
 
-  const toggleStatusMutation = useMutation({
-    // Every status toggle in the list shares this key, so a reload of the list waits for the last of them.
+  const toggleStatusMutation = useCoordinatedMutation({
+    // Creates, edits and status toggles share this group so refreshes wait for pending optimistic changes.
     mutationKey: ticketQueryKeys.lists('admin'),
     mutationFn: ({ ticket, nextStatus }: { ticket: ITicket; nextStatus: TicketStatus; listKey: QueryKey }) =>
       api.tickets.updateTicketStatus(ticket.ticket_id, nextStatus),
     onMutate: async ({ ticket, nextStatus, listKey }) => {
-      joinMutationGroup(queryClient, ticketQueryKeys.lists('admin'));
+      if (hasConcurrentMutations(queryClient, ticketQueryKeys.lists('admin'))) {
+        holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      }
       await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
       const response = queryClient.setQueryData<IGetTicketsResponse>(
         listKey,
@@ -109,9 +120,15 @@ export const TicketsPage = () => {
       const optimisticRow = response?.tickets.find((row) => row.ticket_id === ticket.ticket_id);
       return { optimisticRow };
     },
-    onSuccess: (updatedTicket, { ticket, nextStatus, listKey }, context) => {
-      // The response is written only to the row this toggle wrote: a newer toggle of the row replaced it, and its
-      // own response describes the ticket as it is now.
+    onSuccess: async (updatedTicket, { ticket, nextStatus, listKey }, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
+      const currentRow = queryClient
+        .getQueryData<IGetTicketsResponse>(listKey)
+        ?.tickets.find((row) => row.ticket_id === ticket.ticket_id);
+      if (currentRow !== context.optimisticRow) {
+        holdReload(queryClient, ticketQueryKeys.lists('admin'), listKey);
+      }
+      // Preserve newer optimistic rows. Overlapping changes reconcile from the server after the group settles.
       queryClient.setQueryData<IGetTicketsResponse>(
         listKey,
         (current) =>
@@ -120,7 +137,16 @@ export const TicketsPage = () => {
             tickets: current.tickets.map((row) => (row === context.optimisticRow ? { ...row, ...updatedTicket } : row))
           }
       );
-      refreshChangedQueries(queryClient, changedQueryKeys.ticket(ticket.ticket_id), ticketQueryKeys.lists('admin'));
+      for (const query of queryClient.getQueryCache().findAll({
+        queryKey: ticketQueryKeys.lists('admin'),
+        predicate: (query) => query.queryHash !== hashKey(listKey)
+      })) {
+        holdReload(queryClient, ticketQueryKeys.lists('admin'), query.queryKey);
+      }
+      refreshChangedQueries(queryClient, [
+        ...changedQueryKeys.ticketDetail(ticket.ticket_id),
+        ticketQueryKeys.lists('user')
+      ]);
       dialogContext.setSnackbar({
         open: true,
         snackbarMessage: (
@@ -143,54 +169,34 @@ export const TicketsPage = () => {
             )
           }
       );
-    },
-    onSettled: () => settleMutationGroup(queryClient, ticketQueryKeys.lists('admin'))
+    }
   });
   const { mutate: toggleStatus } = toggleStatusMutation;
 
-  const createTicketMutation = useMutation({
-    mutationFn: ({ values }: { values: ITicketFormValues; listKey: QueryKey }) => api.tickets.createTicket(values),
-    onSuccess: (createdTicket, { listKey }) => {
-      queryClient.setQueryData<IGetTicketsResponse>(
-        listKey,
-        (current) =>
-          current && {
-            ...current,
-            tickets: [createdTicket, ...current.tickets],
-            pagination: { ...current.pagination, total: current.pagination.total + 1 }
-          }
-      );
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketLists(), ticketQueryKeys.lists('admin'));
+  const createTicketMutation = useCoordinatedMutation({
+    mutationKey: ticketQueryKeys.lists('admin'),
+    mutationFn: (values: ITicketFormValues) => api.tickets.createTicket(values),
+    onSuccess: async () => {
+      // Discard older reads now; reload all list pages after pending optimistic toggles settle.
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      refreshChangedQueries(queryClient, [ticketQueryKeys.lists('user')]);
       setIsCreateDialogOpen(false);
     },
     onError: showApiErrorSnackbar
   });
 
-  const editTicketMutation = useMutation({
+  const editTicketMutation = useCoordinatedMutation({
     mutationKey: ticketQueryKeys.lists('admin'),
-    onMutate: () => joinMutationGroup(queryClient, ticketQueryKeys.lists('admin')),
-    mutationFn: ({ ticketId, payload }: { ticketId: string; payload: IUpdateTicketRequest; listKey: QueryKey }) =>
+    mutationFn: ({ ticketId, payload }: { ticketId: string; payload: IUpdateTicketRequest }) =>
       api.tickets.updateTicket(ticketId, payload),
-    onSuccess: (updatedTicket, { listKey }) => {
-      // The whole row is written from the response, which can predate a status toggle saved alongside; the list
-      // then reloads once they have all settled instead.
-      if (!holdReloadIfConcurrent(queryClient, ticketQueryKeys.lists('admin'), listKey)) {
-        queryClient.setQueryData<IGetTicketsResponse>(
-          listKey,
-          (current) =>
-            current && {
-              ...current,
-              tickets: current.tickets.map((row) =>
-                row.ticket_id === updatedTicket.ticket_id ? { ...row, ...updatedTicket } : row
-              )
-            }
-        );
-      }
-      refreshChangedQueries(
-        queryClient,
-        changedQueryKeys.ticket(updatedTicket.ticket_id),
-        ticketQueryKeys.lists('admin')
-      );
+    onSuccess: async (updatedTicket) => {
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      refreshChangedQueries(queryClient, [
+        ...changedQueryKeys.ticketDetail(updatedTicket.ticket_id),
+        ticketQueryKeys.lists('user')
+      ]);
       setIsEditDialogOpen(false);
       setSelectedTicket(undefined);
       dialogContext.setSnackbar({
@@ -198,8 +204,7 @@ export const TicketsPage = () => {
         snackbarMessage: 'Updated ticket'
       });
     },
-    onError: showApiErrorSnackbar,
-    onSettled: () => settleMutationGroup(queryClient, ticketQueryKeys.lists('admin'))
+    onError: showApiErrorSnackbar
   });
 
   const handleDeleteTicket = useCallback(
@@ -262,6 +267,7 @@ export const TicketsPage = () => {
       </Paper>
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+        <QueryErrorDialog error={ticketsQuery.error} label="tickets" />
         <TicketsContainer
           rows={ticketsQuery.data?.tickets ?? []}
           rowCount={ticketsQuery.data?.pagination.total ?? 0}
@@ -285,7 +291,7 @@ export const TicketsPage = () => {
         open={isCreateDialogOpen}
         isLoading={createTicketMutation.isPending}
         onCancel={() => setIsCreateDialogOpen(false)}
-        onSave={(values) => createTicketMutation.mutate({ values, listKey: ticketsQueryKey })}
+        onSave={(values) => createTicketMutation.mutate(values)}
       />
 
       {selectedTicket ? (
@@ -297,9 +303,7 @@ export const TicketsPage = () => {
             setIsEditDialogOpen(false);
             setSelectedTicket(undefined);
           }}
-          onSubmit={(payload) =>
-            editTicketMutation.mutate({ ticketId: selectedTicket.ticket_id, payload, listKey: ticketsQueryKey })
-          }
+          onSubmit={(payload) => editTicketMutation.mutate({ ticketId: selectedTicket.ticket_id, payload })}
         />
       ) : null}
     </>

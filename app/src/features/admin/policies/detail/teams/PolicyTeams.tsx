@@ -1,5 +1,6 @@
+import { keepPreviousDataWithin } from 'utils/query-client';
 import { GridColDef } from '@mui/x-data-grid';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
@@ -25,7 +26,7 @@ export const PolicyTeams = ({ policyId }: PolicyTeamsProps) => {
   const teamsQuery = useQuery({
     queryKey: policyQueryKeys.teams(policyId, teamsGrid.apiPagination),
     queryFn: ({ signal }) => api.policies.getPolicyTeams(policyId, teamsGrid.apiPagination, { signal }),
-    placeholderData: keepPreviousData
+    placeholderData: keepPreviousDataWithin(policyQueryKeys.policy(policyId))
   });
 
   const columns = useMemo<GridColDef<ITeamPolicyDetails>[]>(

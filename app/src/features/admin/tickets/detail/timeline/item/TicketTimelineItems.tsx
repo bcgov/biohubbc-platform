@@ -1,7 +1,4 @@
 import Icon from '@mdi/react';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
@@ -23,7 +20,6 @@ import { TicketUploadTimelineItem } from './TicketUploadTimelineItem';
 
 interface ITicketTimelineItemsProps {
   ticket: ITicketExtended;
-  isLoading: boolean;
   updatingDataRequestId: string | null;
   onArtifactLinkClick: (artifact: ITicketArtifact) => Promise<void>;
   onEditComment: (ticketCommentId: string) => void;
@@ -55,7 +51,6 @@ interface ITicketTimelineItemsProps {
 export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
   const {
     ticket,
-    isLoading,
     updatingDataRequestId,
     onArtifactLinkClick,
     onEditComment,
@@ -224,16 +219,5 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     }
   });
 
-  return (
-    <LoadingGuard
-      isLoading={isLoading}
-      isLoadingFallback={
-        <Stack gap={1.5}>
-          <Skeleton variant="rounded" height={52} />
-          <Skeleton variant="rounded" height={52} />
-        </Stack>
-      }>
-      <CustomTimeline items={timelineItems} />
-    </LoadingGuard>
-  );
+  return <CustomTimeline items={timelineItems} />;
 };

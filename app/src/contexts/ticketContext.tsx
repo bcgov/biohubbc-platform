@@ -44,7 +44,12 @@ const TicketContextProvider = ({ children, ticketScope }: PropsWithChildren<{ ti
     [ticketId, ticketScope]
   );
 
-  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+  // A different record owns different drafts and dialogs; pending saves retain the previous instance.
+  return (
+    <TicketContext.Provider key={ticketId} value={value}>
+      {children}
+    </TicketContext.Provider>
+  );
 };
 
 /**

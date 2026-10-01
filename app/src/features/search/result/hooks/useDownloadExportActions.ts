@@ -104,14 +104,9 @@ export const useDownloadExportActions = () => {
       downloadVersionId: string;
       values: IExportConfigFormValues;
     }) => biohubApi.downloadExport.createExport(downloadId, downloadVersionId, buildExportConfig(values)),
-    onSuccess: (_data, { downloadId, downloadVersionId }) => {
+    onSuccess: async (_data, { downloadId, downloadVersionId }) => {
+      await refreshChangedQueries(queryClient, changedQueryKeys.downloadExport(downloadId, downloadVersionId));
       setConfigDownloadId(null);
-      refreshChangedQueries(
-        queryClient,
-        changedQueryKeys.downloadExport(downloadId, downloadVersionId),
-        downloadQueryKeys.lists()
-      );
-      return refresh();
     },
     onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
   });

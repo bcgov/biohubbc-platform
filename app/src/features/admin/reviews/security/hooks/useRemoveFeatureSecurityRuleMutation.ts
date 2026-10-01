@@ -1,6 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
-import { holdReload, joinMutationGroup, refreshChangedQueries, settleMutationGroup } from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
+import { useCoordinatedMutation, holdReload } from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import {
   submissionUploadQueryKeys,
@@ -27,10 +28,9 @@ export const useRemoveFeatureSecurityRuleMutation = (scope: SubmissionUploadRevi
   const api = useApi();
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, RemoveFeatureSecurityRuleVariables>({
+  return useCoordinatedMutation<void, Error, RemoveFeatureSecurityRuleVariables>({
     // Every security change in the review shares this key, so the reloads they need wait for the last of them.
     mutationKey: submissionUploadQueryKeys.securityRules(scope),
-    onMutate: () => joinMutationGroup(queryClient, submissionUploadQueryKeys.securityRules(scope)),
     mutationFn: ({ submissionFeatureId, securityRuleId }) =>
       api.admin.deleteSubmissionUploadReviewSecurityRuleAssignments(
         scope.submissionId,
@@ -54,7 +54,6 @@ export const useRemoveFeatureSecurityRuleMutation = (scope: SubmissionUploadRevi
         false
       );
       refreshChangedQueries(queryClient, changedQueryKeys.submissionSecurity(scope.submissionId));
-    },
-    onSettled: () => settleMutationGroup(queryClient, submissionUploadQueryKeys.securityRules(scope))
+    }
   });
 };

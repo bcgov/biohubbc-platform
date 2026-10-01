@@ -407,6 +407,7 @@ describe('PolicyDetailPage', () => {
   });
 
   it('updates the policy status from the header dropdown', async () => {
+    getPolicy.mockResolvedValueOnce(policy).mockResolvedValue({ ...policy, status: PolicyStatus.DENIED });
     const user = userEvent.setup();
     const { findByTestId, findByRole, getByRole } = renderPage();
 
@@ -439,6 +440,9 @@ describe('PolicyDetailPage', () => {
   });
 
   it('edits policy metadata from the header edit button', async () => {
+    getPolicy
+      .mockResolvedValueOnce(policy)
+      .mockResolvedValue({ ...policy, name: 'Updated Policy', description: 'Updated description' });
     const user = userEvent.setup();
     updatePolicy.mockResolvedValueOnce({
       ...policy,
@@ -485,11 +489,15 @@ describe('PolicyDetailPage', () => {
       });
     });
     expect(updatePolicy).not.toHaveBeenCalled();
-    expect(getPolicy).toHaveBeenCalledTimes(1);
+    expect(getPolicy).toHaveBeenCalledTimes(2);
     expect(getPolicyExpressions).toHaveBeenCalledTimes(2);
   });
 
   it('edits a policy expression from the row actions menu', async () => {
+    getPolicy.mockResolvedValueOnce(policy).mockResolvedValue({
+      ...policy,
+      expressions: [{ ...policy.expressions[0], name: 'Updated sensitive species' }, policy.expressions[1]]
+    });
     const user = userEvent.setup();
     const { findByText, findByRole, getByRole, getByText, getByTestId } = renderPage();
 
@@ -544,6 +552,13 @@ describe('PolicyDetailPage', () => {
   });
 
   it('creates a policy statement from the statements toolbar', async () => {
+    getPolicy.mockResolvedValueOnce(policy).mockResolvedValue({
+      ...policy,
+      statements: [
+        ...policy.statements,
+        { ...policy.statements[0], policy_statement_id: 'statement-3', submission_feature_urn: 'urn:1:telemetry:*' }
+      ]
+    });
     const user = userEvent.setup();
     const { findByTestId, findByRole, getByRole, getByText, getByTestId } = renderPage();
 

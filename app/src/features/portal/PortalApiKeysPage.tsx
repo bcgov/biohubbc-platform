@@ -1,6 +1,8 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import { IApiKeyView } from 'interfaces/useApiKeysApi.interface';
 import { useMemo, useState } from 'react';
 import { apiKeyQueryKeys } from 'utils/query-keys/api-key-query-keys';
@@ -17,6 +19,7 @@ import { PortalApiKeysContainer } from './list/PortalApiKeysContainer';
  */
 export const PortalApiKeysPage = () => {
   const api = useApi();
+  const { setOkDialog } = useDialogContext();
   const queryClient = useQueryClient();
 
   const keysQuery = useQuery({
@@ -27,9 +30,9 @@ export const PortalApiKeysPage = () => {
   /**
    * Reloads the key list, so it reflects a key created, revoked or deleted.
    *
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the visible key list refreshes.
    */
-  const refreshKeys = () => void queryClient.invalidateQueries({ queryKey: apiKeyQueryKeys.mine() });
+  const refreshKeys = () => queryClient.invalidateQueries({ queryKey: apiKeyQueryKeys.mine() });
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -46,22 +49,47 @@ export const PortalApiKeysPage = () => {
 
   // Create dialog state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const createMutation = useMutation({ mutationFn: (name: string) => api.apiKeys.createApiKey(name) });
+  const createMutation = useMutation({
+    mutationFn: (name: string) => api.apiKeys.createApiKey(name),
+    onSuccess: refreshKeys
+  });
 
   // Revoke dialog state
   const [revokeTarget, setRevokeTarget] = useState<IApiKeyView | null>(null);
   const revokeMutation = useMutation({
     mutationFn: (apiKeyId: IApiKeyView['api_key_id']) => api.apiKeys.revokeApiKey(apiKeyId),
-    onSuccess: refreshKeys,
-    onSettled: () => setRevokeTarget(null)
+    onError: (error) => {
+      setOkDialog({
+        open: true,
+        dialogTitle: 'Failed to revoke API key',
+        dialogText: error.message,
+        dialogProps: { maxWidth: 'sm' },
+        onClose: () => setOkDialog({ open: false })
+      });
+    },
+    onSuccess: async () => {
+      await refreshKeys();
+      setRevokeTarget(null);
+    }
   });
 
   // Delete dialog state
   const [deleteTarget, setDeleteTarget] = useState<IApiKeyView | null>(null);
   const deleteMutation = useMutation({
     mutationFn: (apiKeyId: IApiKeyView['api_key_id']) => api.apiKeys.deleteApiKey(apiKeyId),
-    onSuccess: refreshKeys,
-    onSettled: () => setDeleteTarget(null)
+    onError: (error) => {
+      setOkDialog({
+        open: true,
+        dialogTitle: 'Failed to delete API key',
+        dialogText: error.message,
+        dialogProps: { maxWidth: 'sm' },
+        onClose: () => setOkDialog({ open: false })
+      });
+    },
+    onSuccess: async () => {
+      await refreshKeys();
+      setDeleteTarget(null);
+    }
   });
 
   /** Reset create-dialog state and open the dialog. */
@@ -69,10 +97,9 @@ export const PortalApiKeysPage = () => {
     setIsCreateDialogOpen(true);
   };
 
-  /** Close the create dialog and refresh the key list to reflect any newly created key. */
+  /** Close the create dialog. */
   const handleCloseCreate = () => {
     setIsCreateDialogOpen(false);
-    refreshKeys();
   };
 
   /**
@@ -109,6 +136,7 @@ export const PortalApiKeysPage = () => {
 
   return (
     <PortalListPageLayout>
+      <QueryErrorDialog error={keysQuery.error} label="API keys" />
       <PortalApiKeysContainer
         rows={filteredKeys}
         rowCount={filteredKeys.length}
@@ -116,8 +144,14 @@ export const PortalApiKeysPage = () => {
         searchTerm={searchTerm}
         onSearch={setSearchTerm}
         onAdd={handleOpenCreate}
-        onRevoke={setRevokeTarget}
-        onDelete={setDeleteTarget}
+        onRevoke={(key) => {
+          revokeMutation.reset();
+          setRevokeTarget(key);
+        }}
+        onDelete={(key) => {
+          deleteMutation.reset();
+          setDeleteTarget(key);
+        }}
       />
 
       {/* New API Key dialog */}

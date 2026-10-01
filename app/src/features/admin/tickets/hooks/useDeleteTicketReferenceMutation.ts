@@ -1,13 +1,9 @@
-import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketExtended, ITicketReference } from 'interfaces/useTicketsApi.interface';
-import {
-  cancelQueryForOptimisticUpdate,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
+import { useCoordinatedMutation, holdReload, cancelQueryForOptimisticUpdate } from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 interface DeleteTicketReferenceContext {
@@ -31,12 +27,11 @@ export const useDeleteTicketReferenceMutation = () => {
   const { setSnackbar } = useDialogContext();
   const { ticketId, ticketQueryKey } = useTicketContext();
 
-  return useMutation<void, Error, string, DeleteTicketReferenceContext>({
+  return useCoordinatedMutation<void, Error, string, DeleteTicketReferenceContext>({
     // Every change to the ticket shares this key, so reloads of the ticket wait for the last of them.
     mutationKey: ticketQueryKey,
     mutationFn: (ticketReferenceId) => api.tickets.deleteTicketReference(ticketId, ticketReferenceId),
     onMutate: async (ticketReferenceId) => {
-      joinMutationGroup(queryClient, ticketQueryKey);
       await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const references = queryClient.getQueryData<ITicketExtended>(ticketQueryKey)?.references ?? [];
       const index = references.findIndex((reference) => reference.ticket_reference_id === ticketReferenceId);
@@ -54,14 +49,23 @@ export const useDeleteTicketReferenceMutation = () => {
         removed: index > -1 ? { reference: references[index], index } : undefined
       };
     },
-    onSuccess: (_data, _variables, context) =>
+    onSuccess: async (_data, referenceId, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      if (
+        queryClient
+          .getQueryData<ITicketExtended>(context.ticketQueryKey)
+          ?.references.some((row) => row.ticket_reference_id === referenceId)
+      ) {
+        holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      }
       refreshChangedQueries(
         queryClient,
         context.removed
           ? changedQueryKeys.ticketReference(context.removed.reference)
           : changedQueryKeys.ticketDetail(context.ticketId),
         context.ticketQueryKey
-      ),
+      );
+    },
     onError: (error, ticketReferenceId, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
       const removed = context?.removed;
@@ -81,8 +85,6 @@ export const useDeleteTicketReferenceMutation = () => {
           ]
         };
       });
-    },
-    onSettled: (_data, _error, _variables, context) =>
-      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
+    }
   });
 };

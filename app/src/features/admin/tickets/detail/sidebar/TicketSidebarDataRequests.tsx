@@ -1,3 +1,4 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
 import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
@@ -10,12 +11,11 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useMemo, useState } from 'react';
 import { useTicketQuery } from '../../hooks/useTicketQuery';
 import { TicketSidebarItem } from './TicketSidebarItem';
 import { TicketSidebarSection } from './TicketSidebarSection';
-import { refreshChangedQueries, setSavedQueryData } from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
@@ -40,7 +40,7 @@ export const TicketSidebarDataRequests = () => {
   }, [ticket?.data_requests]);
 
   /**
-   * Creates a data request on the ticket, adds it to the cached ticket and closes the dialog; a failure keeps the
+   * Creates a data request on the ticket, refreshes the ticket and closes the dialog; a failure keeps the
    * dialog open and shows the error.
    *
    * @param {CreateDataRequestDialogValues} values Reason and users to request data for.
@@ -54,16 +54,13 @@ export const TicketSidebarDataRequests = () => {
 
     try {
       setIsSubmitting(true);
-      const createdDataRequest = await api.dataRequest.createTicketDataRequest(ticketId, {
+      await api.dataRequest.createTicketDataRequest(ticketId, {
         requested_by: requestedBy,
         reason: values.reason,
         system_user_ids: values.system_user_ids
       });
-      await setSavedQueryData<ITicketExtended>(
-        queryClient,
-        ticketQueryKey,
-        (current) => current && { ...current, data_requests: [...current.data_requests, createdDataRequest] }
-      );
+      await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
       refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
 
       setIsCreateDialogOpen(false);

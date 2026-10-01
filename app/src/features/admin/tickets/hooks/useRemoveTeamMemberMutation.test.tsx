@@ -1,3 +1,6 @@
+import { QueryObserver } from '@tanstack/react-query';
+import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { ITeamMembersResponse } from 'interfaces/useTeamsApi.interface';
 import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, renderHook, waitFor } from 'test-helpers/test-utils';
@@ -36,6 +39,30 @@ describe('useRemoveTeamMemberMutation', () => {
 
     await waitFor(() => expect(mocks.setSnackbar).toHaveBeenCalledWith({ open: true, snackbarMessage: 'Denied' }));
     expect(queryClient.getQueryData(teamQueryKeys.members('team-1'))).toEqual(members);
+  });
+
+  it('reloads visible search counts and discards cached feature details after access is revoked', async () => {
+    mocks.deleteTeamMember.mockResolvedValue(undefined);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(teamQueryKeys.members('team-1'), members);
+    const countKey = searchQueryKeys.featureCount('observation', undefined, null);
+    const featureKey = submissionQueryKeys.featureDetail(1, 2);
+    queryClient.setQueryData(countKey, { total: 3 });
+    queryClient.setQueryData(featureKey, { feature: 'previously accessible' });
+    const readCount = vi.fn().mockResolvedValue({ total: 0 });
+    const stop = new QueryObserver(queryClient, {
+      queryKey: countKey,
+      queryFn: readCount,
+      staleTime: Infinity
+    }).subscribe(() => undefined);
+    const { result } = renderHook(() => useRemoveTeamMemberMutation(), { queryClient });
+    act(() => result.current.mutate({ teamId: 'team-1', teamMemberId: 'b' }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(queryClient.getQueryData(countKey)).toEqual({ total: 0 }));
+    expect(readCount).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryData(featureKey)).toBeUndefined();
+    stop();
+    queryClient.clear();
   });
 
   it("drops the cached teams tables once the member is removed, since they show the team's member count", async () => {

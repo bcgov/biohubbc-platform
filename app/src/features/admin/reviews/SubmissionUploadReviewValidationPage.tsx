@@ -1,8 +1,9 @@
+import { keepPreviousDataWithin } from 'utils/query-client';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { keepPreviousData, skipToken, useQuery } from '@tanstack/react-query';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { PageSection } from 'components/section/PageSection';
@@ -67,7 +68,7 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
       api.admin.getSubmissionUploadFeatures(scope.submissionId, scope.submissionUploadId, featureGrid.apiPagination, {
         signal
       }),
-    placeholderData: keepPreviousData
+    placeholderData: keepPreviousDataWithin(submissionUploadQueryKeys.upload(scope))
   });
   const featureRows = useMemo(
     () =>

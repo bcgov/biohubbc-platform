@@ -10,7 +10,8 @@ import {
 
 /**
  * Completes or reopens a review, writing the updated review into the review detail query and refreshing the ticket
- * timelines and dashboard lists that show review status.
+ * timelines and dashboard lists that show review status. The returned review ID identifies the cache entry across navigation,
+ * and reads started before the save are cancelled and reconciled so they cannot overwrite the saved status.
  *
  * @param {SubmissionUploadReviewKeyScope} scope The review to update.
  * @returns The mutation; call `mutate` with the new status.
@@ -27,8 +28,10 @@ export const useUpdateSubmissionUploadReviewStatusMutation = (scope: SubmissionU
         scope.submissionUploadReviewId,
         status
       ),
-    onSuccess: (review) => {
-      queryClient.setQueryData(submissionUploadQueryKeys.reviewDetail(scope), review);
+    onSuccess: async (review) => {
+      const reviewQueryKey = submissionUploadQueryKeys.reviewDetail(review.submission_upload_review_id);
+      await queryClient.cancelQueries({ queryKey: reviewQueryKey, exact: true });
+      queryClient.setQueryData(reviewQueryKey, review);
       refreshChangedQueries(queryClient, changedQueryKeys.reviewStatus());
     }
   });

@@ -1,7 +1,8 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTicketContext } from 'hooks/useContext';
 import { ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
-import { refreshChangedQueries, setSavedQueryData } from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
@@ -21,11 +22,16 @@ export const useTicketCommentCache = () => {
    * Writes a saved comment change into the cached ticket and refreshes the ticket's other copies.
    *
    * @param {(ticket: ITicketExtended) => ITicketExtended} update Builds the ticket with the change.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
-  const writeSavedComment = (update: (ticket: ITicketExtended) => ITicketExtended) => {
-    void setSavedQueryData<ITicketExtended>(queryClient, ticketQueryKey, (ticket) => ticket && update(ticket));
-    refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
+  const writeSavedComment = async (update: (ticket: ITicketExtended) => ITicketExtended) => {
+    const hadPendingRead = queryClient.isFetching({ queryKey: ticketQueryKey, exact: true }) > 0;
+    await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+    queryClient.setQueryData<ITicketExtended>(ticketQueryKey, (ticket) => ticket && update(ticket));
+    if (hadPendingRead) {
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+    }
+    await refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
   };
 
   /**
@@ -34,10 +40,16 @@ export const useTicketCommentCache = () => {
    * Used after the API returns a created comment. If ticket details are not loaded, the cache is left unchanged.
    *
    * @param {ITicketCommentLog} newComment Comment to append.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
   const appendCachedComment = (newComment: ITicketCommentLog) => {
-    writeSavedComment((ticket) => ({ ...ticket, comments: [...ticket.comments, newComment] }));
+    return writeSavedComment((ticket) => ({
+      ...ticket,
+      comments: [
+        ...ticket.comments.filter((comment) => comment.ticket_comment_id !== newComment.ticket_comment_id),
+        newComment
+      ]
+    }));
   };
 
   /**
@@ -46,10 +58,10 @@ export const useTicketCommentCache = () => {
    * Used by persisted deletes. If ticket details are not loaded, the cache is left unchanged.
    *
    * @param {string} ticketCommentId Comment identifier to remove.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
   const removeCachedComment = (ticketCommentId: string) => {
-    writeSavedComment((ticket) => ({
+    return writeSavedComment((ticket) => ({
       ...ticket,
       comments: ticket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
     }));
@@ -62,10 +74,10 @@ export const useTicketCommentCache = () => {
    *
    * @param {string} ticketCommentId Comment identifier to replace.
    * @param {ITicketCommentLog} replacementComment Comment to write into the cache.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
   const replaceCachedComment = (ticketCommentId: string, replacementComment: ITicketCommentLog) => {
-    writeSavedComment((ticket) => {
+    return writeSavedComment((ticket) => {
       if (!ticket.comments.some((comment) => comment.ticket_comment_id === ticketCommentId)) {
         return ticket;
       }

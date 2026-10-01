@@ -21,7 +21,7 @@ export const SubmissionUploadReviewPage = () => {
   const hasReviewParams = Boolean(submissionId && submissionUploadId && submissionUploadReviewId);
   const scope = { submissionId: Number(submissionId), submissionUploadId, submissionUploadReviewId };
   const reviewQuery = useQuery({
-    queryKey: submissionUploadQueryKeys.reviewDetail(scope),
+    queryKey: submissionUploadQueryKeys.reviewDetail(scope.submissionUploadReviewId),
     queryFn: hasReviewParams
       ? ({ signal }) =>
           api.admin.getSubmissionUploadReview(

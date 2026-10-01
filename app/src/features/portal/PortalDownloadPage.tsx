@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
@@ -23,6 +24,7 @@ export const PortalDownloadPage = () => {
 
   return (
     <PortalListPageLayout>
+      <QueryErrorDialog error={downloadsQuery.error} label="downloads" />
       <PortalDownloadsContainer
         rows={downloadsQuery.data?.downloads ?? []}
         rowCount={downloadsQuery.data?.pagination.total ?? 0}

@@ -1,14 +1,10 @@
-import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketSystemUserFormValues } from 'features/admin/tickets/components/dialog/system-user/form/TicketSystemUserForm';
 import { ITicketExtended, ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
-import {
-  cancelQueryForOptimisticUpdate,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
+import { useCoordinatedMutation, holdReload, cancelQueryForOptimisticUpdate } from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 interface CreateTicketSystemUsersContext {
@@ -59,7 +55,7 @@ export const useCreateTicketSystemUsersMutation = () => {
   const { setSnackbar } = useDialogContext();
   const { ticketId, ticketQueryKey } = useTicketContext();
 
-  return useMutation<
+  return useCoordinatedMutation<
     ITicketSystemUser[],
     Error,
     ITicketSystemUserFormValues['ticketSystemUsers'],
@@ -73,7 +69,6 @@ export const useCreateTicketSystemUsersMutation = () => {
         drafts.map((draft) => ({ system_user_id: draft.system_user_id, status: draft.status }))
       ),
     onMutate: async (drafts) => {
-      joinMutationGroup(queryClient, ticketQueryKey);
       await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const placeholders = buildPlaceholders(ticketId, drafts);
       const ticket = queryClient.setQueryData<ITicketExtended>(
@@ -87,7 +82,12 @@ export const useCreateTicketSystemUsersMutation = () => {
         placeholders: ticket?.ticket_system_users.filter((row) => placeholderIds.has(row.ticket_system_user_id)) ?? []
       };
     },
-    onSuccess: (created, _drafts, context) => {
+    onSuccess: async (created, _drafts, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      const current = queryClient.getQueryData<ITicketExtended>(context.ticketQueryKey);
+      if (!context.placeholders.every((row) => current?.ticket_system_users.includes(row))) {
+        holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      }
       const createdByUserId = new Map(created.map((row) => [row.system_user_id, row]));
       queryClient.setQueryData<ITicketExtended>(
         context.ticketQueryKey,
@@ -117,8 +117,6 @@ export const useCreateTicketSystemUsersMutation = () => {
             ticket_system_users: ticket.ticket_system_users.filter((row) => !context.placeholders.includes(row))
           }
       );
-    },
-    onSettled: (_data, _error, _variables, context) =>
-      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
+    }
   });
 };

@@ -17,7 +17,7 @@ import { ICreateTicketReferenceFormValues, TicketReferenceForm } from './form/Ti
 interface ICreateTicketReferenceDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit?: (references: ITicketReference[]) => void;
+  onSubmit?: (references: ITicketReference[]) => void | Promise<void>;
 }
 
 /**
@@ -58,8 +58,10 @@ export const CreateTicketReferenceDialog = (props: ICreateTicketReferenceDialogP
 
   const createReferenceMutation = useMutation({
     mutationFn: (request: ICreateTicketReferenceRequest) => api.tickets.createTicketReference(ticketId, request),
-    onSuccess: (createdReferences) => {
-      onSubmit?.(createdReferences);
+    // Preserve the cache writer for the ticket where the request started; navigation can replace this prop.
+    onMutate: () => ({ onSubmit }),
+    onSuccess: async (createdReferences, _request, context) => {
+      await context.onSubmit?.(createdReferences);
       onClose();
     },
     onError: (error) => setSnackbar({ open: true, snackbarMessage: error.message })

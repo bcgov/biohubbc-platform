@@ -1,3 +1,4 @@
+import { DownloadVersionExportTable } from './components/table/DownloadVersionExportTable';
 import { cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { DownloadDetail, DownloadVersion } from 'interfaces/useDownloadApi.interface';
 import { DownloadExportDetail, DownloadExportListResponse } from 'interfaces/useDownloadExportApi.interface';
@@ -109,6 +110,16 @@ describe('DownloadVersionPage', () => {
   });
 
   afterEach(cleanup);
+
+  it('clears the previous version exports while another version loads', async () => {
+    const { findByRole, queryByRole, rerender } = render(
+      <DownloadVersionExportTable downloadId={DOWNLOAD_ID} downloadVersionId={VERSION_ID} />
+    );
+    await findByRole('button', { name: 'Download' });
+    mockListDownloadVersionExports.mockReturnValue(new Promise(() => undefined));
+    rerender(<DownloadVersionExportTable downloadId={DOWNLOAD_ID} downloadVersionId="other-version" />);
+    expect(queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
+  });
 
   it('renders the download header with Features and Exports tabs', async () => {
     const { findByRole, getByRole, getByText } = renderPage();

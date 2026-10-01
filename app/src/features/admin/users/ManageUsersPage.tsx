@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
@@ -307,6 +308,8 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
       </Paper>
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+        <QueryErrorDialog error={usersQuery.error} label="users" />
+        <QueryErrorDialog error={rolesQuery.error} label="user roles" />
         <ActiveUsersList
           rows={usersQuery.data?.users ?? []}
           rowCount={usersQuery.data?.pagination.total ?? 0}

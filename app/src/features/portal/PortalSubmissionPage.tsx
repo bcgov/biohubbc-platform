@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SUBMISSIONS_LIST_DEFAULT_SORT } from 'constants/submission';
 import { useApi } from 'hooks/useApi';
@@ -25,6 +26,7 @@ export const PortalSubmissionPage = () => {
 
   return (
     <PortalListPageLayout>
+      <QueryErrorDialog error={submissionsQuery.error} label="submissions" />
       <PortalSubmissionsContainer
         rows={submissionsQuery.data?.submissions ?? []}
         rowCount={submissionsQuery.data?.pagination.total ?? 0}

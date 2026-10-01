@@ -2,6 +2,7 @@ import { useTicketComment } from 'features/admin/tickets/hooks/useTicketComment'
 import { useTicketQuery } from 'features/admin/tickets/hooks/useTicketQuery';
 import { TicketSkeleton } from 'features/admin/tickets/detail/skeleton/TicketSkeleton';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import { PortalTicketDetailPageContent } from './detail/content/PortalTicketDetailPageContent';
 
 /**
@@ -16,22 +17,24 @@ export const PortalTicketDetailPage = () => {
   const ticket = ticketQuery.data;
 
   return (
-    <LoadingGuard
-      isLoading={ticketQuery.isFetching || !ticket}
-      isLoadingFallback={<TicketSkeleton />}
-      isLoadingFallbackDelay={300}>
-      {ticket ? (
-        <PortalTicketDetailPageContent
-          ticket={ticket}
-          isLoading={ticketQuery.isFetching}
-          comment={comment}
-          setComment={setComment}
-          isSavingComment={isSavingComment}
-          isUploadingAttachment={isUploadingAttachment}
-          onAddComment={handleAddComment}
-          onUploadAttachment={handleUploadAttachment}
-        />
-      ) : null}
-    </LoadingGuard>
+    <>
+      <QueryErrorDialog error={ticketQuery.error} label="ticket" />
+      <LoadingGuard
+        isLoading={ticketQuery.isFetching && !ticket}
+        isLoadingFallback={<TicketSkeleton />}
+        isLoadingFallbackDelay={300}>
+        {ticket ? (
+          <PortalTicketDetailPageContent
+            ticket={ticket}
+            comment={comment}
+            setComment={setComment}
+            isSavingComment={isSavingComment}
+            isUploadingAttachment={isUploadingAttachment}
+            onAddComment={handleAddComment}
+            onUploadAttachment={handleUploadAttachment}
+          />
+        ) : null}
+      </LoadingGuard>
+    </>
   );
 };

@@ -1,7 +1,8 @@
+import { keepPreviousDataWithin } from 'utils/query-client';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
 import { SubmissionFeatureLayout } from 'features/submissions/page/features/components/SubmissionFeatureLayout';
 import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
@@ -40,7 +41,7 @@ export const SubmissionReviewFeaturePageContent = (props: SubmissionReviewFeatur
       api.admin.getSubmissionUploadFeature(submissionId, submissionUploadId, submissionFeatureId, { signal })
   });
   const reviewQuery = useQuery({
-    queryKey: submissionUploadQueryKeys.reviewDetail(props),
+    queryKey: submissionUploadQueryKeys.reviewDetail(submissionUploadReviewId),
     queryFn: ({ signal }) =>
       api.admin.getSubmissionUploadReview(submissionId, submissionUploadId, submissionUploadReviewId, { signal })
   });
@@ -63,7 +64,7 @@ export const SubmissionReviewFeaturePageContent = (props: SubmissionReviewFeatur
           signal
         }
       ),
-    placeholderData: keepPreviousData
+    placeholderData: keepPreviousDataWithin(submissionUploadQueryKeys.feature(props, submissionFeatureId))
   });
 
   const pathResolvers = useMemo<SubmissionPropertyValuePathResolvers>(

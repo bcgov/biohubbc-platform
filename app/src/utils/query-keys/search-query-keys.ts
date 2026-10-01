@@ -51,6 +51,13 @@ const featureResults = (
 ) => [...featureScope(featureTypeName, submissionIds), 'results', { expression, pagination }] as const;
 
 /**
+ * Key prefix of landing-page keyword records and summaries affected by publication changes.
+ *
+ * @returns The keyword search key prefix.
+ */
+const keywordSearch = () => [QUERY_KEY_ROOT.SEARCH, 'keyword'] as const;
+
+/**
  * Key of one page of records matching a keyword across every kind of record.
  *
  * @param {string} keyword The keyword searched.
@@ -58,7 +65,7 @@ const featureResults = (
  * @returns The keyword records key.
  */
 const keywordRecords = (keyword: string, pagination: ApiPaginationRequestOptions) =>
-  [QUERY_KEY_ROOT.SEARCH, 'keyword', keyword, 'records', { pagination }] as const;
+  [...keywordSearch(), keyword, 'records', { pagination }] as const;
 
 /**
  * Key of the counts of features, submissions and taxa matching a keyword.
@@ -66,7 +73,7 @@ const keywordRecords = (keyword: string, pagination: ApiPaginationRequestOptions
  * @param {string} keyword The keyword searched; empty matches everything.
  * @returns The keyword summary key.
  */
-const keywordSummary = (keyword: string) => [QUERY_KEY_ROOT.SEARCH, 'keyword', keyword, 'summary'] as const;
+const keywordSummary = (keyword: string) => [...keywordSearch(), keyword, 'summary'] as const;
 
 /**
  * Key of the property options offered by expression-builder pickers for a keyword.
@@ -118,6 +125,7 @@ const taxonOptions = (keyword: string) => [QUERY_KEY_ROOT.SEARCH, 'taxon', 'opti
  * invalidates.
  */
 export const searchQueryKeys = {
+  keyword: keywordSearch,
   features,
   featureScope,
   featureCount,

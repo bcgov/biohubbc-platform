@@ -1,5 +1,5 @@
-import { PropsWithChildren } from 'react';
-import { cleanup, render } from 'test-helpers/test-utils';
+import { PropsWithChildren, useState } from 'react';
+import { act, cleanup, render, renderHook } from 'test-helpers/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { AdminTicketContextProvider, ITicketContext, TicketContext, UserTicketContextProvider } from './ticketContext';
@@ -41,6 +41,18 @@ describe('ticket context providers', () => {
     cleanup();
     vi.clearAllMocks();
     mockUseParams.mockReturnValue({ ticketId: TICKET_ID });
+  });
+
+  it('resets drafts on record navigation and ignores completion from the previous record', () => {
+    const { result, rerender } = renderHook(() => useState(''), { wrapper: AdminTicketContextProvider });
+    act(() => result.current[1]('First draft'));
+    const finishPreviousSave = result.current[1];
+    mockUseParams.mockReturnValue({ ticketId: 'other-record' });
+    rerender();
+    expect(result.current[0]).toBe('');
+    act(() => result.current[1]('Second draft'));
+    act(() => finishPreviousSave(''));
+    expect(result.current[0]).toBe('Second draft');
   });
 
   it('scopes admin routes to the administrative ticket endpoints', () => {

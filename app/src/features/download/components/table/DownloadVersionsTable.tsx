@@ -1,7 +1,9 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
+import { keepPreviousDataWithin } from 'utils/query-client';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
@@ -37,7 +39,7 @@ export const DownloadVersionsTable = ({ downloadId }: DownloadVersionsTableProps
   const versionsQuery = useQuery({
     queryKey: downloadQueryKeys.versions(downloadId, versionsPagination),
     queryFn: ({ signal }) => api.download.listDownloadVersions(downloadId, versionsPagination, { signal }),
-    placeholderData: keepPreviousData
+    placeholderData: keepPreviousDataWithin(downloadQueryKeys.download(downloadId))
   });
   const columns = useMemo<GridColDef<DownloadVersion>[]>(
     () => [
@@ -102,6 +104,7 @@ export const DownloadVersionsTable = ({ downloadId }: DownloadVersionsTableProps
           </Typography>
         </>
       }>
+      <QueryErrorDialog error={versionsQuery.error} label="download versions" />
       <ServerPaginatedDataGrid<DownloadVersion>
         dataTestId="download-versions-table"
         rows={versionsQuery.data?.versions ?? []}

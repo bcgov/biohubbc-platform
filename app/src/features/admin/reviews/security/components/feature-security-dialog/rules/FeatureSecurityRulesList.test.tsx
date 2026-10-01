@@ -1,3 +1,4 @@
+import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
 import { QueryClient } from '@tanstack/react-query';
 import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
@@ -79,6 +80,7 @@ describe('FeatureSecurityRulesList', () => {
     expect(mocks.remove).toHaveBeenCalledWith(1, 'upload', 'review', [10], 4);
     expect(invalidatedKeys()).toEqual([
       submissionQueryKeys.submission(1),
+      searchQueryKeys.features(),
       submissionUploadQueryKeys.securityRules(props),
       submissionUploadQueryKeys.featureSearchResultsAll(props)
     ]);

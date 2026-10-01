@@ -1,17 +1,17 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
 import { useQueryClient } from '@tanstack/react-query';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import {
   ICreateSubmissionUploadReviewRequest,
-  ITicketExtended,
   IUpdateSubmissionUploadDecisionRequest,
   SubmissionUploadReviewScope,
   TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
-import { refreshChangedQueries, reloadAfterPendingMutations, setSavedQueryData } from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 type SubmissionUploadDecisionUpdate = IUpdateSubmissionUploadDecisionRequest['decision'];
@@ -30,46 +30,6 @@ export const useTicketTimelineUploadActions = () => {
   const navigate = useNavigate();
 
   /**
-   * Writes a saved change to one of the ticket's uploads into the cached ticket.
-   *
-   * @param {string} submissionUploadId Submission upload being updated in the ticket cache.
-   * @param {(upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse} updateUpload Builds the
-   * changed upload.
-   * @returns {void}
-   */
-  const updateCachedSubmissionUpload = (
-    submissionUploadId: string,
-    updateUpload: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
-  ): void => {
-    void setSavedQueryData<ITicketExtended>(
-      queryClient,
-      ticketQueryKey,
-      (ticket) =>
-        ticket && {
-          ...ticket,
-          submission_uploads: ticket.submission_uploads.map((upload) =>
-            upload.submission_upload_id === submissionUploadId ? updateUpload(upload) : upload
-          )
-        }
-    );
-  };
-
-  /**
-   * Replaces the cached decision for one upload after the backend records it.
-   * This is only used for the upload-level decision row and intentionally leaves scoped review tasks unchanged.
-   *
-   * @param {string} submissionUploadId Submission upload being updated in the ticket cache.
-   * @param {TicketSubmissionUploadResponse['decision']} decision Backend-confirmed upload decision.
-   * @returns {void}
-   */
-  const setCachedUploadDecision = (
-    submissionUploadId: string,
-    decision: TicketSubmissionUploadResponse['decision']
-  ): void => {
-    updateCachedSubmissionUpload(submissionUploadId, (upload) => ({ ...upload, decision }));
-  };
-
-  /**
    * Shows the API error from a failed upload action in the shared ticket snackbar.
    * All upload handlers use the same failure path so the UI reports backend validation and permission errors consistently.
    *
@@ -85,28 +45,25 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Persists an upload-level decision and updates the cached upload with the backend response. The submission, its
+   * Persists an upload-level decision and refreshes the ticket after pending optimistic changes settle. The submission, its
    * other ticket copies and feature searches are refreshed, since a decision changes what is published.
    * Use this only from the confirmation dialog callback, after the reviewer has confirmed the decision.
    *
    * @param {TicketSubmissionUploadResponse} upload Upload receiving the decision.
    * @param {SubmissionUploadDecisionUpdate} nextDecision Decision to persist.
-   * @returns {Promise<void>} Resolves after the backend response has been reflected in local ticket state.
+   * @returns {Promise<void>} Resolves after the decision is saved and its affected queries are scheduled to refresh.
    */
   const handleSubmissionUploadDecisionUpdate = async (
     upload: TicketSubmissionUploadResponse,
     nextDecision: SubmissionUploadDecisionUpdate
   ): Promise<void> => {
     try {
-      const updated = await api.tickets.updateSubmissionUploadDecision(
-        upload.submission_id,
-        upload.submission_upload_id,
-        {
-          decision: nextDecision
-        }
-      );
+      await api.tickets.updateSubmissionUploadDecision(upload.submission_id, upload.submission_upload_id, {
+        decision: nextDecision
+      });
 
-      setCachedUploadDecision(upload.submission_upload_id, updated.decision);
+      await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
       refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
     } catch (error) {
       showUploadActionError(error);
@@ -139,7 +96,7 @@ export const useTicketTimelineUploadActions = () => {
       // The ticket's timeline lists the upload's reviews, so every copy of its detail is out of date, including this page's,
       // which reloads once any change to the ticket still being saved has settled.
       refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
-      reloadAfterPendingMutations(queryClient, ticketQueryKey);
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
       navigate(
         `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${insertedReview.submission_upload_review_id}`
       );

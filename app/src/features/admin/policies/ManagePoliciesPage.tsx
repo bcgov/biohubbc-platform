@@ -1,3 +1,4 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
@@ -79,6 +80,7 @@ export const ManagePoliciesPage = () => {
     <>
       <PageHeader label="Manage Policies" />
       <Box py={4}>
+        <QueryErrorDialog error={policiesQuery.error} label="policies" />
         <PoliciesContainer
           policies={policiesQuery.data?.policies ?? []}
           rowCount={policiesQuery.data?.pagination.total ?? 0}
@@ -92,6 +94,7 @@ export const ManagePoliciesPage = () => {
         />
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
+          <QueryErrorDialog error={teamsQuery.error} label="teams" />
           <TeamsContainer
             teams={teamsQuery.data?.teams ?? []}
             rowCount={teamsQuery.data?.pagination.total ?? 0}
@@ -106,6 +109,7 @@ export const ManagePoliciesPage = () => {
         </Container>
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
+          <QueryErrorDialog error={teamPoliciesQuery.error} label="team-policy assignments" />
           <TeamPoliciesContainer
             teamPolicies={teamPoliciesQuery.data?.team_policies ?? []}
             rowCount={teamPoliciesQuery.data?.pagination.total ?? 0}

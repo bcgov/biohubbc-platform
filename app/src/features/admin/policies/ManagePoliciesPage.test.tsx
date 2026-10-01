@@ -1,3 +1,4 @@
+import { DialogContextProvider } from 'contexts/dialogContext';
 import { cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
@@ -131,7 +132,8 @@ const renderPage = () => {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <ManagePoliciesPage />
-    </MemoryRouter>
+    </MemoryRouter>,
+    { wrapper: DialogContextProvider }
   );
 };
 
@@ -191,6 +193,19 @@ describe('ManagePoliciesPage', () => {
         expect(getByTestId('header')).toHaveTextContent('Team-Policy Assignments');
       });
     });
+  });
+
+  it('reports a failed policies load in a dismissible dialog', async () => {
+    setupMocksWithData();
+    mockGetPolicies.mockRejectedValueOnce(new Error('Service unavailable'));
+    const { findByRole, findByTestId, getByRole, queryByRole } = renderPage();
+    expect(await findByRole('dialog')).toHaveTextContent('Failed to load policiesService unavailable');
+    expect(await findByTestId('team-t1')).toBeVisible();
+    fireEvent.click(getByRole('button', { name: 'Ok' }));
+    await waitFor(() => expect(queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockGetPolicies).toHaveBeenCalledOnce();
+    expect(mockGetTeams).toHaveBeenCalledOnce();
+    expect(mockGetTeamPolicies).toHaveBeenCalledOnce();
   });
 
   describe('API Integration', () => {

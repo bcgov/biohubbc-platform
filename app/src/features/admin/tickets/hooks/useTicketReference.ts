@@ -1,8 +1,9 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTicketContext } from 'hooks/useContext';
 import { ITicketExtended, ITicketReference } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
-import { refreshChangedQueries, setSavedQueryData } from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useDeleteTicketReferenceMutation } from './useDeleteTicketReferenceMutation';
 
@@ -38,19 +39,36 @@ export const useTicketReference = () => {
    * they link, and closes the dialog.
    *
    * @param {ITicketReference[]} createdReferences References returned by the create request.
-   * @return {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
-  const handleCreateReferenceSubmit = (createdReferences: ITicketReference[]) => {
+  const handleCreateReferenceSubmit = async (createdReferences: ITicketReference[]) => {
     if (!createdReferences.length) {
       return;
     }
 
-    void setSavedQueryData<ITicketExtended>(
+    const hadPendingRead = queryClient.isFetching({ queryKey: ticketQueryKey, exact: true }) > 0;
+    await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+    queryClient.setQueryData<ITicketExtended>(ticketQueryKey, (ticket) => {
+      if (!ticket) {
+        return ticket;
+      }
+      const createdIds = new Set(createdReferences.map((reference) => reference.ticket_reference_id));
+      return {
+        ...ticket,
+        references: [
+          ...ticket.references.filter((reference) => !createdIds.has(reference.ticket_reference_id)),
+          ...createdReferences
+        ]
+      };
+    });
+    if (hadPendingRead) {
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+    }
+    await refreshChangedQueries(
       queryClient,
-      ticketQueryKey,
-      (ticket) => ticket && { ...ticket, references: [...ticket.references, ...createdReferences] }
+      createdReferences.flatMap(changedQueryKeys.ticketReference),
+      ticketQueryKey
     );
-    refreshChangedQueries(queryClient, createdReferences.flatMap(changedQueryKeys.ticketReference), ticketQueryKey);
     setIsCreateReferenceDialogOpen(false);
   };
 

@@ -1,4 +1,6 @@
+import { DialogContextProvider } from 'contexts/dialogContext';
 import { fireEvent, screen } from '@testing-library/react';
+import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
@@ -38,10 +40,9 @@ vi.mock('./detail/artifacts/TicketArtifacts', () => ({
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
-  TicketTimeline: ({ ticket, isLoading }: { ticket: ITicketExtended; isLoading: boolean }) => (
+  TicketTimeline: ({ ticket }: { ticket: ITicketExtended }) => (
     <div
       data-testid="ticket-timeline"
-      data-loading={String(isLoading)}
       data-ticket-id={ticket.ticket_id}
       data-events={JSON.stringify(
         [...ticket.statuses, ...ticket.comments, ...ticket.data_requests].sort(
@@ -79,9 +80,74 @@ vi.mock('./detail/skeleton/TicketSkeleton', () => ({
   TicketSkeleton: () => <div data-testid="ticket-skeleton" />
 }));
 
+vi.mock('features/portal/detail/content/PortalTicketDetailPageContent', () => ({
+  PortalTicketDetailPageContent: ({ ticket }: { ticket: ITicketExtended }) => (
+    <div data-testid="portal-ticket-content">{ticket.subject}</div>
+  )
+}));
+
 beforeEach(() => {
   // Prevent delayed setTimeout callbacks from firing after Vitest tears down the test environment.
   vi.useFakeTimers();
+});
+
+describe.each([
+  { scope: 'admin', Page: TicketDetailPage, contentTestId: 'ticket-timeline' },
+  { scope: 'portal', Page: PortalTicketDetailPage, contentTestId: 'portal-ticket-content' }
+])('$scope ticket detail error handling', ({ Page, contentTestId }) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseTicketComment.mockReturnValue({
+      comment: '',
+      setComment,
+      isSavingComment: false,
+      isUploadingAttachment: false,
+      handleAddComment: onAddComment,
+      handleUploadAttachment: onUploadAttachment
+    });
+  });
+
+  it('shows an initial load failure in a dismissible dialog', () => {
+    const refetch = vi.fn();
+    mockUseTicketQuery.mockReturnValue({
+      data: undefined,
+      error: new Error('Invalid response for status code 200'),
+      isFetching: false,
+      refetch
+    });
+    const { rerender } = render(<Page />, { wrapper: DialogContextProvider });
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('Failed to load ticketInvalid response for status code 200');
+    expect(screen.queryByTestId('ticket-skeleton')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
+    expect(refetch).not.toHaveBeenCalled();
+
+    mockUseTicketQuery.mockReturnValue({ data: baseTicket, error: null, isFetching: false, refetch });
+    rerender(<Page />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId(contentTestId)).toBeVisible();
+  });
+
+  it('keeps loaded ticket content mounted after a refresh fails and while retrying', () => {
+    const refetch = vi.fn();
+    mockUseTicketQuery.mockReturnValue({ data: baseTicket, error: null, isFetching: false, refetch });
+    const { rerender } = render(<Page />, { wrapper: DialogContextProvider });
+    const content = screen.getByTestId(contentTestId);
+    const error = new Error('Refresh failed');
+
+    mockUseTicketQuery.mockReturnValue({ data: baseTicket, error, isFetching: false, refetch });
+    rerender(<Page />);
+    expect(screen.getByRole('dialog')).toHaveTextContent('Refresh failed');
+    expect(screen.getByTestId(contentTestId)).toBe(content);
+
+    mockUseTicketQuery.mockReturnValue({ data: baseTicket, error, isFetching: true, refetch });
+    rerender(<Page />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ok' }));
+    rerender(<Page />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId(contentTestId)).toBe(content);
+    expect(screen.queryByTestId('ticket-skeleton')).not.toBeInTheDocument();
+  });
 });
 
 afterEach(() => {
@@ -203,7 +269,21 @@ describe('TicketDetailPage', () => {
     expect(events).toHaveLength(
       baseTicket.statuses.length + baseTicket.comments.length + baseTicket.data_requests.length
     );
-    expect(timeline).toHaveAttribute('data-loading', 'false');
+  });
+
+  it('keeps the loaded timeline mounted during background refreshes', () => {
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket));
+    const { rerender } = render(<TicketDetailPage />);
+    const timeline = screen.getByTestId('ticket-timeline');
+
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket, true));
+    rerender(<TicketDetailPage />);
+    expect(screen.getByTestId('ticket-timeline')).toBe(timeline);
+    expect(screen.queryByTestId('ticket-skeleton')).not.toBeInTheDocument();
+
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery({ ...baseTicket, subject: 'Updated subject' }));
+    rerender(<TicketDetailPage />);
+    expect(screen.getByTestId('ticket-timeline')).toBe(timeline);
   });
 
   it('hides comment input for closed tickets', () => {
@@ -235,7 +315,6 @@ describe('TicketDetailPage', () => {
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Hook comment');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-saving', 'true');
-    expect(screen.getByTestId('ticket-timeline')).toHaveAttribute('data-loading', 'false');
   });
 
   it('switches from timeline to artifacts tab content', async () => {

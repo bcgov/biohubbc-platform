@@ -1,13 +1,9 @@
-import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ITeamMember, ITeamMembersResponse } from 'interfaces/useTeamsApi.interface';
-import {
-  cancelQueryForOptimisticUpdate,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+import { refreshChangedQueries } from 'utils/query-client';
+import { useCoordinatedMutation, holdReload, cancelQueryForOptimisticUpdate } from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
 
@@ -37,13 +33,13 @@ export const useRemoveTeamMemberMutation = () => {
   const queryClient = useQueryClient();
   const { setSnackbar } = useDialogContext();
 
-  return useMutation<void, Error, RemoveTeamMemberVariables, RemoveTeamMemberContext>({
+  return useCoordinatedMutation<void, Error, RemoveTeamMemberVariables, RemoveTeamMemberContext>({
     // Every membership change shares this key, so reloads of the members wait for the last of them.
     mutationKey: teamQueryKeys.membershipChanges(),
     mutationFn: ({ teamId, teamMemberId }) => api.teams.deleteTeamMember(teamId, teamMemberId),
     onMutate: async ({ teamId, teamMemberId }) => {
       const membersQueryKey = teamQueryKeys.members(teamId);
-      joinMutationGroup(queryClient, teamQueryKeys.membershipChanges());
+
       await cancelQueryForOptimisticUpdate(queryClient, membersQueryKey, teamQueryKeys.membershipChanges());
       const members = queryClient.getQueryData<ITeamMembersResponse>(membersQueryKey)?.members ?? [];
       const index = members.findIndex((member) => member.team_member_id === teamMemberId);
@@ -54,7 +50,17 @@ export const useRemoveTeamMemberMutation = () => {
       );
       return { membersQueryKey, removed: index > -1 ? { member: members[index], index } : undefined };
     },
-    onSuccess: () => refreshChangedQueries(queryClient, changedQueryKeys.teamMembership()),
+    onSuccess: async (_data, { teamMemberId }, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, context.membersQueryKey, teamQueryKeys.membershipChanges());
+      if (
+        queryClient
+          .getQueryData<ITeamMembersResponse>(context.membersQueryKey)
+          ?.members.some((row) => row.team_member_id === teamMemberId)
+      ) {
+        holdReload(queryClient, teamQueryKeys.membershipChanges(), context.membersQueryKey);
+      }
+      refreshChangedQueries(queryClient, changedQueryKeys.teamMembership());
+    },
     onError: (error, { teamMemberId }, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
       const removed = context?.removed;
@@ -70,7 +76,6 @@ export const useRemoveTeamMemberMutation = () => {
           members: [...current.members.slice(0, removed.index), removed.member, ...current.members.slice(removed.index)]
         };
       });
-    },
-    onSettled: () => settleMutationGroup(queryClient, teamQueryKeys.membershipChanges())
+    }
   });
 };

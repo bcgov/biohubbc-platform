@@ -23,7 +23,7 @@ import { ITicketTimelineProps } from './TicketTimeline.interface';
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { ticket, isLoading } = props;
+  const { ticket } = props;
   const {
     selectedComment,
     isEditCommentDialogOpen,
@@ -65,7 +65,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     <>
       <TicketTimelineItems
         ticket={ticket}
-        isLoading={isLoading}
         updatingDataRequestId={updatingDataRequestId}
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}

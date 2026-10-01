@@ -1,13 +1,14 @@
-import { QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketExtended, ITicketSystemUser, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
+import { refreshChangedQueries } from 'utils/query-client';
 import {
+  useCoordinatedMutation,
+  holdReload,
   cancelQueryForOptimisticUpdate,
-  joinMutationGroup,
-  refreshChangedQueries,
-  settleMutationGroup
-} from 'utils/query-client';
+  holdReloadIfConcurrent
+} from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /** A status change for one user assigned to the route's ticket. */
@@ -40,7 +41,7 @@ export const useUpdateTicketSystemUserStatusMutation = () => {
   const { setSnackbar } = useDialogContext();
   const { ticketId, ticketQueryKey } = useTicketContext();
 
-  return useMutation<
+  return useCoordinatedMutation<
     ITicketSystemUser,
     Error,
     UpdateTicketSystemUserStatusVariables,
@@ -51,7 +52,7 @@ export const useUpdateTicketSystemUserStatusMutation = () => {
     mutationFn: ({ ticketSystemUserId, status }) =>
       api.tickets.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status }),
     onMutate: async ({ ticketSystemUserId, status }) => {
-      joinMutationGroup(queryClient, ticketQueryKey);
+      holdReloadIfConcurrent(queryClient, ticketQueryKey, ticketQueryKey);
       await cancelQueryForOptimisticUpdate(queryClient, ticketQueryKey, ticketQueryKey);
       const previousStatus = queryClient
         .getQueryData<ITicketExtended>(ticketQueryKey)
@@ -69,8 +70,16 @@ export const useUpdateTicketSystemUserStatusMutation = () => {
       const optimisticRow = ticket?.ticket_system_users.find((row) => row.ticket_system_user_id === ticketSystemUserId);
       return { ticketId, ticketQueryKey, previousStatus, optimisticRow };
     },
-    onSuccess: (_data, _variables, context) =>
-      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey),
+    onSuccess: async (_data, variables, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      const currentRow = queryClient
+        .getQueryData<ITicketExtended>(context.ticketQueryKey)
+        ?.ticket_system_users.find((row) => row.ticket_system_user_id === variables.ticketSystemUserId);
+      if (currentRow !== context.optimisticRow) {
+        holdReload(queryClient, context.ticketQueryKey, context.ticketQueryKey);
+      }
+      refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(context.ticketId), context.ticketQueryKey);
+    },
     onError: (error, _variables, context) => {
       setSnackbar({ open: true, snackbarMessage: error.message });
       const previousStatus = context?.previousStatus;
@@ -87,8 +96,6 @@ export const useUpdateTicketSystemUserStatusMutation = () => {
             )
           }
       );
-    },
-    onSettled: (_data, _error, _variables, context) =>
-      settleMutationGroup(queryClient, context?.ticketQueryKey ?? ticketQueryKey)
+    }
   });
 };
