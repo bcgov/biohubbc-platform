@@ -168,7 +168,7 @@ export class PredicateRepository extends BaseRepository {
         jsonb_build_object(
           'operator', px.operator::text
         ) || CASE
-          WHEN px.operator::text <> 'Exists' THEN jsonb_build_object('value', px.taxon_id)
+          WHEN px.operator::text <> 'Exists' THEN jsonb_build_object('value', t.itis_tsn)
           ELSE '{}'::jsonb
         END
       WHEN pg.predicate_id IS NOT NULL THEN
@@ -204,6 +204,8 @@ export class PredicateRepository extends BaseRepository {
    *
    * This keeps payload-count logic computed once and avoids sparse-row mapper
    * branches in TypeScript.
+   * Taxon values are projected back to ITIS TSNs, matching public write inputs.
+   * The taxon join stays optional because `Exists` has no taxon reference.
    *
    * @param {string[]} predicateIds - Predicate identifiers to fetch.
    * @return {Knex.QueryBuilder} Knex query builder returning `ReadPredicateNodeRow`-shaped rows.
@@ -234,6 +236,7 @@ export class PredicateRepository extends BaseRepository {
       .leftJoin('predicate_taxon as px', function () {
         this.on('px.predicate_id', '=', 'p.predicate_id').onNull('px.record_end_date');
       })
+      .leftJoin('taxon as t', 't.taxon_id', 'px.taxon_id')
       .leftJoin('predicate_geometry as pg', function () {
         this.on('pg.predicate_id', '=', 'p.predicate_id').onNull('pg.record_end_date');
       })
