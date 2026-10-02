@@ -1,4 +1,6 @@
+import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
+import { HTTP403 } from '../errors/http-error';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
 import {
   ICreateSubmission,
@@ -17,16 +19,43 @@ import {
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
+import { UserService } from './user-service';
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
   teamService: TeamService;
+  userService: UserService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
     this.teamService = new TeamService(connection);
+    this.userService = new UserService(connection);
+  }
+
+  /**
+   * Require owning-contributor membership for submission writes, with a system-administrator exception.
+   * Ownership comes from the stored submission. Team access is checked by middleware.
+   *
+   * @param {string} submissionUuid Submission whose contributor owns the operation.
+   * @returns {Promise<void>} Resolves when contributor write access is allowed.
+   * @throws {HTTP403} If the caller has no contributor write access.
+   */
+  async assertSubmissionContributorWriteAccess(submissionUuid: string): Promise<void> {
+    const systemUserId = this.connection.systemUserId();
+    const contributor = await this.submissionRepository.findSubmissionContributorMembership(
+      submissionUuid,
+      systemUserId
+    );
+    if (contributor?.is_member) {
+      return;
+    }
+
+    const user = await this.userService.getUserById(systemUserId);
+    if (!user.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN)) {
+      throw new HTTP403('No active membership in the submission contributor');
+    }
   }
 
   /**

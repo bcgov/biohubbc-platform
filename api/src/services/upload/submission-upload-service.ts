@@ -235,6 +235,7 @@ export class SubmissionUploadService extends DBService {
     requestorSystemUserId: number,
     submitterSystemUserIds: number[] = []
   ): Promise<{ submission_upload_id: string }> {
+    // This team scopes deletion of this upload independently of submission-wide history access.
     const team = await this.teamService.createTeam({
       name: `Submission Upload Team ${submissionUpload.upload_id}`,
       description: `Auto-generated access team for submission upload ${submissionUpload.upload_id}.`,
@@ -593,6 +594,7 @@ export class SubmissionUploadService extends DBService {
    *
    * The wire values predate the `decision` column and are kept stable for external consumers: a
    * soft-deleted upload is `deleted`, a pending decision is `submitted`.
+   * Requires submission-team authorization or system-administrator access, enforced by middleware.
    *
    * @param {string} submissionUuid Submission UUID whose uploads are requested.
    * @returns {Promise<SubmissionHistoryResponse>} Submission identifier and one entry per upload.
@@ -736,6 +738,7 @@ export class SubmissionUploadService extends DBService {
   /**
    * Delete an unreviewed submission upload and retire its dedicated access team.
    *
+   * Requires owning-contributor membership or system-administrator access; middleware checks the upload team.
    * Verifies that the upload belongs to the submission, locks the upload, requires the locked row's
    * decision to still be `pending` (so a concurrent approval cannot slip past the check), soft-deletes
    * the upload and soft-deletes its team. Deletion is expressed by the upload's
@@ -750,6 +753,7 @@ export class SubmissionUploadService extends DBService {
    */
   async deleteSubmissionUpload(submissionUuid: string, submissionUploadId: string): Promise<void> {
     await this.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+    await this.submissionService.assertSubmissionContributorWriteAccess(submissionUuid);
     const lockedUpload = await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
 
     if (lockedUpload.decision !== 'pending') {

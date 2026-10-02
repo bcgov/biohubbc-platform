@@ -15,6 +15,7 @@ import { CreateSubmissionForm } from './form/CreateSubmissionForm';
 import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 
 const initialSubmissionValues: ICreateSubmissionForm = {
+  clientId: '',
   name: '',
   description: '',
   comment: '',
@@ -22,6 +23,7 @@ const initialSubmissionValues: ICreateSubmissionForm = {
 };
 
 export const SubmissionYupSchema = yup.object().shape({
+  clientId: yup.string().trim().max(100),
   name: yup.string().required('Enter a name for the submission').max(100),
   description: yup.string().max(500).required('Description is required'),
   comment: yup.string().max(500).required('Comment is required'),
@@ -33,6 +35,11 @@ export const SubmissionYupSchema = yup.object().shape({
     })
 });
 
+/**
+ * Create a submission for the selected contributor or token default and upload its archive.
+ *
+ * @returns The submission creation page.
+ */
 export const CreateSubmissionPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const bioHubApi = useApi();
@@ -44,16 +51,21 @@ export const CreateSubmissionPage = () => {
 
   /**
    * Upload a user-provided TAR archive as a multipart submission upload.
+   *
+   * @param values Contributor selection, submission details, and archive file.
+   * @returns Resolves after upload completion or displaying the request error.
    */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
     setIsSubmitting(true);
 
-    const { file, ...submission } = values;
+    const { file, clientId, ...submission } = values;
+    const selectedClientId = clientId.trim();
 
     try {
       // Request pre-signed upload URLs for multipart upload
       const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls({
         ...submission,
+        ...(selectedClientId ? { client_id: selectedClientId } : {}),
         bytes: file.size
       });
 

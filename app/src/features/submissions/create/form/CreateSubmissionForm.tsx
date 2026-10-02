@@ -10,6 +10,11 @@ import { useFormikContext } from 'formik';
 import { useConfigContext } from 'hooks/useContext';
 import { ICreateSubmissionForm } from './CreateSubmissionForm.interface';
 
+/**
+ * Render the contributor selection, submission details, and archive input.
+ *
+ * @returns The submission form fields.
+ */
 export const CreateSubmissionForm = () => {
   const { errors, setFieldError, setFieldValue } = useFormikContext<ICreateSubmissionForm>();
   const config = useConfigContext();
@@ -37,6 +42,12 @@ export const CreateSubmissionForm = () => {
 
   return (
     <Box component="form" display="flex" flexDirection="column" gap={3}>
+      <CustomTextFieldFormik
+        name="clientId"
+        label="Contributor client ID"
+        placeholder="Defaults to your signed-in client"
+      />
+
       {/* Name Field */}
       <CustomTextFieldFormik name="name" label="Name" />
 

@@ -7,7 +7,12 @@ import {
 } from '../constants/database-lock-keys';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
+import {
+  SubmissionContributorMembership,
+  SubmissionFeatureForReview,
+  SubmissionFilters,
+  SubmissionSummary
+} from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
@@ -242,7 +247,7 @@ export const SubmissionRecord = z.object({
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
-export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
+export const SubmissionRecordWithSecurity = SubmissionRecord.omit({ comment: true }).extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   contributor_name: z.string(),
   last_approved_upload_date: z.string().nullable(),
@@ -309,6 +314,33 @@ export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
+  /**
+   * Find the current submission's active contributor and the caller's membership in it.
+   *
+   * @param {string} submissionUuid Submission whose owner is checked.
+   * @param {number} systemUserId Authenticated caller.
+   * @return {Promise<SubmissionContributorMembership | undefined>} Membership in the active owner, if available.
+   * @memberof SubmissionRepository
+   */
+  async findSubmissionContributorMembership(
+    submissionUuid: string,
+    systemUserId: number
+  ): Promise<SubmissionContributorMembership | undefined> {
+    const sql = SQL`
+      SELECT EXISTS (
+        SELECT 1 FROM contributor_system_user csu
+        WHERE csu.contributor_id = c.contributor_id
+          AND csu.system_user_id = ${systemUserId} AND csu.record_end_date IS NULL
+      ) AS is_member
+      FROM submission s
+      JOIN contributor c ON c.contributor_id = s.contributor_id AND c.record_end_date IS NULL
+      WHERE s.uuid = ${submissionUuid}
+        AND (s.record_end_date IS NULL OR s.record_end_date > NOW());
+    `;
+    const response = await this.connection.sql(sql, SubmissionContributorMembership);
+    return response.rows[0];
+  }
+
   /**
    * Lock the submission's current feature state for the current transaction.
    *
@@ -1273,7 +1305,6 @@ export class SubmissionRepository extends BaseRepository {
         submission.contributor_id,
         submission.name,
         submission.description,
-        submission.comment,
         submission.publish_timestamp,
         submission.record_end_date,
         submission.create_date,

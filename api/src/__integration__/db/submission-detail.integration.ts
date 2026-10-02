@@ -37,6 +37,20 @@ describe('Submission detail (integration)', function () {
     expect(result.security).to.equal(SECURITY_APPLIED_STATUS.UNSECURED);
   });
 
+  it('excludes internal comments from public metadata while preserving the stored comment', async () => {
+    const submissionId = await createTestSubmission(connection);
+    await connection.sql(SQL`
+      UPDATE submission SET comment = 'Internal administrative note'
+      WHERE submission_id = ${submissionId};
+    `);
+
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const stored = await repository.getSubmissionRecordBySubmissionId(submissionId);
+
+    expect(result).not.to.have.property('comment');
+    expect(stored.comment).to.equal('Internal administrative note');
+  });
+
   it('keeps metadata available while a closure is invalidated and restores the feature types after rebuilding', async () => {
     const submissionId = await createTestSubmission(connection);
     const root = await createTestFeature(connection, submissionId, 'survey', {});
