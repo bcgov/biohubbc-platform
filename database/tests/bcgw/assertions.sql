@@ -1,0 +1,40 @@
+DO $checks$
+BEGIN
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=2 AND secured='Y'), 'secured root retained in all';
+  ASSERT NOT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id IN (2,3,5)), 'root, ancestor and missing self-link excluded';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=3 AND secured='Y'), 'ancestor security';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=5 AND secured='Y'), 'missing self-link fails closed';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=4), 'property security does not propagate';
+  ASSERT NOT EXISTS (SELECT FROM bcgw.wld_incidental_all WHERE feature_id=6), 'missing closure candidate excluded';
+  ASSERT (SELECT count(*) FROM bcgw.wld_incidental_public WHERE feature_id IN (7,8))=2, 'future and deleted sites do not link';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=9 AND latitude='52' AND longitude='-122'), 'ancestor site preferred';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=12 AND latitude='51' AND longitude='-121'), 'lower site id breaks ties';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=10 AND latitude IS NULL), 'unusable site remains linked';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_incidental_public WHERE feature_id=11 AND date='2018-02-03' AND time='04:05:06'), 'ancestor period timestamp fallback';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_incidental_public WHERE feature_id=13 AND date='2019-01-01'), 'lower period id breaks ties';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=1 AND count='2' AND sex='Female' AND life_stage='Adult' AND sign='Seen' AND group_id='fixture::group'), 'column enrichments';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=14 AND longitude='-123'), 'line start point';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=15 AND longitude='-124'), 'first multiline start';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=16 AND latitude='1' AND longitude='1'), 'polygon centroid';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=17 AND longitude='-125'), 'stored observation point';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=18 AND longitude='-126'), 'stored observation point from collection';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=19 AND longitude='-127'), 'explicit coordinates first';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=20 AND longitude='-121'), 'missing observation geometry falls back to site';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_incidental_public WHERE feature_id=399 AND scientific_name IS NULL), 'missing taxonomy retained';
+  ASSERT NOT EXISTS (SELECT FROM bcgw.wld_incidental_all WHERE feature_id IN (303,305,306,307,308,310,311,315)), 'fish branches and fish cycle excluded';
+  ASSERT NOT EXISTS (SELECT FROM bcgw.wld_incidental_all WHERE feature_id=302 AND scientific_name <> 'Inactive root'), 'active Actinopterygii roots excluded';
+  ASSERT (SELECT count(*) FROM bcgw.wld_incidental_public WHERE feature_id IN (304,309,312,313,317,318))=6, 'Tetrapoda, incomplete/cyclic taxonomy and missing active taxon retained';
+  ASSERT (SELECT count(*) FROM bcgw.wld_incidental_public WHERE feature_id=320)=1, 'normalized FK identifies one active taxon';
+  ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_public WHERE feature_id=600)=1, 'exact cutoff included, multiple animals serialized into one feature row';
+  ASSERT NOT EXISTS (SELECT FROM bcgw.wld_telemetry_all WHERE feature_id IN (601,610,611)), 'too recent, missing candidate and null timestamp excluded';
+  ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_all WHERE feature_id=602 AND secured='Y')=1, 'just older cutoff and root security';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=603 AND animal_id IS NULL AND taxon_id IS NULL), 'missing deployment retained';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=604), 'telemetry property security does not propagate';
+  ASSERT NOT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id IN (602,605,606)), 'telemetry security exclusions';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_all WHERE feature_id=606 AND secured='Y'), 'telemetry missing self-link';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND eco_unit='A::1;B::2' AND device_key='vendor::device' AND sex='Female;Female' AND dop='1.5'), 'distinct ordered ecological units across relation directions and parents';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=607 AND latitude IS NULL), 'missing telemetry geometry remains null';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=608 AND longitude='-119'), 'stored telemetry point';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=609 AND longitude='-118'), 'stored telemetry point from collection';
+END
+$checks$;
