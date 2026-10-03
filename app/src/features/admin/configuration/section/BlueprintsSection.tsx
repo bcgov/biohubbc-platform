@@ -1,5 +1,6 @@
 import { codeQueryKeys } from 'utils/query-keys/code-query-keys';
 import { refreshChangedQueries } from 'utils/query-client';
+import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { BlueprintForm } from '../dialog/BlueprintForm';
@@ -23,6 +24,7 @@ import { getConfigurationStatus } from '../utils/lifecycleStatus';
  */
 export const BlueprintsSection = () => {
   const api = useApi();
+  const navigate = useNavigate();
   const dialogs = useDialogContext();
   const [saveError, setSaveError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -252,6 +254,7 @@ export const BlueprintsSection = () => {
         }))}
         rowCount={query.data?.pagination.total ?? 0}
         isLoading={query.isPending}
+        onOpenBlueprint={(blueprint) => navigate(`/admin/configuration/blueprints/${blueprint.blueprint_id}`)}
         onCreateBlueprint={handleCreateBlueprint}
         onEditBlueprint={handleEditBlueprint}
         onRetireBlueprint={confirmRetire}
