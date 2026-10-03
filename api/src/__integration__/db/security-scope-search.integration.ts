@@ -899,8 +899,8 @@ describe('Security scope search (integration)', function () {
     it('is FALSE for a wildcard (urn:*:*:*) caller even when secured matches exist (AC3)', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
-      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
-      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
       await secureFeature(connection, feat1);
       await secureFeature(connection, feat2);
 
@@ -909,7 +909,7 @@ describe('Security scope search (integration)', function () {
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
         type: 'user',
         systemUserId: userId
       });
@@ -926,7 +926,7 @@ describe('Security scope search (integration)', function () {
       // Accepted tradeoff: a brief false-positive banner rather than a more permissive probe that would
       // hide the banner while the rows themselves stay filtered out.
       const submissionId = await createTestSubmission(connection);
-      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Lagged Secured' });
+      const feature = await createTestFeature(connection, submissionId, 'survey', { name: 'Lagged Secured' });
       await rebuildClosureForSubmission(submissionId);
 
       const wildcardUser = connection.systemUserId();
@@ -936,7 +936,7 @@ describe('Security scope search (integration)', function () {
       // Now secure it — effectively secured on the read path, but with no scope anchor.
       await secureFeature(connection, feature);
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
         type: 'user',
         systemUserId: wildcardUser
       });
@@ -946,7 +946,7 @@ describe('Security scope search (integration)', function () {
 
     it('is TRUE when a secured match is grantable to another team but not the caller (AC2)', async () => {
       const submissionId = await createTestSubmission(connection);
-      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Other Team Secured' });
+      const feature = await createTestFeature(connection, submissionId, 'survey', { name: 'Other Team Secured' });
       await secureFeature(connection, feature);
       await rebuildClosureForSubmission(submissionId);
 
@@ -956,7 +956,7 @@ describe('Security scope search (integration)', function () {
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, otherUser, 'Other Team');
 
       const caller = await createOtherUser(); // authenticated, but in no team
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
         type: 'user',
         systemUserId: caller
       });
@@ -970,12 +970,12 @@ describe('Security scope search (integration)', function () {
       const feature = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       await secureFeature(connection, feature);
       await rebuildClosure(uploadId);
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
         type: 'anonymous'
       });
 
@@ -984,13 +984,13 @@ describe('Security scope search (integration)', function () {
 
     it('is TRUE for an authenticated caller with no covering policy (AC2 — banner shows)', async () => {
       const submissionId = await createTestSubmission(connection);
-      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Ungranted Secured' });
+      const feature = await createTestFeature(connection, submissionId, 'survey', { name: 'Ungranted Secured' });
       await secureFeature(connection, feature);
       await rebuildClosureForSubmission(submissionId);
 
       // Authenticated, but holds no team/policy/scope at all.
       const caller = await createOtherUser();
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', null, {
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
         type: 'user',
         systemUserId: caller
       });
@@ -1710,7 +1710,24 @@ describe('Security scope search (integration)', function () {
         SET record_end_date = now()
         WHERE submission_feature_id = ${parent};
       `);
+      // A stale self-loop must not make the ended parent a current search result or banner match.
+      const hiddenParent = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree(
+        'survey',
+        null,
+        { type: 'anonymous' },
+        { submissionIds: [submissionId] }
+      );
+      expect(hiddenParent).to.be.false;
       await unsecureFeature(parent);
+
+      const paginatedParents = await searchRepo.searchFeaturesByExpressionTree(
+        'survey',
+        null,
+        { limit: 25, sort: 'submission_feature_id', order: 'desc' },
+        { type: 'anonymous' },
+        { submissionIds: [submissionId] }
+      );
+      expect(paginatedParents).to.be.empty;
 
       const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);

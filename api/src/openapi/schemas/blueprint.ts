@@ -110,139 +110,6 @@ export const PublishBlueprintRequestSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-/**
- * Schema for a property assigned to a blueprint feature type (admin view).
- */
-export const AdminBlueprintFeatureTypePropertySchema: OpenAPIV3.SchemaObject = {
-  title: 'AdminBlueprintFeatureTypeProperty',
-  type: 'object',
-  required: [
-    'blueprint_feature_type_property_id',
-    'blueprint_feature_type_id',
-    'feature_property_id',
-    'property_name',
-    'property_display_name',
-    'property_type_name',
-    'required_value',
-    'allow_multiple',
-    'sort'
-  ],
-  properties: {
-    blueprint_feature_type_property_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'System generated surrogate primary key identifier of the assignment'
-    },
-    blueprint_feature_type_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Foreign key to the blueprint_feature_type table'
-    },
-    feature_property_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Foreign key to the feature_property table; the reusable property definition being assigned'
-    },
-    property_name: {
-      type: 'string',
-      description: 'Name of the feature property'
-    },
-    property_display_name: {
-      type: 'string',
-      description: 'Display name of the feature property'
-    },
-    property_type_name: {
-      type: 'string',
-      description: 'Name of the feature property type'
-    },
-    required_value: {
-      type: 'boolean',
-      description: 'Whether the property is required for the feature type within this blueprint'
-    },
-    allow_multiple: {
-      type: 'boolean',
-      description: 'Whether the property may carry multiple values for the feature type within this blueprint'
-    },
-    sort: {
-      type: 'integer',
-      nullable: true,
-      description: 'Custom sort order of the property within the feature type'
-    }
-  }
-};
-
-/**
- * Schema for paginated blueprint feature type properties list response.
- */
-export const BlueprintFeatureTypePropertiesListResponseSchema: OpenAPIV3.SchemaObject = {
-  title: 'BlueprintFeatureTypePropertiesListResponse',
-  type: 'object',
-  required: ['blueprint_feature_type_properties', 'pagination'],
-  properties: {
-    blueprint_feature_type_properties: {
-      type: 'array',
-      items: AdminBlueprintFeatureTypePropertySchema,
-      description: 'List of properties assigned to the blueprint feature type'
-    },
-    pagination: paginationResponseSchema
-  }
-};
-
-/**
- * Schema for create blueprint feature type property request body.
- * The blueprint feature type is taken from the path param, not the body.
- */
-export const CreateBlueprintFeatureTypePropertyRequestSchema: OpenAPIV3.SchemaObject = {
-  title: 'CreateBlueprintFeatureTypePropertyRequest',
-  type: 'object',
-  required: ['feature_property_id'],
-  properties: {
-    feature_property_id: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Foreign key to the feature_property table; the property to assign'
-    },
-    required_value: {
-      type: 'boolean',
-      description: 'Whether the property is required for the feature type within this blueprint'
-    },
-    allow_multiple: {
-      type: 'boolean',
-      description: 'Whether the property may carry multiple values for the feature type within this blueprint'
-    },
-    sort: {
-      type: 'integer',
-      nullable: true,
-      description: 'Custom sort order of the property within the feature type'
-    }
-  }
-};
-
-/**
- * Schema for update blueprint feature type property request body.
- * Only assignment metadata is updatable; the assigned property cannot change.
- */
-export const UpdateBlueprintFeatureTypePropertyRequestSchema: OpenAPIV3.SchemaObject = {
-  title: 'UpdateBlueprintFeatureTypePropertyRequest',
-  type: 'object',
-  minProperties: 1,
-  properties: {
-    required_value: {
-      type: 'boolean',
-      description: 'Whether the property is required for the feature type within this blueprint'
-    },
-    allow_multiple: {
-      type: 'boolean',
-      description: 'Whether the property may carry multiple values for the feature type within this blueprint'
-    },
-    sort: {
-      type: 'integer',
-      nullable: true,
-      description: 'Custom sort order of the property within the feature type'
-    }
-  }
-};
-
 export const BlueprintSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: [
@@ -284,4 +151,65 @@ export const BlueprintsResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: ['blueprints', 'pagination'],
   properties: { blueprints: { type: 'array', items: BlueprintSchema }, pagination: paginationResponseSchema }
+};
+
+/** Response metadata shared by blueprint property assignment operations. */
+export const BlueprintFeaturePropertyAssignmentSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: [
+    'blueprint_feature_type_id',
+    'name',
+    'display_name',
+    'description',
+    'sort',
+    'record_end_date',
+    'blueprint_feature_type_property_id',
+    'feature_property_id',
+    'feature_type_name',
+    'type_name',
+    'required_value',
+    'allow_multiple'
+  ],
+  properties: {
+    blueprint_feature_type_id: {
+      type: 'integer'
+    },
+    name: {
+      type: 'string'
+    },
+    display_name: {
+      type: 'string'
+    },
+    description: {
+      type: 'string',
+      nullable: true
+    },
+    sort: {
+      type: 'integer',
+      nullable: true
+    },
+    record_end_date: {
+      type: 'string',
+      format: 'date',
+      nullable: true
+    },
+    blueprint_feature_type_property_id: {
+      type: 'integer'
+    },
+    feature_property_id: {
+      type: 'integer'
+    },
+    feature_type_name: {
+      type: 'string'
+    },
+    type_name: {
+      type: 'string'
+    },
+    required_value: {
+      type: 'boolean'
+    },
+    allow_multiple: {
+      type: 'boolean'
+    }
+  }
 };

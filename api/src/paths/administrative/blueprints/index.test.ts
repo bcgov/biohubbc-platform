@@ -9,6 +9,7 @@ import { ensureHTTPError } from '../../../errors/http-error';
 import { CreateBlueprintRequestSchema, UpdateBlueprintRequestSchema } from '../../../openapi/schemas/blueprint';
 import { authorizationDependencies } from '../../../request-handlers/security/authorization';
 import { BlueprintService } from '../../../services/blueprint-service';
+import { BlueprintVersionService } from '../../../services/blueprint-version-service';
 import { GET as typesGET } from '../feature-property-types';
 import { createBlueprint, GET, getBlueprints, POST } from './index';
 import { DELETE, GET as detailGET, getBlueprint, PUT, retireBlueprint, updateBlueprint } from './{blueprintId}';
@@ -36,6 +37,22 @@ describe('Configuration API boundaries', () => {
     });
   });
 
+  it('PUT updates supplied metadata through the shared transaction handler', async () => {
+    const connection = getMockDBConnection({ commit: sinon.stub().resolves(), release: sinon.stub() });
+    sinon.stub(dbDependencies, 'getDBConnection').returns(connection);
+    const result = { blueprint_id: 1, name: 'Renamed', description: null };
+    const update = sinon.stub(BlueprintService.prototype, 'updateBlueprint').resolves(result as any);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { blueprintId: '1' };
+    mockReq.body = { name: 'Renamed', description: null };
+    await (PUT[1] as RequestHandler)(mockReq, mockRes, mockNext);
+    sinon.assert.calledWithExactly(update, 1, mockReq.body);
+    sinon.assert.calledWith(mockRes.status, 200);
+    sinon.assert.calledWith(mockRes.json, result);
+    sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
+    sinon.assert.calledOnce(connection.release as sinon.SinonStub);
+  });
+
   const handlers = [
     ['getBlueprints', getBlueprints],
     ['createBlueprint', createBlueprint],
@@ -52,7 +69,11 @@ describe('Configuration API boundaries', () => {
         release: sinon.stub()
       });
       sinon.stub(dbDependencies, 'getDBConnection').returns(connection);
-      const service = sinon.stub(BlueprintService.prototype, method).resolves({ blueprint_id: 1 } as any);
+      const service = (
+        method === 'createBlueprint'
+          ? sinon.stub(BlueprintVersionService.prototype, method)
+          : sinon.stub(BlueprintService.prototype, method)
+      ).resolves({ blueprint_id: 1 } as any);
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { blueprintId: '1' };
       mockReq.query = {};
@@ -73,7 +94,10 @@ describe('Configuration API boundaries', () => {
       });
       sinon.stub(dbDependencies, 'getDBConnection').returns(connection);
       const failure = new Error('failed');
-      sinon.stub(BlueprintService.prototype, method).rejects(failure);
+      (method === 'createBlueprint'
+        ? sinon.stub(BlueprintVersionService.prototype, method)
+        : sinon.stub(BlueprintService.prototype, method)
+      ).rejects(failure);
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = { blueprintId: '1' };
       mockReq.query = {};

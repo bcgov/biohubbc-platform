@@ -25,3 +25,17 @@ export const BLUEPRINT_FEATURE_TYPE_SORT_FIELDS = [
   'feature_type_id',
   'blueprint_feature_type_id'
 ];
+
+export const BLUEPRINT_PROPERTY_SORT_FIELDS = [
+  'name',
+  'display_name',
+  'description',
+  'feature_type_name',
+  'type_name',
+  'required_value',
+  'allow_multiple',
+  'sort',
+  'record_end_date',
+  'feature_property_id',
+  'blueprint_feature_type_property_id'
+];

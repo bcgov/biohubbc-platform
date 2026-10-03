@@ -9,8 +9,20 @@ import { dbDependencies } from '../../../database/db';
 import { ensureHTTPError } from '../../../errors/http-error';
 import { authorizationDependencies } from '../../../request-handlers/security/authorization';
 import { BlueprintCompositionService } from '../../../services/blueprint-composition-service';
+import { BlueprintFeatureTypePropertyService } from '../../../services/blueprint-feature-type-property-service';
 import { BlueprintFeatureTypeService } from '../../../services/blueprint-feature-type-service';
-
+import {
+  createBlueprintFeatureTypeProperty,
+  getBlueprintFeatureTypeProperties,
+  GET as propertiesGET,
+  POST as propertiesPOST
+} from './{blueprintId}/properties';
+import {
+  deleteBlueprintFeatureTypeProperty,
+  DELETE as propertyDELETE,
+  PUT as propertyPUT,
+  updateBlueprintFeatureTypeProperty
+} from './{blueprintId}/properties/{assignmentId}';
 import {
   createBlueprintFeatureType,
   getBlueprintFeatureTypes,
@@ -24,8 +36,23 @@ import {
   DELETE as typeDELETE,
   GET as typeGET
 } from './{blueprintId}/types/{assignmentId}';
+import {
+  GET as availablePropertiesGET,
+  getAvailableFeaturePropertiesForBlueprintFeatureType
+} from './{blueprintId}/types/{assignmentId}/properties/available';
 
-const operations = [typesGET, typesPOST, typeGET, typeDELETE, availableTypesGET];
+const operations = [
+  typesGET,
+  typesPOST,
+  propertiesGET,
+  propertiesPOST,
+  typeGET,
+  typeDELETE,
+  propertyPUT,
+  propertyDELETE,
+  availableTypesGET,
+  availablePropertiesGET
+];
 describe('Blueprint composition API boundaries', () => {
   afterEach(() => sinon.restore());
 
@@ -49,9 +76,18 @@ describe('Blueprint composition API boundaries', () => {
   const handlers = [
     [BlueprintFeatureTypeService, 'getBlueprintFeatureTypes', getBlueprintFeatureTypes],
     [BlueprintFeatureTypeService, 'getBlueprintFeatureType', getBlueprintFeatureType],
+    [BlueprintFeatureTypePropertyService, 'getBlueprintFeatureTypeProperties', getBlueprintFeatureTypeProperties],
     [BlueprintCompositionService, 'createBlueprintFeatureType', createBlueprintFeatureType],
+    [BlueprintCompositionService, 'createBlueprintFeatureTypeProperty', createBlueprintFeatureTypeProperty],
+    [BlueprintCompositionService, 'updateBlueprintFeatureTypeProperty', updateBlueprintFeatureTypeProperty],
     [BlueprintCompositionService, 'deleteBlueprintFeatureType', deleteBlueprintFeatureType],
-    [BlueprintCompositionService, 'getAvailableFeatureTypesForBlueprint', getAvailableFeatureTypesForBlueprint]
+    [BlueprintCompositionService, 'deleteBlueprintFeatureTypeProperty', deleteBlueprintFeatureTypeProperty],
+    [BlueprintCompositionService, 'getAvailableFeatureTypesForBlueprint', getAvailableFeatureTypesForBlueprint],
+    [
+      BlueprintCompositionService,
+      'getAvailableFeaturePropertiesForBlueprintFeatureType',
+      getAvailableFeaturePropertiesForBlueprintFeatureType
+    ]
   ] as const;
   handlers.forEach(([Service, method, handler]) => {
     it(`${method} commits the confirmed response and releases its connection`, async () => {
@@ -71,7 +107,10 @@ describe('Blueprint composition API boundaries', () => {
       sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
       sinon.assert.calledOnce(connection.release as sinon.SinonStub);
       sinon.assert.calledWith(mockRes.json, { blueprint_id: 1 });
-      sinon.assert.calledWith(mockRes.status, method === 'createBlueprintFeatureType' ? 201 : 200);
+      sinon.assert.calledWith(
+        mockRes.status,
+        method === 'createBlueprintFeatureType' || method === 'createBlueprintFeatureTypeProperty' ? 201 : 200
+      );
     });
 
     it(`${method} rolls back and releases on failure`, async () => {
@@ -98,13 +137,28 @@ describe('Blueprint composition API boundaries', () => {
     });
   });
 
-  it('rejects sort in feature-type assignment creation', () => {
+  it('rejects sort and mutable identities while preserving boolean/omission semantics', () => {
     const ajv = new Ajv({ strict: false });
     const createBlueprintFeatureType = ajv.compile(
       (typesPOST.apiDoc!.requestBody as OpenAPIV3.RequestBodyObject).content['application/json'].schema!
     );
+    const createBlueprintFeatureTypeProperty = ajv.compile(
+      (propertiesPOST.apiDoc!.requestBody as OpenAPIV3.RequestBodyObject).content['application/json'].schema!
+    );
+    const updateBlueprintFeatureTypeProperty = ajv.compile(
+      (propertyPUT.apiDoc!.requestBody as OpenAPIV3.RequestBodyObject).content['application/json'].schema!
+    );
     expect(createBlueprintFeatureType({ featureTypeId: 3 })).equal(true);
     expect(createBlueprintFeatureType({ featureTypeId: 3, sort: 1 })).equal(false);
+    expect(createBlueprintFeatureTypeProperty({ blueprintFeatureTypeId: 2, featurePropertyId: 5, sort: null })).equal(
+      false
+    );
+    expect(updateBlueprintFeatureTypeProperty({ sort: 1 })).equal(false);
+    expect(createBlueprintFeatureTypeProperty({ blueprintFeatureTypeId: 2, featurePropertyId: 5 })).equal(true);
+    expect(updateBlueprintFeatureTypeProperty({ featurePropertyId: 6 })).equal(false);
+    expect(updateBlueprintFeatureTypeProperty({ requiredValue: null })).equal(false);
+    expect(updateBlueprintFeatureTypeProperty({ requiredValue: false, allowMultiple: true })).equal(true);
+    expect(createBlueprintFeatureTypeProperty({ featurePropertyId: 5 })).equal(false);
   });
 });
 
