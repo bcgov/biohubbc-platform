@@ -14,6 +14,33 @@ describe('BlueprintRepository', () => {
     sinon.restore();
   });
 
+  describe('administrative query values', () => {
+    it('returns the database date after acquiring the transaction lock', async () => {
+      const sqlStub = sinon.stub().resolves({ rows: [{ current_date: '2026-09-23' }] });
+      const repository = new BlueprintRepository(getMockDBConnection({ sql: sqlStub }));
+
+      expect(await repository.lockBlueprintAdministration()).to.equal('2026-09-23');
+      sinon.assert.calledOnce(sqlStub);
+      expect(sqlStub.firstCall.args[0].text).to.include('pg_advisory_xact_lock');
+    });
+
+    it('returns numeric identifiers from the parent lineage', async () => {
+      const sqlStub = sinon.stub().resolves({ rows: [{ blueprint_id: 2 }, { blueprint_id: 1 }] });
+      const repository = new BlueprintRepository(getMockDBConnection({ sql: sqlStub }));
+
+      expect(await repository.getBlueprintAncestorIds(2)).to.deep.equal([2, 1]);
+      sinon.assert.calledOnce(sqlStub);
+      expect(sqlStub.firstCall.args[0].values).to.deep.equal([2]);
+    });
+
+    it('returns no ancestor identifiers for a missing parent', async () => {
+      const sqlStub = sinon.stub().resolves({ rows: [] });
+      const repository = new BlueprintRepository(getMockDBConnection({ sql: sqlStub }));
+
+      expect(await repository.getBlueprintAncestorIds(99)).to.deep.equal([]);
+    });
+  });
+
   describe('findActiveBlueprintById', () => {
     it('returns the blueprint_id when the Blueprint is available (record_end_date IS NULL)', async () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ blueprint_id: 7 }] } as any as Promise<QueryResult<any>>;

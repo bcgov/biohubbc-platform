@@ -42,7 +42,9 @@ export class FeaturePropertyRepository extends BaseRepository {
         'fp.display_name',
         'fp.description',
         knex.ref('fpt.name').as('type_name'),
-        'fp.calculated_value'
+        'fp.calculated_value',
+        'fp.record_effective_date',
+        'fp.record_end_date'
       ]);
   }
 
@@ -147,7 +149,7 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Get active feature properties with optional search and pagination.
+   * Get active and retired feature properties with optional search and pagination.
    *
    * @param {FeaturePropertyFilters} [filters] - Optional filter set.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
@@ -158,13 +160,15 @@ export class FeaturePropertyRepository extends BaseRepository {
     filters?: FeaturePropertyFilters,
     pagination?: ApiPaginationOptions
   ): Promise<FeatureProperty[]> {
-    const query = this.applyFilters(this.baseQuery().whereNull('fp.record_end_date'), filters);
+    const query = this.applyFilters(this.baseQuery(), filters);
 
-    query.orderBy('fp.name', 'asc');
-
-    if (pagination) {
+    if (pagination?.sort && pagination.order) {
+      this.applyPagination(query, pagination);
+    } else {
+      query.orderBy('fp.name', 'asc');
       this.applyPagination(query, pagination);
     }
+    query.orderBy('fp.feature_property_id', 'asc');
 
     const response = await this.connection.knex(query, FeatureProperty);
 
@@ -172,7 +176,7 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Get count of active feature properties matching optional filters.
+   * Get count of active and retired feature properties matching optional filters.
    *
    * @param {FeaturePropertyFilters} [filters] - Optional filter set.
    * @return {Promise<number>}
@@ -180,7 +184,7 @@ export class FeaturePropertyRepository extends BaseRepository {
    */
   async getFeaturePropertiesCount(filters?: FeaturePropertyFilters): Promise<number> {
     const knex = getKnex();
-    const baseQuery = this.applyFilters(knex.from('feature_property as fp').whereNull('fp.record_end_date'), filters);
+    const baseQuery = this.applyFilters(knex.from('feature_property as fp'), filters);
 
     const countQuery = baseQuery.clone().select(knex.raw('coalesce(count(*), 0)::integer as count')).first();
     const countResult = await this.connection.knex(countQuery, CountResult);
@@ -188,7 +192,7 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing feature property record.
+   * Update descriptive metadata on an active or retired feature property record.
    *
    * @param {number} featurePropertyId - The ID of the feature property to update.
    * @param {UpdateFeatureProperty} data - The data to update.
@@ -201,13 +205,9 @@ export class FeaturePropertyRepository extends BaseRepository {
     const query = knex
       .table('feature_property')
       .update({
-        name: data.name,
         display_name: data.display_name,
-        description: data.description,
-        calculated_value: data.calculated_value,
-        record_end_date: data.record_end_date
+        description: data.description
       })
-      .whereNull('record_end_date')
       .where('feature_property_id', featurePropertyId);
 
     const response = await this.connection.knex(query);
@@ -232,8 +232,7 @@ export class FeaturePropertyRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('feature_property')
-      .update({ record_end_date: knex.fn.now() })
-      .whereNull('record_end_date')
+      .update({ record_end_date: knex.raw('COALESCE(record_end_date, CURRENT_DATE)') })
       .where('feature_property_id', featurePropertyId)
       .returning(['feature_property_id']);
 
@@ -332,6 +331,37 @@ export class FeaturePropertyRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
         'FeaturePropertyRepository->getExpressionPredicatePropertyMetadata',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active or retired feature property by ID.
+   *
+   * @param {number} featurePropertyId - The ID of the feature property to retrieve.
+   * @return {Promise<FeatureProperty>} The feature property record.
+   * @throws {ApiNotFoundError} If no feature property exists for the id.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeaturePropertyRepository
+   */
+  async getAdminFeatureProperty(featurePropertyId: number): Promise<FeatureProperty> {
+    const query = this.baseQuery().where('fp.feature_property_id', featurePropertyId);
+
+    const response = await this.connection.knex(query, FeatureProperty);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property not found', [
+        'FeaturePropertyRepository->getAdminFeatureProperty',
+        { featurePropertyId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeaturePropertyRepository->getAdminFeatureProperty',
         `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }

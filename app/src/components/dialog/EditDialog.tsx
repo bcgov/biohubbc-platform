@@ -30,6 +30,7 @@ export interface IEditDialogProps<T> {
    * @memberof IEditDialogProps
    */
   dialogSaveButtonLabel?: string;
+
   /**
    * Set to `true` to open the dialog, `false` to close the dialog.
    *

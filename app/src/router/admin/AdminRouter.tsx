@@ -1,3 +1,4 @@
+import { ConfigurationPage } from 'features/admin/configuration/ConfigurationPage';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
 import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
@@ -155,6 +156,22 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <TicketsRouter />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="configuration"
+        element={
+          <BaseLayout>
+            <PageTitle title="Configuration" description="Manage platform schema configuration" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <ConfigurationPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>
