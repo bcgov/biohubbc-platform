@@ -19,6 +19,7 @@ import { refreshChangedQueries } from 'utils/query-client';
 import { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
 import { blueprintFormSchema } from '../dialog/ConfigurationFormYupSchema';
+import { BlueprintFeatureTypesSection } from './section/BlueprintFeatureTypesSection';
 import { BlueprintMetadataForm, IBlueprintMetadataFormValues } from './dialog/BlueprintMetadataForm';
 import { BlueprintMetadata } from './section/BlueprintMetadata';
 import { BlueprintSkeleton } from './skeleton/BlueprintSkeleton';
@@ -39,7 +40,8 @@ export const BlueprintPage = () => {
   const { blueprintId } = useParams();
   const id = Number(blueprintId);
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = 'metadata';
+  const requestedTab = searchParams.get('tab');
+  const tab = requestedTab === 'metadata' ? requestedTab : 'feature-types';
   const queryClient = useQueryClient();
   const validId = Number.isInteger(id) && id > 0;
   const blueprintQuery = useQuery({
@@ -176,8 +178,11 @@ export const BlueprintPage = () => {
   const isPublished = Boolean(
     blueprint?.record_effective_date && blueprint.record_effective_date <= dayjs().format('YYYY-MM-DD')
   );
+  const readOnly = Boolean(blueprint?.record_end_date || isPublished);
   return (
-    <LoadingGuard isLoading={validId && blueprintQuery.isPending} isLoadingFallback={<BlueprintSkeleton />}>
+    <LoadingGuard
+      isLoading={validId && blueprintQuery.isPending}
+      isLoadingFallback={<BlueprintSkeleton metadata={tab === 'metadata'} />}>
       <PageHeader
         label={blueprint?.name ?? 'Blueprint'}
         buttons={
@@ -222,6 +227,12 @@ export const BlueprintPage = () => {
               next.set('tab', value);
               setSearchParams(next);
             }}>
+            <Tab
+              value="feature-types"
+              label="Feature Types"
+              id="blueprint-feature-types-tab"
+              aria-controls="blueprint-panel"
+            />
             <Tab value="metadata" label="Metadata" id="blueprint-metadata-tab" aria-controls="blueprint-panel" />
           </Tabs>
         }
@@ -231,6 +242,7 @@ export const BlueprintPage = () => {
           {blueprint && (
             <Box role="tabpanel" id="blueprint-panel" aria-labelledby={`blueprint-${tab}-tab`}>
               {tab === 'metadata' && <BlueprintMetadata blueprint={blueprint} />}
+              <BlueprintFeatureTypesSection key={id} blueprintId={id} readOnly={readOnly} tab={tab} />
             </Box>
           )}
         </Stack>

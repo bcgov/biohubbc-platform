@@ -11,11 +11,9 @@ import {
   BlueprintFilters,
   CreateBlueprint,
   CreateBlueprintFeatureTypePropertyRecord,
-  CreateBlueprintFeatureTypeRecord,
   CreateBlueprintVersionRecord,
   UpdateBlueprint,
-  UpdateBlueprintFeatureTypePropertyRecord,
-  UpdateBlueprintFeatureTypeRecord
+  UpdateBlueprintFeatureTypePropertyRecord
 } from '../models/blueprint';
 import { CountResult } from '../models/count';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -377,65 +375,6 @@ export class BlueprintRepository extends BaseRepository {
   // ---------------------------------------------------------------------------
 
   /**
-   * Find the active inclusion of a feature type in a blueprint.
-   *
-   * Returns `null` when the blueprint does not include the feature type; callers are responsible for
-   * deciding whether that constitutes a conflict.
-   *
-   * @param {number} blueprintId - Blueprint identifier.
-   * @param {number} featureTypeId - Feature type identifier.
-   * @return {Promise<{ blueprint_feature_type_id: number } | null>} The matching record, or `null` if none exists.
-   * @memberof BlueprintRepository
-   */
-  async findActiveBlueprintFeatureType(
-    blueprintId: number,
-    featureTypeId: number
-  ): Promise<{ blueprint_feature_type_id: number } | null> {
-    const knex = getKnex();
-    const query = knex
-      .from('blueprint_feature_type')
-      .select('blueprint_feature_type_id')
-      .whereNull('record_end_date')
-      .where({ blueprint_id: blueprintId, feature_type_id: featureTypeId })
-      .first();
-
-    const response = await this.connection.knex(query);
-
-    return response.rows[0] ?? null;
-  }
-
-  /**
-   * Include a feature type in a blueprint.
-   *
-   * @param {CreateBlueprintFeatureTypeRecord} data - Data for the record to insert.
-   * @return {Promise<number>} The new blueprint_feature_type_id.
-   * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
-   * @memberof BlueprintRepository
-   */
-  async insertBlueprintFeatureType(data: CreateBlueprintFeatureTypeRecord): Promise<number> {
-    const knex = getKnex();
-    const query = knex
-      .table('blueprint_feature_type')
-      .insert({
-        blueprint_id: data.blueprint_id,
-        feature_type_id: data.feature_type_id,
-        sort: data.sort ?? null
-      })
-      .returning(['blueprint_feature_type_id']);
-
-    const response = await this.connection.knex(query);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert blueprint feature type', [
-        'BlueprintRepository->insertBlueprintFeatureType',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0].blueprint_feature_type_id;
-  }
-
-  /**
    * Get a single active blueprint feature type by ID.
    *
    * The lookup is scoped to the parent blueprint, which enforces the nested route hierarchy and
@@ -470,91 +409,6 @@ export class BlueprintRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Get the active feature types included in a blueprint.
-   *
-   * @param {number} blueprintId - Blueprint identifier to scope results.
-   * @return {Promise<AdminBlueprintFeatureType[]>}
-   * @memberof BlueprintRepository
-   */
-  async getAdminBlueprintFeatureTypes(blueprintId: number): Promise<AdminBlueprintFeatureType[]> {
-    const knex = getKnex();
-    const query = knex
-      .from('blueprint_feature_type as bft')
-      .join('feature_type as ft', 'ft.feature_type_id', 'bft.feature_type_id')
-      .select(ADMIN_BLUEPRINT_FEATURE_TYPE_COLUMNS)
-      .whereNull('bft.record_end_date')
-      .where('bft.blueprint_id', blueprintId)
-      .orderBy('bft.sort', 'asc')
-      .orderBy('bft.blueprint_feature_type_id', 'asc');
-
-    const response = await this.connection.knex(query, AdminBlueprintFeatureType);
-
-    return response.rows;
-  }
-
-  /**
-   * Update an existing blueprint feature type.
-   *
-   * @param {number} blueprintFeatureTypeId - Blueprint feature type identifier.
-   * @param {number} blueprintId - Parent blueprint identifier used to scope the update.
-   * @param {UpdateBlueprintFeatureTypeRecord} data - The data to update.
-   * @return {Promise<void>}
-   * @throws {ApiNotFoundError} If no active record exists for the id within the parent blueprint.
-   * @memberof BlueprintRepository
-   */
-  async updateBlueprintFeatureType(
-    blueprintFeatureTypeId: number,
-    blueprintId: number,
-    data: UpdateBlueprintFeatureTypeRecord
-  ): Promise<void> {
-    const knex = getKnex();
-    const query = knex
-      .table('blueprint_feature_type')
-      .update({ sort: data.sort })
-      .whereNull('record_end_date')
-      .where('blueprint_feature_type_id', blueprintFeatureTypeId)
-      .where('blueprint_id', blueprintId);
-
-    const response = await this.connection.knex(query);
-
-    if (response.rowCount !== 1) {
-      throw new ApiNotFoundError('Blueprint feature type not found', [
-        'BlueprintRepository->updateBlueprintFeatureType',
-        { blueprintFeatureTypeId, blueprintId }
-      ]);
-    }
-  }
-
-  /**
-   * Soft delete a blueprint feature type scoped to a parent blueprint.
-   *
-   * @param {number} blueprintFeatureTypeId - Blueprint feature type identifier.
-   * @param {number} blueprintId - Parent blueprint identifier used to scope the delete.
-   * @return {Promise<void>}
-   * @throws {ApiNotFoundError} If no active record exists for the id within the parent blueprint.
-   * @memberof BlueprintRepository
-   */
-  async deleteBlueprintFeatureType(blueprintFeatureTypeId: number, blueprintId: number): Promise<void> {
-    const knex = getKnex();
-    const query = knex
-      .table('blueprint_feature_type')
-      .update({ record_end_date: knex.fn.now() })
-      .whereNull('record_end_date')
-      .where('blueprint_feature_type_id', blueprintFeatureTypeId)
-      .where('blueprint_id', blueprintId)
-      .returning(['blueprint_feature_type_id']);
-
-    const response = await this.connection.knex(query);
-
-    if (response.rowCount !== 1) {
-      throw new ApiNotFoundError('Blueprint feature type not found', [
-        'BlueprintRepository->deleteBlueprintFeatureType',
-        { blueprintFeatureTypeId, blueprintId }
-      ]);
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -779,27 +633,6 @@ export class BlueprintRepository extends BaseRepository {
         { blueprintFeatureTypePropertyId, blueprintFeatureTypeId }
       ]);
     }
-  }
-
-  /**
-   * Soft delete every active property assignment of a blueprint feature type.
-   *
-   * Used when the feature type itself is removed from the blueprint, so no active assignment is left
-   * under a retired parent.
-   *
-   * @param {number} blueprintFeatureTypeId - Blueprint feature type identifier.
-   * @return {Promise<void>}
-   * @memberof BlueprintRepository
-   */
-  async deleteBlueprintFeatureTypePropertiesByBlueprintFeatureTypeId(blueprintFeatureTypeId: number): Promise<void> {
-    const knex = getKnex();
-    const query = knex
-      .table('blueprint_feature_type_property')
-      .update({ record_end_date: knex.fn.now() })
-      .whereNull('record_end_date')
-      .where('blueprint_feature_type_id', blueprintFeatureTypeId);
-
-    await this.connection.knex(query);
   }
 
   /**
