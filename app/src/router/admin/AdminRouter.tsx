@@ -1,3 +1,5 @@
+import { SubmissionUploadReviewValidationFeatureTypePage } from 'features/admin/reviews/SubmissionUploadReviewValidationFeatureTypePage';
+import { SubmissionUploadReviewValidationReconciliationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationReconciliationPage';
 import { BlueprintFeatureTypePage } from 'features/admin/configuration/blueprint/feature/BlueprintFeatureTypePage';
 import { BlueprintPage } from 'features/admin/configuration/blueprint/BlueprintPage';
 import { ConfigurationPage } from 'features/admin/configuration/ConfigurationPage';
@@ -47,6 +49,39 @@ export const AdminRouter = () => {
       />
 
       {/* Submission upload review routes */}
+      <Route
+        path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/:reconciliation?/feature-type/:featureType"
+        element={
+          <BaseLayout>
+            <PageTitle
+              title="Feature Type Properties"
+              description="Review property definitions within a submission upload"
+            />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <SubmissionUploadReviewValidationFeatureTypePage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/:reconciliation"
+        element={
+          <BaseLayout>
+            <PageTitle title="Reconciliation Features" description="Review features by reconciliation outcome" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <SubmissionUploadReviewValidationReconciliationPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
       <Route
         path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/feature/:submissionFeatureId"
         element={

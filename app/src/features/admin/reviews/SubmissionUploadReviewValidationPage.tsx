@@ -1,4 +1,3 @@
-import { keepPreviousDataWithin } from 'utils/query-client';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
@@ -9,11 +8,8 @@ import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
-import { useMemo } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SubmissionFeatureTable } from 'features/submissions/components/SubmissionFeatureTable';
 import { SubmissionUploadMap } from './components/map/SubmissionUploadMap';
 import { SubmissionUploadReconciliationTable } from './components/SubmissionUploadReconciliationTable';
 import { SubmissionUploadReviewHeader } from './components/SubmissionUploadReviewHeader';
@@ -28,8 +24,7 @@ interface SubmissionUploadReviewValidationPageProps {
  * Validation review workspace for a single submission upload.
  *
  * Displays the review metadata, reconciliation overview, a map of the upload's active
- * spatial features, and a server-paginated table containing the features belonging to
- * the reviewed submission upload. `review` is the cached review detail, so a status change
+ * spatial features. `review` is the cached review detail, so a status change
  * written to that query re-renders the header.
  *
  * @param {SubmissionUploadReviewValidationPageProps} props - Validation review page properties.
@@ -60,24 +55,6 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
           api.admin.getSubmissionUploadReconciliationCounts(scope.submissionId, scope.submissionUploadId, { signal })
       : skipToken
   });
-
-  const featureGrid = useServerPaginatedGridState({ defaultSort: { field: 'submission_feature_id', sort: 'asc' } });
-  const featuresQuery = useQuery({
-    queryKey: submissionUploadQueryKeys.featureList(scope, featureGrid.apiPagination),
-    queryFn: ({ signal }) =>
-      api.admin.getSubmissionUploadFeatures(scope.submissionId, scope.submissionUploadId, featureGrid.apiPagination, {
-        signal
-      }),
-    placeholderData: keepPreviousDataWithin(submissionUploadQueryKeys.upload(scope))
-  });
-  const featureRows = useMemo(
-    () =>
-      featuresQuery.data?.features.map((feature) => ({
-        submission_feature_id: feature.submission_feature_id,
-        feature_type_name: feature.feature_type_name
-      })) ?? [],
-    [featuresQuery.data]
-  );
 
   const reconciliationCounts = reconciliationQuery.data;
   const isLoading = reconciliationQuery.isLoading;
@@ -134,16 +111,6 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
     });
   };
 
-  /**
-   * Navigate to a feature detail page nested under the current review.
-   *
-   * @param {number} submissionFeatureId ID of the feature to open.
-   * @returns {void}
-   */
-  const handleFeatureRowClick = (submissionFeatureId: number) => {
-    navigate(`feature/${submissionFeatureId}`);
-  };
-
   return (
     <LoadingGuard
       isLoading={isLoading}
@@ -164,20 +131,13 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
           />
           <Container maxWidth="xl" sx={{ py: 4 }}>
             <Stack spacing={4}>
-              <SubmissionUploadReconciliationTable counts={reconciliationCounts} />
+              <SubmissionUploadReconciliationTable
+                counts={reconciliationCounts}
+                onOutcomeClick={(route) => navigate(route)}
+              />
               <PageSection id="review-map" label="Map">
                 <SubmissionUploadMap submissionId={Number(submissionId)} submissionUploadId={submissionUploadId} />
               </PageSection>
-              <SubmissionFeatureTable
-                rows={featureRows}
-                rowCount={featuresQuery.data?.pagination.total ?? 0}
-                isLoading={featuresQuery.isFetching && !featuresQuery.data}
-                onRowClick={(params) => handleFeatureRowClick(params.row.submission_feature_id)}
-                paginationModel={featureGrid.paginationModel}
-                onPaginationModelChange={featureGrid.handlePaginationChange}
-                sortModel={featureGrid.sortModel}
-                onSortModelChange={featureGrid.handleSortChange}
-              />
             </Stack>
           </Container>
         </>

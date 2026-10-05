@@ -1,3 +1,5 @@
+import { IFeatureProperty } from './useFeaturePropertiesApi.interface';
+import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from './useSearchApi.interface';
 import { ExpressionTreeExpression } from './expression.interface';
 import { ApiCursorResponseParams, ApiPaginationResponseParams } from 'types/pagination';
 
@@ -94,4 +96,30 @@ export interface SubmissionFeatureSecurityRulesFilters {
 export interface ISubmissionUploadFeatureGeometryExtent {
   bbox: [number, number, number, number] | null;
   geometry_count: number;
+}
+
+/** Persisted reconciliation classifications. */
+export type ReconciliationType = 'new' | 'unmodified' | 'modified';
+
+/** Required ownership and outcome for reconciliation browsing. */
+export interface ReconciliationFeatureScope {
+  submissionId: number;
+  submissionUploadId: string;
+  reconciliation: ReconciliationType;
+}
+
+export interface ReconciliationFeatureCounts {
+  total: number;
+  feature_types: { feature_type_name: string; count: number }[];
+}
+
+export interface ReconciliationFeaturePage {
+  features: SearchFeatureResultWithRelevancy[];
+  properties: SearchFeatureProperty[];
+  pagination: ApiCursorResponseParams;
+}
+
+/** Property definitions observed for one feature type across an upload. */
+export interface ISubmissionUploadFeatureTypePropertiesResponse {
+  properties: IFeatureProperty[];
 }
