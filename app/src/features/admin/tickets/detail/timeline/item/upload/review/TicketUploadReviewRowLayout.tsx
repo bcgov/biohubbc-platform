@@ -2,17 +2,17 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { PropsWithChildren } from 'react';
 
-type TicketUploadReviewRowLayoutProps = PropsWithChildren<{
+interface TicketUploadReviewRowLayoutProps {
   label: string;
-}>;
+}
 
 /**
  * Shared row chrome for submission upload review timeline rows.
  *
- * @param {TicketUploadReviewRowLayoutProps} props
- * @return {*}
+ * @param {PropsWithChildren<TicketUploadReviewRowLayoutProps>} props - Component props.
+ * @returns {JSX.Element} Submission upload review timeline row layout.
  */
-export const TicketUploadReviewRowLayout = (props: TicketUploadReviewRowLayoutProps) => {
+export const TicketUploadReviewRowLayout = (props: PropsWithChildren<TicketUploadReviewRowLayoutProps>) => {
   const { label, children } = props;
 
   return (
@@ -28,7 +28,7 @@ export const TicketUploadReviewRowLayout = (props: TicketUploadReviewRowLayoutPr
         justifyContent: 'space-between',
         gap: 2
       }}>
-      <Typography variant="body2" color="text.secondary" fontWeight={700}>
+      <Typography variant="body2" fontWeight={700}>
         {label}
       </Typography>
       {children}

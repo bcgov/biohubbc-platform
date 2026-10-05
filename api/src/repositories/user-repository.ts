@@ -3,8 +3,11 @@ import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { CountResult } from '../models/count';
 import {
   AvailableUser,
+  ContributorSystemUserOption,
+  ContributorSystemUserOptionFilters,
   IAddSystemUserParams,
   IUpdateSystemUserParams,
   SystemRoles,
@@ -575,5 +578,52 @@ export class UserRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * List users of every identity source for contributor assignment.
+   * @param filters - Optional keyword search.
+   * @param pagination - Bounded page request.
+   * @returns User options, including ended users for disabled presentation.
+   */
+  async listContributorSystemUserOptions(
+    filters: ContributorSystemUserOptionFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<ContributorSystemUserOption[]> {
+    const knex = getKnex();
+    const query = knex('system_user').select('system_user_id', 'user_identifier', 'display_name', 'record_end_date');
+    if (filters.keyword) {
+      query.where((builder) => {
+        builder
+          .whereILike('user_identifier', `%${filters.keyword}%`)
+          .orWhereILike('display_name', `%${filters.keyword}%`);
+      });
+    }
+    query
+      .orderBy('user_identifier', 'asc')
+      .orderBy('system_user_id', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+    const response = await this.connection.knex(query, ContributorSystemUserOption);
+    return response.rows;
+  }
+
+  /**
+   * Count users of every identity source matching the assignment search.
+   * @param filters - Optional keyword search.
+   * @returns Total matching users.
+   */
+  async countContributorSystemUserOptions(filters: ContributorSystemUserOptionFilters): Promise<number> {
+    const knex = getKnex();
+    const query = knex('system_user').select(knex.raw('count(*)::integer as count'));
+    if (filters.keyword) {
+      query.where((builder) => {
+        builder
+          .whereILike('user_identifier', `%${filters.keyword}%`)
+          .orWhereILike('display_name', `%${filters.keyword}%`);
+      });
+    }
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
   }
 }

@@ -1,7 +1,7 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { PredicateOperator } from '../../../models/expression-predicate';
 import { GeoJSON } from '../geoJson';
-import { paginationRequestBodySchema, paginationResponseSchema } from '../pagination';
+import { cursorPaginationRequestBodySchema, cursorPaginationResponseSchema } from '../pagination';
 
 /**
  * Recursive expression tree for feature search.
@@ -19,11 +19,11 @@ export const featureSearchExpressionTreeSchema: OpenAPIV3.SchemaObject = {
         oneOf: [
           {
             type: 'object',
-            required: ['type', 'feature_property_id', 'feature_type_property_id', 'operator'],
+            required: ['type', 'feature_property_id', 'blueprint_feature_type_property_id', 'operator'],
             properties: {
               type: { type: 'string', enum: ['predicate'] },
               feature_property_id: { type: 'integer', minimum: 1 },
-              feature_type_property_id: { type: 'integer', nullable: true },
+              blueprint_feature_type_property_id: { type: 'integer', nullable: true },
               operator: { type: 'string', enum: PredicateOperator.options },
               value: {
                 description:
@@ -56,6 +56,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: [
     'submission_feature_id',
+    'parent_submission_feature_id',
+    'provenance',
     'submission_id',
     'uuid',
     'feature_type_id',
@@ -68,6 +70,8 @@ export const featureSearchResultSchema: OpenAPIV3.SchemaObject = {
   ],
   properties: {
     submission_feature_id: { type: 'integer' },
+    parent_submission_feature_id: { type: 'integer', nullable: true },
+    provenance: { type: 'string', enum: ['direct', 'inherited', null], nullable: true },
     submission_id: { type: 'integer' },
     uuid: { type: 'string', format: 'uuid' },
     feature_type_id: { type: 'integer' },
@@ -84,30 +88,35 @@ export const featureSearchPropertySchema: OpenAPIV3.SchemaObject = {
   title: 'featureSearchProperty',
   type: 'object',
   required: [
-    'feature_type_property_id',
+    'feature_property_id',
     'name',
     'display_name',
     'description',
     'type_name',
-    'required_value',
     'calculated_value',
     'allow_multiple'
   ],
   properties: {
-    feature_type_property_id: { type: 'integer' },
     feature_property_id: { type: 'integer' },
     feature_property_type_id: { type: 'integer' },
     name: { type: 'string' },
     display_name: { type: 'string' },
     description: { type: 'string', nullable: true },
     type_name: { type: 'string' },
-    required_value: { type: 'boolean' },
     calculated_value: { type: 'boolean' },
     allow_multiple: {
       type: 'boolean',
       description: 'Whether this property can be returned as an array of values.'
     }
   }
+};
+
+/** Optional submission scope shared by feature searches and their counts. */
+const submissionIdsSchema: OpenAPIV3.SchemaObject = {
+  type: 'array',
+  minItems: 1,
+  uniqueItems: true,
+  items: { type: 'integer', minimum: 1 }
 };
 
 /**
@@ -122,9 +131,29 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
         additionalProperties: false,
         properties: {
           expression: featureSearchExpressionTreeSchema,
-          pagination: paginationRequestBodySchema
+          submissionIds: submissionIdsSchema,
+          pagination: cursorPaginationRequestBodySchema
         },
         description: 'Optional expression tree and pagination. Omit expression to list target features.'
+      }
+    }
+  }
+};
+
+/**
+ * Feature count request body.
+ */
+export const featureSearchCountRequestBodySchema: OpenAPIV3.RequestBodyObject = {
+  required: true,
+  content: {
+    'application/json': {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          expression: featureSearchExpressionTreeSchema,
+          submissionIds: submissionIdsSchema
+        }
       }
     }
   }
@@ -135,7 +164,7 @@ export const featureSearchRequestBodySchema: OpenAPIV3.RequestBodyObject = {
  */
 export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['features', 'properties', 'pagination', 'has_more_secured_features'],
+  required: ['features', 'properties', 'has_inaccessible_secured_features', 'pagination'],
   properties: {
     features: {
       type: 'array',
@@ -144,14 +173,37 @@ export const featureSearchResponseSchema: OpenAPIV3.SchemaObject = {
     properties: {
       type: 'array',
       description:
-        'Metadata for properties with a non-null indexed value on at least one feature in the full filtered expression result. Independent of pagination.',
+        'One entry per property ever assigned to the selected feature type, under any Blueprint. Independent of pagination and filters.',
       items: featureSearchPropertySchema
     },
-    pagination: paginationResponseSchema,
-    has_more_secured_features: {
+    has_inaccessible_secured_features: {
       type: 'boolean',
       description:
-        'True when the search matched secured features that were excluded from the results because the caller cannot access them.'
+        'True when any secured target feature matches the complete search expression but is inaccessible to the caller. Independent of cursor pagination.'
+    },
+    pagination: cursorPaginationResponseSchema
+  }
+};
+
+/** Count response for feature searches. */
+export const featureSearchCountResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['total'],
+  properties: {
+    total: {
+      type: 'integer',
+      minimum: 0,
+      description: 'Number of matching features.'
     }
+  }
+};
+
+/** Administrator upload search returns a mixed-type page without property metadata. */
+export const submissionUploadFeatureSearchResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['features', 'pagination'],
+  properties: {
+    features: { type: 'array', items: featureSearchResultSchema },
+    pagination: cursorPaginationResponseSchema
   }
 };

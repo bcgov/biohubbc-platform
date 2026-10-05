@@ -1,14 +1,15 @@
 import { IDBConnection } from '../database/db';
 import { ExpressionTree } from '../models/expression-tree';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import type { SearchFeatureSecurityContext } from '../models/search';
 import { MartinContextRepository } from '../repositories/martin-context-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
+import { optimizeExpression } from '../utils/expression-optimization';
 import { getLogger } from '../utils/logger';
 import { getMartinConfig } from '../utils/martin-config';
 import { computeMartinContextHash } from '../utils/martin-context-hash';
 import { DBService } from './db-service';
-import { ExpressionPredicateSemanticValidator } from './expression-predicate-semantic-validator';
+import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { ExpressionTreeService } from './expression-tree-service';
 
 const defaultLog = getLogger('services/martin-context-service');
@@ -18,7 +19,7 @@ export interface MartinContextResult {
   /** Remaining context lifetime, seconds. */
   expiresInSeconds: number;
   /** True when the search matched secured features this caller may not see. */
-  hasMoreSecuredFeatures: boolean;
+  hasInaccessibleSecuredFeatures: boolean;
 }
 
 /**
@@ -37,7 +38,7 @@ export class MartinContextService extends DBService {
   searchFeatureRepository: SearchFeatureRepository;
   submissionRepository: SubmissionRepository;
   expressionTreeService: ExpressionTreeService;
-  semanticValidator: ExpressionPredicateSemanticValidator;
+  expressionTreeNormalizationService: ExpressionTreeNormalizationService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -46,7 +47,7 @@ export class MartinContextService extends DBService {
     this.searchFeatureRepository = new SearchFeatureRepository(connection);
     this.submissionRepository = new SubmissionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
-    this.semanticValidator = new ExpressionPredicateSemanticValidator(connection);
+    this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
   }
 
   /**
@@ -61,18 +62,18 @@ export class MartinContextService extends DBService {
   async createOrReuseMartinContext(
     featureTypeName: string,
     expressionTree: ExpressionTree | undefined,
-    systemUserId: number | null
+    systemUserId: number | null,
+    submissionIds?: number[]
   ): Promise<MartinContextResult> {
     const { contextTtlSeconds, tokenTtlSeconds, maxLiveContexts } = getMartinConfig();
 
     // Resolved exactly as feature search resolves it, so an unknown feature type fails identically.
     const { feature_type_id } = await this.submissionRepository.getFeatureTypeIdByName(featureTypeName);
 
-    // Validated once, then used twice: the secured-results probe below and the write path both take
-    // the normalized tree, so the search has one identity here and the metadata reads behind
-    // validation are not repeated per mint.
-    const normalizedExpression: NormalizedExpressionTreeExpression | undefined = expressionTree
-      ? await this.semanticValidator.validateExpressionTree(expressionTree)
+    // Validate once. Persistence retains the canonical normalized tree, while expression-driven
+    // SQL consumes its optimized representation.
+    const normalizedExpression = expressionTree
+      ? await this.expressionTreeNormalizationService.normalize(expressionTree)
       : undefined;
 
     // Persisting (with reuse by semantic hash) is what gives the search a stable id the tile
@@ -81,22 +82,29 @@ export class MartinContextService extends DBService {
     const expressionId = normalizedExpression
       ? (await this.expressionTreeService.writeNormalizedExpressionTree(normalizedExpression)).expression_id
       : null;
+    const optimizedExpression = normalizedExpression ? optimizeExpression(normalizedExpression) : undefined;
 
+    const normalizedSubmissionIds = submissionIds ? [...new Set(submissionIds)].sort((a, b) => a - b) : null;
     const contextHash = computeMartinContextHash({
       expressionId,
       featureTypeId: feature_type_id,
-      systemUserId: systemUserId ?? null
+      systemUserId: systemUserId ?? null,
+      submissionIds: normalizedSubmissionIds
     });
 
     await this.martinContextRepository.deleteExpiredContextsByHash(contextHash);
 
     // Recomputed even for a reused context: features may have been secured since it was created, and
     // this drives the "some results are hidden" notice.
-    const hasMoreSecuredFeatures = await this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
-      featureTypeName,
-      normalizedExpression,
-      systemUserId
-    );
+    const securityContext: SearchFeatureSecurityContext =
+      systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId };
+    const hasInaccessibleSecuredFeatures =
+      await this.searchFeatureRepository.hasInaccessibleSecuredFeaturesByExpressionTree(
+        featureTypeName,
+        optimizedExpression ?? null,
+        securityContext,
+        { submissionIds: normalizedSubmissionIds ?? undefined }
+      );
 
     // Reuse and creation are one statement, serialized per context hash: two identical mints racing
     // here would otherwise both find nothing and both insert, and Martin would cache one search's
@@ -106,7 +114,8 @@ export class MartinContextService extends DBService {
         context_hash: contextHash,
         expression_id: expressionId,
         feature_type_id,
-        system_user_id: systemUserId ?? null
+        system_user_id: systemUserId ?? null,
+        submission_ids: normalizedSubmissionIds
       },
       tokenTtlSeconds,
       contextTtlSeconds
@@ -145,7 +154,7 @@ export class MartinContextService extends DBService {
     return {
       martinContextId: context.martin_context_id,
       expiresInSeconds: context.expires_in_seconds,
-      hasMoreSecuredFeatures
+      hasInaccessibleSecuredFeatures
     };
   }
 

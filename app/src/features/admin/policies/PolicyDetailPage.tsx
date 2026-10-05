@@ -30,7 +30,7 @@ export const PolicyDetailPage = () => {
     isSavingPolicyStatus,
     isSavingStatement,
     policy,
-    policyDataLoader,
+    isLoadingPolicy,
     handleCloseExpressionDialog,
     handleClosePolicyDialog,
     handleCloseStatementDialog,
@@ -51,10 +51,7 @@ export const PolicyDetailPage = () => {
   } = usePolicyDetailPage();
 
   return (
-    <LoadingGuard
-      isLoading={policyDataLoader.isLoading && !policy}
-      isLoadingFallback={<PolicySkeleton />}
-      isLoadingFallbackDelay={300}>
+    <LoadingGuard isLoading={isLoadingPolicy} isLoadingFallback={<PolicySkeleton />} isLoadingFallbackDelay={300}>
       {policy ? (
         <>
           <PolicyHeader

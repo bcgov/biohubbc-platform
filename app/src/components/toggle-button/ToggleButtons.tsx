@@ -21,17 +21,23 @@ interface ToggleButtonsProps<ViewValueType extends string> {
   onViewChange: (view: ViewValueType) => void;
   /** Orientation of the group */
   orientation?: 'horizontal' | 'vertical';
+  /** Accessible label for the toggle-button group. */
+  ariaLabel?: string;
 }
 
 /**
- * A reusable toggle button group component
- * @template ViewValueType
+ * Renders a mutually exclusive group of view-selection buttons.
+ *
+ * @template ViewValueType - String union represented by the available buttons.
+ * @param {ToggleButtonsProps<ViewValueType>} props - Available views, active selection, layout, and change handler.
+ * @returns {JSX.Element} The configured toggle-button group.
  */
 export const ToggleButtons = <ViewValueType extends string>({
   views,
   activeView,
   onViewChange,
-  orientation = 'horizontal'
+  orientation = 'horizontal',
+  ariaLabel
 }: ToggleButtonsProps<ViewValueType>) => {
   return (
     <ToggleButtonGroup
@@ -39,6 +45,8 @@ export const ToggleButtons = <ViewValueType extends string>({
       color="primary"
       value={activeView}
       exclusive
+      aria-label={ariaLabel}
+      aria-orientation={orientation}
       onChange={(_, newView) => {
         if (newView) {
           onViewChange(newView as ViewValueType);
@@ -46,11 +54,17 @@ export const ToggleButtons = <ViewValueType extends string>({
       }}
       sx={{
         display: 'flex',
+        ...(orientation === 'vertical' && { alignItems: 'stretch' }),
         '& .MuiToggleButton-root': {
           borderRadius: 1,
           textTransform: 'none',
           fontWeight: 700,
-          fontSize: '0.875rem'
+          fontSize: '0.875rem',
+          ...(orientation === 'vertical' && {
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            width: '100%'
+          })
         }
       }}>
       {views.map((view) => {

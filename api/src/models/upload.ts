@@ -32,3 +32,10 @@ export const UpdateUpload = z.object({
   s3_upload_id: z.string().optional()
 });
 export type UpdateUpload = z.infer<typeof UpdateUpload>;
+
+/** Upload creator and active membership in the submission's owning contributor. */
+export const UploadCompletionAccess = z.object({
+  create_user: z.number().int(),
+  is_contributor_member: z.boolean()
+});
+export type UploadCompletionAccess = z.infer<typeof UploadCompletionAccess>;

@@ -28,7 +28,13 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
    */
   const handleResultClick = useCallback(
     (result: Pick<SearchFeatureResultWithRelevancy, 'submission_id' | 'submission_feature_id'>) => {
-      navigate(`/submission/${result.submission_id}/feature/${result.submission_feature_id}${location.search}`);
+      // Global search uses its route segment for the feature type. Do not carry a stale
+      // submission selection into a new submission's pagination context.
+      const params = new URLSearchParams(location.search);
+      params.delete(URL_PARAMS.FEATURE_TYPE);
+      const queryString = params.toString();
+      const search = queryString ? `?${queryString}` : '';
+      navigate(`/submission/${result.submission_id}/feature/${result.submission_feature_id}${search}`);
     },
     [location.search, navigate]
   );
@@ -48,6 +54,7 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
         const nextSearchParams = new URLSearchParams(location.search);
         nextSearchParams.delete(URL_PARAMS.FEATURE_TYPE);
         nextSearchParams.delete(URL_PARAMS.PAGE);
+        nextSearchParams.delete(URL_PARAMS.CURSOR);
         const nextSearch = nextSearchParams.toString();
         navigate(nextSearch ? `${nextLink.to}?${nextSearch}` : nextLink.to);
       }

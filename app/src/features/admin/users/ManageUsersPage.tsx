@@ -1,26 +1,34 @@
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Box from '@mui/material/Box';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
+import { PageHeader } from 'components/header/PageHeader';
+import { TabGroup } from 'components/tabs/TabGroup';
 import { AddSystemUserI18N, BlockSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
+import { SYSTEM_ROLE } from 'constants/roles';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import groupBy from 'lodash-es/groupBy';
+import { useCallback, useMemo, useState } from 'react';
+import { userQueryKeys } from 'utils/query-keys/user-query-keys';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import ActiveUsersList from './ActiveUsersList';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
   AddSystemUsersFormYupSchema,
   IAddSystemUsersForm
 } from './AddSystemUsersForm';
-
-const DEFAULT_PAGE_SIZE = 10;
+import { ContributorPanel } from './contributors/content/ContributorPanel';
 
 /**
  * Page to display user management data/functionality.
@@ -31,30 +39,45 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
 
-  const [activeTab, setActiveTab] = useState<'users'>('users');
+  const authState = useAuthStateContext();
+  const isSystemAdmin = authState.biohubUserWrapper.roleNames?.includes(SYSTEM_ROLE.SYSTEM_ADMIN) ?? false;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const activeTab = isSystemAdmin && requestedTab === 'contributors' ? requestedTab : 'users';
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
 
-  const rolesDataLoader = useDataLoader(() => biohubApi.user.getRoles());
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    rolesDataLoader.load();
-  }, [rolesDataLoader]);
-
-  const usersGrid = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) => biohubApi.user.getUsersList({ search, ...pagination }),
-    extractData: (response) => response.users,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'user_identifier', sort: 'asc' },
-    defaultPageSize: DEFAULT_PAGE_SIZE
+  const rolesQuery = useQuery({
+    queryKey: userQueryKeys.roles(),
+    queryFn: ({ signal }) => biohubApi.user.getRoles({ signal })
   });
 
-  const systemRoles = rolesDataLoader.data || [];
+  const usersGrid = useServerPaginatedGridState({ defaultSort: { field: 'user_identifier', sort: 'asc' } });
+  const usersParams = { search: usersGrid.debouncedSearchTerm, ...usersGrid.apiPagination };
+  const usersQuery = useQuery({
+    queryKey: userQueryKeys.list(usersParams),
+    queryFn: ({ signal }) => biohubApi.user.getUsersList(usersParams, { signal }),
+    placeholderData: keepPreviousData
+  });
 
-  const closeYesNoDialog = useCallback(() => {
+  const systemRoles = rolesQuery.data ?? [];
+
+  /**
+   * Reloads every page of the users table after a user changes, and the user pickers that search the same users.
+   *
+   * @returns {void}
+   */
+  const refreshUsers = useCallback(
+    () => refreshChangedQueries(queryClient, changedQueryKeys.systemUser()),
+    [queryClient]
+  );
+
+  const handleCloseYesNoDialog = useCallback(() => {
     dialogContext.setYesNoDialog({ open: false });
   }, [dialogContext]);
 
-  const showApiErrorDialog = useCallback(
+  const handleShowApiErrorDialog = useCallback(
     (caughtError: unknown, title: string, text: string) => {
       const apiError = caughtError as APIError;
 
@@ -78,7 +101,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const handleUpdateUserRecordEndDate = useCallback(
     async (user: ISystemUser, recordEndDate: string | null) => {
       await biohubApi.user.updateSystemUser(user.system_user_id, { record_end_date: recordEndDate });
-      usersGrid.refresh();
+      refreshUsers();
 
       dialogContext.setSnackbar({
         open: true,
@@ -89,7 +112,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         )
       });
     },
-    [biohubApi.user, dialogContext, usersGrid]
+    [biohubApi.user, dialogContext, refreshUsers]
   );
 
   const handleBlockUser = useCallback(
@@ -98,13 +121,13 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         try {
           await handleUpdateUserRecordEndDate(user, new Date().toISOString());
         } catch (caughtError) {
-          showApiErrorDialog(
+          handleShowApiErrorDialog(
             caughtError,
             BlockSystemUserI18N.blockUserErrorTitle,
             BlockSystemUserI18N.blockUserErrorText
           );
         } finally {
-          closeYesNoDialog();
+          handleCloseYesNoDialog();
         }
       };
 
@@ -119,13 +142,13 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         yesButtonLabel: 'Block User',
         noButtonLabel: 'Cancel',
         yesButtonProps: { color: 'error' },
-        onClose: closeYesNoDialog,
-        onNo: closeYesNoDialog,
+        onClose: handleCloseYesNoDialog,
+        onNo: handleCloseYesNoDialog,
         open: true,
         onYes: handleConfirmBlock
       });
     },
-    [closeYesNoDialog, dialogContext, handleUpdateUserRecordEndDate, showApiErrorDialog]
+    [handleCloseYesNoDialog, dialogContext, handleUpdateUserRecordEndDate, handleShowApiErrorDialog]
   );
 
   const handleActivateUser = useCallback(
@@ -134,13 +157,13 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         try {
           await handleUpdateUserRecordEndDate(user, null);
         } catch (caughtError) {
-          showApiErrorDialog(
+          handleShowApiErrorDialog(
             caughtError,
             UpdateSystemUserI18N.updateUserErrorTitle,
             UpdateSystemUserI18N.updateUserErrorText
           );
         } finally {
-          closeYesNoDialog();
+          handleCloseYesNoDialog();
         }
       };
 
@@ -155,13 +178,13 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         yesButtonLabel: 'Activate User',
         noButtonLabel: 'Cancel',
         yesButtonProps: { color: 'primary' },
-        onClose: closeYesNoDialog,
-        onNo: closeYesNoDialog,
+        onClose: handleCloseYesNoDialog,
+        onNo: handleCloseYesNoDialog,
         open: true,
         onYes: handleConfirmActivate
       });
     },
-    [closeYesNoDialog, dialogContext, handleUpdateUserRecordEndDate, showApiErrorDialog]
+    [handleCloseYesNoDialog, dialogContext, handleUpdateUserRecordEndDate, handleShowApiErrorDialog]
   );
 
   const handleChangeUserPermissions = useCallback(
@@ -169,7 +192,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
       const handleConfirmRoleChange = async () => {
         try {
           await biohubApi.user.updateSystemUserRoles(user.system_user_id, [roleId]);
-          usersGrid.refresh();
+          refreshUsers();
 
           dialogContext.setSnackbar({
             open: true,
@@ -180,13 +203,13 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
             )
           });
         } catch (caughtError) {
-          showApiErrorDialog(
+          handleShowApiErrorDialog(
             caughtError,
             UpdateSystemUserI18N.updateUserErrorTitle,
             UpdateSystemUserI18N.updateUserErrorText
           );
         } finally {
-          closeYesNoDialog();
+          handleCloseYesNoDialog();
         }
       };
 
@@ -200,44 +223,64 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
         yesButtonLabel: 'Change Role',
         noButtonLabel: 'Cancel',
         yesButtonProps: { color: 'primary' },
-        onClose: closeYesNoDialog,
-        onNo: closeYesNoDialog,
+        onClose: handleCloseYesNoDialog,
+        onNo: handleCloseYesNoDialog,
         open: true,
         onYes: handleConfirmRoleChange
       });
     },
-    [biohubApi.user, closeYesNoDialog, dialogContext, showApiErrorDialog, usersGrid]
+    [biohubApi.user, handleCloseYesNoDialog, dialogContext, handleShowApiErrorDialog, refreshUsers]
   );
 
   const handleAddSystemUsersSave = useCallback(
     async (values: IAddSystemUsersForm) => {
       setOpenAddUserDialog(false);
 
-      try {
-        for (const systemUser of values.systemUsers) {
-          await biohubApi.admin.addSystemUser(
-            systemUser.userIdentifier,
-            systemUser.userGuid,
-            systemUser.identitySource,
-            systemUser.systemRole
-          );
-        }
-
-        usersGrid.refresh();
-
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: (
-            <Typography variant="body2" component="div">
-              {values.systemUsers.length} system {values.systemUsers.length > 1 ? 'users' : 'user'} added.
-            </Typography>
+      // Different users are added together. Rows naming the same user are sent one after another, since the server
+      // reads or creates the user and two concurrent requests for one user would race that read. The server finds a
+      // user by GUID alone, ignoring case, so rows are grouped the same way.
+      const rowsByUser = groupBy(values.systemUsers, (systemUser) => systemUser.userGuid.toLowerCase());
+      const addedUserCount = Object.keys(rowsByUser).length;
+      const results = await Promise.allSettled(
+        Object.values(rowsByUser).map((rows) =>
+          rows.reduce<Promise<unknown>>(
+            (previous, systemUser) =>
+              previous.then(() =>
+                biohubApi.admin.addSystemUser(
+                  systemUser.userIdentifier,
+                  systemUser.userGuid,
+                  systemUser.identitySource,
+                  systemUser.systemRole
+                )
+              ),
+            Promise.resolve()
           )
-        });
-      } catch (caughtError) {
-        showApiErrorDialog(caughtError, AddSystemUserI18N.addUserErrorTitle, AddSystemUserI18N.addUserErrorText);
+        )
+      );
+
+      // Users added before a failure are listed whether or not every request succeeded.
+      refreshUsers();
+
+      const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failure) {
+        handleShowApiErrorDialog(
+          failure.reason,
+          AddSystemUserI18N.addUserErrorTitle,
+          AddSystemUserI18N.addUserErrorText
+        );
+        return;
       }
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            {addedUserCount} system {addedUserCount > 1 ? 'users' : 'user'} added.
+          </Typography>
+        )
+      });
     },
-    [biohubApi.admin, dialogContext, showApiErrorDialog, usersGrid]
+    [biohubApi.admin, dialogContext, handleShowApiErrorDialog, refreshUsers]
   );
 
   const rowActions = useMemo(
@@ -251,46 +294,80 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <>
-      <Paper square elevation={0}>
-        <Container maxWidth="xl" sx={{ py: 4, pb: 0 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              Administrative
+      <PageHeader
+        label="Administrative"
+        breadcrumbs={
+          <Breadcrumbs aria-label="users breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Users
             </Typography>
-          </Box>
-
-          <Tabs
+          </Breadcrumbs>
+        }
+        tabs={
+          <TabGroup
             value={activeTab}
-            onChange={(_, value) => {
-              setActiveTab(value);
-              usersGrid.handlePaginationChange({ ...usersGrid.paginationModel, page: 0 });
+            onChange={(value) => {
+              setSearchParams(value === 'users' ? {} : { tab: value });
+              if (value === 'users') {
+                usersGrid.handlePaginationChange({ ...usersGrid.paginationModel, page: 0 });
+              }
             }}
-            aria-label="administrative tabs"
-            sx={{ mt: 1.5 }}>
-            <Tab
-              value="users"
-              label="Users"
-              id="administrative-users-tab"
-              aria-controls="administrative-users-tabpanel"
-            />
-          </Tabs>
-        </Container>
-      </Paper>
+            ariaLabel="administrative tabs"
+            tabs={[
+              {
+                value: 'users',
+                label: 'Users',
+                id: 'administrative-users-tab',
+                ariaControls: 'administrative-users-tabpanel'
+              },
+              ...(isSystemAdmin
+                ? [
+                    {
+                      value: 'contributors',
+                      label: 'Contributors',
+                      id: 'administrative-contributors-tab',
+                      ariaControls: 'administrative-contributors-tabpanel'
+                    }
+                  ]
+                : [])
+            ]}
+          />
+        }
+      />
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
-        <ActiveUsersList
-          rows={usersGrid.rows}
-          rowCount={usersGrid.rowCount}
-          paginationModel={usersGrid.paginationModel}
-          setPaginationModel={usersGrid.handlePaginationChange}
-          sortModel={usersGrid.sortModel}
-          setSortModel={usersGrid.handleSortChange}
-          searchTerm={usersGrid.searchTerm}
-          onSearch={usersGrid.handleSearch}
-          onAddUsers={() => setOpenAddUserDialog(true)}
-          systemRoles={systemRoles}
-          rowActions={rowActions}
-        />
+        <QueryErrorDialog error={usersQuery.error} label="users" />
+        <QueryErrorDialog error={rolesQuery.error} label="user roles" />
+        <Box
+          hidden={activeTab !== 'users'}
+          role="tabpanel"
+          id="administrative-users-tabpanel"
+          aria-labelledby="administrative-users-tab">
+          <ActiveUsersList
+            rows={usersQuery.data?.users ?? []}
+            rowCount={usersQuery.data?.pagination.total ?? 0}
+            paginationModel={usersGrid.paginationModel}
+            setPaginationModel={usersGrid.handlePaginationChange}
+            sortModel={usersGrid.sortModel}
+            setSortModel={usersGrid.handleSortChange}
+            searchTerm={usersGrid.searchTerm}
+            onSearch={usersGrid.handleSearch}
+            onAddUsers={() => setOpenAddUserDialog(true)}
+            systemRoles={systemRoles}
+            rowActions={rowActions}
+          />
+        </Box>
+        {activeTab === 'contributors' && (
+          <Box
+            role="tabpanel"
+            id="administrative-contributors-tabpanel"
+            aria-labelledby="administrative-contributors-tab">
+            <ContributorPanel />
+          </Box>
+        )}
       </Container>
 
       <EditDialog

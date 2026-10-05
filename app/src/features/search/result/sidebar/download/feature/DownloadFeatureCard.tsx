@@ -14,7 +14,7 @@ import { CustomMenuIconButton, IMenuToolbarItem } from 'components/toolbar/Actio
 import { DOWNLOAD_STATUS_CHIP_PROPS, EXPORT_STATUS_CHIP_PROPS } from 'constants/download';
 import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { DownloadExport } from 'interfaces/useDownloadExportApi.interface';
-import { isExportReady } from '../downloads/download-export-utils';
+import { isExportReady } from 'utils/download';
 
 interface DownloadFeatureCardProps {
   download: DownloadRecord;

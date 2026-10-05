@@ -1,13 +1,11 @@
-import { APIError } from 'hooks/api/useAxios';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
-import useIsMounted from 'hooks/useIsMounted';
-import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
@@ -17,8 +15,8 @@ interface UseSearchResultDownloadProps {
   expressionTree: ExpressionTreeExpression | null;
   /** Whether result data is currently loading. */
   isLoading: boolean;
-  /** Result pagination metadata; undefined while initial results are pending. */
-  pagination: ApiPaginationResponseParams | undefined;
+  /** Matching result count; undefined while the count request is pending. */
+  totalCount: number | undefined;
 }
 
 /**
@@ -28,24 +26,34 @@ interface UseSearchResultDownloadProps {
  * tab, create-download dialog state, checkout, and expression-backed download
  * creation. Guards against empty searches and stale in-flight result state.
  *
- * @param {UseSearchResultDownloadProps} props - Route, expression, loading, and pagination state needed by download actions.
+ * @param {UseSearchResultDownloadProps} props - Route, expression, loading, and count state needed by download actions.
  * @returns Download sidebar state, create-download dialog state, and handlers for opening, saving, canceling, and checkout.
  */
 export const useSearchResultDownload = ({
   featureType,
   expressionTree,
   isLoading,
-  pagination
+  totalCount
 }: UseSearchResultDownloadProps) => {
   const api = useApi();
   const navigate = useNavigate();
-  const { auth } = useAuthStateContext();
   const dialogContext = useDialogContext();
-  const isMounted = useIsMounted();
-  const { runSerialized } = useSerializedAsync();
+  const queryClient = useQueryClient();
+  // Scopes the in-flight check below to this hook instance.
+  const createDownloadMutationKey = ['search-result', 'create-download', useId()];
+  const createDownloadMutation = useMutation({
+    mutationKey: createDownloadMutationKey,
+    mutationFn: (values: ICreateDownloadFormValues) =>
+      api.download.createDownload({
+        name: values.name,
+        description: values.description,
+        expression: expressionTree
+      }),
+    onSuccess: () => refreshChangedQueries(queryClient, changedQueryKeys.download())
+  });
+  const { mutate: createDownload } = createDownloadMutation;
 
   const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
-  const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
 
   useEffect(() => {
     setIsCreateDownloadDialogOpen(false);
@@ -53,15 +61,15 @@ export const useSearchResultDownload = ({
 
   /**
    * Opens the create-download dialog for the currently applied search.
-   * Waits for pagination before deciding whether to open the form or show the
+   * Waits for the count before deciding whether to open the form or show the
    * zero-results dialog.
    */
   const handleOpenCreateDownload = useCallback(() => {
-    if (isLoading || pagination === undefined) {
+    if (isLoading || totalCount === undefined) {
       return;
     }
 
-    if (pagination.total === 0) {
+    if (totalCount === 0) {
       dialogContext.setOkDialog({
         open: true,
         dialogTitle: 'Create Download',
@@ -72,58 +80,31 @@ export const useSearchResultDownload = ({
     }
 
     setIsCreateDownloadDialogOpen(true);
-  }, [isLoading, pagination, dialogContext]);
+  }, [isLoading, totalCount, dialogContext]);
 
   /**
    * Submits the create-download form for the current expression search.
-   * Serialized to prevent duplicate downloads. On success the dialog closes and
-   * the outcome branches on authentication: authenticated users switch to the
-   * Downloads sidebar with a success snackbar, while anonymous users are
-   * navigated to the public download page at `/download/:downloadId`, where they
-   * can monitor status and obtain their export. Failure keeps the dialog open
-   * and shows the API error. State updates are skipped after unmount.
+   * Ignored while a submission from this hook is in flight, so a double submit creates one download. On success the
+   * dialog closes and navigates to the download page at `/download/:downloadId`, where the user can monitor status
+   * and obtain exports. Failure keeps the dialog open and shows the API error. Neither runs once the page has
+   * unmounted.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name and description.
-   * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
+   * @returns {void}
    */
-  const handleCreateDownload = useCallback(
-    (values: ICreateDownloadFormValues) =>
-      runSerialized(async () => {
-        setIsSubmittingDownload(true);
-        try {
-          const response = await api.download.createDownload({
-            name: values.name,
-            description: values.description,
-            expression: expressionTree
-          });
-          if (!isMounted()) {
-            return;
-          }
-          setIsCreateDownloadDialogOpen(false);
-          if (auth.isAuthenticated) {
-            dialogContext.setSnackbar({
-              open: true,
-              snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
-            });
-          } else {
-            navigate(`/download/${response.download_id}`);
-          }
-        } catch (error) {
-          if (!isMounted()) {
-            return;
-          }
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: (error as APIError).message
-          });
-        } finally {
-          if (isMounted()) {
-            setIsSubmittingDownload(false);
-          }
-        }
-      }),
-    [api.download, auth.isAuthenticated, dialogContext, expressionTree, navigate, runSerialized, isMounted]
-  );
+  const handleCreateDownload = (values: ICreateDownloadFormValues) => {
+    if (queryClient.isMutating({ mutationKey: createDownloadMutationKey }) > 0) {
+      return;
+    }
+
+    createDownload(values, {
+      onSuccess: (response) => {
+        setIsCreateDownloadDialogOpen(false);
+        navigate(`/download/${response.download_id}`);
+      },
+      onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+    });
+  };
 
   /**
    * Closes the create-download dialog without submitting.
@@ -136,7 +117,7 @@ export const useSearchResultDownload = ({
   return {
     downloadView: 'Downloads',
     isCreateDownloadDialogOpen,
-    isSubmittingDownload,
+    isSubmittingDownload: createDownloadMutation.isPending,
     handleOpenCreateDownload,
     handleCreateDownload,
     handleCancelCreateDownload

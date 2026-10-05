@@ -3,11 +3,11 @@ import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import dayjs from 'dayjs';
 import { CreateDataRequestDialog } from 'features/data-request/components/CreateDataRequestDialog';
-import { useCodesContext } from 'hooks/useContext';
+import { useCodesQuery } from 'hooks/useCodesQuery';
 import { useMemo, useState } from 'react';
-import { Navigate, useParams } from 'react-router';
+import { Navigate, useLocation, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
-import { getSearchFeatureTypeRouteConfig } from 'utils/routes';
+import { buildSubmissionPropertyValuePathResolvers, getSearchFeatureTypeRouteConfig } from 'utils/routes';
 import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultMapContainer } from './layout/map/SearchResultMapContainer';
@@ -34,19 +34,33 @@ import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
  */
 export const SearchResultPage = () => {
   const { featureType } = useParams<{ featureType: string }>();
-  const { codesDataLoader } = useCodesContext();
+  const location = useLocation();
+  const codesQuery = useCodesQuery();
   const [view, setView] = useState<SEARCH_RESULT_VIEW>(SEARCH_RESULT_VIEW.TABLE);
 
-  const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesDataLoader.data?.feature_type_with_properties);
+  const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesQuery.data?.feature_type_with_properties);
   const featureTypeLinks = useMemo(
-    () => buildSearchFeatureTypeLinks(codesDataLoader.data?.feature_type_with_properties),
-    [codesDataLoader.data?.feature_type_with_properties]
+    () => buildSearchFeatureTypeLinks(codesQuery.data?.feature_type_with_properties),
+    [codesQuery.data?.feature_type_with_properties]
   );
-  const { expressionTree, expressionApplyRevision, handleExpressionApply } = useSearchResultExpression();
-  const { rows, properties, hasMoreSecuredFeatures, isLoading, searchParams, setSearchParams, pagination } =
-    useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree, expressionApplyRevision);
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
+    [location.search]
+  );
+  const { expressionTree, handleExpressionApply } = useSearchResultExpression();
+  const {
+    rows,
+    properties,
+    hasInaccessibleSecuredFeatures,
+    isLoading,
+    searchParams,
+    setSearchParams,
+    totalCount,
+    cursor,
+    reload
+  } = useSearchResults(routeConfig?.featureTypeName, Boolean(routeConfig), expressionTree);
   const { activeSort, sortOptions, handleSortChange, handlePageChange, handlePageSizeChange } =
-    useSearchResultPagingSort({ pagination, setSearchParams });
+    useSearchResultPagingSort({ cursor, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
     downloadView,
@@ -55,7 +69,7 @@ export const SearchResultPage = () => {
     handleOpenCreateDownload,
     handleCreateDownload,
     handleCancelCreateDownload
-  } = useSearchResultDownload({ featureType, expressionTree, isLoading, pagination });
+  } = useSearchResultDownload({ featureType, expressionTree, isLoading, totalCount });
   const {
     isCreateDataRequestDialogOpen,
     isSubmittingDataRequest,
@@ -67,7 +81,6 @@ export const SearchResultPage = () => {
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || '';
   // Show the "request access" banner when the search matched secured features hidden from the caller,
   // not merely because visible rows the caller can already see are secured.
-  const hasHiddenSecuredResults = hasMoreSecuredFeatures;
 
   if (routeConfig) {
     return (
@@ -78,22 +91,28 @@ export const SearchResultPage = () => {
             featureTypeLinks={featureTypeLinks}
             searchTerm={searchQuery}
             expressionTree={expressionTree}
-            onExpressionApply={handleExpressionApply}
+            onExpressionApply={(expression) => {
+              if (!handleExpressionApply(expression)) {
+                reload();
+              }
+            }}
             onFeatureTypeChange={handleFeatureTypeTabChange}
           />
 
-          {hasHiddenSecuredResults && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
+          {hasInaccessibleSecuredFeatures && <SearchResultSecuredAlert onRequestAccess={handleOpenCreateDataRequest} />}
 
           <SearchResultPanel
             rows={rows}
             featureTypeProperties={properties}
+            pathResolvers={pathResolvers}
             isLoading={isLoading}
-            pagination={pagination}
+            cursor={cursor}
+            totalCount={totalCount}
             sortOptions={sortOptions}
             activeSort={activeSort}
             view={view}
             viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-            isCreateDownloadDisabled={isSubmittingDownload || isLoading || pagination === undefined}
+            isCreateDownloadDisabled={isSubmittingDownload || isLoading || totalCount === undefined}
             onCreateDownloadClick={handleOpenCreateDownload}
             onSortChange={handleSortChange}
             onViewChange={setView}
@@ -131,7 +150,7 @@ export const SearchResultPage = () => {
     );
   }
 
-  if (codesDataLoader.isReady) {
+  if (codesQuery.isFetched) {
     return <Navigate to="/page-not-found" replace />;
   }
 

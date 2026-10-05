@@ -1,16 +1,27 @@
-import Box from '@mui/material/Box';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { PageHeader } from 'components/header/PageHeader';
+import { TabGroup } from 'components/tabs/TabGroup';
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
-import { APIError } from 'hooks/api/useAxios';
+import { hashKey, keepPreviousData, QueryKey, useQuery, useQueryClient } from '@tanstack/react-query';
+import { TICKETS_LIST_DEFAULT_SORT } from 'constants/ticket';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { useTicketsListPageState } from 'hooks/useTicketsListPageState';
-import { ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { IGetTicketsResponse, ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { refreshChangedQueries } from 'utils/query-client';
+import {
+  useCoordinatedMutation,
+  cancelQueryForOptimisticUpdate,
+  holdReload,
+  hasConcurrentMutations
+} from 'hooks/useCoordinatedMutation';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
+import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { CreateTicketDialog } from './components/dialog/create/CreateTicketDialog';
 import { EditTicketDialog } from './components/dialog/edit/EditTicketDialog';
 import { ITicketFormValues } from './components/dialog/form/TicketForm';
@@ -19,71 +30,185 @@ import { TicketsContainer } from './list/TicketsContainer';
 /**
  * Admin tickets page with administrative tabs and ticket pagination.
  *
+ * Creating and editing refresh the server-sorted list once pending list mutations settle. Status toggles update
+ * optimistically in place. Each change also refreshes the ticket's other cached copies: its detail pages, the
+ * portal's lists and this list's other pages.
+ *
  * @return {*}
  */
 export const TicketsPage = () => {
   const api = useApi();
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
+  const queryClient = useQueryClient();
 
   // NOTE: More tab options will be added as more administrative features are added. For now, only tickets are supported.
   const [activeTab, setActiveTab] = useState<'tickets'>('tickets');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEditingTicket, setIsEditingTicket] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<ITicket | undefined>();
 
-  const {
-    response,
-    rows,
-    rowCount,
-    paginationModel,
-    handlePaginationChange,
-    sortModel,
-    handleSortChange,
-    searchTerm,
-    handleSearch,
-    refresh,
-    setData
-  } = useTicketsListPageState(api.tickets.getTicketsForAdmin);
-
-  const closeDeleteTicketDialog = useCallback(() => {
-    dialogContext.setYesNoDialog({ open: false });
-  }, [dialogContext]);
+  const grid = useServerPaginatedGridState({ defaultSort: TICKETS_LIST_DEFAULT_SORT });
+  const listParams = { search: grid.debouncedSearchTerm, ...grid.apiPagination };
+  const ticketsQueryKey = ticketQueryKeys.list('admin', listParams);
+  const ticketsQuery = useQuery({
+    queryKey: ticketsQueryKey,
+    queryFn: ({ signal }) => api.tickets.getTicketsForAdmin(listParams, { signal }),
+    placeholderData: keepPreviousData
+  });
 
   const showApiErrorSnackbar = useCallback(
-    (caughtError: unknown) => {
-      const apiError = caughtError as APIError;
+    (error: Error) => {
       dialogContext.setSnackbar({
         open: true,
-        snackbarMessage: apiError.message
+        snackbarMessage: error.message
       });
     },
     [dialogContext]
   );
 
+  const closeDeleteTicketDialog = useCallback(() => {
+    dialogContext.setYesNoDialog({ open: false });
+  }, [dialogContext]);
+
+  const deleteTicketMutation = useCoordinatedMutation({
+    mutationKey: ticketQueryKeys.lists('admin'),
+    mutationFn: (ticket: ITicket) => api.tickets.deleteTicket(ticket.ticket_id),
+    onSuccess: async (_data, ticket) => {
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      void refreshChangedQueries(queryClient, [
+        ...changedQueryKeys.ticketDetail(ticket.ticket_id),
+        ticketQueryKeys.lists('user')
+      ]);
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            Ticket <strong>#{ticket.ticket_slug}</strong> removed.
+          </Typography>
+        )
+      });
+    },
+    onError: showApiErrorSnackbar,
+    onSettled: () => {
+      closeDeleteTicketDialog();
+    }
+  });
+  const { mutate: deleteTicket } = deleteTicketMutation;
+
+  const toggleStatusMutation = useCoordinatedMutation({
+    // Creates, edits and status toggles share this group so refreshes wait for pending optimistic changes.
+    mutationKey: ticketQueryKeys.lists('admin'),
+    mutationFn: ({ ticket, nextStatus }: { ticket: ITicket; nextStatus: TicketStatus; listKey: QueryKey }) =>
+      api.tickets.updateTicketStatus(ticket.ticket_id, nextStatus),
+    onMutate: async ({ ticket, nextStatus, listKey }) => {
+      if (hasConcurrentMutations(queryClient, ticketQueryKeys.lists('admin'))) {
+        holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      }
+      await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
+      const response = queryClient.setQueryData<IGetTicketsResponse>(
+        listKey,
+        (current) =>
+          current && {
+            ...current,
+            tickets: current.tickets.map((row) =>
+              row.ticket_id === ticket.ticket_id ? { ...row, status: nextStatus } : row
+            )
+          }
+      );
+      const optimisticRow = response?.tickets.find((row) => row.ticket_id === ticket.ticket_id);
+      return { optimisticRow };
+    },
+    onSuccess: async (updatedTicket, { ticket, nextStatus, listKey }, context) => {
+      await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
+      const currentRow = queryClient
+        .getQueryData<IGetTicketsResponse>(listKey)
+        ?.tickets.find((row) => row.ticket_id === ticket.ticket_id);
+      if (currentRow !== context.optimisticRow) {
+        holdReload(queryClient, ticketQueryKeys.lists('admin'), listKey);
+      }
+      // Preserve newer optimistic rows. Overlapping changes reconcile from the server after the group settles.
+      queryClient.setQueryData<IGetTicketsResponse>(
+        listKey,
+        (current) =>
+          current && {
+            ...current,
+            tickets: current.tickets.map((row) => (row === context.optimisticRow ? { ...row, ...updatedTicket } : row))
+          }
+      );
+      for (const query of queryClient.getQueryCache().findAll({
+        queryKey: ticketQueryKeys.lists('admin'),
+        predicate: (query) => query.queryHash !== hashKey(listKey)
+      })) {
+        holdReload(queryClient, ticketQueryKeys.lists('admin'), query.queryKey);
+      }
+      void refreshChangedQueries(queryClient, [
+        ...changedQueryKeys.ticketDetail(ticket.ticket_id),
+        ticketQueryKeys.lists('user')
+      ]);
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            Ticket <strong>#{ticket.ticket_slug}</strong> {nextStatus === 'closed' ? 'closed' : 'reopened'}.
+          </Typography>
+        )
+      });
+    },
+    // Rows toggle independently, so the rollback touches only this toggle's row, and every failure is reported here.
+    onError: (error, { ticket, listKey }, context) => {
+      showApiErrorSnackbar(error);
+      queryClient.setQueryData<IGetTicketsResponse>(
+        listKey,
+        (current) =>
+          current && {
+            ...current,
+            tickets: current.tickets.map((row) =>
+              row === context?.optimisticRow ? { ...row, status: ticket.status } : row
+            )
+          }
+      );
+    }
+  });
+  const { mutate: toggleStatus } = toggleStatusMutation;
+
+  const createTicketMutation = useCoordinatedMutation({
+    mutationKey: ticketQueryKeys.lists('admin'),
+    mutationFn: (values: ITicketFormValues) => api.tickets.createTicket(values),
+    onSuccess: async () => {
+      // Discard older reads now; reload all list pages after pending optimistic toggles settle.
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      void refreshChangedQueries(queryClient, [ticketQueryKeys.lists('user')]);
+      setIsCreateDialogOpen(false);
+    },
+    onError: showApiErrorSnackbar
+  });
+
+  const editTicketMutation = useCoordinatedMutation({
+    mutationKey: ticketQueryKeys.lists('admin'),
+    mutationFn: ({ ticketId, payload }: { ticketId: string; payload: IUpdateTicketRequest }) =>
+      api.tickets.updateTicket(ticketId, payload),
+    onSuccess: async (updatedTicket) => {
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.lists('admin') });
+      holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
+      void refreshChangedQueries(queryClient, [
+        ...changedQueryKeys.ticketDetail(updatedTicket.ticket_id),
+        ticketQueryKeys.lists('user')
+      ]);
+      setIsEditDialogOpen(false);
+      setSelectedTicket(undefined);
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: 'Updated ticket'
+      });
+    },
+    onError: showApiErrorSnackbar
+  });
+
   const handleDeleteTicket = useCallback(
     (ticket: ITicket) => {
-      const handleConfirmDelete = async () => {
-        try {
-          await api.tickets.deleteTicket(ticket.ticket_id);
-          refresh();
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: (
-              <Typography variant="body2" component="div">
-                Ticket <strong>#{ticket.ticket_slug}</strong> removed.
-              </Typography>
-            )
-          });
-        } catch (caughtError) {
-          showApiErrorSnackbar(caughtError);
-        } finally {
-          closeDeleteTicketDialog();
-        }
-      };
-
       dialogContext.setYesNoDialog({
         dialogTitle: 'Remove ticket?',
         dialogContent: (
@@ -97,85 +222,15 @@ export const TicketsPage = () => {
         onClose: closeDeleteTicketDialog,
         onNo: closeDeleteTicketDialog,
         open: true,
-        onYes: handleConfirmDelete
+        onYes: () => deleteTicket(ticket)
       });
     },
-    [api.tickets, closeDeleteTicketDialog, dialogContext, refresh, showApiErrorSnackbar]
+    [closeDeleteTicketDialog, deleteTicket, dialogContext]
   );
 
   const handleToggleTicketStatus = useCallback(
-    async (ticket: ITicket, nextStatus: TicketStatus) => {
-      if (!response) {
-        return;
-      }
-
-      const optimisticRows = rows.map((existingTicket) =>
-        existingTicket.ticket_id === ticket.ticket_id ? { ...existingTicket, status: nextStatus } : existingTicket
-      );
-      const previousTicket = rows.find((existingTicket) => existingTicket.ticket_id === ticket.ticket_id);
-
-      setData({ ...response, tickets: optimisticRows });
-
-      try {
-        const updatedTicket = await api.tickets.updateTicketStatus(ticket.ticket_id, nextStatus);
-
-        setData({
-          ...response,
-          tickets: optimisticRows.map((existingTicket) =>
-            existingTicket.ticket_id === ticket.ticket_id ? { ...existingTicket, ...updatedTicket } : existingTicket
-          )
-        });
-
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: (
-            <Typography variant="body2" component="div">
-              Ticket <strong>#{ticket.ticket_slug}</strong> {nextStatus === 'closed' ? 'closed' : 'reopened'}.
-            </Typography>
-          )
-        });
-      } catch (caughtError) {
-        if (previousTicket) {
-          setData({
-            ...response,
-            tickets: rows.map((existingTicket) =>
-              existingTicket.ticket_id === ticket.ticket_id ? previousTicket : existingTicket
-            )
-          });
-        }
-        showApiErrorSnackbar(caughtError);
-      }
-    },
-    [api.tickets, dialogContext, response, rows, setData, showApiErrorSnackbar]
-  );
-
-  const handleCreateTicket = useCallback(
-    async (values: ITicketFormValues) => {
-      if (!response) {
-        return;
-      }
-
-      try {
-        setIsSubmitting(true);
-        const createdTicket = await api.tickets.createTicket(values);
-
-        setData({
-          ...response,
-          tickets: [createdTicket, ...rows],
-          pagination: {
-            ...response.pagination,
-            total: response.pagination.total + 1
-          }
-        });
-
-        setIsCreateDialogOpen(false);
-      } catch (caughtError) {
-        showApiErrorSnackbar(caughtError);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [api.tickets, response, rows, setData, showApiErrorSnackbar]
+    (ticket: ITicket, nextStatus: TicketStatus) => toggleStatus({ ticket, nextStatus, listKey: ticketsQueryKey }),
+    [ticketsQueryKey, toggleStatus]
   );
 
   const handleEditTicket = useCallback((ticket: ITicket) => {
@@ -183,77 +238,51 @@ export const TicketsPage = () => {
     setIsEditDialogOpen(true);
   }, []);
 
-  const handleEditTicketSave = useCallback(
-    async (payload: IUpdateTicketRequest) => {
-      if (!response || !selectedTicket) {
-        return;
-      }
-
-      try {
-        setIsEditingTicket(true);
-        const updatedTicket = await api.tickets.updateTicket(selectedTicket.ticket_id, payload);
-
-        setData({
-          ...response,
-          tickets: rows.map((ticket) =>
-            ticket.ticket_id === updatedTicket.ticket_id ? { ...ticket, ...updatedTicket } : ticket
-          )
-        });
-
-        setIsEditDialogOpen(false);
-        setSelectedTicket(undefined);
-
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: 'Updated ticket'
-        });
-      } catch (caughtError) {
-        showApiErrorSnackbar(caughtError);
-      } finally {
-        setIsEditingTicket(false);
-      }
-    },
-    [api.tickets, dialogContext, response, rows, selectedTicket, setData, showApiErrorSnackbar]
-  );
-
   return (
     <>
-      <Paper square elevation={0}>
-        <Container maxWidth="xl" sx={{ py: 4, pb: 0 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              Administrative
+      <PageHeader
+        label="Administrative"
+        breadcrumbs={
+          <Breadcrumbs aria-label="tickets breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Tickets
             </Typography>
-          </Box>
-
-          <Tabs
+          </Breadcrumbs>
+        }
+        tabs={
+          <TabGroup<'tickets'>
             value={activeTab}
-            onChange={(_, value) => {
+            onChange={(value) => {
               setActiveTab(value);
-              handlePaginationChange({ ...paginationModel, page: 0 });
+              grid.handlePaginationChange({ ...grid.paginationModel, page: 0 });
             }}
-            aria-label="administrative tabs"
-            sx={{ mt: 1.5 }}>
-            <Tab
-              value="tickets"
-              label="Tickets"
-              id="administrative-tickets-tab"
-              aria-controls="administrative-tickets-tabpanel"
-            />
-          </Tabs>
-        </Container>
-      </Paper>
+            ariaLabel="administrative tabs"
+            tabs={[
+              {
+                value: 'tickets',
+                label: 'Tickets',
+                id: 'administrative-tickets-tab',
+                ariaControls: 'administrative-tickets-tabpanel'
+              }
+            ]}
+          />
+        }
+      />
 
       <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+        <QueryErrorDialog error={ticketsQuery.error} label="tickets" />
         <TicketsContainer
-          rows={rows}
-          rowCount={rowCount}
-          paginationModel={paginationModel}
-          setPaginationModel={handlePaginationChange}
-          sortModel={sortModel}
-          setSortModel={handleSortChange}
-          searchTerm={searchTerm}
-          onSearch={handleSearch}
+          rows={ticketsQuery.data?.tickets ?? []}
+          rowCount={ticketsQuery.data?.pagination.total ?? 0}
+          paginationModel={grid.paginationModel}
+          setPaginationModel={grid.handlePaginationChange}
+          sortModel={grid.sortModel}
+          setSortModel={grid.handleSortChange}
+          searchTerm={grid.searchTerm}
+          onSearch={grid.handleSearch}
           onAddTicket={() => setIsCreateDialogOpen(true)}
           rowActions={{
             onEditTicket: handleEditTicket,
@@ -266,21 +295,21 @@ export const TicketsPage = () => {
 
       <CreateTicketDialog
         open={isCreateDialogOpen}
-        isLoading={isSubmitting}
+        isLoading={createTicketMutation.isPending}
         onCancel={() => setIsCreateDialogOpen(false)}
-        onSave={handleCreateTicket}
+        onSave={(values) => createTicketMutation.mutate(values)}
       />
 
       {selectedTicket ? (
         <EditTicketDialog
           open={isEditDialogOpen}
-          isLoading={isEditingTicket}
+          isLoading={editTicketMutation.isPending}
           ticket={selectedTicket}
           onClose={() => {
             setIsEditDialogOpen(false);
             setSelectedTicket(undefined);
           }}
-          onSubmit={handleEditTicketSave}
+          onSubmit={(payload) => editTicketMutation.mutate({ ticketId: selectedTicket.ticket_id, payload })}
         />
       ) : null}
     </>

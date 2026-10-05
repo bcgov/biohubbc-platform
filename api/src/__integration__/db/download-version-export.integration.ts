@@ -26,6 +26,7 @@
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
 
+import * as parquetjs from '@dsnp/parquetjs';
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
 import sinon from 'sinon';
@@ -43,7 +44,9 @@ import { DownloadExportService } from '../../services/download/download-export-s
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
+import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
+import { buildParquetPropertiesMetadata, PARQUET_PROPERTIES_METADATA_KEY } from '../../utils/parquet-utils';
 
 /**
  * Build a minimal-but-valid `per_feature_type` export recipe over the given
@@ -78,6 +81,12 @@ function hashForConfig(request: CreateDownloadVersionExportRequest): string {
   return computeConfigHash(canonicalizeExportConfig(ExportConfig.parse(rawConfig)));
 }
 
+/** The property list each seeded feature type's Parquet file describes itself with. */
+const FAKE_PARQUET_PROPERTIES: Record<string, CsvPropertyDefinition[]> = {
+  survey: [{ feature_property_name: 'name', feature_property_type_name: 'string' }],
+  animal: [{ feature_property_name: 'animal_identifier', feature_property_type_name: 'string' }]
+};
+
 describe('Download version export state machine (integration)', function () {
   this.timeout(30000);
 
@@ -100,6 +109,16 @@ describe('Download version export state machine (integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
+    // Recipe validation reads each materialized file's own property list, so the seeded artifact
+    // keys resolve to an in-process reader describing one property per feature type.
+    sinon.stub(parquetjs.ParquetReader, 'openS3').callsFake(async (_client: unknown, params: { Key: string }) => {
+      const featureType = params.Key.split('/')[4];
+      const properties = FAKE_PARQUET_PROPERTIES[featureType] ?? [];
+      return {
+        getMetadata: () => ({ [PARQUET_PROPERTIES_METADATA_KEY]: buildParquetPropertiesMetadata(properties) }),
+        close: async () => undefined
+      } as unknown as parquetjs.ParquetReader;
+    });
     exportService = new DownloadExportService(connection);
     exportRepo = new DownloadVersionExportRepository(connection);
     versionRepo = new DownloadVersionRepository(connection);
@@ -912,9 +931,9 @@ describe('Download version export state machine (integration)', function () {
       // The export table has no status column — status + part_count are JOINed
       // from the group, so both exports read `ready` with part_count 2 despite
       // no per-export status write ever happening.
-      const list = await exportService.listDownloadVersionExportsByDownloadId(downloadId);
-      expect(list).to.have.length(2);
-      for (const row of list) {
+      const exports = await exportService.listDownloadVersionExports(downloadId);
+      expect(exports).to.have.length(2);
+      for (const row of exports) {
         expect(row.status).to.equal(DownloadStatusEnum.READY);
         expect(row.part_count).to.equal(2);
       }

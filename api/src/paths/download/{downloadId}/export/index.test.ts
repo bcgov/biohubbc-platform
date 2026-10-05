@@ -2,12 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { createDownloadVersionExport, listDownloadVersionExports } from '.';
+import { listDownloadVersionExports } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { createMockDownloadVersionExport } from '../../../../__mocks__/download';
 import * as db from '../../../../database/db';
-import { ApiValidationError } from '../../../../errors/api-error';
-import { HTTP403, HTTP409, HTTPError } from '../../../../errors/http-error';
+import { HTTP403 } from '../../../../errors/http-error';
 import { DownloadStatusEnum } from '../../../../models/download-status';
 import { DownloadVersionExportListRow, DownloadVersionExportRecord } from '../../../../models/download-version-export';
 import { DownloadExportService } from '../../../../services/download/download-export-service';
@@ -31,185 +30,11 @@ describe('paths/download/{downloadId}/export/index', () => {
     sinon.restore();
   });
 
-  describe('createDownloadVersionExport (POST)', () => {
-    it('opens the connection, calls the service with the route connection, commits, and returns 200 with the record', async () => {
-      // Verifies: the POST threads (downloadId, systemUserId, request, connection) into the service —
-      // including the SAME route connection used for the transaction — and returns the record.
-
-      // Step 1: Stub the DB connection and the service create method
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const exportRecord = makeExportRecord();
-      const createStub = sinon
-        .stub(DownloadExportService.prototype, 'createDownloadVersionExport')
-        .resolves(exportRecord);
-
-      // Step 2: Send the request with no body (no max_part_size_bytes)
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = {};
-
-      await createDownloadVersionExport()(mockReq, mockRes, mockNext);
-
-      // Step 3: Verify the service got the four args, with the route connection as the 4th
-      expect(createStub).to.have.been.calledOnceWith(
-        DOWNLOAD_ID,
-        42,
-        { max_part_size_bytes: undefined },
-        dbConnectionObj
-      );
-
-      // Step 4: Verify the response
-      expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(exportRecord);
-    });
-
-    it('widens a numeric body max_part_size_bytes to a string before calling the service', async () => {
-      // Verifies: the route's number → string widening for the service request payload.
-
-      // Step 1: Stub the DB connection and the service
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      const createStub = sinon
-        .stub(DownloadExportService.prototype, 'createDownloadVersionExport')
-        .resolves(makeExportRecord({ max_part_size_bytes: '10485760' }));
-
-      // Step 2: Send the request with a numeric max_part_size_bytes
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = { max_part_size_bytes: 10485760 };
-
-      await createDownloadVersionExport()(mockReq, mockRes, mockNext);
-
-      // Step 3: Verify the widened string reached the service request
-      expect(createStub.firstCall.args[2]).to.deep.equal({ max_part_size_bytes: '10485760' });
-    });
-
-    it('does not publish at the route layer — the service owns enqueueing', async () => {
-      // Verifies: the route is thin — it never calls any publish*; the service decides whether to
-      // enqueue on the route connection.
-
-      // Step 1: Stub the DB connection and spy the publish dependency
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      const publishStub = sinon.stub(DownloadExportService.dependencies, 'publishProcessDownloadVersionExportJob');
-      sinon.stub(DownloadExportService.prototype, 'createDownloadVersionExport').resolves(makeExportRecord());
-
-      // Step 2: Send the request
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = {};
-
-      await createDownloadVersionExport()(mockReq, mockRes, mockNext);
-
-      // Step 3: Verify the route never published (publish lives behind the stubbed service)
-      expect(publishStub).to.not.have.been.called;
-    });
-
-    it('propagates HTTP409 from the service when the download is not ready', async () => {
-      // Verifies: a 409 from the service surfaces unchanged through the route.
-
-      // Step 1: Stub the DB connection and reject from the service
-      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon
-        .stub(DownloadExportService.prototype, 'createDownloadVersionExport')
-        .rejects(new HTTP409('Download is not ready — cannot export'));
-
-      // Step 2: Send the request and capture the error
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = {};
-
-      try {
-        await createDownloadVersionExport()(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        // Step 3: Verify the 409 propagated
-        expect(error).to.be.instanceOf(HTTP409);
-        expect((error as HTTPError).status).to.equal(409);
-      }
-    });
-
-    it('propagates ApiValidationError raw and rolls back + releases the connection', async () => {
-      // Verifies: a recipe-validation failure in the service surfaces unchanged through the route (the
-      // middleware — not the handler — maps it to HTTP400), and the catch/finally still rolls back the
-      // transaction and releases the connection.
-
-      // Step 1: Stub the DB connection (spying rollback + release) and reject from the service
-      const dbConnectionObj = getMockDBConnection({
-        systemUserId: () => 42,
-        rollback: sinon.stub(),
-        release: sinon.stub()
-      });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon
-        .stub(DownloadExportService.prototype, 'createDownloadVersionExport')
-        .rejects(new ApiValidationError('invalid config', []));
-
-      // Step 2: Send the request and capture the error
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = {};
-
-      try {
-        await createDownloadVersionExport()(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        // Step 3: Verify the validation error propagated RAW (no HTTP400 mapping at the route)
-        expect(error).to.be.instanceOf(ApiValidationError);
-
-        // Step 4: Verify the failed transaction rolled back and the connection was released
-        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
-        expect(dbConnectionObj.release).to.have.been.calledOnce;
-      }
-    });
-
-    it('propagates HTTP403 and rolls back + releases the connection', async () => {
-      // Verifies: an auth failure in the service surfaces unchanged through the route, and the
-      // catch/finally still rolls back the transaction and releases the connection.
-
-      // Step 1: Stub the DB connection (spying rollback + release) and reject from the service
-      const dbConnectionObj = getMockDBConnection({
-        systemUserId: () => 42,
-        rollback: sinon.stub(),
-        release: sinon.stub()
-      });
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadExportService.prototype, 'createDownloadVersionExport').rejects(new HTTP403('Access denied'));
-
-      // Step 2: Send the request and capture the error
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: DOWNLOAD_ID };
-      mockReq.body = {};
-
-      try {
-        await createDownloadVersionExport()(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        // Step 3: Verify the 403 propagated
-        expect(error).to.be.instanceOf(HTTP403);
-
-        // Step 4: Verify the failed transaction rolled back and the connection was released
-        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
-        expect(dbConnectionObj.release).to.have.been.calledOnce;
-      }
-    });
-  });
-
   describe('listDownloadVersionExports (GET)', () => {
-    it('returns 200 with the authorized list from the service', async () => {
-      // Verifies: GET delegates to the service's authorized list (threading downloadId + system user)
-      // and returns the rows. The auth-before-list ordering is the service's contract, covered there.
+    it('returns 200 with the paginated export list from the service', async () => {
+      // Verifies: GET delegates to the service list/count calls and returns the paginated rows.
 
-      // Step 1: Stub the DB connection and the authorized-list method
+      // Step 1: Stub the DB connection and list/count methods
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
@@ -220,32 +45,67 @@ describe('paths/download/{downloadId}/export/index', () => {
           part_count: 0
         }
       ];
-      const listStub = sinon.stub(DownloadExportService.prototype, 'listAuthorizedExportsByDownloadId').resolves(rows);
+      const listStub = sinon.stub(DownloadExportService.prototype, 'listDownloadVersionExports').resolves(rows);
+      const countStub = sinon.stub(DownloadExportService.prototype, 'listDownloadVersionExportsCount').resolves(2);
 
       // Step 2: Send the request
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: DOWNLOAD_ID };
+      mockReq.query = { page: '1', limit: '10' };
 
       await listDownloadVersionExports()(mockReq, mockRes, mockNext);
 
-      // Step 3: Verify the service got the downloadId and the system user
-      expect(listStub).to.have.been.calledOnceWith(DOWNLOAD_ID, 42);
+      // Step 3: Verify the service got the downloadId and pagination
+      expect(listStub).to.have.been.calledOnceWith(DOWNLOAD_ID, {
+        page: 1,
+        limit: 10,
+        sort: undefined,
+        order: undefined
+      });
+      expect(countStub).to.have.been.calledOnceWith(DOWNLOAD_ID);
 
       // Step 4: Verify the response
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(rows);
+      expect(mockRes.jsonValue).to.eql({
+        exports: rows,
+        pagination: {
+          total: 2,
+          per_page: 10,
+          current_page: 1,
+          last_page: 1,
+          sort: undefined,
+          order: undefined
+        }
+      });
+    });
+
+    it('uses the API user connection when no bearer token is present', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const getAPIUserDBConnectionStub = sinon
+        .stub(db.dbDependencies, 'getAPIUserDBConnection')
+        .returns(dbConnectionObj);
+
+      sinon.stub(DownloadExportService.prototype, 'listDownloadVersionExports').resolves([]);
+      sinon.stub(DownloadExportService.prototype, 'listDownloadVersionExportsCount').resolves(0);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { downloadId: DOWNLOAD_ID };
+
+      await listDownloadVersionExports()(mockReq, mockRes, mockNext);
+
+      expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
+      expect(mockRes.statusValue).to.equal(200);
     });
 
     it('propagates HTTP403 from the service', async () => {
-      // Verifies: an auth failure inside the service surfaces unchanged through the route.
+      // Verifies: service failures surface unchanged through the route.
 
-      // Step 1: Stub the DB connection and reject from the authorized-list method
+      // Step 1: Stub the DB connection and reject from the list method
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon
-        .stub(DownloadExportService.prototype, 'listAuthorizedExportsByDownloadId')
-        .rejects(new HTTP403('Access denied'));
+      sinon.stub(DownloadExportService.prototype, 'listDownloadVersionExports').rejects(new HTTP403('Access denied'));
+      sinon.stub(DownloadExportService.prototype, 'listDownloadVersionExportsCount').resolves(0);
 
       // Step 2: Send the request and capture the error
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

@@ -84,6 +84,40 @@ export const paginationRequestBodySchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Cursor pagination parameters for POST request bodies.
+ */
+export const cursorPaginationRequestBodySchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 200,
+      default: 25,
+      description: 'The number of records to return per page'
+    },
+    cursor: {
+      type: 'string',
+      description: 'Opaque cursor returned by an adjacent page'
+    },
+    sort: {
+      type: 'string',
+      description: "The column to sort on, e.g. 'name'",
+      default: 'relevancy_score',
+      nullable: true
+    },
+    order: {
+      type: 'string',
+      enum: ['asc', 'desc'],
+      description: 'Sort order: ascending or descending',
+      default: 'desc',
+      nullable: true
+    }
+  }
+};
+
+/**
  * API schema to assert pagination information for paginated data
  * responses.
  */
@@ -118,6 +152,41 @@ export const paginationResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       enum: ['asc', 'desc'],
       description: 'The sort order of the response'
+    }
+  }
+};
+
+/**
+ * API schema for cursor pagination information in responses.
+ */
+export const cursorPaginationResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['limit', 'sort', 'order', 'next_cursor', 'previous_cursor'],
+  properties: {
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      description: 'The maximum number of records requested for this page'
+    },
+    sort: {
+      type: 'string',
+      description: 'The column used to sort this result set'
+    },
+    order: {
+      type: 'string',
+      enum: ['asc', 'desc'],
+      description: 'The sort order used for this result set'
+    },
+    next_cursor: {
+      type: 'string',
+      nullable: true,
+      description: 'Opaque cursor for the following page'
+    },
+    previous_cursor: {
+      type: 'string',
+      nullable: true,
+      description: 'Opaque cursor for the preceding page'
     }
   }
 };

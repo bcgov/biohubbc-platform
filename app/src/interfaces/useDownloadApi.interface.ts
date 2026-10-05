@@ -15,8 +15,9 @@ export interface DownloadRecord {
   download_id: string;
   download_version_id: string;
   download_status: DownloadStatus;
+  name: string;
+  description: string | null;
   create_date: string;
-  feature_count: number;
   started_at: string | null;
   completed_at: string | null;
   downloaded_at: string | null;
@@ -33,7 +34,7 @@ export interface DownloadRecord {
  *
  * The route renames `download_status` to `status` and joins the owning policy
  * to surface `name` (always present) and `description` (nullable) for the
- * public download page header.
+ * download page header.
  */
 export interface DownloadDetail {
   download_id: string;
@@ -46,12 +47,29 @@ export interface DownloadDetail {
   downloaded_at: string | null;
 }
 
+export interface DownloadVersion {
+  download_version_id: string;
+  download_id: string;
+  status: DownloadStatus;
+  feature_count: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  materialized_at: string | null;
+  error_message: string | null;
+  create_date: string;
+}
+
 /**
  * Response from GET /api/download.
  * Includes server-side pagination metadata alongside the data array.
  */
 export interface DownloadListResponse {
   downloads: DownloadRecord[];
+  pagination: ApiPaginationResponseParams;
+}
+
+export interface DownloadVersionListResponse {
+  versions: DownloadVersion[];
   pagination: ApiPaginationResponseParams;
 }
 

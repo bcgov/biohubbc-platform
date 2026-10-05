@@ -39,7 +39,7 @@ change). It is intentionally NOT wired into any build or request flow.
 
 ## Environment prerequisites
 
-- The full stack must be up: **DB + MinIO + queue** (the queue is only used to enqueue an inert
+- The full stack must be up: **DB + RustFS + queue** (the queue is only used to enqueue an inert
   anchor-compute job; the generator computes anchors synchronously itself).
 - **Migrations must be current.** The Moose dataset carries `mortality.is_confirmed` and
   `capture.is_recapture`, defined by `20260709130000_boolean_feature_properties`. Without that
@@ -72,7 +72,7 @@ Run from `biohubbc-platform/`. Only `./api` is bind-mounted into the api contain
 is staged into the api tree and the produced fixtures are copied back out to the committed location.
 
 ```bash
-# 1. Stack up (db + minio + queue) and seed the required ITIS taxa (see prerequisites above).
+# 1. Stack up (db + rustfs + queue) and seed the required ITIS taxa (see prerequisites above).
 
 # 2. Stage the Moose tar into the bind-mounted api tree. Its dataset sits at the tar root
 #    (<datasetId>/features|codes|files), which the parser ingests directly — no unwrapping.

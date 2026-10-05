@@ -11,6 +11,7 @@ export type SubmissionUploadSecurityStatus = z.infer<typeof SubmissionUploadSecu
 export const SubmissionUploadSecurityRecord = z.object({
   submission_upload_security_id: z.number(),
   submission_upload_id: z.string().uuid(),
+  submission_upload_review_id: z.string().uuid(),
   job_id: z.string().nullable(),
   status: SubmissionUploadSecurityStatus,
   metadata: z.record(z.unknown()).nullable(),
@@ -21,3 +22,16 @@ export type SubmissionUploadSecurityRecord = z.infer<typeof SubmissionUploadSecu
 
 export const SubmissionUploadSecurityId = SubmissionUploadSecurityRecord.pick({ submission_upload_security_id: true });
 export type SubmissionUploadSecurityId = z.infer<typeof SubmissionUploadSecurityId>;
+
+/**
+ * Summary recorded in `metadata` when a screening event completes.
+ *
+ * `matchedFeatureCount` counts distinct upload features matched by at least one rule;
+ * `insertedAssignmentCount` counts the feature/rule assignments this event created or made effective again.
+ */
+export type SubmissionUploadSecurityMetadata = {
+  evaluatedRuleCount: number;
+  skippedRuleCount: number;
+  matchedFeatureCount: number;
+  insertedAssignmentCount: number;
+};

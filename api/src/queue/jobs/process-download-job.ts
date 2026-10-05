@@ -61,7 +61,7 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       // Fetch the version once, up front, to drive the status guards. The version IS the unit
       // of materialization; its lifecycle status lives on the version row, not the download.
       const version = await withConnection(async (connection) =>
-        new DownloadVersionRepository(connection).getDownloadVersionStatusById(downloadVersionId)
+        new DownloadVersionRepository(connection).getDownloadVersion(downloadVersionId)
       );
 
       // The owning download id is still needed for the parquet S3 key and the download source.
@@ -195,7 +195,7 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
     try {
       await connection.open();
 
-      const version = await new DownloadVersionRepository(connection).getDownloadVersionStatusById(downloadVersionId);
+      const version = await new DownloadVersionRepository(connection).getDownloadVersion(downloadVersionId);
 
       if (TERMINAL_DOWNLOAD_STATUSES.includes(version.status)) {
         defaultLog.info({

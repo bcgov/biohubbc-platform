@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { DialogContext, IDialogContext, defaultSnackbarProps } from 'contexts/dialogContext';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
@@ -7,6 +8,7 @@ import { IPolicy, IPolicyExpression, PolicyStatus } from 'interfaces/usePolicies
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PolicyDetailPage } from './PolicyDetailPage';
@@ -101,7 +103,7 @@ vi.mock('components/expression-builder/PolicyExpressionBuilder', () => ({
               {
                 type: 'predicate',
                 feature_property_id: 1,
-                feature_type_property_id: 1,
+                blueprint_feature_type_property_id: 1,
                 operator: 'Equals',
                 value: 'sensitive'
               }
@@ -123,7 +125,7 @@ const expression: ExpressionTreeExpression = {
     {
       type: 'predicate',
       feature_property_id: 1,
-      feature_type_property_id: 1,
+      blueprint_feature_type_property_id: 1,
       operator: 'Equals',
       value: 'sensitive'
     }
@@ -171,7 +173,7 @@ const policy: IPolicy = {
   ]
 };
 
-const renderPage = (dialogContext?: Partial<IDialogContext>) =>
+const renderPage = (dialogContext?: Partial<IDialogContext>, queryClient?: QueryClient) =>
   render(
     <DialogContext.Provider
       value={{
@@ -215,7 +217,8 @@ const renderPage = (dialogContext?: Partial<IDialogContext>) =>
           />
         </Routes>
       </MemoryRouter>
-    </DialogContext.Provider>
+    </DialogContext.Provider>,
+    { queryClient }
   );
 
 describe('PolicyDetailPage', () => {
@@ -357,7 +360,11 @@ describe('PolicyDetailPage', () => {
       expect(getByText('Filters sensitive species observations')).toBeVisible();
       expect(getByTestId('policy-expressions-table').textContent).toContain(JSON.stringify(expression, null, 2));
     });
-    expect(getPolicyExpressions).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'name', order: 'asc' });
+    expect(getPolicyExpressions).toHaveBeenCalledWith(
+      'policy-1',
+      { page: 1, limit: 10, sort: 'name', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
   });
 
   it('renders the statements section from the statements tab', async () => {
@@ -391,11 +398,16 @@ describe('PolicyDetailPage', () => {
     expect(getByText('Team Alpha')).toBeVisible();
 
     await waitFor(() => {
-      expect(getPolicyTeams).toHaveBeenCalledWith('policy-1', { page: 1, limit: 10, sort: 'team_name', order: 'asc' });
+      expect(getPolicyTeams).toHaveBeenCalledWith(
+        'policy-1',
+        { page: 1, limit: 10, sort: 'team_name', order: 'asc' },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 
   it('updates the policy status from the header dropdown', async () => {
+    getPolicy.mockResolvedValueOnce(policy).mockResolvedValue({ ...policy, status: PolicyStatus.DENIED });
     const user = userEvent.setup();
     const { findByTestId, findByRole, getByRole } = renderPage();
 
@@ -408,7 +420,29 @@ describe('PolicyDetailPage', () => {
     expect(getByRole('button', { name: 'Denied' })).toBeVisible();
   });
 
+  it("drops the policy's cached listings once its status is saved: the policy and assignment tables and ticket timelines", async () => {
+    const user = userEvent.setup();
+    const queryClient = createTestQueryClient();
+    const listings = [
+      ['policy', 'list', { search: {}, pagination: {} }],
+      ['team-policy', 'list', { search: {}, pagination: {} }],
+      ['ticket', 'admin', 'detail', 'ticket-1']
+    ];
+    listings.forEach((key) => queryClient.setQueryData(key, { cached: true }));
+    const { findByTestId, findByRole } = renderPage(undefined, queryClient);
+
+    await user.click(await findByTestId('policy-status-dropdown'));
+    await user.click(await findByRole('menuitem', { name: 'Denied' }));
+
+    await waitFor(() =>
+      expect(listings.map((key) => queryClient.getQueryData(key))).toEqual([undefined, undefined, undefined])
+    );
+  });
+
   it('edits policy metadata from the header edit button', async () => {
+    getPolicy
+      .mockResolvedValueOnce(policy)
+      .mockResolvedValue({ ...policy, name: 'Updated Policy', description: 'Updated description' });
     const user = userEvent.setup();
     updatePolicy.mockResolvedValueOnce({
       ...policy,
@@ -455,11 +489,15 @@ describe('PolicyDetailPage', () => {
       });
     });
     expect(updatePolicy).not.toHaveBeenCalled();
-    expect(getPolicy).toHaveBeenCalledTimes(1);
+    expect(getPolicy).toHaveBeenCalledTimes(2);
     expect(getPolicyExpressions).toHaveBeenCalledTimes(2);
   });
 
   it('edits a policy expression from the row actions menu', async () => {
+    getPolicy.mockResolvedValueOnce(policy).mockResolvedValue({
+      ...policy,
+      expressions: [{ ...policy.expressions[0], name: 'Updated sensitive species' }, policy.expressions[1]]
+    });
     const user = userEvent.setup();
     const { findByText, findByRole, getByRole, getByText, getByTestId } = renderPage();
 
@@ -514,6 +552,13 @@ describe('PolicyDetailPage', () => {
   });
 
   it('creates a policy statement from the statements toolbar', async () => {
+    getPolicy.mockResolvedValueOnce(policy).mockResolvedValue({
+      ...policy,
+      statements: [
+        ...policy.statements,
+        { ...policy.statements[0], policy_statement_id: 'statement-3', submission_feature_urn: 'urn:1:telemetry:*' }
+      ]
+    });
     const user = userEvent.setup();
     const { findByTestId, findByRole, getByRole, getByText, getByTestId } = renderPage();
 

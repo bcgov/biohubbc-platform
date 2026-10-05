@@ -6,7 +6,7 @@ import {
   CreateSecurityRule,
   SecurityRule,
   SecurityRuleAndCategory,
-  SecurityRuleRecord,
+  SecurityRuleWithExpressions,
   SecurityRuleWithFeatureCount,
   SecuritySearchFilters,
   UpdateSecurityRule
@@ -23,91 +23,68 @@ import { BaseRepository } from './base-repository';
  */
 export class SecurityRuleRepository extends BaseRepository {
   /**
-   * Gets a list of all active security rules. A security rule is active if it has not been end-dated.
+   * Gets security rules eligible for automatic screening, each with the ids of its active expressions.
    *
-   * @return {Promise<SecurityRuleRecord[]>}
+   * A rule is screenable when it is active (`is_active = true`) and neither it nor its category is
+   * soft-deleted, which is the same availability manual assignment requires. An expression counts when
+   * both its `security_rule_expression` link and the expression itself are current; a rule with none
+   * has an empty `expression_ids`.
+   *
+   * @return {Promise<SecurityRuleWithExpressions[]>} Screenable rules ordered by id.
    * @memberof SecurityRuleRepository
    */
-  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
+  async getScreenableSecurityRules(): Promise<SecurityRuleWithExpressions[]> {
     const sql = SQL`
-      SELECT
-        security_rule_id,
-        policy_id,
-        name,
-        description,
-        is_active,
-        record_effective_date,
-        record_end_date,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count
-      FROM security_rule
-      WHERE record_end_date IS NULL;
+      SELECT sr.security_rule_id, sr.name, expressions.expression_ids
+      FROM security_rule sr
+      JOIN security_category sc
+        ON sc.security_category_id = sr.security_category_id
+        AND sc.record_end_date IS NULL
+      CROSS JOIN LATERAL (
+        SELECT COALESCE(array_agg(sre.expression_id ORDER BY sre.expression_id), '{}') AS expression_ids
+        FROM security_rule_expression sre
+        JOIN expression e
+          ON e.expression_id = sre.expression_id
+          AND e.record_end_date IS NULL
+        WHERE sre.security_rule_id = sr.security_rule_id
+          AND sre.record_end_date IS NULL
+      ) expressions
+      WHERE sr.record_end_date IS NULL
+        AND sr.is_active = true
+      ORDER BY sr.security_rule_id;
     `;
-    const response = await this.connection.sql(sql, SecurityRuleRecord);
+    const response = await this.connection.sql(sql, SecurityRuleWithExpressions);
     return response.rows;
   }
 
   /**
-   * Gets security rules eligible for automatic screening.
-   * A rule is screenable when it is not soft-deleted and is_active is true.
+   * Fetch rules and their category lifecycle fields for assignment validation, in one query.
    *
-   * Future automatic screening must use this method (not getActiveSecurityRules).
-   *
-   * @return {Promise<SecurityRuleRecord[]>}
+   * @param {number[]} securityRuleIds Rule identifiers.
+   * @returns {Promise<SecurityRuleAndCategory[]>} The requested rules that exist, with their categories.
    * @memberof SecurityRuleRepository
    */
-  async getScreenableSecurityRules(): Promise<SecurityRuleRecord[]> {
-    const sql = SQL`
-      SELECT
-        security_rule_id,
-        policy_id,
-        name,
-        description,
-        is_active,
-        record_effective_date,
-        record_end_date,
-        create_date,
-        create_user,
-        update_date,
-        update_user,
-        revision_count
-      FROM security_rule
-      WHERE record_end_date IS NULL
-        AND is_active = true;
-    `;
-    const response = await this.connection.sql(sql, SecurityRuleRecord);
-    return response.rows;
-  }
+  async getSecurityRulesWithCategory(securityRuleIds: number[]): Promise<SecurityRuleAndCategory[]> {
+    const knex = getKnex();
 
-  /**
-   * Gets a list of all active security rules with their associated categories.
-   *
-   * @return {Promise<SecurityRuleAndCategory[]>}
-   * @memberof SecurityRuleRepository
-   */
-  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
-    const sql = SQL`
-      SELECT 
-        sr.security_rule_id,
-        sr.policy_id,
-        sr.name,
-        sr.description,
-        sr.is_active,
-        sr.record_effective_date,
-        sr.record_end_date,
-        sc.security_category_id,
-        sc.name as category_name,
-        sc.description as category_description,
-        sc.record_effective_date as category_record_effective_date,
-        sc.record_end_date as category_record_end_date
-      FROM security_rule sr, security_category sc 
-      WHERE sr.security_category_id = sc.security_category_id
-      AND sr.record_end_date IS NULL;
-    `;
-    const response = await this.connection.sql(sql, SecurityRuleAndCategory);
+    const query = knex('security_rule as sr')
+      .join('security_category as sc', 'sc.security_category_id', 'sr.security_category_id')
+      .select(
+        'sr.security_rule_id',
+        'sr.policy_id',
+        'sr.name',
+        'sr.description',
+        'sr.is_active',
+        'sr.record_effective_date',
+        'sr.record_end_date',
+        'sc.security_category_id',
+        'sc.name as category_name',
+        'sc.description as category_description',
+        'sc.record_effective_date as category_record_effective_date',
+        'sc.record_end_date as category_record_end_date'
+      )
+      .whereIn('sr.security_rule_id', securityRuleIds);
+    const response = await this.connection.knex(query, SecurityRuleAndCategory);
     return response.rows;
   }
 
@@ -141,10 +118,7 @@ export class SecurityRuleRepository extends BaseRepository {
         this.on('sr.security_category_id', '=', 'sc.security_category_id').andOnNull('sc.record_end_date');
       })
       .leftJoin('submission_feature_security as sfs', function () {
-        // Draft rows (automatic screening output pending review) are not applied security
-        this.on('sfs.security_rule_id', '=', 'sr.security_rule_id')
-          .andOnNull('sfs.record_end_date')
-          .andOnVal('sfs.status', '=', 'active');
+        this.on('sfs.security_rule_id', '=', 'sr.security_rule_id').andOnNull('sfs.record_end_date');
       })
       .whereNull('sr.record_end_date')
       .groupBy(
@@ -326,13 +300,10 @@ export class SecurityRuleRepository extends BaseRepository {
   }
 
   /**
-   * Count how many active (non-soft-deleted, `status = 'active'`) `submission_feature_security`
+   * Count how many current (non-soft-deleted) `submission_feature_security`
    * records reference the given rule.
    *
    * Used by the rule-delete guard to prevent deleting rules that are still applied to features.
-   * `draft` rows (automatic screening output pending review) are excluded — they are not applied
-   * security, so they must not block deleting an otherwise unused rule.
-   *
    * @param {number} securityRuleId
    * @return {Promise<number>}
    * @throws {ApiExecuteSQLError} If the count query returns an unexpected row count.
@@ -344,7 +315,6 @@ export class SecurityRuleRepository extends BaseRepository {
       .select(knex.raw('count(*)::integer as count'))
       .from('submission_feature_security')
       .where('security_rule_id', securityRuleId)
-      .where('status', 'active')
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, CountResult);

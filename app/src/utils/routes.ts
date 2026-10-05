@@ -1,4 +1,5 @@
 import { FEATURE_TYPE_CONFIG, PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
+import { type SubmissionPropertyValuePathResolvers } from './routes.interface';
 
 /**
  * Builds a search result URL for a feature type and optional query params.
@@ -138,3 +139,21 @@ export const buildSubmissionFeaturePath = (
   submissionFeatureId: number,
   search = ''
 ): string => `${basePath}/${submissionId}/feature/${submissionFeatureId}${search}`;
+
+/**
+ * Builds link target resolvers for submitted property values under a standard submission route base.
+ *
+ * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
+ * @returns {SubmissionPropertyValuePathResolvers} Link target resolvers for submitted property values.
+ */
+export const buildSubmissionPropertyValuePathResolvers = (
+  basePath: string,
+  search = ''
+): SubmissionPropertyValuePathResolvers => ({
+  getSubmissionTaxonPath: (submissionId, taxonId) => buildSubmissionTaxonPath(basePath, submissionId, taxonId, search),
+  getSubmissionCodePath: (submissionId, codesetKey, codeKey) =>
+    buildSubmissionCodePath(basePath, submissionId, codesetKey, codeKey, search),
+  getSubmissionFeaturePath: (submissionId, submissionFeatureId) =>
+    buildSubmissionFeaturePath(basePath, submissionId, submissionFeatureId, search)
+});

@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
     'import.meta.env.VITE_KEYCLOAK_REALM': JSON.stringify(env.VITE_KEYCLOAK_REALM),
     'import.meta.env.VITE_KEYCLOAK_CLIENT_ID': JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID),
     'import.meta.env.VITE_BASEMAP_URL': JSON.stringify(env.VITE_BASEMAP_URL),
-    'import.meta.env.VITE_BASEMAP_ATTRIBUTION': JSON.stringify(env.VITE_BASEMAP_ATTRIBUTION)
+    'import.meta.env.VITE_BASEMAP_ATTRIBUTION': JSON.stringify(env.VITE_BASEMAP_ATTRIBUTION),
+    'import.meta.env.VITE_BASEMAP_FALLBACK_STYLE_URL': JSON.stringify(env.VITE_BASEMAP_FALLBACK_STYLE_URL)
   };
 
   return {
@@ -33,6 +34,8 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: 'jsdom',
+      // Bound concurrent JSDOM renderers so UI tests retain CPU time on CI runners.
+      maxWorkers: 2,
       server: {
         // Fixes an error caused by Vite trying to load .css required for x-data-grid
         // See https://stackoverflow.com/questions/79592526/testing-error-after-upgrading-mui-x-data-grid-to-v8-1-0-unknown-file-extensio

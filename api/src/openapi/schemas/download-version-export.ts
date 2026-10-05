@@ -1,4 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { paginationResponseSchema } from './pagination';
 
 /**
  * 5 MiB — S3 multipart upload minimum part size. Below this, a part-zip can't
@@ -121,6 +122,23 @@ export const CreateDownloadVersionExportRequestSchema: OpenAPIV3.SchemaObject = 
   }
 };
 
+const createDownloadVersionExportConfigRequestProperties = {
+  ...CreateDownloadVersionExportRequestSchema.properties
+};
+delete createDownloadVersionExportConfigRequestProperties.download_version_id;
+
+/**
+ * Body schema for `POST /api/download/:downloadId/version/:downloadVersionId/export`.
+ *
+ * The route path identifies the materialized download version. The body remains the export recipe
+ * plus the optional packaging knob.
+ */
+export const CreateDownloadVersionExportConfigRequestSchema: OpenAPIV3.SchemaObject = {
+  ...CreateDownloadVersionExportRequestSchema,
+  required: ['version', 'export_type', 'mode', 'feature_types'],
+  properties: createDownloadVersionExportConfigRequestProperties
+};
+
 /**
  * Response schema for a single download version export record (used by POST and
  * by list items). Detail endpoint extends this with `parts[]`.
@@ -166,15 +184,56 @@ export const DownloadVersionExportResponseSchema: OpenAPIV3.SchemaObject = {
  * detail-endpoint round-trip.
  */
 export const DownloadVersionExportListResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'array',
-  items: {
-    type: 'object',
-    required: [...(DownloadVersionExportResponseSchema.required ?? []), 'part_count'],
-    additionalProperties: false,
-    properties: {
-      ...DownloadVersionExportResponseSchema.properties,
-      part_count: { type: 'integer', minimum: 0 }
-    }
+  type: 'object',
+  required: ['exports', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    exports: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: [...(DownloadVersionExportResponseSchema.required ?? []), 'part_count'],
+        additionalProperties: false,
+        properties: {
+          ...DownloadVersionExportResponseSchema.properties,
+          part_count: { type: 'integer', minimum: 0 }
+        }
+      }
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+export const DownloadVersionResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['download_version_id', 'download_id', 'status', 'feature_count', 'create_date'],
+  additionalProperties: false,
+  properties: {
+    download_version_id: { type: 'string', format: 'uuid' },
+    download_id: { type: 'string', format: 'uuid' },
+    status: {
+      type: 'string',
+      enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+    },
+    feature_count: { type: 'integer', nullable: true },
+    started_at: { type: 'string', nullable: true },
+    completed_at: { type: 'string', nullable: true },
+    materialized_at: { type: 'string', nullable: true },
+    error_message: { type: 'string', nullable: true },
+    create_date: { type: 'string' }
+  }
+};
+
+export const DownloadVersionListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['versions', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    versions: {
+      type: 'array',
+      items: DownloadVersionResponseSchema
+    },
+    pagination: paginationResponseSchema
   }
 };
 

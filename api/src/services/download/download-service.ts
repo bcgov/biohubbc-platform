@@ -8,7 +8,7 @@ import {
   DownloadListRecord,
   DownloadParquetPart
 } from '../../models/download';
-import { DownloadVersionRecord } from '../../models/download-version';
+import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
 import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
@@ -16,12 +16,15 @@ import { DownloadRepository } from '../../repositories/download/download-reposit
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { parseFeatureTypeFromParquetKey } from '../../utils/export-utils';
+import { getLogger } from '../../utils/logger';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPolicyService } from './download-policy-service';
+
+const defaultLog = getLogger('services/download/download-service');
 
 export interface CreateDownloadRequestPayload {
   name: string;
@@ -118,7 +121,7 @@ export class DownloadService extends DBService {
    * seeded from the same identity at creation: the person the content is filtered for is exactly
    * the person granted access. They diverge only later, via claim.
    *
-   * An anonymous caller's only handle is the download UUID itself; the public download page lets
+   * An anonymous caller's only handle is the download UUID itself; the download page lets
    * them watch status, and any later export is a separate user-initiated action.
    *
    * Authorization is enforced at export time, not create time — the worker re-evaluates
@@ -242,6 +245,51 @@ export class DownloadService extends DBService {
   }
 
   /**
+   * List versions belonging to a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting parameters.
+   * @return {Promise<DownloadVersionStatusRecord[]>} The matching download versions.
+   */
+  async listDownloadVersions(
+    downloadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadVersionStatusRecord[]> {
+    return this.downloadVersionRepository.listDownloadVersions(downloadId, pagination);
+  }
+
+  /**
+   * Count versions for a download.
+   *
+   * The count method follows its paired list method's name: `listDownloadVersionsCount`.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @return {Promise<number>} The number of matching download versions.
+   */
+  async listDownloadVersionsCount(downloadId: string): Promise<number> {
+    return this.downloadVersionRepository.listDownloadVersionsCount(downloadId);
+  }
+
+  /**
+   * Get one version belonging to a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionStatusRecord>} The requested download version status record.
+   * @throws {ApiNotFoundError} When the download version does not exist.
+   * @throws {HTTP404} When the download version does not belong to the parent download.
+   */
+  async getDownloadVersion(downloadId: string, downloadVersionId: string): Promise<DownloadVersionStatusRecord> {
+    const version = await this.downloadVersionRepository.getDownloadVersion(downloadVersionId);
+
+    if (version.download_id !== downloadId) {
+      throw new HTTP404('Download version not found');
+    }
+
+    return version;
+  }
+
+  /**
    * Link a download to a team via the download_team join table.
    *
    * @param {string} downloadId - The download ID.
@@ -316,6 +364,56 @@ export class DownloadService extends DBService {
   }
 
   /**
+   * Check whether a request can access a download by UUID or linked-team membership.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number | null} systemUserId - The authenticated user's ID, or null.
+   * @return {Promise<boolean>}
+   */
+  async isUserAuthorizedForDownload(downloadId: string, systemUserId: number | null): Promise<boolean> {
+    const download = await this.downloadRepository.findDownloadById(downloadId);
+
+    if (!download) {
+      defaultLog.warn({
+        label: 'isUserAuthorizedForDownload',
+        message: 'Download authorization denied because the download was not found',
+        downloadId
+      });
+
+      return false;
+    }
+
+    const hasTeams = await this.downloadRepository.isDownloadClaimedByTeam(downloadId);
+
+    if (!hasTeams) {
+      return true;
+    }
+
+    if (systemUserId === null) {
+      defaultLog.warn({
+        label: 'isUserAuthorizedForDownload',
+        message: 'Download authorization denied because authentication is required',
+        downloadId
+      });
+
+      return false;
+    }
+
+    const authorized = await this.downloadRepository.isUserAuthorizedForDownload(downloadId, systemUserId);
+
+    if (!authorized) {
+      defaultLog.warn({
+        label: 'isUserAuthorizedForDownload',
+        message: 'Download authorization denied because the user is not a member of a linked team',
+        downloadId,
+        systemUserId
+      });
+    }
+
+    return authorized;
+  }
+
+  /**
    * Link a download to a new team containing the given user.
    *
    * Creates a single-member team and inserts a download_team row so
@@ -361,9 +459,7 @@ export class DownloadService extends DBService {
    * @memberof DownloadService
    */
   async listDownloadParquetUrls(downloadId: string, downloadVersionId: string): Promise<DownloadParquetPart[]> {
-    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifactsByDownloadVersionId(
-      downloadVersionId
-    );
+    const artifacts = await this.downloadVersionRepository.listDownloadVersionArtifacts(downloadVersionId);
     const objectStorageService = new ObjectStorageService();
 
     const parts: DownloadParquetPart[] = [];

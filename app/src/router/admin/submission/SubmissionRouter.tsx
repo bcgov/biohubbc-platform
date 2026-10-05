@@ -1,4 +1,3 @@
-import { SubmissionContextProvider } from 'contexts/submissionContext';
 import DashboardPage from 'features/admin/dashboard/DashboardPage';
 import { AdminSubmissionPage } from 'features/submissions/AdminSubmissionPage';
 import { CreateSubmissionPage } from 'features/submissions/create/CreateSubmissionPage';
@@ -37,10 +36,10 @@ export const SubmissionsRouter = () => {
       <Route
         path="/:submission_id"
         element={
-          <SubmissionContextProvider>
+          <>
             <PageTitle title="Submission Details" description="Details of a specific submission" />
             <AdminSubmissionPage />
-          </SubmissionContextProvider>
+          </>
         }
       />
       {/* Catch any unknown routes, and re-direct to the not found page */}

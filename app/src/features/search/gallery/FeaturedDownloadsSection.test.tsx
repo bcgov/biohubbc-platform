@@ -55,7 +55,11 @@ describe('FeaturedDownloadsSection', () => {
     renderSection();
 
     await waitFor(() => {
-      expect(mockGetGalleryDownloadsBySlug).toHaveBeenCalledWith('home', { page: 1, limit: 9 });
+      expect(mockGetGalleryDownloadsBySlug).toHaveBeenCalledWith(
+        'home',
+        { page: 1, limit: 9 },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 
@@ -191,7 +195,11 @@ describe('FeaturedDownloadsSection', () => {
     fireEvent.click(getByRole('button', { name: /go to page 2/i }));
 
     await waitFor(() => {
-      expect(mockGetGalleryDownloadsBySlug).toHaveBeenCalledWith('home', { page: 2, limit: 9 });
+      expect(mockGetGalleryDownloadsBySlug).toHaveBeenCalledWith(
+        'home',
+        { page: 2, limit: 9 },
+        { signal: expect.any(AbortSignal) }
+      );
     });
   });
 });

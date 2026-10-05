@@ -2,7 +2,7 @@
 // (Boreal Moose + Feature Type Sampler). It is the only executable in this folder; generate.ts and
 // dump.ts are pure library code with no entrypoint of their own.
 //
-// Execute it inside the api container (which carries the DB + MinIO env and the source bind mount):
+// Execute it inside the api container (which carries the DB + S3 env and the source bind mount):
 //   docker compose exec api npx tsx src/seed-data-generator/run.ts
 //
 // It writes the fixtures to a directory inside the mounted api tree (only `./api` is bind-mounted into

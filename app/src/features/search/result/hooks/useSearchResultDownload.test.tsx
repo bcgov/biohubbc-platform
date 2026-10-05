@@ -1,16 +1,13 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook } from 'test-helpers/test-utils';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ApiPaginationResponseParams } from 'types/pagination';
 import { Mock, vi } from 'vitest';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 import { useSearchResultDownload } from './useSearchResultDownload';
 
 vi.mock('hooks/useApi');
-vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
 
 const mockNavigate = vi.fn();
@@ -30,28 +27,16 @@ const expressionTree: ExpressionTreeExpression = {
     {
       type: 'predicate',
       feature_property_id: 10,
-      feature_type_property_id: null,
+      blueprint_feature_type_property_id: null,
       operator: 'ILike',
       value: 'salmon'
     }
   ]
 };
 
-const pagination: ApiPaginationResponseParams = {
-  total: 1,
-  current_page: 1,
-  last_page: 1
-};
-
 const formValues: ICreateDownloadFormValues = {
   name: 'My download',
   description: 'a description'
-};
-
-const setupAuth = (isAuthenticated: boolean) => {
-  (useAuthStateContext as Mock).mockReturnValue({
-    auth: { isAuthenticated }
-  });
 };
 
 describe('useSearchResultDownload', () => {
@@ -73,32 +58,25 @@ describe('useSearchResultDownload', () => {
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
     });
-
-    setupAuth(true);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('H1: authenticated success shows the success snackbar', async () => {
-    setupAuth(true);
-
+  it('H1: success navigates to the download page without dialog or snackbar', async () => {
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
+    expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
     expect(result.current.downloadView).toBe('Downloads');
-    expect(mockSetSnackbar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        open: true,
-        snackbarMessage: 'Download created. Track its progress in the Downloads sidebar.'
-      })
-    );
+    expect(mockSetSnackbar).not.toHaveBeenCalled();
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
     expect(mockSetOkDialog).not.toHaveBeenCalled();
     expect(mockCreateDownload).toHaveBeenCalledWith({
@@ -108,8 +86,7 @@ describe('useSearchResultDownload', () => {
     });
   });
 
-  it('H2: anonymous success navigates to the public download page without dialog or snackbar', async () => {
-    setupAuth(false);
+  it('H2: success navigates regardless of auth-state-specific response fields', async () => {
     mockCreateDownload.mockResolvedValueOnce({
       download_id: 'download-uuid',
       download_url: 'http://localhost/api/download/download-uuid',
@@ -118,11 +95,12 @@ describe('useSearchResultDownload', () => {
     });
 
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
@@ -132,12 +110,11 @@ describe('useSearchResultDownload', () => {
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
   });
 
-  it('H3: failure shows the error snackbar and keeps the create dialog open (authenticated)', async () => {
-    setupAuth(true);
+  it('H3: failure shows the error snackbar and keeps the create dialog open', async () => {
     mockCreateDownload.mockRejectedValueOnce({ message: 'quota exceeded' } as APIError);
 
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     act(() => {
@@ -146,7 +123,8 @@ describe('useSearchResultDownload', () => {
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);
@@ -159,12 +137,11 @@ describe('useSearchResultDownload', () => {
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
-  it('H4: failure shows the error snackbar and keeps the create dialog open (anonymous)', async () => {
-    setupAuth(false);
+  it('H4: failure shows the error snackbar and keeps the create dialog open after another failed submission', async () => {
     mockCreateDownload.mockRejectedValueOnce({ message: 'server unavailable' } as APIError);
 
     const { result } = renderHook(() =>
-      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, pagination })
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
 
     act(() => {
@@ -173,7 +150,8 @@ describe('useSearchResultDownload', () => {
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);
 
     await act(async () => {
-      await result.current.handleCreateDownload(formValues);
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current.isCreateDownloadDialogOpen).toBe(true);

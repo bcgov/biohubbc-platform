@@ -1,9 +1,8 @@
-import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
+import { URL_PARAMS } from 'constants/query-params';
 import { useDialogContext } from 'hooks/useContext';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { normalizeQueryParam } from 'utils/query-param';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { decodeExpressionFromUrl, encodeExpressionToUrl } from 'utils/expression-url';
 
 /**
@@ -19,12 +18,11 @@ import { decodeExpressionFromUrl, encodeExpressionToUrl } from 'utils/expression
  *   and the expression falls back to `null` without rewriting the URL.
  * - Clearing: when the user clears filters, `expr` is removed and sort/order are reset.
  *
- * @returns Current expression tree, an explicit refresh revision key, and an apply handler.
+ * @returns Current expression tree and an apply handler.
  */
 export const useSearchResultExpression = () => {
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
-  const dialogContext = useDialogContext();
-  const [expressionApplyRevision, setExpressionApplyRevision] = useState(0);
+  const { setSnackbar } = useDialogContext();
 
   // Track the raw encoded value so we only show the error snackbar once per invalid value.
   const lastInvalidExprRef = useRef<string | null>(null);
@@ -51,7 +49,7 @@ export const useSearchResultExpression = () => {
     if (rawExpr && expressionTree === null) {
       if (lastInvalidExprRef.current !== rawExpr) {
         lastInvalidExprRef.current = rawExpr;
-        dialogContext.setSnackbar({
+        setSnackbar({
           open: true,
           snackbarMessage: 'Could not load saved search filters'
         });
@@ -60,72 +58,48 @@ export const useSearchResultExpression = () => {
       // Reset the guard when the expr param changes to a valid or absent value.
       lastInvalidExprRef.current = null;
     }
-  }, [rawExpr, expressionTree, dialogContext]);
+  }, [rawExpr, expressionTree, setSnackbar]);
 
   /**
    * Applies a new expression tree to the search result page.
    *
-   * When `nextExpressionTree` is non-null the encoded expression is written to
+   * When `expression` is non-null the encoded expression is written to
    * the `expr` URL param and the page resets to page 1. When `null` the `expr`
    * param is removed and sort/order are cleared so results revert to their
    * default ordering.
    *
-   * Incrementing `expressionApplyRevision` only when the URL is unchanged ensures
-   * re-applying the same expression still refreshes without double-firing normal
-   * applies, where the URL change itself triggers the search.
+   * Re-applying the expression already applied leaves the URL, and so every search keyed on it, unchanged;
+   * the caller is told so that it can search again.
    *
-   * @param {ExpressionTreeExpression | null} nextExpressionTree - Expression to apply, or `null` to clear filters.
+   * @param {ExpressionTreeExpression | null} expression - Expression to apply, or `null` to clear filters.
+   * @returns {boolean} True when the URL changed; false when the expression was already applied.
    */
   const handleExpressionApply = useCallback(
-    (nextExpressionTree: ExpressionTreeExpression | null) => {
-      const nextParams: Partial<Record<UrlParamKey, string>> = {
-        [URL_PARAMS.PAGE]: '1'
-      };
-
-      if (nextExpressionTree === null) {
-        nextParams[URL_PARAMS.SORT] = '';
-        nextParams[URL_PARAMS.ORDER] = '';
-      }
-
+    (expression: ExpressionTreeExpression | null): boolean => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
+      newParams.delete(URL_PARAMS.PAGE);
+      newParams.delete(URL_PARAMS.CURSOR);
 
-      Object.entries(nextParams).forEach(([key, value]) => {
-        const typedKey = key.toLowerCase() as UrlParamKey;
-        const normalizedValue = normalizeQueryParam(value);
-
-        if (normalizedValue === undefined || normalizedValue === '') {
-          newParams.delete(typedKey);
-        } else {
-          newParams.delete(typedKey);
-          newParams.append(typedKey, normalizedValue);
-        }
-      });
-
-      if (nextExpressionTree === null) {
+      if (expression === null) {
         newParams.delete(URL_PARAMS.EXPR);
+        newParams.delete(URL_PARAMS.SORT);
+        newParams.delete(URL_PARAMS.ORDER);
       } else {
-        // Use super.set directly on the underlying URLSearchParams to store the
-        // base64url value as-is (TypedURLSearchParams.set lowercases values).
-        URLSearchParams.prototype.set.call(newParams, URL_PARAMS.EXPR, encodeExpressionToUrl(nextExpressionTree));
+        newParams.set(URL_PARAMS.EXPR, encodeExpressionToUrl(expression));
       }
 
-      // Most applies change the URL; the search hook observes that URL/expression change
-      // and fires one request. Re-applying the exact same filters produces the same URL,
-      // so React Router may not rerender. Bump this explicit revision only for that
-      // same-URL case so Apply still refreshes without double-requesting normal applies.
       if (newParams.toString() === searchParams.toString()) {
-        setExpressionApplyRevision((current) => current + 1);
-        return;
+        return false;
       }
 
       setRawSearchParams(newParams);
+      return true;
     },
     [searchParams, setRawSearchParams]
   );
 
   return {
     expressionTree,
-    expressionApplyRevision,
     handleExpressionApply
   };
 };

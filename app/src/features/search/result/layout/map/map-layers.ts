@@ -1,4 +1,5 @@
 import type { ISlippyMapLayer } from 'components/map/SlippyMap.interface';
+import { resolveMartinTileUrlTemplate } from 'components/map/martin-request';
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import type { SourceSpecification } from 'maplibre-gl';
 
@@ -20,8 +21,8 @@ const RESULT_COLOR = '#1f6fb2';
 /**
  * Build the search-result vector tile source.
  *
- * The tile URL template is returned by the API and is relative, so it resolves against the app's own origin: the same
- * path is served by the dev server proxy locally and by an OpenShift route when deployed.
+ * The tile URL template is returned by the API and is relative; see {@link resolveMartinTileUrlTemplate} for how it
+ * becomes absolute.
  *
  * The context id is appended purely as a client-side cache key. Tiles are authorized by the token in the request
  * header, and the gateway discards every client-supplied query parameter, so this changes nothing server side. Without
@@ -32,9 +33,7 @@ const RESULT_COLOR = '#1f6fb2';
  * @return {*}  {SourceSpecification}
  */
 export const buildSearchResultsSource = (martinUrlTemplate: string, contextId: string): SourceSpecification => {
-  const absoluteTemplate = martinUrlTemplate.startsWith('http')
-    ? martinUrlTemplate
-    : `${window.location.origin}${martinUrlTemplate}`;
+  const absoluteTemplate = resolveMartinTileUrlTemplate(martinUrlTemplate);
 
   const separator = absoluteTemplate.includes('?') ? '&' : '?';
 
@@ -49,7 +48,7 @@ export const buildSearchResultsSource = (martinUrlTemplate: string, contextId: s
 /**
  * Build the layers rendering the search results.
  *
- * Ordered so areas sit beneath lines, and lines beneath points; the basemap is added by the caller before these.
+ * Ordered so areas sit beneath lines, and lines beneath points; the basemap layer is added by the caller before these.
  *
  * Only the cluster layer is interactive: selecting a cluster offers a zoom-in. Feature tiles are geometry only — they
  * carry nothing a click could resolve — so the raw feature layers stay display-only and take no part in hit testing.

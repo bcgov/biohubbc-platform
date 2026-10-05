@@ -1,16 +1,12 @@
 import { ITALICIZED_TAXON_RANKS } from 'constants/taxon';
 import { TaxonPropertyValue } from 'interfaces/property-value.interface';
-import { useLocation } from 'react-router-dom';
-import { buildSubmissionTaxonPath } from 'utils/routes';
+import { type SubmissionTaxonPathResolver } from 'utils/routes.interface';
 import { PropertyValueLink } from './PropertyValueLink';
 
-export interface TaxonPropertyValueLinkProps {
-  /** Structured taxon value from the indexed-property read model. */
+interface TaxonPropertyValueLinkProps {
   value: TaxonPropertyValue;
-  /** Submission the referencing feature belongs to. */
   submissionId: number;
-  /** Submission route base, e.g. `/submission` or `/portal/submission`. */
-  featureRouteBasePath: string;
+  getSubmissionTaxonPath: SubmissionTaxonPathResolver;
 }
 
 /**
@@ -22,15 +18,17 @@ export interface TaxonPropertyValueLinkProps {
  * @param {TaxonPropertyValueLinkProps} props
  * @returns {JSX.Element}
  */
-export const TaxonPropertyValueLink = ({ value, submissionId, featureRouteBasePath }: TaxonPropertyValueLinkProps) => {
-  const location = useLocation();
-
+export const TaxonPropertyValueLink = ({
+  value,
+  submissionId,
+  getSubmissionTaxonPath
+}: TaxonPropertyValueLinkProps) => {
   const italic = value.rank ? ITALICIZED_TAXON_RANKS.has(value.rank.toLowerCase()) : false;
   const title = [`TSN ${value.tsn}`, value.rank].filter(Boolean).join(' · ');
 
   return (
     <PropertyValueLink
-      to={buildSubmissionTaxonPath(featureRouteBasePath, submissionId, value.taxon_id, location.search)}
+      to={getSubmissionTaxonPath(submissionId, value.taxon_id)}
       label={value.label}
       title={title}
       italic={italic}

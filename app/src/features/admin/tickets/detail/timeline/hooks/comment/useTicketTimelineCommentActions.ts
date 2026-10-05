@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { getArtifactMarkdownByMimeType } from 'features/admin/tickets/utils/ticketArtifactMarkdown';
 import { useTicketAttachmentUpload } from 'features/admin/tickets/hooks/useTicketAttachmentUpload';
 import { useTicketCommentCache } from 'features/admin/tickets/hooks/useTicketCommentCache';
@@ -5,7 +6,7 @@ import { downloadTicketArtifact } from 'features/admin/tickets/utils/ticketArtif
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketArtifact, ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
+import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useRef, useState } from 'react';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
 import { ITicketCommentEditFormValues } from '../../comment/edit/TicketCommentEditForm.interface';
@@ -18,7 +19,8 @@ import { ITicketCommentEditFormValues } from '../../comment/edit/TicketCommentEd
 export const useTicketTimelineCommentActions = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketId, ticketQueryKey } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
   const { removeCachedComment, replaceCachedComment } = useTicketCommentCache();
   const { isUploadingAttachment: isUploadingCommentAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
@@ -77,9 +79,9 @@ export const useTicketTimelineCommentActions = () => {
    * @returns {void}
    */
   const handleOpenEditCommentDialog = (ticketCommentId: string) => {
-    const comment = ticketDataLoader.data?.comments.find(
-      (ticketComment) => ticketComment.ticket_comment_id === ticketCommentId
-    );
+    const comment = queryClient
+      .getQueryData<ITicketExtended>(ticketQueryKey)
+      ?.comments.find((ticketComment) => ticketComment.ticket_comment_id === ticketCommentId);
 
     if (!comment) {
       return;
@@ -130,7 +132,7 @@ export const useTicketTimelineCommentActions = () => {
         comment: values.comment
       });
 
-      replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
+      await replaceCachedComment(updatedComment.ticket_comment_id, updatedComment);
 
       setIsEditCommentDialogOpen(false);
       setSelectedComment(null);
@@ -163,7 +165,7 @@ export const useTicketTimelineCommentActions = () => {
     try {
       isDeletingCommentRef.current = true;
       await api.tickets.deleteTicketComment(ticketId, ticketCommentId);
-      removeCachedComment(ticketCommentId);
+      await removeCachedComment(ticketCommentId);
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({

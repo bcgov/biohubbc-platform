@@ -36,8 +36,11 @@ app:
     ts: ""
   # Add any app-specific overrides here
 
+# Off by default: the biohub-platform-db image is built only by deploy.yml, for PR previews.
+# Static environments run the separate Crunchy Postgres release (infrastructure/crunchy-db), so an
+# environment that inherited `true` here would render a Deployment for an image nobody builds.
 database:
-  enabled: true
+  enabled: false
   environment:
     licensePlate: "a0ec71"
     name: ""

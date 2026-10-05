@@ -1,23 +1,15 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { DataRequestResponseSchema } from './data-request';
 import { paginationResponseSchema } from './pagination';
 import { TicketSystemUserWithUserSchema } from './ticket-system-user';
+import { SubmissionUploadReviewResponseSchema } from './upload';
 
 const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
 const TicketStatusEnum = ['open', 'closed'];
-const SubmissionUploadJobStatusEnum = ['uploaded', 'ingesting', 'ingested', 'indexing', 'indexed', 'invalid', 'failed'];
-const SubmissionUploadReviewStatusEnum = ['submitted', 'approved', 'denied', 'deleted'];
+const SubmissionUploadJobStatusEnum = SubmissionUploadJobStatus.options;
+const SubmissionUploadDecisionEnum = SubmissionUploadDecision.options;
 const SubmissionValidationStatusEnum = ['pending', 'started', 'completed', 'invalid', 'failed'];
-const SubmissionUploadReviewScopeEnum = ['validation', 'security'];
-const SubmissionUploadReviewTaskStatusEnum = [
-  'pending',
-  'requested',
-  'in_progress',
-  'completed',
-  'blocked',
-  'skipped',
-  'cancelled'
-];
 
 export const TicketArtifactSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -52,25 +44,12 @@ const TicketSubmissionValidationSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-const TicketSubmissionUploadReviewSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
-  properties: {
-    submission_upload_review_id: { type: 'string', format: 'uuid' },
-    submission_upload_id: { type: 'string', format: 'uuid' },
-    scope: { type: 'string', enum: SubmissionUploadReviewScopeEnum },
-    status: { type: 'string', enum: SubmissionUploadReviewTaskStatusEnum },
-    requested_by: { type: 'integer', minimum: 1, nullable: true }
-  }
-};
-
 const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: [
     'submission_upload_id',
-    'submission_uuid',
+    'submission_id',
     'upload_id',
     'create_date',
     'submission_name',
@@ -78,13 +57,13 @@ const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
     'submission_comment',
     'submitted_by_identifier',
     'upload_status',
-    'review_status',
+    'decision',
     'validation',
     'reviews'
   ],
   properties: {
     submission_upload_id: { type: 'string', format: 'uuid' },
-    submission_uuid: { type: 'string', format: 'uuid' },
+    submission_id: { type: 'integer', minimum: 1 },
     upload_id: { type: 'string', format: 'uuid' },
     create_date: { type: 'string', format: 'date-time' },
     submission_name: { type: 'string', nullable: true },
@@ -92,15 +71,15 @@ const TicketSubmissionUploadSchema: OpenAPIV3.SchemaObject = {
     submission_comment: { type: 'string', nullable: true },
     submitted_by_identifier: { type: 'string', nullable: true },
     upload_status: { type: 'string', enum: SubmissionUploadJobStatusEnum },
-    review_status: { type: 'string', enum: SubmissionUploadReviewStatusEnum },
+    decision: { type: 'string', enum: SubmissionUploadDecisionEnum },
     validation: { ...TicketSubmissionValidationSchema, nullable: true },
     reviews: {
       type: 'object',
       additionalProperties: false,
       required: ['validation', 'security'],
       properties: {
-        validation: { ...TicketSubmissionUploadReviewSchema, nullable: true },
-        security: { ...TicketSubmissionUploadReviewSchema, nullable: true }
+        validation: { type: 'array', items: SubmissionUploadReviewResponseSchema },
+        security: { type: 'array', items: SubmissionUploadReviewResponseSchema }
       }
     }
   }

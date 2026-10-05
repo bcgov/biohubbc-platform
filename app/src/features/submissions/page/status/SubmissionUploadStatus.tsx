@@ -1,11 +1,11 @@
 import { mdiAlertOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Stack, Typography } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect } from 'react';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { SubmissionUploadStatusCard } from './card/SubmissionUploadStatusCard';
 
 interface SubmissionUploadStatusProps {
@@ -22,21 +22,18 @@ export const SubmissionUploadStatus = (props: SubmissionUploadStatusProps) => {
   const { submissionId } = props;
   const api = useApi();
 
-  const dataLoader = useDataLoader((submissionId: number) =>
-    api.submissionStatus.getSubmissionUploadStatus(submissionId)
-  );
+  const statusQuery = useQuery({
+    queryKey: submissionQueryKeys.uploadStatus(submissionId),
+    queryFn: ({ signal }) => api.submissionStatus.getSubmissionUploadStatus(submissionId, { signal })
+  });
 
-  useEffect(() => {
-    dataLoader.load(submissionId);
-  }, [submissionId, dataLoader]);
-
-  const status = dataLoader.data;
+  const status = statusQuery.data;
 
   return (
     <LoadingGuard
-      isLoading={dataLoader.isLoading}
+      isLoading={statusQuery.isPending}
       isLoadingFallback={<SkeletonList numberOfLines={4} />}
-      hasNoData={!dataLoader.data && dataLoader.isReady}
+      hasNoData={!status && statusQuery.isError}
       hasNoDataFallback={
         <Stack gap={2} minHeight={200} display="flex" alignItems="center" justifyContent="center">
           <Icon path={mdiAlertOutline} size={1.5} />

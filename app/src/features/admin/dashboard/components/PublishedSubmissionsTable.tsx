@@ -1,5 +1,6 @@
 import { mdiTextBoxSearchOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { useQuery } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -17,25 +18,30 @@ import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/Su
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
+import { useSubmissionRecordOrder } from '../hooks/useSubmissionRecordOrder';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
+/**
+ * Admin dashboard list of submissions that have completed security review and been published, in the order the sort menu last chose.
+ *
+ * @returns {JSX.Element}
+ */
 const PublishedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const publishedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getPublishedSubmissionsForAdmins());
+  const publishedSubmissionsQuery = useQuery({
+    queryKey: submissionQueryKeys.adminList('published'),
+    queryFn: ({ signal }) => biohubApi.submissions.getPublishedSubmissionsForAdmins({ signal })
+  });
 
-  publishedSubmissionsDataLoader.load();
+  const { orderedRecords: submissionRecords, handleSortSubmissions } = useSubmissionRecordOrder(
+    publishedSubmissionsQuery.data
+  );
 
-  const submissionRecords = publishedSubmissionsDataLoader.data || [];
-
-  const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
-    publishedSubmissionsDataLoader.setData(submissions);
-  };
-
-  if (publishedSubmissionsDataLoader.isLoading) {
+  if (publishedSubmissionsQuery.isPending) {
     return (
       <>
         <RecordsFoundSkeletonLoader />
@@ -205,7 +211,7 @@ const PublishedSubmissionsTable = () => {
                     {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">
                         <dd>{p(submissionRecord.regions.length, 'Region')}:</dd>
-                        <dt>{submissionRecord.regions.sort().join(', ')}</dt>
+                        <dt>{[...submissionRecord.regions].sort((a, b) => a.localeCompare(b)).join(', ')}</dt>
                       </Stack>
                     )}
                   </Stack>

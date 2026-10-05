@@ -1,21 +1,28 @@
 import { useConfigContext } from 'hooks/useContext';
+import { useMemo } from 'react';
 import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import { useBlueprintFeatureTypesApi } from './api/useBlueprintFeatureTypesApi';
+import { useBlueprintFeatureTypePropertiesApi } from './api/useBlueprintFeatureTypePropertiesApi';
+import { useBlueprintsApi } from './api/useBlueprintsApi';
+import { useFeaturePropertiesApi } from './api/useFeaturePropertiesApi';
+import { useFeatureTypesApi } from './api/useFeatureTypesApi';
+import useCodesApi from './api/useCodesApi';
+import { useContributorsApi } from './api/useContributorsApi';
+import { useDataRequestApi } from './api/useDataRequestApi';
 import { useDownloadApi } from './api/useDownloadApi';
 import { useDownloadExportApi } from './api/useDownloadExportApi';
-import useCodesApi from './api/useCodesApi';
-import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import { useGalleryApi } from './api/useGalleryApi';
+import { useMartinApi } from './api/useMartinApi';
 import { useObjectStorageApi } from './api/useObjectStorageApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
-import { useMartinApi } from './api/useMartinApi';
 import useSecurityApi from './api/useSecurityApi';
-import useSubmissionsApi from './api/useSubmissionsApi';
 import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
+import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
@@ -31,6 +38,8 @@ export const useApi = () => {
   const config = useConfigContext();
 
   const apiAxios = useAxios(config?.API_HOST);
+
+  const contributors = useContributorsApi(apiAxios);
 
   const user = useUserApi(apiAxios);
 
@@ -74,7 +83,23 @@ export const useApi = () => {
 
   const objectStorage = useObjectStorageApi();
 
-  return {
+  const featureTypes = useFeatureTypesApi(apiAxios);
+
+  const featureProperties = useFeaturePropertiesApi(apiAxios);
+
+  const blueprints = useBlueprintsApi(apiAxios);
+
+  const blueprintFeatureTypes = useBlueprintFeatureTypesApi(apiAxios);
+
+  const blueprintFeatureTypeProperties = useBlueprintFeatureTypePropertiesApi(apiAxios);
+
+  const apis = {
+    blueprints,
+    blueprintFeatureTypes,
+    blueprintFeatureTypeProperties,
+    featureProperties,
+    featureTypes,
+    contributors,
     user,
     admin,
     submissions,
@@ -97,4 +122,10 @@ export const useApi = () => {
     apiKeys,
     objectStorage
   };
+
+  // Every sub-api is a set of closures over `apiAxios` (or, for object storage, over nothing), so
+  // the object only needs to change when the axios instance does. Returning a stable object keeps
+  // `api` usable as an effect or callback dependency without re-triggering on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => apis, [apiAxios]);
 };

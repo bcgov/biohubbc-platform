@@ -45,6 +45,16 @@ export const PortalRouter = () => {
       />
 
       <Route
+        path="/download"
+        element={
+          <>
+            <PageTitle title="My Downloads" description="View downloads available to you" />
+            <PortalPage initialTab="downloads" />
+          </>
+        }
+      />
+
+      <Route
         path="/api-key"
         element={
           <>

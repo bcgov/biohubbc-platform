@@ -6,6 +6,7 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
+import { submissionFeaturePropertyValueSchema } from './submission-feature-property-value';
 
 /**
  * Schema for a feature property.
@@ -23,6 +24,8 @@ export const FeaturePropertySchema: OpenAPIV3.SchemaObject = {
     'calculated_value'
   ],
   properties: {
+    record_effective_date: { type: 'string', format: 'date' },
+    record_end_date: { type: 'string', format: 'date', nullable: true },
     feature_property_id: {
       type: 'integer',
       minimum: 1,
@@ -78,6 +81,32 @@ export const FeaturePropertiesListResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Schema for paginated submission feature properties list response.
+ */
+export const SubmissionFeaturePropertiesListResponseSchema: OpenAPIV3.SchemaObject = {
+  title: 'SubmissionFeaturePropertiesListResponse',
+  type: 'object',
+  required: ['properties', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    properties: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'property', 'value'],
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string' },
+          property: { type: 'string' },
+          value: submissionFeaturePropertyValueSchema
+        }
+      }
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
  * Schema for create feature property request body.
  */
 export const CreateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
@@ -121,11 +150,6 @@ export const UpdateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    name: {
-      type: 'string',
-      maxLength: 100,
-      description: 'Canonical name of the feature property'
-    },
     display_name: {
       type: 'string',
       maxLength: 100,
@@ -136,10 +160,6 @@ export const UpdateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
       maxLength: 500,
       nullable: true,
       description: 'Description of the feature property'
-    },
-    calculated_value: {
-      type: 'boolean',
-      description: 'Whether the property value is calculated rather than supplied'
     }
   }
 };

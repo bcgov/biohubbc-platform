@@ -40,12 +40,26 @@ const TaxonHarness = ({ onChange }: { onChange: (value: number | undefined) => v
   );
 };
 
-// Use to run the 300ms taxon search debounce and flush the resulting state updates.
+/**
+ * Runs the 300ms taxon search debounce, then the query client's zero-delay update delivery.
+ *
+ * @returns {Promise<void>} Resolves once the search has started and settled responses have rendered.
+ */
 const advancePastTaxonSearchDebounce = async () => {
   await act(async () => {
-    vi.advanceTimersByTime(300);
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(1);
+  });
+};
+
+/**
+ * Delivers query updates for a response that has just settled.
+ *
+ * @returns {Promise<void>} Resolves once the update has rendered.
+ */
+const flushQueryUpdates = async () => {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
   });
 };
 
@@ -66,6 +80,7 @@ describe('ExpressionBuilderPredicateTokenTaxon', () => {
 
     fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '180701' } });
     await advancePastTaxonSearchDebounce();
+    await flushQueryUpdates();
 
     fireEvent.click(screen.getByRole('option', { name: 'Ovis canadensis' }));
 
@@ -103,12 +118,14 @@ describe('ExpressionBuilderPredicateTokenTaxon', () => {
       resolveCervusSearch(taxonSearchResponse(180694, 'Cervus canadensis'));
       await cervusSearch;
     });
+    await flushQueryUpdates();
     expect(screen.getByRole('option', { name: 'Cervus canadensis' })).toBeVisible();
 
     await act(async () => {
       resolveOvisSearch(taxonSearchResponse(180701, 'Ovis canadensis'));
       await ovisSearch;
     });
+    await flushQueryUpdates();
 
     expect(screen.queryByRole('option', { name: 'Ovis canadensis' })).not.toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Cervus canadensis' })).toBeVisible();

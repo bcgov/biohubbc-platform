@@ -1,13 +1,22 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import {
+  SUBMISSION_ACTIVE_STATE_LOCK_PREFIX,
+  SUBMISSION_ACTIVE_STATE_LOCK_SEED
+} from '../constants/database-lock-keys';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
+import {
+  SubmissionContributorMembership,
+  SubmissionFeatureForReview,
+  SubmissionFilters,
+  SubmissionSummary
+} from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureActive } from './sql-fragments';
+import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureCurrent } from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -57,6 +66,9 @@ export const SubmissionFeatureRecord = z.object({
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
   data: z.record(z.any()),
+  content_hash: z.string().nullable(),
+  reconciliation: z.enum(['new', 'modified', 'unmodified']).nullable(),
+  successor_submission_feature_id: z.number().nullable(),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
@@ -73,13 +85,14 @@ export const SubmissionFeature = z.object({
   submission_feature_id: z.number(),
   uuid: z.string(),
   urn: z.string(),
+  create_date: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
-  data: z.record(z.any()),
+  successor_submission_feature_id: z.number().nullable(),
   feature_type_name: z.string(),
-  feature_type_display_name: z.string(),
   submission_name: z.string(),
+  contributor_name: z.string(),
   secured: z.boolean(),
   security_reasons: z.array(z.string())
 });
@@ -88,7 +101,6 @@ export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
 
 export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
   feature_type_name: z.string(),
-  feature_type_display_name: z.string(),
   submission_feature_security_ids: z.array(z.number())
 });
 
@@ -235,8 +247,11 @@ export const SubmissionRecord = z.object({
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
-export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
-  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
+export const SubmissionRecordWithSecurity = SubmissionRecord.omit({ comment: true }).extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  contributor_name: z.string(),
+  last_approved_upload_date: z.string().nullable(),
+  feature_types: z.array(z.string())
 });
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
@@ -291,13 +306,6 @@ export const SubmissionMessageRecord = z.object({
 
 export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
 
-export const PatchSubmissionRecord = z.object({
-  security_reviewed: z.boolean().optional(),
-  published: z.boolean().optional()
-});
-
-export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
-
 /**
  * A repository class for accessing submission data.
  *
@@ -306,6 +314,51 @@ export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
+  /**
+   * Find the current submission's active contributor and the caller's membership in it.
+   *
+   * @param {string} submissionUuid Submission whose owner is checked.
+   * @param {number} systemUserId Authenticated caller.
+   * @return {Promise<SubmissionContributorMembership | undefined>} Membership in the active owner, if available.
+   * @memberof SubmissionRepository
+   */
+  async findSubmissionContributorMembership(
+    submissionUuid: string,
+    systemUserId: number
+  ): Promise<SubmissionContributorMembership | undefined> {
+    const sql = SQL`
+      SELECT EXISTS (
+        SELECT 1 FROM contributor_system_user csu
+        WHERE csu.contributor_id = c.contributor_id
+          AND csu.system_user_id = ${systemUserId} AND csu.record_end_date IS NULL
+      ) AS is_member
+      FROM submission s
+      JOIN contributor c ON c.contributor_id = s.contributor_id AND c.record_end_date IS NULL
+      WHERE s.uuid = ${submissionUuid}
+        AND (s.record_end_date IS NULL OR s.record_end_date > NOW());
+    `;
+    const response = await this.connection.sql(sql, SubmissionContributorMembership);
+    return response.rows[0];
+  }
+
+  /**
+   * Lock the submission's current feature state for the current transaction.
+   *
+   * Reconciliation and publication use the same submission-scoped advisory lock so
+   * that a baseline cannot change while an upload is being classified or published.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async lockSubmissionFeatureStateForSubmissionId(submissionId: number): Promise<void> {
+    await this.connection.sql(SQL`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${SUBMISSION_ACTIVE_STATE_LOCK_PREFIX} || ':' || ${submissionId}::text, ${SUBMISSION_ACTIVE_STATE_LOCK_SEED})
+      );
+    `);
+  }
+
   /**
    * Insert a new submission record.
    *
@@ -422,67 +475,10 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission feature record.
-   * Features belong to a submission (submission_id) but are produced by a specific
-   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
-   * (append, replace).
+   * Delete feature relationships owned by features from one upload.
    *
-   * @param {number} submissionId The ID of the submission.
-   * @param {string} submissionUploadId The submission_upload_id that produced these features.
-   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
-   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
-   * @param {string} featureTypeName The name of the feature type.
-   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @returns {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionFeatureRecord(
-    submissionId: number,
-    submissionUploadId: string,
-    parentSubmissionFeatureId: number | null,
-    featureSourceId: string | null,
-    featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties']
-  ): Promise<{ submission_feature_id: number }> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id,
-        source_id,
-        feature_type_id,
-        data,
-        record_effective_date
-      ) VALUES (
-        ${submissionId},
-        ${submissionUploadId},
-        ${parentSubmissionFeatureId},
-        ${featureSourceId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
-        ${featureProperties},
-        now()
-      )
-      RETURNING
-        submission_feature_id;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'SubmissionRepository->insertSubmissionFeatureRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Delete all feature relationships for one upload attempt.
-   *
-   * @param {string} submissionUploadId
-   * @return {Promise<void>}
+   * @param {string} submissionUploadId Submission upload identifier whose pending feature relationships are deleted.
+   * @returns {Promise<void>} Resolves after upload-owned feature relationship rows have been deleted.
    * @memberof SubmissionRepository
    */
   async deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
@@ -491,12 +487,9 @@ export class SubmissionRepository extends BaseRepository {
       WHERE source_feature_id IN (
         SELECT submission_feature_id
         FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      )
-      OR target_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_effective_date IS NULL
+          AND record_end_date IS NULL
       );
     `;
 
@@ -881,7 +874,9 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -983,7 +978,9 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -1060,7 +1057,9 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       LEFT JOIN 
         submission_regions
       ON
@@ -1099,7 +1098,6 @@ export class SubmissionRepository extends BaseRepository {
       SELECT
         submission_feature.*,
         feature_type.name as feature_type_name,
-        feature_type.display_name as feature_type_display_name,
         array_remove(array_agg(submission_feature_security.submission_feature_security_id), NULL) AS submission_feature_security_ids
       FROM
         submission_feature
@@ -1112,11 +1110,13 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       WHERE
         submission_id = ${submissionId}
     `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')}`);
+    sqlStatement.append(` AND ${isSubmissionFeatureCurrent('submission_feature')}`);
     sqlStatement.append(`
       GROUP BY
         submission_feature.submission_feature_id,
@@ -1169,10 +1169,12 @@ export class SubmissionRepository extends BaseRepository {
         this.on('s.team_id', '=', 'tm.team_id').andOnNull('s.record_end_date');
       })
       .leftJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureActive('sf')));
+        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureCurrent('sf')));
       })
       .leftJoin('submission_feature_security as sfs', function () {
-        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id').andOnVal('sfs.status', '=', 'active');
+        this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id')
+          .andOn(knex.raw('sfs.record_effective_date <= now()'))
+          .andOn(knex.raw('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)'));
       })
       .leftJoin('submission_regions as sr', 'sr.submission_id', 's.submission_id')
       .leftJoin('region_lookup as rl', 'rl.region_id', 'sr.region_id')
@@ -1303,7 +1305,6 @@ export class SubmissionRepository extends BaseRepository {
         submission.contributor_id,
         submission.name,
         submission.description,
-        submission.comment,
         submission.publish_timestamp,
         submission.record_end_date,
         submission.create_date,
@@ -1311,7 +1312,12 @@ export class SubmissionRepository extends BaseRepository {
         submission.update_date,
         submission.update_user,
         submission.revision_count,
+        contributor.client_id as contributor_name,
+        latest_approved_upload.create_date as last_approved_upload_date,
+        submission_feature_types.feature_types,
         CASE
+          WHEN COUNT(submission_feature.submission_feature_id) > 0
+            AND jsonb_array_length(submission_feature_types.feature_types) = 0 THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
@@ -1319,19 +1325,81 @@ export class SubmissionRepository extends BaseRepository {
       FROM
         submission
       INNER JOIN
+        contributor
+      ON
+        contributor.contributor_id = submission.contributor_id
+      LEFT JOIN LATERAL (
+        SELECT
+          submission_upload.create_date
+        FROM
+          submission_upload
+        WHERE
+          submission_upload.submission_id = submission.submission_id
+        AND
+          submission_upload.decision = 'approved'
+        AND
+          (submission_upload.record_end_date IS NULL OR now() < submission_upload.record_end_date)
+        ORDER BY
+          submission_upload.create_date DESC,
+          submission_upload.submission_upload_id DESC
+        LIMIT 1
+      ) latest_approved_upload ON TRUE
+      INNER JOIN LATERAL (
+        SELECT
+          COALESCE(jsonb_agg(feature_types.name ORDER BY feature_types.is_root DESC, feature_types.name), '[]'::jsonb) as feature_types
+        FROM (
+          SELECT
+            feature_type.name,
+            bool_or(tab_submission_feature.parent_submission_feature_id IS NULL) as is_root
+          FROM
+            submission_feature tab_submission_feature
+          INNER JOIN
+            feature_type
+          ON
+            feature_type.feature_type_id = tab_submission_feature.feature_type_id
+          INNER JOIN
+            submission_feature_closure searchable_tab_feature
+          ON
+            searchable_tab_feature.source_submission_feature_id = tab_submission_feature.submission_feature_id
+          AND
+            searchable_tab_feature.target_submission_feature_id = tab_submission_feature.submission_feature_id
+          WHERE
+            tab_submission_feature.submission_id = submission.submission_id
+          AND
+            tab_submission_feature.record_effective_date <= now()
+          AND
+            (tab_submission_feature.record_end_date IS NULL OR now() < tab_submission_feature.record_end_date)
+          AND
+            tab_submission_feature.successor_submission_feature_id IS NULL
+          GROUP BY
+            feature_type.name
+        ) feature_types
+      ) submission_feature_types ON TRUE
+      LEFT JOIN
         submission_feature
       ON
         submission_feature.submission_id = submission.submission_id
+      AND
+        submission_feature.record_effective_date <= now()
+      AND
+        (submission_feature.record_end_date IS NULL OR now() < submission_feature.record_end_date)
+      AND
+        submission_feature.successor_submission_feature_id IS NULL
       LEFT JOIN
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
-        submission.submission_id;
+        submission.submission_id,
+        contributor.client_id,
+        latest_approved_upload.create_date,
+        submission_feature_types.feature_types;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);
@@ -1461,7 +1529,9 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
+        submission_feature_security.record_effective_date <= now()
+      AND
+        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
       INNER JOIN
         feature_type
       ON
@@ -1552,88 +1622,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Patch a submission record.
-   *
-   * @param {number} submissionId
-   * @param {PatchSubmissionRecord} patch
-   * @returns {Promise<SubmissionRecord>}
-   * @memberof SubmissionRepository
-   */
-  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
-    const knex = getKnex();
-    const queryBuilder = knex.table('submission').where('submission_id', submissionId);
-
-    // Collect all update operations
-    let updateOperations: Record<string, Knex.Raw> = {};
-
-    if (patch.security_reviewed === true) {
-      updateOperations = {
-        ...updateOperations,
-        security_review_timestamp: knex.raw(
-          'CASE WHEN security_review_timestamp IS NULL THEN NOW() ELSE security_review_timestamp END'
-        )
-      };
-    } else if (patch.security_reviewed === false) {
-      updateOperations = {
-        ...updateOperations,
-        security_review_timestamp: knex.raw(
-          'CASE WHEN security_review_timestamp IS NOT NULL THEN NULL ELSE security_review_timestamp END'
-        )
-      };
-    }
-
-    if (patch.published === true) {
-      updateOperations = {
-        ...updateOperations,
-        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
-      };
-
-      // Publishing this submission, first unpublish all submissions with the same uuid as the target submission.
-      // Why? Because we only want one published submission per uuid.
-      await this.unpublishAllSubmissionsBySubmissionId(submissionId);
-    } else if (patch.published === false) {
-      updateOperations = {
-        ...updateOperations,
-        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NOT NULL THEN NULL ELSE publish_timestamp END')
-      };
-    }
-
-    // Register all update operations
-    queryBuilder
-      .update(updateOperations)
-      .returning([
-        'submission_id',
-        'uuid',
-        'security_review_timestamp',
-        'submitted_timestamp',
-        'system_user_id',
-        'contributor_id',
-        'name',
-        'description',
-        'comment',
-        'publish_timestamp',
-        'record_end_date',
-        'create_date',
-        'create_user',
-        'update_date',
-        'update_user',
-        'revision_count'
-      ]);
-
-    const response = await this.connection.knex(queryBuilder);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to patch submission record', [
-        'SubmissionRepository->patchSubmissionRecord',
-        `rowCount was ${response.rowCount}, expected rowCount === 1`
-      ]);
-    }
-
-    const submissionRecord = response.rows[0];
-    return submissionRecord as SubmissionRecord;
-  }
-
-  /**
    * Unpublish all submissions with the same uuid as the submission with the provided id.
    *
    * @param {number} submissionId
@@ -1676,7 +1664,7 @@ export class SubmissionRepository extends BaseRepository {
       and
         parent_submission_feature_id is null
     `;
-    sqlStatement.append(` AND ${isSubmissionFeatureActive('submission_feature')};`);
+    sqlStatement.append(` AND ${isSubmissionFeatureCurrent('submission_feature')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
 
@@ -1693,13 +1681,17 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Build the base query for submission features.
    *
-   * @param {number} submissionId ID of the submission whose features should be queried.
+   * @param {{ submissionId?: number; submissionUploadId?: string; currentOnly?: boolean }} filters Query scope.
    * @param {Knex} knex Knex instance used to construct the query.
    * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
-   * @returns {Knex.QueryBuilder} Query for distinct active submission features.
+   * @returns {Knex.QueryBuilder} Query for distinct submission features.
    * @memberof SubmissionRepository
    */
-  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex, systemUserId?: number | null) {
+  private _getSubmissionFeaturesBaseQuery(
+    filters: { submissionId?: number; submissionUploadId?: string; currentOnly?: boolean },
+    knex: Knex,
+    systemUserId?: number | null
+  ) {
     const baseQuery = knex('submission_feature')
       .select(
         'submission_feature.submission_id',
@@ -1708,9 +1700,19 @@ export class SubmissionRepository extends BaseRepository {
         knex.raw('feature_type.name AS feature_type_name'),
         knex.raw(`${isEffectivelySecured('submission_feature.submission_feature_id')} AS secured`)
       )
-      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
-      .where('submission_feature.submission_id', submissionId)
-      .whereRaw(isSubmissionFeatureActive('submission_feature'));
+      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id');
+
+    if (filters.currentOnly !== false) {
+      baseQuery.whereRaw(isSubmissionFeatureCurrent('submission_feature'));
+    }
+
+    if (filters.submissionId) {
+      baseQuery.where('submission_feature.submission_id', filters.submissionId);
+    }
+
+    if (filters.submissionUploadId) {
+      baseQuery.where('submission_feature.submission_upload_id', filters.submissionUploadId);
+    }
 
     const securityFilter = buildSecurityFilter(knex, systemUserId, 'submission_feature.submission_feature_id');
     if (securityFilter) {
@@ -1736,7 +1738,7 @@ export class SubmissionRepository extends BaseRepository {
   ): Promise<SubmissionFeatureForReview[]> {
     const knex = getKnex();
 
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionId }, knex, systemUserId);
 
     this.applyPagination(baseQuery, pagination);
 
@@ -1757,7 +1759,7 @@ export class SubmissionRepository extends BaseRepository {
     const knex = getKnex();
 
     // Wrap the base query as a subquery
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionId }, knex, systemUserId);
     const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
 
     const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
@@ -1770,5 +1772,42 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].count;
+  }
+
+  /**
+   * Get all features belonging to one submission upload, regardless of effective dates.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting parameters.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Features belonging to the upload.
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionUploadFeatures(
+    submissionUploadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    const knex = getKnex();
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionUploadId, currentOnly: false }, knex);
+
+    this.applyPagination(baseQuery, pagination);
+
+    const response = await this.connection.knex(baseQuery, SubmissionFeatureForReview);
+    return response.rows;
+  }
+
+  /**
+   * Count all features belonging to one submission upload, regardless of effective dates.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @returns {Promise<number>} Number of features belonging to the upload.
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionUploadFeaturesCount(submissionUploadId: string): Promise<number> {
+    const knex = getKnex();
+    const baseQuery = this._getSubmissionFeaturesBaseQuery({ submissionUploadId, currentOnly: false }, knex);
+    const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
+    const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
+
+    return response.rows[0]?.count ?? 0;
   }
 }

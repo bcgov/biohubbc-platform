@@ -14,12 +14,20 @@ import { DownloadVersionRepository } from '../../repositories/download/download-
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { buildParquetKey } from '../../utils/export-utils';
+import { optimizeExpression } from '../../utils/expression-optimization';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
-import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
+import {
+  buildGeoParquetMetadata,
+  buildParquetPropertiesMetadata,
+  buildParquetSchema,
+  featureToRow,
+  PARQUET_PROPERTIES_METADATA_KEY
+} from '../../utils/parquet-utils';
 import { PolicyStatementService } from '../access-policy/policy-statement-service';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
+import { ExpressionTreeNormalizationService } from '../expression-tree-normalization-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
@@ -67,6 +75,7 @@ export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   downloadVersionRepository: DownloadVersionRepository;
   expressionTreeService: ExpressionTreeService;
+  expressionTreeNormalizationService: ExpressionTreeNormalizationService;
   policyStatementService: PolicyStatementService;
   artifactService: ArtifactService;
 
@@ -75,6 +84,7 @@ export class DownloadPipelineService extends DBService {
     this.downloadRepository = new DownloadRepository(connection);
     this.downloadVersionRepository = new DownloadVersionRepository(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
+    this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.artifactService = new ArtifactService(connection);
   }
@@ -133,7 +143,7 @@ export class DownloadPipelineService extends DBService {
     allowedCurrentStatuses: DownloadStatusEnum[],
     metadata?: { error?: string; featureCount?: number }
   ): Promise<void> {
-    const version = await this.downloadVersionRepository.getDownloadVersionStatusById(downloadVersionId);
+    const version = await this.downloadVersionRepository.getDownloadVersion(downloadVersionId);
 
     this.assertDownloadStatusTransition(
       downloadVersionId,
@@ -265,11 +275,9 @@ export class DownloadPipelineService extends DBService {
     // the abort path can't run and the upload either hangs or leaks. Building the
     // cursor descriptor is cheap and side-effect-free until the stream is iterated.
     //
-    // The expression evaluator consumes the *normalized* internal tree shape
-    // (predicates carry resolved property type metadata). `readExpressionTree`
-    // returns the public API tree, so we re-normalize through the same semantic
-    // validator the search path uses — keeping read-time SQL semantics identical
-    // for the two consumers of the evaluator.
+    // The expression evaluator consumes the optimized internal tree shape.
+    // `readExpressionTree` returns the public API tree, so validate and optimize
+    // through the same stages used by search before generating SQL.
     const expressionIds =
       statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
 
@@ -279,12 +287,13 @@ export class DownloadPipelineService extends DBService {
     } else {
       const expressionSubqueries = [];
       for (const expressionId of expressionIds) {
-        const tree = await this.expressionTreeService.readExpressionTree(expressionId);
-        const normalizedTree = await this.expressionTreeService.semanticValidator.validateExpressionTree(tree);
+        const expressionTree = await this.expressionTreeService.readExpressionTree(expressionId);
+        const normalizedExpression = await this.expressionTreeNormalizationService.normalize(expressionTree);
+        const optimizedExpression = optimizeExpression(normalizedExpression);
         expressionSubqueries.push(
           expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
             featureTypeName,
-            normalizedTree,
+            optimizedExpression,
             source.requested_by
           )
         );
@@ -340,6 +349,10 @@ export class DownloadPipelineService extends DBService {
       if (spatialColumns.length > 0) {
         writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
       }
+
+      // The file describes itself: the export reads column names and types from this entry, so
+      // a later change to the property catalogue cannot alter how this file is exported.
+      writer.setMetadata(PARQUET_PROPERTIES_METADATA_KEY, buildParquetPropertiesMetadata(properties));
 
       // Stream: cursor → hydrate typed properties → convert to Parquet row → write.
       // Count hydrated rows (what actually lands in the file), not base cursor rows.
@@ -487,10 +500,14 @@ export class DownloadPipelineService extends DBService {
 
   /**
    * Build a lookup map from feature type name to property definitions.
+   *
+   * The definitions are every property ever assigned to the feature type under any Blueprint, so the
+   * Parquet schema describes every value a feature of the type can carry, whatever Blueprint it was
+   * uploaded under and whether or not its assignment has since been retired.
    */
   private async buildSchemaLookup(): Promise<Map<string, CsvPropertyDefinition[]>> {
     const codeService = new CodeService(this.connection);
-    const allFeatureTypeCodes = await codeService.getFeatureTypePropertyCodes();
+    const allFeatureTypeCodes = await codeService.getFeatureTypeProperties();
 
     const lookup = new Map<string, CsvPropertyDefinition[]>();
     for (const ftCode of allFeatureTypeCodes) {

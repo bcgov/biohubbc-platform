@@ -4,11 +4,12 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
+import useDebounce from 'hooks/useDebounce';
 import { IAvailableUser } from 'interfaces/useTeamsApi.interface';
-import { debounce } from 'lodash-es';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 import { getUserLabel } from 'utils/Utils';
 
 /**
@@ -33,27 +34,16 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
   // Track the search input value
   const [inputValue, setInputValue] = useState('');
 
-  // Load available users with search
-  const usersDataLoader = useDataLoader((search?: string) => biohubApi.teams.getAvailableUsers(search));
+  // The search applied to the user list, which trails the input by the debounce delay
+  const [userSearch, setUserSearch] = useState('');
 
-  // Load initial results on mount
-  useEffect(() => {
-    usersDataLoader.load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const usersQuery = useQuery({
+    queryKey: userQueryKeys.available(userSearch),
+    queryFn: ({ signal }) => biohubApi.teams.getAvailableUsers(userSearch, { signal }),
+    placeholderData: keepPreviousData
+  });
 
-  /**
-   * Debounced function to search users.
-   * Waits 300ms after last keystroke before triggering API call.
-   */
-  const debouncedSearch = useMemo(
-    () =>
-      debounce((term: string) => {
-        usersDataLoader.refresh(term || undefined);
-      }, 300),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  const debouncedSearch = useDebounce(setUserSearch, 300);
 
   /**
    * Handle input value changes - triggers debounced search.
@@ -77,7 +67,7 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
 
   // Merge search results with selected users to ensure selected users are always visible
   const availableOptions = useMemo(() => {
-    const searchResults = usersDataLoader.data?.users ?? [];
+    const searchResults = usersQuery.data?.users ?? [];
     const optionsMap = new Map<number, IAvailableUser>();
 
     // Add all search results
@@ -93,7 +83,7 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
     }
 
     return Array.from(optionsMap.values()).sort((a, b) => getUserLabel(a).localeCompare(getUserLabel(b)));
-  }, [usersDataLoader.data?.users, selectedUsers]);
+  }, [usersQuery.data?.users, selectedUsers]);
 
   /**
    * Handle selection changes - notify parent with full user objects.
@@ -111,7 +101,7 @@ export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectP
       options={availableOptions}
       value={selectedUsers}
       inputValue={inputValue}
-      loading={usersDataLoader.isLoading}
+      loading={usersQuery.isFetching}
       getOptionLabel={(user) => getUserLabel(user)}
       isOptionEqualToValue={(option, value) => option.system_user_id === value.system_user_id}
       onInputChange={handleInputChange}

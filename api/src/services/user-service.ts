@@ -4,6 +4,7 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP401 } from '../errors/http-error';
 import {
   AvailableUser,
+  ContributorSystemUserOptionFilters,
   IAddSystemUserParams,
   IUpdateSystemUserParams,
   SystemRoles,
@@ -12,6 +13,7 @@ import {
   isSystemUserInactive
 } from '../models/system-user';
 import { UserRepository } from '../repositories/user-repository';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
@@ -34,6 +36,7 @@ export class UserService extends DBService {
 
     this.userRepository = new UserRepository(connection);
   }
+
   /**
    * Get all system roles in db
    *
@@ -343,5 +346,20 @@ export class UserService extends DBService {
     // Return updated user
     const updatedUser = await this.getUserById(existingUser.system_user_id);
     return { user: updatedUser, created: false };
+  }
+
+  /**
+   * List contributor assignment options without excluding service accounts.
+   * @param filters - Optional keyword search.
+   * @param pagination - Bounded page request.
+   * @returns User options and pagination metadata.
+   */
+  async listContributorSystemUserOptions(
+    filters: ContributorSystemUserOptionFilters,
+    pagination: ApiPaginationOptions
+  ) {
+    const users = await this.userRepository.listContributorSystemUserOptions(filters, pagination);
+    const count = await this.userRepository.countContributorSystemUserOptions(filters);
+    return { users, pagination: makePaginationResponse(count, pagination) };
   }
 }

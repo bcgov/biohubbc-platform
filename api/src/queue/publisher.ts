@@ -11,6 +11,7 @@ import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submissi
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
+import { IReconcileSubmissionFeaturesJobData } from './jobs/reconcile-submission-features-job';
 import { ISubmissionUploadSecurityJobData } from './jobs/submission-upload-security-job';
 import { getPgBoss } from './pg-boss-service';
 
@@ -361,9 +362,7 @@ export const publishProcessDownloadJob = async (
 ): Promise<PublishJobResult> => {
   try {
     // Resolve the version directly; a missing version throws ApiNotFoundError from the repository.
-    const version = await new DownloadVersionRepository(connection).getDownloadVersionStatusById(
-      data.downloadVersionId
-    );
+    const version = await new DownloadVersionRepository(connection).getDownloadVersion(data.downloadVersionId);
 
     // Only a pending version is enqueueable — any other status is already in flight or terminal.
     if (version.status !== DownloadStatusEnum.PENDING) {
@@ -500,15 +499,62 @@ export const publishProcessDownloadVersionExportJob = async (
   }
 };
 
-/**
- * Options for index submission features jobs.
- * Same timeout as validation — indexing should complete within minutes.
- */
-const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
+/** Shared retry and timeout policy for reconciliation and indexing pipeline stages. */
+const FEATURE_PIPELINE_STAGE_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
   retryBackoff: true,
-  expireInSeconds: 60 * 10 // 10 minutes
+  expireInSeconds: 60 * 10
+};
+
+/**
+ * Publish durable feature reconciliation in the caller's transaction.
+ *
+ * @param {IDBConnection} connection Active database connection.
+ * @param {IReconcileSubmissionFeaturesJobData} data Upload scope.
+ * @param {IPublishOptions} [options={}] Optional pg-boss overrides.
+ * @returns {Promise<PublishJobResult>} Publish result.
+ */
+export const publishReconcileSubmissionFeaturesJob = async (
+  connection: IDBConnection,
+  data: IReconcileSubmissionFeaturesJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    await boss.createQueue(JobQueues.RECONCILE_SUBMISSION_FEATURES);
+    const jobId = await boss.send(JobQueues.RECONCILE_SUBMISSION_FEATURES, data, {
+      ...FEATURE_PIPELINE_STAGE_OPTIONS,
+      ...options,
+      singletonKey: `submission-upload-reconcile-${data.submissionUploadId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishReconcileSubmissionFeaturesJob',
+        message: 'Reconciliation job published',
+        jobId,
+        submissionUploadId: data.submissionUploadId
+      });
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishReconcileSubmissionFeaturesJob',
+      message: 'Reconciliation job not published because it already exists',
+      submissionUploadId: data.submissionUploadId
+    });
+    return { status: 'duplicate', message: 'Reconciliation job already exists' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishReconcileSubmissionFeaturesJob',
+      message: 'Failed to publish reconciliation job',
+      submissionUploadId: data.submissionUploadId,
+      error
+    });
+    throw error;
+  }
 };
 
 /**
@@ -519,7 +565,7 @@ const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
  * the same transaction — if the caller rolls back, the job is never visible.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId and submissionUploadId
+ * @param {IIndexSubmissionFeaturesJobData} data Upload scope.
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
@@ -532,7 +578,7 @@ export const publishIndexSubmissionFeaturesJob = async (
 ): Promise<PublishJobResult> => {
   try {
     const boss = publisherDependencies.getPgBoss();
-    const mergedOptions = { ...INDEX_SUBMISSION_FEATURES_OPTIONS, ...options };
+    const mergedOptions = { ...FEATURE_PIPELINE_STAGE_OPTIONS, ...options };
 
     await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES);
 
@@ -549,7 +595,6 @@ export const publishIndexSubmissionFeaturesJob = async (
         label: 'publishIndexSubmissionFeaturesJob',
         message: 'Index submission features job published',
         jobId,
-        submissionId: data.submissionId,
         submissionUploadId: data.submissionUploadId
       });
 
@@ -559,7 +604,6 @@ export const publishIndexSubmissionFeaturesJob = async (
     defaultLog.warn({
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Job not published (duplicate or throttled)',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId
     });
 
@@ -568,7 +612,6 @@ export const publishIndexSubmissionFeaturesJob = async (
     defaultLog.error({
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Failed to publish job',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,
       error
     });
@@ -676,7 +719,7 @@ const COMPUTE_SUBMISSION_FEATURE_CLOSURE_OPTIONS: IPublishOptions = {
  * the same transaction — if the caller rolls back, the job is never visible.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IComputeSubmissionFeatureClosureJobData} data Job data containing submissionId and submissionUploadId
+ * @param {IComputeSubmissionFeatureClosureJobData} data Upload scope.
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
@@ -693,11 +736,12 @@ export const publishComputeSubmissionFeatureClosureJob = async (
 
     await boss.createQueue(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
 
-    // Use singletonKey to prevent duplicate concurrent closure recomputes for the same submission upload.
+    // Default to per-upload dedupe; callers may pass a revision-specific key when a later
+    // feature-state change for the same upload must enqueue its own recompute.
     // Pass caller's connection via db option so job insert is part of the same transaction
     const jobId = await boss.send(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE, data, {
       ...mergedOptions,
-      singletonKey: `closure-recompute-${data.submissionUploadId}`,
+      singletonKey: mergedOptions.singletonKey ?? `closure-recompute-${data.submissionUploadId}`,
       db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
     });
 
@@ -706,7 +750,6 @@ export const publishComputeSubmissionFeatureClosureJob = async (
         label: 'publishComputeSubmissionFeatureClosureJob',
         message: 'Compute submission feature closure job published',
         jobId,
-        submissionId: data.submissionId,
         submissionUploadId: data.submissionUploadId
       });
 
@@ -716,7 +759,6 @@ export const publishComputeSubmissionFeatureClosureJob = async (
     defaultLog.warn({
       label: 'publishComputeSubmissionFeatureClosureJob',
       message: 'Job not published (duplicate or throttled)',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId
     });
 
@@ -725,7 +767,6 @@ export const publishComputeSubmissionFeatureClosureJob = async (
     defaultLog.error({
       label: 'publishComputeSubmissionFeatureClosureJob',
       message: 'Failed to publish job',
-      submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,
       error
     });
@@ -749,10 +790,9 @@ const SUBMISSION_UPLOAD_SECURITY_OPTIONS: IPublishOptions = {
 /**
  * Publish a submission upload security (automatic screening) job to the queue.
  *
- * Queues screening for a submission upload after its `submission_feature_closure`
- * has been populated. Uses the caller's DB connection via pg-boss's `db` option so
- * the job insert participates in the same transaction as the closure write — if the
- * caller rolls back, the job is never visible.
+ * Queues screening for a submission upload once it has been indexed. Uses the caller's DB
+ * connection via pg-boss's `db` option so the job insert participates in the same transaction
+ * as the `indexed` transition — if the caller rolls back, the job is never visible.
  *
  * `singletonKey: screening-${submissionUploadId}` paired with `policy: 'short'` on the
  * queue prevents two concurrent screening jobs for the same upload.

@@ -1,5 +1,6 @@
 import { mdiTextBoxCheckOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { useQuery } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -17,27 +18,29 @@ import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/Su
 import dayjs from 'dayjs';
 import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
+import { useSubmissionRecordOrder } from '../hooks/useSubmissionRecordOrder';
 import { Link as RouterLink } from 'react-router-dom';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { getDaysSinceDate, pluralize as p } from 'utils/Utils';
 
+/**
+ * Admin dashboard list of submissions awaiting security review, in the order the sort menu last chose.
+ *
+ * @returns {JSX.Element}
+ */
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const unreviewedSubmissionsDataLoader = useDataLoader(() =>
-    biohubApi.submissions.getUnreviewedSubmissionsForAdmins()
+  const unreviewedSubmissionsQuery = useQuery({
+    queryKey: submissionQueryKeys.adminList('unreviewed'),
+    queryFn: ({ signal }) => biohubApi.submissions.getUnreviewedSubmissionsForAdmins({ signal })
+  });
+
+  const { orderedRecords: submissionRecords, handleSortSubmissions } = useSubmissionRecordOrder(
+    unreviewedSubmissionsQuery.data
   );
 
-  unreviewedSubmissionsDataLoader.load();
-
-  const submissionRecords = unreviewedSubmissionsDataLoader.data || [];
-
-  const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
-    unreviewedSubmissionsDataLoader.setData(submissions);
-  };
-
-  if (unreviewedSubmissionsDataLoader.isLoading) {
+  if (unreviewedSubmissionsQuery.isPending) {
     return (
       <>
         <RecordsFoundSkeletonLoader />
@@ -192,7 +195,7 @@ const UnreviewedSubmissionsTable = () => {
                     {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">
                         <dd>{p(submissionRecord.regions.length, 'Region')}:</dd>
-                        <dt>{submissionRecord.regions.sort().join(', ')}</dt>
+                        <dt>{[...submissionRecord.regions].sort((a, b) => a.localeCompare(b)).join(', ')}</dt>
                       </Stack>
                     )}
                   </Stack>

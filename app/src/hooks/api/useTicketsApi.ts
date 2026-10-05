@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICompleteTicketUploadRequest,
   ICreateTicketCommentRequest,
@@ -11,7 +11,8 @@ import {
   IGetTicketArtifactsQueryParams,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
-  ISubmissionUploadReviewStatusResponse,
+  ISubmissionUploadDecisionResponse,
+  ISubmissionUploadProcessingStatusHistoryItem,
   ITicketSystemUser,
   ITicket,
   ITicketArtifact,
@@ -20,8 +21,7 @@ import {
   ITicketExtended,
   ITicketArtifactDownloadResponse,
   ITicketsQueryParams,
-  IUpdateSubmissionUploadReviewRequest,
-  IUpdateSubmissionUploadReviewStatusRequest,
+  IUpdateSubmissionUploadDecisionRequest,
   IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
   TicketSubmissionUploadReviewResponse,
@@ -41,12 +41,17 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get tickets using optional filters and pagination options.
    *
    * @param {ITicketsQueryParams} [params]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForAdmin = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForAdmin = async (
+    params?: ITicketsQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/administrative/tickets', {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -56,10 +61,14 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
-    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
+  const getTicketForAdmin = async (
+    ticketId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`, options);
 
     return data;
   };
@@ -196,15 +205,18 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    *
    * @param {string} ticketId
    * @param {IGetTicketArtifactsQueryParams} [params]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<IGetTicketArtifactsResponse>}
    */
   const getTicketArtifacts = async (
     ticketId: string,
-    params?: IGetTicketArtifactsQueryParams
+    params?: IGetTicketArtifactsQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IGetTicketArtifactsResponse> => {
     const { data } = await axios.get(`/api/administrative/tickets/${ticketId}/artifact`, {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -227,20 +239,41 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Update final review status for a submission upload.
+   * Get the active processing status history of a submission upload, earliest first.
    *
-   * @param {string} submissionUuid
+   * @param {number} submissionId
    * @param {string} submissionUploadId
-   * @param {IUpdateSubmissionUploadReviewStatusRequest} payload
-   * @return {Promise<ISubmissionUploadReviewStatusResponse>}
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {Promise<ISubmissionUploadProcessingStatusHistoryItem[]>}
    */
-  const updateSubmissionUploadReviewStatus = async (
-    submissionUuid: string,
+  const getSubmissionUploadProcessingStatusHistory = async (
+    submissionId: number,
     submissionUploadId: string,
-    payload: IUpdateSubmissionUploadReviewStatusRequest
-  ): Promise<ISubmissionUploadReviewStatusResponse> => {
-    const { data } = await axios.patch<ISubmissionUploadReviewStatusResponse>(
-      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/status`,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionUploadProcessingStatusHistoryItem[]> => {
+    const { data } = await axios.get<ISubmissionUploadProcessingStatusHistoryItem[]>(
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status/history`,
+      options
+    );
+
+    return data;
+  };
+
+  /**
+   * Record the human review decision for a submission upload.
+   *
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @param {IUpdateSubmissionUploadDecisionRequest} payload
+   * @return {Promise<ISubmissionUploadDecisionResponse>}
+   */
+  const updateSubmissionUploadDecision = async (
+    submissionId: number,
+    submissionUploadId: string,
+    payload: IUpdateSubmissionUploadDecisionRequest
+  ): Promise<ISubmissionUploadDecisionResponse> => {
+    const { data } = await axios.patch<ISubmissionUploadDecisionResponse>(
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/status`,
       payload
     );
 
@@ -248,46 +281,22 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Update a scoped submission upload review task.
+   * Create a new scoped submission upload review task.
    *
-   * @param {string} submissionUuid
-   * @param {string} submissionUploadId
-   * @param {string} submissionUploadReviewId
-   * @param {IUpdateSubmissionUploadReviewRequest} payload
-   * @return {Promise<TicketSubmissionUploadReviewResponse>}
-   */
-  const updateSubmissionUploadReview = async (
-    submissionUuid: string,
-    submissionUploadId: string,
-    submissionUploadReviewId: string,
-    payload: IUpdateSubmissionUploadReviewRequest
-  ): Promise<TicketSubmissionUploadReviewResponse> => {
-    const { data } = await axios.patch<TicketSubmissionUploadReviewResponse>(
-      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
-      payload
-    );
-
-    return data;
-  };
-
-  /**
-   * Request a new scoped submission upload review task.
+   * Existing reviews for the requested upload and scope remain unchanged.
    *
-   * The backend closes any active review for the requested scope before creating
-   * the replacement review row.
-   *
-   * @param {string} submissionUuid
+   * @param {number} submissionId
    * @param {string} submissionUploadId
    * @param {ICreateSubmissionUploadReviewRequest} payload
    * @return {Promise<TicketSubmissionUploadReviewResponse>}
    */
   const insertSubmissionUploadReview = async (
-    submissionUuid: string,
+    submissionId: number,
     submissionUploadId: string,
     payload: ICreateSubmissionUploadReviewRequest
   ): Promise<TicketSubmissionUploadReviewResponse> => {
     const { data } = await axios.post<TicketSubmissionUploadReviewResponse>(
-      `/api/administrative/submission/${submissionUuid}/upload/${submissionUploadId}/review`,
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review`,
       payload
     );
 
@@ -325,12 +334,17 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get tickets accessible to the current user via team membership.
    *
    * @param {ITicketsQueryParams} [params]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForUser = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForUser = async (
+    params?: ITicketsQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/tickets', {
       params,
-      paramsSerializer: (params) => qs.stringify(params)
+      paramsSerializer: (params) => qs.stringify(params),
+      ...options
     });
 
     return data;
@@ -340,10 +354,14 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
-    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
+  const getTicketForUser = async (
+    ticketId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`, options);
 
     return data;
   };
@@ -407,8 +425,8 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     completeTicketUpload,
     getTicketArtifacts,
     getTicketArtifactDownloadUrl,
-    updateSubmissionUploadReviewStatus,
-    updateSubmissionUploadReview,
+    getSubmissionUploadProcessingStatusHistory,
+    updateSubmissionUploadDecision,
     insertSubmissionUploadReview,
     createTicketReference,
     deleteTicketReference,
