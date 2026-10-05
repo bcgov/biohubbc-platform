@@ -67,6 +67,7 @@ export class MartinContextRepository extends BaseRepository {
           expression_id,
           feature_type_id,
           system_user_id,
+          submission_ids,
           record_end_date,
           create_user
         )
@@ -75,6 +76,7 @@ export class MartinContextRepository extends BaseRepository {
           ${context.expression_id},
           ${context.feature_type_id},
           ${context.system_user_id},
+          ${context.submission_ids ?? null},
           now() + make_interval(secs => ${ttlSeconds}),
           api_get_context_user_id()
         WHERE NOT EXISTS (

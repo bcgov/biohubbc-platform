@@ -5,10 +5,9 @@ import sinonChai from 'sinon-chai';
 import { claimDownloadForCurrentUser, findDownloadById } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
-import { HTTP403, HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
+import { HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
 import { DownloadDetailRecord } from '../../../models/download';
 import { DownloadService } from '../../../services/download/download-service';
-import { UserService } from '../../../services/user-service';
 
 chai.use(sinonChai);
 
@@ -33,20 +32,14 @@ describe('paths/download/{downloadId}/index', () => {
   });
 
   describe('findDownloadById', () => {
-    it('should return 200 with download details when user is authorized', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
-
+    it('should return 200 with authorized download details', async () => {
       const mockDownload = makeDownloadRecord();
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
+      const dbConnectionObj = getMockDBConnection();
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      mockReq.params = { downloadId: mockDownload.download_id };
 
       const requestHandler = findDownloadById();
 
@@ -69,18 +62,13 @@ describe('paths/download/{downloadId}/index', () => {
     });
 
     it('should return 200 with description: null when policy description is null', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
       const mockDownload = makeDownloadRecord({ description: null });
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
+      const dbConnectionObj = getMockDBConnection();
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      mockReq.params = { downloadId: mockDownload.download_id };
 
       const requestHandler = findDownloadById();
 
@@ -93,156 +81,35 @@ describe('paths/download/{downloadId}/index', () => {
       });
     });
 
-    it('should return 200 for anonymous download without authentication', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-
+    it('uses the authenticated connection when a bearer token is present', async () => {
       const mockDownload = makeDownloadRecord();
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
+      const dbConnectionObj = getMockDBConnection();
+      const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = 'token';
+      mockReq.params = { downloadId: mockDownload.download_id };
 
-      // No keycloak_token — unauthenticated request
-      mockReq.keycloak_token = undefined as any;
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      await findDownloadById()(mockReq, mockRes, mockNext);
 
-      const requestHandler = findDownloadById();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
+      expect(getDBConnectionStub).to.have.been.calledOnceWith('token');
       expect(mockRes.statusValue).to.equal(200);
     });
 
-    it('should return 200 for owned download when user is authorized', async () => {
+    it('should throw HTTP404 when the download is not found during response loading', async () => {
       const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-      const mockDownload = makeDownloadRecord();
-
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(mockRes.statusValue).to.equal(200);
-    });
-
-    it('should throw HTTP403 when unauthenticated user accesses owned download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
-      const requestHandler = findDownloadById();
-
       try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
+        await findDownloadById()(mockReq, mockRes, mockNext);
+        expect.fail('Expected HTTP404');
       } catch (error) {
-        expect((error as HTTPError).status).to.equal(403);
-        expect((error as HTTPError).message).to.equal('Access denied');
-      }
-    });
-
-    it('should throw HTTP403 when wrong user accesses owned download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(403);
-        expect((error as HTTPError).message).to.equal('Access denied');
-      }
-    });
-
-    it('should throw HTTP404 when download not found', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP404('Download not found'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.params = { downloadId: '999' };
-
-      const requestHandler = findDownloadById();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(404);
-        expect((error as HTTPError).message).to.equal('Download not found');
-      }
-    });
-
-    it('should throw HTTP403 when unauthenticated user accesses team download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = undefined as any;
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(403);
-        expect((error as HTTPError).message).to.equal('Access denied');
-      }
-    });
-
-    it('should throw HTTP403 when authenticated user is not authorized for the download', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.keycloak_token = 'token';
-      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
-
-      const requestHandler = findDownloadById();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(403);
-        expect((error as HTTPError).message).to.equal('Access denied');
+        expect(error).to.be.instanceOf(HTTP404);
       }
     });
   });

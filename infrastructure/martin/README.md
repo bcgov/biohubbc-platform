@@ -69,12 +69,18 @@ Martin's automatic discovery is **always disabled** (`auto_publish: false`). Lef
 publishes every table and function its database role can read. Only the function sources listed in
 `app.martin.functions` are served.
 
-One source is published:
+Three sources are published:
 
 - **`search`** (`biohub.martin_search`) — authorized search-result tiles. Resolves the opaque context id
   the gateway forwards, then applies the feature security predicate **at serve time**, so securing a
   feature removes it from tiles within one gateway cache TTL rather than lasting for the life of a
   session.
+- **`feature`** (`biohub.martin_feature`) — the spatial properties of one submission feature. The
+  submission and feature ids travel inside the verified token, so no context row is needed; access is
+  decided when the token is minted.
+- **`upload`** (`biohub.martin_upload`) — the spatial properties of every active feature of one
+  submission upload, for the administrative upload review map. Same token-carried design as `feature`;
+  minting is restricted to system administrators.
 
 ### Tile cache
 

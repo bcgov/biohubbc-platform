@@ -1,24 +1,20 @@
 import { Box, ClickAwayListener, Stack } from '@mui/material';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonHorizontalStack } from 'components/loading/SkeletonLoaders';
 import { SearchInput } from 'components/search/SearchInput';
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import { URL_PARAMS } from 'constants/query-params';
+import { SEARCH_PREVIEW_DEBOUNCE_MS, SEARCH_PREVIEW_PAGINATION } from 'constants/search';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
-import { ISearchAllFilters, SearchResponse, SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
-import { debounce } from 'lodash-es';
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import useDebounce from 'hooks/useDebounce';
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
 import { buildSearchFeatureTypePath } from 'utils/routes';
 import { SearchListbox } from './listbox/SearchListbox';
 import { SearchTabs } from './tab/SearchTabs';
 import { ISearchContainerLink } from './tab/SearchTabs.interface';
-
-const SEARCH_PREVIEW_PAGINATION: ApiPaginationRequestOptions = { limit: 3, page: 1 };
-const SEARCH_DEBOUNCE_MS = 400;
 
 interface ISearchContainerProps {
   links: ISearchContainerLink[];
@@ -40,56 +36,32 @@ interface ISearchContainerProps {
 export const SearchContainer = ({ links, isLoading = false }: ISearchContainerProps) => {
   const api = useApi();
   const navigate = useNavigate();
-  const dialogContext = useDialogContext();
 
   const [searchValue, setSearchValue] = useState('');
-  const [records, setRecords] = useState<SearchResponse | null>(null);
-  const [summary, setSummary] = useState<SearchSummaryResponse | null>(null);
+  // The keyword the preview shows; null until the user first types, when only the summary of everything is shown.
+  const [previewKeyword, setPreviewKeyword] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const recordsLoader = useDataLoader((params: ISearchAllFilters, pagination?: ApiPaginationRequestOptions) =>
-    api.search.searchAll(params, pagination)
-  );
-  const summaryLoader = useDataLoader((params: ISearchAllFilters) => api.search.searchSummary(params));
+  const recordsQuery = useQuery({
+    queryKey: searchQueryKeys.keywordRecords(previewKeyword ?? '', SEARCH_PREVIEW_PAGINATION),
+    queryFn: ({ signal }) =>
+      api.search.searchAll({ keyword: previewKeyword ?? '' }, SEARCH_PREVIEW_PAGINATION, { signal }),
+    enabled: previewKeyword !== null,
+    placeholderData: keepPreviousData
+  });
+  const summaryQuery = useQuery({
+    queryKey: searchQueryKeys.keywordSummary(previewKeyword ?? ''),
+    queryFn: ({ signal }) => api.search.searchSummary({ keyword: previewKeyword ?? '' }, { signal }),
+    placeholderData: keepPreviousData
+  });
+  const records = recordsQuery.data ?? null;
+  const summary = summaryQuery.data ?? null;
 
-  // Load initial summary (empty query = match everything)
-  useEffect(() => {
-    const loadInitialSummary = async () => {
-      const summaryData = await summaryLoader.load({ keyword: '' });
-      if (summaryData) {
-        setSummary(summaryData);
-      }
-    };
-    loadInitialSummary();
-  }, [summaryLoader, dialogContext]);
+  const debouncedSearch = useDebounce(setPreviewKeyword, SEARCH_PREVIEW_DEBOUNCE_MS);
 
-  // Preview search (used only for dropdown)
-  const runPreviewSearch = useCallback(
-    async (value: string) => {
-      const params: ISearchAllFilters = { keyword: value };
-
-      const [recordsData, summaryData] = await Promise.all([
-        recordsLoader.refresh(params, SEARCH_PREVIEW_PAGINATION),
-        summaryLoader.refresh(params)
-      ]);
-
-      if (recordsData) {
-        setRecords(recordsData);
-      }
-      if (summaryData) {
-        setSummary(summaryData);
-      }
-    },
-    [recordsLoader, summaryLoader]
-  );
-
-  const debouncedSearch = useMemo(
-    () => debounce((value: string) => runPreviewSearch(value), SEARCH_DEBOUNCE_MS),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
 
   // Input change → debounced preview search
   const handleChange = useCallback(
@@ -129,7 +101,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
   const handleClickAway = useCallback(() => setIsDropdownOpen(false), []);
 
   const shouldShowDropdown = isDropdownOpen && (records || summary);
-  const showLoading = !records && !summary && recordsLoader.isLoading && summaryLoader.isLoading;
+  const showLoading = !records && !summary && recordsQuery.isFetching && summaryQuery.isFetching;
 
   return (
     <Stack gap={2}>

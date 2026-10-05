@@ -1,36 +1,48 @@
 import { TaxonPropertyValue } from 'interfaces/property-value.interface';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { TaxonPropertyValueLink } from './TaxonPropertyValueLink';
 
 const taxon: TaxonPropertyValue = { taxon_id: 180543, tsn: 180543, rank: 'Species', label: 'Ursus americanus' };
 
 interface RenderOptions {
   submissionId?: number;
-  featureRouteBasePath?: string;
-  initialEntry?: string;
+  getSubmissionTaxonPath?: (submissionId: number, taxonId: number) => string;
 }
 
 const renderLink = (value: TaxonPropertyValue, options: RenderOptions = {}) => {
-  const { submissionId = 3, featureRouteBasePath = '/submission', initialEntry = '/x' } = options;
+  const {
+    submissionId = 3,
+    getSubmissionTaxonPath = buildSubmissionPropertyValuePathResolvers('/submission').getSubmissionTaxonPath
+  } = options;
 
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <TaxonPropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
+    <MemoryRouter>
+      <TaxonPropertyValueLink
+        value={value}
+        submissionId={submissionId}
+        getSubmissionTaxonPath={getSubmissionTaxonPath}
+      />
     </MemoryRouter>
   );
 };
 
 describe('TaxonPropertyValueLink', () => {
-  it('links the label to the taxon page under the referencing submission, keeping the query string', () => {
-    const { getByRole } = renderLink(taxon, { submissionId: 3, initialEntry: '/x?view=table' });
+  it('links the label to the taxon path provided by the caller', () => {
+    const getSubmissionTaxonPath = vi.fn(() => '/submission/3/taxon/180543?view=table');
+    const { getByRole } = renderLink(taxon, { submissionId: 3, getSubmissionTaxonPath });
 
     const link = getByRole('link', { name: 'Ursus americanus' });
     expect(link).toHaveAttribute('href', '/submission/3/taxon/180543?view=table');
+    expect(getSubmissionTaxonPath).toHaveBeenCalledWith(3, 180543);
   });
 
   it('uses the portal route base when given', () => {
-    const { getByRole } = renderLink(taxon, { submissionId: 3, featureRouteBasePath: '/portal/submission' });
+    const { getByRole } = renderLink(taxon, {
+      submissionId: 3,
+      getSubmissionTaxonPath: buildSubmissionPropertyValuePathResolvers('/portal/submission').getSubmissionTaxonPath
+    });
 
     expect(getByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
       'href',

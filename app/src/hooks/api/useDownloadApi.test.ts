@@ -4,7 +4,9 @@ import {
   CreateDownloadRequest,
   CreateDownloadResponse,
   DownloadDetail,
-  DownloadListResponse
+  DownloadListResponse,
+  DownloadVersion,
+  DownloadVersionListResponse
 } from 'interfaces/useDownloadApi.interface';
 import { useDownloadApi } from './useDownloadApi';
 
@@ -27,8 +29,9 @@ describe('useDownloadApi', () => {
             download_id: 'abc-123',
             download_version_id: 'ver-abc-123',
             download_status: 'ready',
+            name: 'Example download',
+            description: 'Example download description',
             create_date: '2026-03-01T00:00:00Z',
-            feature_count: 42,
             started_at: '2026-03-01T00:01:00Z',
             completed_at: '2026-03-01T00:02:00Z',
             downloaded_at: null,
@@ -72,7 +75,7 @@ describe('useDownloadApi', () => {
             {
               type: 'predicate',
               feature_property_id: 1,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Equals',
               value: 'moose'
             }
@@ -133,6 +136,61 @@ describe('useDownloadApi', () => {
       mock.onGet(`/api/download/${downloadId}`).reply(404, { message: 'Not found' });
 
       await expect(useDownloadApi(axios).getDownload(downloadId)).rejects.toThrow();
+    });
+  });
+
+  describe('listDownloadVersions', () => {
+    it('should send GET to /api/download/<id>/version and return response', async () => {
+      const downloadId = '550e8400-e29b-41d4-a716-446655440099';
+      const mockResponse: DownloadVersionListResponse = {
+        versions: [
+          {
+            download_version_id: 'ver-abc-123',
+            download_id: downloadId,
+            status: 'ready',
+            feature_count: 42,
+            started_at: '2026-03-01T00:01:00Z',
+            completed_at: '2026-03-01T00:02:00Z',
+            materialized_at: '2026-03-01T00:02:00Z',
+            error_message: null,
+            create_date: '2026-03-01T00:00:00Z'
+          }
+        ],
+        pagination: { total: 1, current_page: 1, last_page: 1 }
+      };
+
+      mock.onGet(`/api/download/${downloadId}/version`).reply(200, mockResponse);
+
+      const result = await useDownloadApi(axios).listDownloadVersions(downloadId, { page: 1, limit: 10 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].url).toBe(`/api/download/${downloadId}/version`);
+      expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
+    });
+  });
+
+  describe('getDownloadVersion', () => {
+    it('should send GET to the nested version resource and return it', async () => {
+      const downloadId = '550e8400-e29b-41d4-a716-446655440099';
+      const downloadVersionId = '660e8400-e29b-41d4-a716-446655440099';
+      const mockResponse: DownloadVersion = {
+        download_version_id: downloadVersionId,
+        download_id: downloadId,
+        status: 'ready',
+        feature_count: 42,
+        started_at: null,
+        completed_at: null,
+        materialized_at: null,
+        error_message: null,
+        create_date: '2026-03-01T00:00:00Z'
+      };
+
+      mock.onGet(`/api/download/${downloadId}/version/${downloadVersionId}`).reply(200, mockResponse);
+
+      const result = await useDownloadApi(axios).getDownloadVersion(downloadId, downloadVersionId);
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].url).toBe(`/api/download/${downloadId}/version/${downloadVersionId}`);
     });
   });
 });

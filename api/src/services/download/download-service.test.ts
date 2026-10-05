@@ -6,7 +6,8 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import {
   createMockDownloadRecord,
   createMockDownloadVersion,
-  createMockDownloadVersionExportListRow
+  createMockDownloadVersionExportListRow,
+  createMockDownloadVersionStatusRecord
 } from '../../__mocks__/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
@@ -38,6 +39,65 @@ describe('DownloadService', () => {
 
       expect(stub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001');
       expect(result).to.be.null;
+    });
+  });
+
+  describe('listDownloadVersions', () => {
+    it('lists versions without applying route-level authorization', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+      const rows = [createMockDownloadVersionStatusRecord({ download_id: downloadId })];
+
+      const listStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersions').resolves(rows);
+
+      const result = await service.listDownloadVersions(downloadId, { page: 1, limit: 10 });
+
+      expect(listStub).to.have.been.calledOnceWith(downloadId, { page: 1, limit: 10 });
+      expect(result).to.eql(rows);
+    });
+  });
+
+  describe('listDownloadVersionsCount', () => {
+    it('counts versions without applying route-level authorization', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+
+      const countStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionsCount').resolves(3);
+
+      const result = await service.listDownloadVersionsCount(downloadId);
+
+      expect(countStub).to.have.been.calledOnceWith(downloadId);
+      expect(result).to.equal(3);
+    });
+  });
+
+  describe('getDownloadVersion', () => {
+    it('returns a version belonging to the requested download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+      const version = createMockDownloadVersionStatusRecord({ download_id: downloadId });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(version);
+
+      expect(await service.getDownloadVersion(downloadId, version.download_version_id)).to.eql(version);
+    });
+
+    it('returns 404 when the version belongs to another download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+      const version = createMockDownloadVersionStatusRecord({
+        download_id: 'aaaa0000-0000-0000-0000-000000000002'
+      });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(version);
+
+      try {
+        await service.getDownloadVersion('aaaa0000-0000-0000-0000-000000000001', version.download_version_id);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP404);
+      }
     });
   });
 
@@ -192,7 +252,7 @@ describe('DownloadService', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: 2,
+          blueprint_feature_type_property_id: 2,
           operator: 'Equals',
           value: 'moose'
         }
@@ -573,6 +633,61 @@ describe('DownloadService', () => {
     });
   });
 
+  describe('isUserAuthorizedForDownload', () => {
+    it('returns false when the download does not exist', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
+      const claimedStub = sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam');
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload');
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', null);
+
+      expect(result).to.be.false;
+      expect(claimedStub).not.to.have.been.called;
+      expect(membershipStub).not.to.have.been.called;
+    });
+
+    it('returns true for an unclaimed download without checking team membership', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam').resolves(false);
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload');
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', null);
+
+      expect(result).to.be.true;
+      expect(membershipStub).not.to.have.been.called;
+    });
+
+    it('returns false for an anonymous request to a claimed download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam').resolves(true);
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload');
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', null);
+
+      expect(result).to.be.false;
+      expect(membershipStub).not.to.have.been.called;
+    });
+
+    it('returns the repository membership result for an authenticated request to a claimed download', async () => {
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'isDownloadClaimedByTeam').resolves(true);
+      const membershipStub = sinon.stub(DownloadRepository.prototype, 'isUserAuthorizedForDownload').resolves(true);
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', 42);
+
+      expect(result).to.be.true;
+      expect(membershipStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 42);
+    });
+  });
+
   describe('linkDownloadToNewTeam', () => {
     it('creates a team and links it to the download', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -662,9 +777,7 @@ describe('DownloadService', () => {
         }
       ];
 
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
-        .resolves(artifacts);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves(artifacts);
       const signedUrlStub = sinon
         .stub(ObjectStorageService.prototype, 'getSignedUrl')
         .callsFake(async (_bucket, key) => `https://s3.example.com/${key}?sig=x`);
@@ -685,7 +798,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([
         {
           artifact_id: 'art-1',
           object_key: `downloads/${DOWNLOAD_ID}/versions/${VERSION_ID}/Animal/data.parquet`
@@ -716,9 +829,7 @@ describe('DownloadService', () => {
         }
       ];
 
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId')
-        .resolves(artifacts);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves(artifacts);
       sinon.stub(ObjectStorageService.prototype, 'getSignedUrl').resolves('https://s3.example.com/signed');
 
       const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
@@ -731,7 +842,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifactsByDownloadVersionId').resolves([]);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionArtifacts').resolves([]);
 
       const result = await service.listDownloadParquetUrls(DOWNLOAD_ID, VERSION_ID);
 

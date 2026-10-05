@@ -17,17 +17,27 @@ export const SecurityRuleRecord = z.object({
 
 export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
 
+/**
+ * A screenable rule with the ids of its active expressions. An empty list means the rule has no
+ * expression to evaluate, so screening skips it.
+ */
+export const SecurityRuleWithExpressions = SecurityRuleRecord.pick({ security_rule_id: true, name: true }).extend({
+  expression_ids: z.array(z.string().uuid())
+});
+
+export type SecurityRuleWithExpressions = z.infer<typeof SecurityRuleWithExpressions>;
+
 export const SecurityRuleAndCategory = z.object({
   security_rule_id: z.number(),
   policy_id: z.string().uuid().nullable(),
   name: z.string(),
-  description: z.string(),
+  description: z.string().nullable(),
   is_active: z.boolean(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
   security_category_id: z.number(),
   category_name: z.string(),
-  category_description: z.string(),
+  category_description: z.string().nullable(),
   category_record_effective_date: z.string(),
   category_record_end_date: z.string().nullable()
 });

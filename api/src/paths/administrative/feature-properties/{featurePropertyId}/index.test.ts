@@ -50,7 +50,7 @@ describe('getFeatureProperty', () => {
   it('should return 200 with feature property details', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    sinon.stub(FeaturePropertyService.prototype, 'getFeatureProperty').resolves(mockFeatureProperty);
+    sinon.stub(FeaturePropertyService.prototype, 'getAdminFeatureProperty').resolves(mockFeatureProperty);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { featurePropertyId: '1' };

@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 
 /**
@@ -11,10 +11,11 @@ const useCodesApi = (axios: AxiosInstance) => {
   /**
    * Fetch all code sets.
    *
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*}  {Promise<IGetAllCodeSetsResponse>}
    */
-  const getAllCodeSets = async (): Promise<IGetAllCodeSetsResponse> => {
-    const { data } = await axios.get('/api/codes/');
+  const getAllCodeSets = async (options?: Pick<AxiosRequestConfig, 'signal'>): Promise<IGetAllCodeSetsResponse> => {
+    const { data } = await axios.get('/api/codes/', options);
 
     return data;
   };

@@ -26,3 +26,12 @@ export const EXPRESSION_BUILDER_PREDICATE_OPERATOR_LABELS: Partial<Record<Expres
   Intersects: 'intersects',
   Exists: 'exists'
 };
+
+/** Most suggestion chips of each kind (properties, species) the expression builder shows at once. */
+export const EXPRESSION_BUILDER_MAX_SUGGESTIONS_PER_CATEGORY = 6;
+
+/** Page size of the property searches behind expression-builder pickers. */
+export const EXPRESSION_BUILDER_PROPERTY_SEARCH_LIMIT = 25;
+
+/** Most pages fetched to find the definitions of properties a draft expression already uses. */
+export const EXPRESSION_BUILDER_PROPERTY_HYDRATION_MAX_PAGES = 20;

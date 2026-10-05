@@ -85,7 +85,6 @@ const defaultProps: IReasonsContainerProps = {
   sortModel: [{ field: 'name', sort: 'asc' }],
   setSortModel: vi.fn(),
   refresh: vi.fn(),
-  refreshCategories: vi.fn(),
   searchTerm: '',
   onSearch: vi.fn()
 };
@@ -130,10 +129,8 @@ describe('ReasonsContainer', () => {
     mockCreateSecurityReason.mockResolvedValueOnce({});
 
     const mockRefresh = vi.fn();
-    const mockRefreshCategories = vi.fn();
     const { getByRole, getByLabelText, queryByText } = renderComponent({
-      refresh: mockRefresh,
-      refreshCategories: mockRefreshCategories
+      refresh: mockRefresh
     });
 
     fireEvent.click(getByRole('button', { name: /^add$/i }));
@@ -162,7 +159,6 @@ describe('ReasonsContainer', () => {
     await waitFor(() => {
       expect(queryByText('Add Reason')).toBeNull();
       expect(mockRefresh).toHaveBeenCalled();
-      expect(mockRefreshCategories).toHaveBeenCalled();
     });
   });
 });

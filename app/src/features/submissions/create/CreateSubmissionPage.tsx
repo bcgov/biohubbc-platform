@@ -1,17 +1,26 @@
-import { Box, Button, Container, Paper, Stack } from '@mui/material';
+import { Box, Container, Paper, Stack } from '@mui/material';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { PrimaryButton } from 'components/button/PrimaryButton';
+import { SecondaryButton } from 'components/button/SecondaryButton';
+import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from 'components/header/PageHeader';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { uploadMultipartTar } from 'utils/submission-upload-utils';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import yup from 'utils/YupSchema';
+import { uploadMultipartTar } from 'utils/submission-upload-utils';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
 import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 
 const initialSubmissionValues: ICreateSubmissionForm = {
+  clientId: '',
   name: '',
   description: '',
   comment: '',
@@ -19,6 +28,7 @@ const initialSubmissionValues: ICreateSubmissionForm = {
 };
 
 export const SubmissionYupSchema = yup.object().shape({
+  clientId: yup.string().trim().max(100),
   name: yup.string().required('Enter a name for the submission').max(100),
   description: yup.string().max(500).required('Description is required'),
   comment: yup.string().max(500).required('Comment is required'),
@@ -30,9 +40,15 @@ export const SubmissionYupSchema = yup.object().shape({
     })
 });
 
+/**
+ * Create a submission for the selected contributor or token default and upload its archive.
+ *
+ * @returns The submission creation page.
+ */
 export const CreateSubmissionPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const bioHubApi = useApi();
+  const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
   const navigate = useNavigate();
 
@@ -40,16 +56,21 @@ export const CreateSubmissionPage = () => {
 
   /**
    * Upload a user-provided TAR archive as a multipart submission upload.
+   *
+   * @param values Contributor selection, submission details, and archive file.
+   * @returns Resolves after upload completion or displaying the request error.
    */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
     setIsSubmitting(true);
 
-    const { file, ...submission } = values;
+    const { file, clientId, ...submission } = values;
+    const selectedClientId = clientId.trim();
 
     try {
       // Request pre-signed upload URLs for multipart upload
       const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls({
         ...submission,
+        ...(selectedClientId ? { client_id: selectedClientId } : {}),
         bytes: file.size
       });
 
@@ -66,6 +87,7 @@ export const CreateSubmissionPage = () => {
         uploadResponse.key,
         parts
       );
+      void refreshChangedQueries(queryClient, changedQueryKeys.submissionCreated());
 
       dialogContext.setSnackbar({
         snackbarMessage: `Successfully submitted "${values.name}"`,
@@ -89,15 +111,25 @@ export const CreateSubmissionPage = () => {
   return (
     <>
       <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="new submission breadcrumb">
+            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+              Submissions
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              New Submission
+            </Typography>
+          </Breadcrumbs>
+        }
         label="New Submission"
         buttons={
           <Stack gap={1} flexDirection="row">
-            <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
+            <SecondaryButton disabled={isSubmitting} onClick={handleCancel}>
               Cancel
-            </Button>
-            <Button loading={isSubmitting} variant="contained" onClick={() => formikRef.current?.submitForm()}>
+            </SecondaryButton>
+            <PrimaryButton loading={isSubmitting} onClick={() => formikRef.current?.submitForm()}>
               Submit
-            </Button>
+            </PrimaryButton>
           </Stack>
         }
       />
@@ -115,12 +147,12 @@ export const CreateSubmissionPage = () => {
               <CreateSubmissionForm />
             </Box>
             <Stack gap={1} flexDirection="row" flex="1 1 auto" justifyContent="flex-end">
-              <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
+              <SecondaryButton disabled={isSubmitting} onClick={handleCancel}>
                 Cancel
-              </Button>
-              <Button loading={isSubmitting} variant="contained" onClick={formikProps.submitForm}>
+              </SecondaryButton>
+              <PrimaryButton loading={isSubmitting} onClick={formikProps.submitForm}>
                 Submit
-              </Button>
+              </PrimaryButton>
             </Stack>
           </Container>
         )}

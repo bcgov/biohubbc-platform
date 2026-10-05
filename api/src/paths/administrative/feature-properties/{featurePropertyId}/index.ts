@@ -66,7 +66,7 @@ export function getFeatureProperty(): RequestHandler {
       await connection.open();
 
       const featurePropertyService = new FeaturePropertyService(connection);
-      const result = await featurePropertyService.getFeatureProperty(featurePropertyId);
+      const result = await featurePropertyService.getAdminFeatureProperty(featurePropertyId);
 
       await connection.commit();
 

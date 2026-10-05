@@ -14,7 +14,7 @@ interface SearchResultSecuredAlertProps {
  * matched secured features the caller cannot access (and were therefore hidden).
  *
  * Rendered when the search response reports hidden secured matches
- * (`has_more_secured_features`), not merely when visible rows are secured.
+ * (`has_inaccessible_secured_features`), not merely when visible rows are secured.
  * Navigation stays in the parent and is passed in as the access-request callback.
  *
  * @param {SearchResultSecuredAlertProps} props - Callback for the "Request Access" action.

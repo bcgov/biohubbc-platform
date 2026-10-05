@@ -5,11 +5,12 @@ import { GridColDef } from '@mui/x-data-grid';
 import { ContextMenuButton } from 'components/ContextMenuButton';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
-import { IUseServerPaginatedDataGridReturn } from 'hooks/useServerPaginatedDataGrid';
-import { IPolicyExpression, IPolicyExpressionsResponse } from 'interfaces/usePoliciesApi.interface';
+import { IServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { IPolicyExpression } from 'interfaces/usePoliciesApi.interface';
 
 interface PolicyExpressionsProps {
-  expressions: IUseServerPaginatedDataGridReturn<IPolicyExpression, IPolicyExpressionsResponse>;
+  /** The page of expressions on screen, its total, and the grid's pagination and sort. */
+  expressions: { grid: IServerPaginatedGridState; rows: IPolicyExpression[]; rowCount: number };
   onCreate: () => void;
   onEdit: (expression: IPolicyExpression) => void;
   onDelete: (expression: IPolicyExpression) => void;
@@ -100,10 +101,10 @@ export const PolicyExpressions = ({ expressions, onCreate, onEdit, onDelete }: P
         getRowId={(row) => row.policy_expression_id}
         noRowsMessage="No Expressions"
         rowCount={expressions.rowCount}
-        paginationModel={expressions.paginationModel}
-        setPaginationModel={expressions.handlePaginationChange}
-        sortModel={expressions.sortModel}
-        setSortModel={expressions.handleSortChange}
+        paginationModel={expressions.grid.paginationModel}
+        setPaginationModel={expressions.grid.handlePaginationChange}
+        sortModel={expressions.grid.sortModel}
+        setSortModel={expressions.grid.handleSortChange}
         getRowHeight={() => 'auto'}
         getEstimatedRowHeight={() => 160}
         sx={{

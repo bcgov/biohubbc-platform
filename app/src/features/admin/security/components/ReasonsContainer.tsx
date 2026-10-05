@@ -16,16 +16,14 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ISecurityReasonWithFeatureCount } from 'interfaces/useSecurityApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { IAddReasonFormValues } from './AddReasonForm';
 import { AddReasonFormInitialValues, ReasonDialog } from './ReasonDialog';
 
 export interface IReasonsContainerProps extends IServerPaginationProps {
   reasons: ISecurityReasonWithFeatureCount[];
-  /** Callback to refresh the reasons list after create/update/delete */
+  /** Callback after create/update/delete, which refreshes the reasons and categories (whose rule_count it changes) */
   refresh: () => void;
-  /** Callback to refresh categories so rule_count stays in sync */
-  refreshCategories: () => void;
   searchTerm: string;
   onSearch: (term: string) => void;
 }
@@ -51,21 +49,13 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     sortModel,
     setSortModel,
     refresh,
-    refreshCategories,
     searchTerm,
     onSearch
   } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
-
-  /**
-   * Refresh reasons and categories tables after a reason mutation.
-   */
-  const refreshTables = () => {
-    refresh();
-    refreshCategories();
-  };
+  const { setErrorDialog } = dialogContext;
 
   const [openAddReasonDialog, setOpenAddReasonDialog] = useState(false);
   const [openEditReasonDialog, setOpenEditReasonDialog] = useState(false);
@@ -83,18 +73,21 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
    * @param {string} text
    * @param {unknown} error
    */
-  const showLoadError = (title: string, text: string, error: unknown) => {
-    const apiError = error as APIError;
-    dialogContext.setErrorDialog({
-      open: true,
-      dialogTitle: title,
-      dialogText: text,
-      dialogError: apiError.message,
-      dialogErrorDetails: apiError.errors,
-      onClose: () => dialogContext.setErrorDialog({ open: false }),
-      onOk: () => dialogContext.setErrorDialog({ open: false })
-    });
-  };
+  const showLoadError = useCallback(
+    (title: string, text: string, error: unknown) => {
+      const apiError = error as APIError;
+      setErrorDialog({
+        open: true,
+        dialogTitle: title,
+        dialogText: text,
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => setErrorDialog({ open: false }),
+        onOk: () => setErrorDialog({ open: false })
+      });
+    },
+    [setErrorDialog]
+  );
 
   /**
    * Open confirmation dialog to delete a security reason.
@@ -117,7 +110,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       open: true,
       onYes: () => {
         dialogContext.setYesNoDialog({ open: false });
-        deleteReason(reason);
+        void deleteReason(reason);
       }
     });
   };
@@ -132,7 +125,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     try {
       await biohubApi.security.deleteSecurityReason(reason.security_rule_id);
       showSnackBar({ snackbarMessage: 'Deleted reason' });
-      refreshTables();
+      refresh();
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setErrorDialog({
@@ -179,7 +172,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       });
 
       setOpenAddReasonDialog(false);
-      refreshTables();
+      refresh();
       showSnackBar({ snackbarMessage: 'Created reason' });
     } catch (error) {
       const apiError = error as APIError;
@@ -220,7 +213,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
 
       setOpenEditReasonDialog(false);
       setEditingReason(null);
-      refreshTables();
+      refresh();
       showSnackBar({ snackbarMessage: 'Updated reason' });
     } catch (error) {
       const apiError = error as APIError;

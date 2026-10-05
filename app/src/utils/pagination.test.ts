@@ -1,23 +1,30 @@
-import { getPaginationItems, range } from './pagination';
+import { URL_PARAMS } from 'constants/query-params';
+import { describe, expect, it } from 'vitest';
+import { toApiCursorPagination } from './pagination';
 
-describe('pagination utils', () => {
-  describe('range', () => {
-    it('builds an inclusive number range', () => {
-      expect(range(2, 5)).toEqual([2, 3, 4, 5]);
+describe('toApiCursorPagination', () => {
+  it('returns default cursor-pagination options when URL parameters are absent', () => {
+    expect(toApiCursorPagination(new URLSearchParams())).toEqual({
+      limit: 10,
+      sort: undefined,
+      order: undefined,
+      cursor: undefined
     });
   });
 
-  describe('getPaginationItems', () => {
-    it('returns every page when all pages fit in the compact window', () => {
-      expect(getPaginationItems(1, 5)).toEqual([1, 2, 3, 4, 5]);
+  it('converts URL state while preserving the opaque cursor value', () => {
+    const params = new URLSearchParams({
+      [URL_PARAMS.LIMIT]: '25',
+      [URL_PARAMS.SORT]: 'create_date',
+      [URL_PARAMS.ORDER]: 'asc',
+      [URL_PARAMS.CURSOR]: 'CaseSensitive_Cursor-123'
     });
 
-    it('caps the leading page run before the ellipsis at four pages', () => {
-      expect(getPaginationItems(1, 99)).toEqual([1, 2, 3, 4, 'end-ellipsis', 99]);
-    });
-
-    it('keeps the final page visible for middle page windows', () => {
-      expect(getPaginationItems(5, 10)).toEqual([1, 'start-ellipsis', 3, 4, 5, 6, 'end-ellipsis', 10]);
+    expect(toApiCursorPagination(params)).toEqual({
+      limit: 25,
+      sort: 'create_date',
+      order: 'asc',
+      cursor: 'CaseSensitive_Cursor-123'
     });
   });
 });

@@ -1,8 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
-import { ExpressionTree } from '../../../../models/expression-tree';
+import type { SearchFeatureSecurityContext } from '../../../../models/search';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   featureSearchRequestBodySchema,
@@ -10,7 +9,9 @@ import {
 } from '../../../../openapi/schemas/search/search-feature';
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { getLogger } from '../../../../utils/logger';
-import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../../utils/pagination';
+import { makeCursorPaginationOptionsFromBody } from '../../../../utils/pagination';
+import { registerRequestCancellation } from '../../../../utils/request-cancellation';
+import { validateSearchExpressionTree, validateSearchFeatureType } from '../../../../utils/search-feature-validation';
 import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/search/feature/{feature_type}');
@@ -55,45 +56,52 @@ POST.apiDoc = {
 export function searchFeatures(): RequestHandler {
   return async (req, res) => {
     const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const cancellation = registerRequestCancellation(res);
+    const connectionOptions = { signal: cancellation.signal };
+    const connection = isAuthenticated
+      ? getDBConnection(req.keycloak_token, connectionOptions)
+      : getAPIUserDBConnection(connectionOptions);
 
     try {
       await connection.open();
 
       const systemUserId = isAuthenticated ? await getActiveSystemUserId(connection) : null;
-      const featureType = req.params.feature_type?.trim().toLowerCase();
-      const pagination = makePaginationOptionsFromBody(req);
+      const securityContext: SearchFeatureSecurityContext =
+        systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId };
+      const featureType = validateSearchFeatureType(req.params.feature_type);
+      const cursorPagination = makeCursorPaginationOptionsFromBody(req);
       const service = new SearchFeatureService(connection);
+      const expressionTree = validateSearchExpressionTree(req.body.expression) ?? null;
 
-      if (!featureType) {
-        throw new HTTP400('Feature type path parameter is required');
-      }
-
-      const expressionTreeParseResult = req.body.expression ? ExpressionTree.safeParse(req.body.expression) : null;
-
-      if (expressionTreeParseResult?.success === false) {
-        throw new HTTP400('Invalid expression tree', expressionTreeParseResult.error.issues);
-      }
-
-      const expressionTree = expressionTreeParseResult?.data;
-
-      const { features, properties, count, has_more_secured_features } =
-        await service.searchFeaturesByExpressionTreeWithCount(featureType, expressionTree, pagination, systemUserId);
+      const {
+        features,
+        properties,
+        has_inaccessible_secured_features,
+        pagination: paginationCursors
+      } = await service.searchFeaturesByExpressionTreeWithMetadata(
+        featureType,
+        expressionTree,
+        cursorPagination,
+        securityContext,
+        { submissionIds: req.body.submissionIds }
+      );
 
       await connection.commit();
 
       return res.status(200).json({
         features,
         properties,
-        pagination: makePaginationResponse(count, pagination),
-        has_more_secured_features
+        has_inaccessible_secured_features,
+        pagination: paginationCursors
       });
     } catch (error) {
       defaultLog.error({ label: 'searchFeatures', message: 'error', error });
+      cancellation.unregister();
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      cancellation.unregister();
+      await connection.release();
     }
   };
 }

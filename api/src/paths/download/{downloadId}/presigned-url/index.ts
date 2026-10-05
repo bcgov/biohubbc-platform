@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP409 } from '../../../../errors/http-error';
+import { HTTP404, HTTP409 } from '../../../../errors/http-error';
 import { DownloadStatusEnum } from '../../../../models/download-status';
 import { DownloadPresignedUrlResponseSchema } from '../../../../openapi/schemas/download';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
@@ -12,7 +12,9 @@ import { getLogger } from '../../../../utils/logger';
 const defaultLog = getLogger('paths/download/{downloadId}/presigned-url');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => ({ and: [{ discriminator: 'SystemUser' }] })),
+  authorizeRequestHandler((req) => ({
+    and: [{ discriminator: 'Download', downloadId: req.params.downloadId }]
+  })),
   getDownloadPresignedUrl()
 ];
 
@@ -46,9 +48,8 @@ GET.apiDoc = {
 /**
  * Generate presigned S3 URLs for the Parquet artifacts of a download.
  *
- * Enforces the same team-membership authorization used by JWT download routes
- * via `DownloadService.getAuthorizedDownload`. The API key only authenticates
- * the caller — it does not bypass normal access control.
+ * The API key authenticates the caller. The Download authorization rule then grants UUID access
+ * to unclaimed downloads or linked-team access to claimed downloads.
  *
  * Only `ready` and `downloaded` downloads may return URLs; any other status
  * produces a 409 Conflict so scripts can distinguish "not ready yet" from
@@ -63,12 +64,14 @@ export function getDownloadPresignedUrl(): RequestHandler {
     try {
       await connection.open();
 
-      const systemUserId = connection.systemUserId();
       const { downloadId } = req.params;
 
       const downloadService = new DownloadService(connection);
 
-      const download = await downloadService.getAuthorizedDownload(downloadId, systemUserId);
+      const download = await downloadService.findDownloadById(downloadId);
+      if (!download) {
+        throw new HTTP404('Download not found');
+      }
 
       const readyStatuses: string[] = [DownloadStatusEnum.READY, DownloadStatusEnum.DOWNLOADED];
       if (!readyStatuses.includes(download.download_status)) {

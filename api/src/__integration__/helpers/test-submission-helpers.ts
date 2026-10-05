@@ -153,8 +153,9 @@ export async function createTestFeature(
 
   // Mark the upload as approved so features are eligible for security scope anchors
   await connection.sql(SQL`
-    INSERT INTO submission_upload_status (submission_upload_id, status, create_user)
-    VALUES (${submissionUploadId}, 'approved', ${systemUserId});
+    UPDATE submission_upload
+    SET decision = 'approved'
+    WHERE submission_upload_id = ${submissionUploadId};
   `);
 
   const result = await connection.sql(SQL`
@@ -221,8 +222,9 @@ export async function createTestFeaturesInBulk(
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
 
   await connection.sql(SQL`
-    INSERT INTO submission_upload_status (submission_upload_id, status, create_user)
-    VALUES (${submissionUploadId}, 'approved', ${systemUserId});
+    UPDATE submission_upload
+    SET decision = 'approved'
+    WHERE submission_upload_id = ${submissionUploadId};
   `);
 
   // Bulk insert using generate_series — one query creates all N features
@@ -247,18 +249,22 @@ export async function createTestFeaturesInBulk(
 
 /**
  * Insert one `submission_upload` plus N `submission_feature` rows under it, each row
- * parameterized by `(source_id, record_end_date, data?)`.
+ * parameterized by `(source_id, record_end_date?, content_hash?, data?)`.
  *
  * Unlike `createTestFeaturesInBulk` — which inserts homogeneous features via
  * `generate_series` and is tuned for large counts — this helper supports
  * heterogeneous per-row data. Use it for tests that need control over
- * `source_id` and `record_end_date` to exercise NULL handling, soft-delete
- * semantics, or other per-row variation.
+ * `source_id`, `record_end_date`, and `content_hash` to exercise NULL handling,
+ * soft-delete semantics, reconciliation classification (a NULL `content_hash`
+ * always classifies as changed/superseded, never unchanged), or other per-row
+ * variation.
  *
  * @param connection Active database connection (transaction-scoped).
  * @param submissionId Submission to attach the upload and features to.
  * @param featureTypeName Feature type name (must exist in seed data).
  * @param features Per-row feature shapes. Empty array creates the upload with no features.
+ * @param status Optional `submission_upload.status` job status to set (e.g. 'indexed', which
+ *   upload activation requires). Defaults to the column default.
  * @returns The created `submission_upload_id`.
  */
 export async function createTestUploadWithFeatures(
@@ -268,8 +274,10 @@ export async function createTestUploadWithFeatures(
   features: Array<{
     source_id: string | null;
     record_end_date?: string | null;
+    content_hash?: string | null;
     data?: Record<string, unknown>;
-  }>
+  }>,
+  status?: string
 ): Promise<string> {
   const systemUserId = connection.systemUserId();
 
@@ -291,6 +299,14 @@ export async function createTestUploadWithFeatures(
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id as string;
 
+  if (status) {
+    await connection.sql(SQL`
+      UPDATE submission_upload
+      SET status = ${status}
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+    `);
+  }
+
   if (features.length === 0) {
     return submissionUploadId;
   }
@@ -309,6 +325,7 @@ export async function createTestUploadWithFeatures(
         feature_type_id,
         source_id,
         record_end_date,
+        content_hash,
         data,
         data_byte_size,
         create_user
@@ -319,6 +336,7 @@ export async function createTestUploadWithFeatures(
         ${featureTypeId},
         ${feature.source_id},
         ${feature.record_end_date ?? null},
+        ${feature.content_hash ?? null},
         ${dataJson}::jsonb,
         octet_length(${dataJson}::jsonb::text) + 500,
         ${systemUserId}

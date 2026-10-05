@@ -1,5 +1,8 @@
 import { EditDialog } from 'components/dialog/EditDialog';
+import { SYSTEM_ROLE } from 'constants/roles';
 import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { hasAtLeastOneValidValue } from 'utils/authUtils';
 import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
 import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditForm.interface';
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
@@ -12,11 +15,15 @@ import { ITicketTimelineProps } from './TicketTimeline.interface';
 /**
  * Renders the timeline section for a ticket.
  *
+ * Shared by the admin ticket page and the portal ticket page. The upload processing history comes
+ * from an admin-only endpoint, so the status row is expandable only for system administrators;
+ * every other viewer sees the current status alone.
+ *
  * @param {ITicketTimelineProps} props
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { ticket, isLoading } = props;
+  const { ticket } = props;
   const {
     selectedComment,
     isEditCommentDialogOpen,
@@ -43,17 +50,21 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleSavePolicy
   } = useTicketTimelineDataRequestActions();
   const {
-    handleRequestSubmissionUploadReview,
-    handleUpdateSubmissionUploadReview,
-    handleConfirmSubmissionUploadReviewStatusUpdate,
-    handleConfirmSubmissionUploadReviewStatusReset
+    handleCreateSubmissionUploadReview,
+    handleOpenSubmissionUploadReview,
+    handleConfirmSubmissionUploadDecisionUpdate,
+    handleConfirmSubmissionUploadDecisionReset
   } = useTicketTimelineUploadActions();
+  const authStateContext = useAuthStateContext();
+  const canViewSubmissionUploadStatusHistory = hasAtLeastOneValidValue(
+    [SYSTEM_ROLE.SYSTEM_ADMIN],
+    authStateContext.biohubUserWrapper.roleNames
+  );
 
   return (
     <>
       <TicketTimelineItems
         ticket={ticket}
-        isLoading={isLoading}
         updatingDataRequestId={updatingDataRequestId}
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}
@@ -62,10 +73,11 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onViewFinalizedPolicy={handleOpenPolicyDetailPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
-        onRequestSubmissionUploadReview={handleRequestSubmissionUploadReview}
-        onUpdateSubmissionUploadReview={handleUpdateSubmissionUploadReview}
-        onConfirmSubmissionUploadReviewStatusUpdate={handleConfirmSubmissionUploadReviewStatusUpdate}
-        onConfirmSubmissionUploadReviewStatusReset={handleConfirmSubmissionUploadReviewStatusReset}
+        canViewSubmissionUploadStatusHistory={canViewSubmissionUploadStatusHistory}
+        onCreateSubmissionUploadReview={handleCreateSubmissionUploadReview}
+        onOpenSubmissionUploadReview={handleOpenSubmissionUploadReview}
+        onConfirmSubmissionUploadDecisionUpdate={handleConfirmSubmissionUploadDecisionUpdate}
+        onConfirmSubmissionUploadDecisionReset={handleConfirmSubmissionUploadDecisionReset}
       />
 
       {selectedPolicy && (

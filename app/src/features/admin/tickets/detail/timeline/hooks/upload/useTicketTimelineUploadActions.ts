@@ -1,77 +1,33 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
+import { useQueryClient } from '@tanstack/react-query';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import {
-  IUpdateSubmissionUploadReviewStatusRequest,
+  ICreateSubmissionUploadReviewRequest,
+  IUpdateSubmissionUploadDecisionRequest,
   SubmissionUploadReviewScope,
-  SubmissionUploadReviewTaskStatus,
-  TicketSubmissionUploadResponse,
-  TicketSubmissionUploadReviewResponse
+  TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
+import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
-type SubmissionUploadReviewStatusUpdate = IUpdateSubmissionUploadReviewStatusRequest['status'];
+type SubmissionUploadDecisionUpdate = IUpdateSubmissionUploadDecisionRequest['decision'];
 
 /**
- * Submission upload review handlers for the ticket timeline.
+ * Submission upload decision and review handlers for the ticket timeline.
  *
  * @returns Timeline upload action handlers.
  */
 export const useTicketTimelineUploadActions = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketId, ticketQueryKey } = useTicketContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
-
-  const updateCachedSubmissionUpload = (
-    submissionUploadId: string,
-    updateUpload: (upload: TicketSubmissionUploadResponse) => TicketSubmissionUploadResponse
-  ): void => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      submission_uploads: latestTicket.submission_uploads.map((upload) =>
-        upload.submission_upload_id === submissionUploadId ? updateUpload(upload) : upload
-      )
-    });
-  };
-
-  /**
-   * Replaces the cached final review status for one upload after the backend accepts or denies it.
-   * This is only used for the upload-level decision row and intentionally leaves scoped review tasks unchanged.
-   *
-   * @param {string} submissionUploadId Submission upload being updated in the ticket cache.
-   * @param {TicketSubmissionUploadResponse['review_status']} reviewStatus Backend-confirmed upload review status.
-   * @returns {void}
-   */
-  const setCachedUploadReviewStatus = (
-    submissionUploadId: string,
-    reviewStatus: TicketSubmissionUploadResponse['review_status']
-  ): void => {
-    updateCachedSubmissionUpload(submissionUploadId, (upload) => ({ ...upload, review_status: reviewStatus }));
-  };
-
-  /**
-   * Replaces one scoped upload review in the cached ticket after an update response.
-   * The backend response is treated as the source of truth, so this does not derive fields from stale row state.
-   *
-   * @param {TicketSubmissionUploadReviewResponse} review Backend-confirmed scoped review record.
-   * @returns {void}
-   */
-  const setCachedUploadReview = (review: TicketSubmissionUploadReviewResponse): void => {
-    updateCachedSubmissionUpload(review.submission_upload_id, (upload) => ({
-      ...upload,
-      reviews: {
-        ...upload.reviews,
-        [review.scope]: review
-      }
-    }));
-  };
+  const navigate = useNavigate();
 
   /**
    * Shows the API error from a failed upload action in the shared ticket snackbar.
@@ -89,101 +45,95 @@ export const useTicketTimelineUploadActions = () => {
   };
 
   /**
-   * Persists an upload-level acceptance or denial and updates the cached upload with the backend response.
-   * Use this only from the confirmation dialog callback, after the reviewer has confirmed the final decision.
+   * Persists an upload-level decision and refreshes the ticket after pending optimistic changes settle. The submission, its
+   * other ticket copies and feature searches are refreshed, since a decision changes what is published.
+   * Use this only from the confirmation dialog callback, after the reviewer has confirmed the decision.
    *
-   * @param {TicketSubmissionUploadResponse} upload Upload receiving the final review decision.
-   * @param {SubmissionUploadReviewStatusUpdate} nextStatus Review status to persist.
-   * @returns {Promise<void>} Resolves after the backend response has been reflected in local ticket state.
+   * @param {TicketSubmissionUploadResponse} upload Upload receiving the decision.
+   * @param {SubmissionUploadDecisionUpdate} nextDecision Decision to persist.
+   * @returns {Promise<void>} Resolves after the decision is saved and its affected queries are scheduled to refresh.
    */
-  const handleSubmissionUploadReviewStatusUpdate = async (
+  const handleSubmissionUploadDecisionUpdate = async (
     upload: TicketSubmissionUploadResponse,
-    nextStatus: SubmissionUploadReviewStatusUpdate
+    nextDecision: SubmissionUploadDecisionUpdate
   ): Promise<void> => {
     try {
-      const updatedReviewStatus = await api.tickets.updateSubmissionUploadReviewStatus(
-        upload.submission_uuid,
-        upload.submission_upload_id,
-        {
-          status: nextStatus
-        }
-      );
+      await api.tickets.updateSubmissionUploadDecision(upload.submission_id, upload.submission_upload_id, {
+        decision: nextDecision
+      });
 
-      setCachedUploadReviewStatus(upload.submission_upload_id, updatedReviewStatus.status);
+      await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
     } catch (error) {
       showUploadActionError(error);
     }
   };
 
   /**
-   * Updates the status of an existing scoped upload review task.
-   * Use this from review rows that already have a backend review record and therefore know the review id to patch.
+   * Creates an in-progress scoped review and opens its review workflow.
    *
-   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
-   * @param {TicketSubmissionUploadReviewResponse} review Existing review task being updated.
-   * @param {SubmissionUploadReviewTaskStatus} nextStatus Status selected by the reviewer.
-   * @returns {Promise<void>} Resolves after the backend response has replaced the cached review.
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the new review.
+   * @param {SubmissionUploadReviewScope} scope Scope selected by the administrator.
+   * @returns {Promise<void>} Resolves after navigation or after a failed request is reported.
    */
-  const handleUpdateSubmissionUploadReview = async (
+  const handleCreateSubmissionUploadReview = async (
     upload: TicketSubmissionUploadResponse,
-    review: TicketSubmissionUploadReviewResponse,
-    nextStatus: SubmissionUploadReviewTaskStatus
-  ): Promise<void> => {
-    try {
-      const updatedReview = await api.tickets.updateSubmissionUploadReview(
-        upload.submission_uuid,
-        upload.submission_upload_id,
-        review.submission_upload_review_id,
-        { status: nextStatus }
-      );
-
-      setCachedUploadReview(updatedReview);
-    } catch (error) {
-      showUploadActionError(error);
-    }
-  };
-
-  /**
-   * Requests a replacement review for one scoped upload task and caches the backend-created row.
-   * Use this from missing review rows only; existing rows should either navigate to the review page or patch status.
-   *
-   * @param {TicketSubmissionUploadResponse} upload Upload that owns the review task.
-   * @param {SubmissionUploadReviewScope} scope Review scope being requested.
-   * @returns {Promise<void>} Resolves after the backend-created review is reflected in local ticket state.
-   */
-  const handleRequestSubmissionUploadReview = async (
-    upload: TicketSubmissionUploadResponse,
-    scope: SubmissionUploadReviewScope
+    scope: SubmissionUploadReviewScope,
+    review: Pick<ICreateSubmissionUploadReviewRequest, 'name' | 'description'>
   ): Promise<void> => {
     try {
       const insertedReview = await api.tickets.insertSubmissionUploadReview(
-        upload.submission_uuid,
+        upload.submission_id,
         upload.submission_upload_id,
         {
+          ...review,
           scope,
-          status: 'requested'
+          status: 'in_progress'
         }
       );
 
-      setCachedUploadReview(insertedReview);
+      // The ticket's timeline lists the upload's reviews, so every copy of its detail is out of date, including this page's,
+      // which reloads once any change to the ticket still being saved has settled.
+      void refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+      navigate(
+        `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${insertedReview.submission_upload_review_id}`
+      );
     } catch (error) {
       showUploadActionError(error);
     }
+  };
+
+  /**
+   * Opens an existing scoped review workflow.
+   *
+   * @param {TicketSubmissionUploadResponse} upload Upload that owns the existing review.
+   * @param {string} submissionUploadReviewId Existing review identifier.
+   * @returns {void}
+   */
+  const handleOpenSubmissionUploadReview = (
+    upload: TicketSubmissionUploadResponse,
+    submissionUploadReviewId: string
+  ): void => {
+    navigate(
+      `/admin/submission/${upload.submission_id}/upload/${upload.submission_upload_id}/review/${submissionUploadReviewId}`
+    );
   };
 
   /**
    * Opens the confirmation dialog for accepting or denying a submission upload.
    * The dialog callback is the only place that calls the final decision handler so accidental button clicks do not persist.
    *
-   * @param {TicketSubmissionUploadResponse} upload Upload receiving the final review decision.
-   * @param {Exclude<SubmissionUploadReviewStatusUpdate, 'submitted'>} nextStatus Final status that will be persisted if confirmed.
+   * @param {TicketSubmissionUploadResponse} upload Upload receiving the decision.
+   * @param {Exclude<SubmissionUploadDecisionUpdate, 'pending'>} nextDecision Decision that will be persisted if confirmed.
    * @returns {void}
    */
-  const handleConfirmSubmissionUploadReviewStatusUpdate = (
+  const handleConfirmSubmissionUploadDecisionUpdate = (
     upload: TicketSubmissionUploadResponse,
-    nextStatus: Exclude<SubmissionUploadReviewStatusUpdate, 'submitted'>
+    nextDecision: Exclude<SubmissionUploadDecisionUpdate, 'pending'>
   ): void => {
-    const isApproval = nextStatus === 'approved';
+    const isApproval = nextDecision === 'approved';
 
     openConfirmationDialog({
       dialogTitle: isApproval ? 'Confirm Acceptance' : 'Confirm Rejection',
@@ -192,33 +142,33 @@ export const useTicketTimelineUploadActions = () => {
         : 'Are you sure you want to reject this submission upload?',
       yesButtonLabel: isApproval ? 'Accept' : 'Reject',
       onConfirm: async () => {
-        await handleSubmissionUploadReviewStatusUpdate(upload, nextStatus);
+        await handleSubmissionUploadDecisionUpdate(upload, nextDecision);
       }
     });
   };
 
   /**
    * Opens the confirmation dialog for clearing an accepted or rejected submission upload decision.
-   * Confirming writes the backend `submitted` status, which returns the upload to the no-decision review state.
+   * Confirming writes the `pending` decision, which returns the upload to the no-decision review state.
    *
-   * @param {TicketSubmissionUploadResponse} upload Upload whose final decision should be reset.
+   * @param {TicketSubmissionUploadResponse} upload Upload whose decision should be reset.
    * @returns {void}
    */
-  const handleConfirmSubmissionUploadReviewStatusReset = (upload: TicketSubmissionUploadResponse): void => {
+  const handleConfirmSubmissionUploadDecisionReset = (upload: TicketSubmissionUploadResponse): void => {
     openConfirmationDialog({
       dialogTitle: 'Confirm Reset',
       dialogText: 'Are you sure you want to reset this submission upload decision?',
       yesButtonLabel: 'Reset',
       onConfirm: async () => {
-        await handleSubmissionUploadReviewStatusUpdate(upload, 'submitted');
+        await handleSubmissionUploadDecisionUpdate(upload, 'pending');
       }
     });
   };
 
   return {
-    handleRequestSubmissionUploadReview,
-    handleUpdateSubmissionUploadReview,
-    handleConfirmSubmissionUploadReviewStatusUpdate,
-    handleConfirmSubmissionUploadReviewStatusReset
+    handleCreateSubmissionUploadReview,
+    handleOpenSubmissionUploadReview,
+    handleConfirmSubmissionUploadDecisionUpdate,
+    handleConfirmSubmissionUploadDecisionReset
   };
 };

@@ -1,7 +1,6 @@
 import { Container, Paper, Stack, Typography } from '@mui/material';
-import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useMemo } from 'react';
+import { useCodesQuery } from 'hooks/useCodesQuery';
+import { useMemo } from 'react';
 import { SearchContainer } from './container/SearchContainer';
 import { FeaturedDownloadsSection } from './gallery/FeaturedDownloadsSection';
 import { buildSearchFeatureTypeLinks } from './utils/search-feature-type-links';
@@ -11,20 +10,14 @@ import { buildSearchFeatureTypeLinks } from './utils/search-feature-type-links';
  * Displays a search interface with quick links to filtered feature type views.
  */
 export const SearchPage = () => {
-  const api = useApi();
-
-  const featureTypesDataLoader = useDataLoader(() => api.codes.getAllCodeSets());
-
-  useEffect(() => {
-    featureTypesDataLoader.load();
-  }, [featureTypesDataLoader]);
+  const codesQuery = useCodesQuery();
 
   const featureTypeLinks = useMemo(
-    () => buildSearchFeatureTypeLinks(featureTypesDataLoader.data?.feature_type_with_properties),
-    [featureTypesDataLoader.data?.feature_type_with_properties]
+    () => buildSearchFeatureTypeLinks(codesQuery.data?.feature_type_with_properties),
+    [codesQuery.data?.feature_type_with_properties]
   );
 
-  const isLoading = featureTypesDataLoader.isLoading || !featureTypesDataLoader.isReady;
+  const isLoading = !codesQuery.isFetched;
 
   return (
     <Container maxWidth="md" sx={{ py: 10 }}>

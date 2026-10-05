@@ -1,23 +1,27 @@
 import { expect } from 'chai';
 import Sinon from 'sinon';
 import { getKnex } from '../database/db';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
+import { optimizeExpression } from '../utils/expression-optimization';
 import { parseTimestamp } from '../utils/timestamp';
 import {
-  applyTaxonExpressionOperator,
+  buildBroadFeatureTypeCountSubquery,
   buildBroadFeatureTypeSubquery,
+  buildExpressionTreeCountFeatureIdsSubquery,
   buildExpressionTreeFeatureIdsSubquery,
   buildUnfilteredExpressionTreeFeatureIdsSubquery
 } from './expression-evaluation';
+import { applyTaxonExpressionOperator } from './expression-predicate-sql';
+import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-feature-search';
 
 const normalizedPredicate = (
   feature_property_id: number,
-  feature_type_property_id: number | null,
+  blueprint_feature_type_property_id: number | null,
   internal_predicate: any
 ) => ({
   type: 'predicate' as const,
   feature_property_id,
-  feature_type_property_id,
+  blueprint_feature_type_property_id,
   operator: internal_predicate.operator,
   ...(internal_predicate.value !== undefined ? { value: internal_predicate.value } : {}),
   feature_property_type_id: internal_predicate.type === 'number' ? 2 : 1,
@@ -27,7 +31,7 @@ const normalizedPredicate = (
 
 const timestampPredicateSql = (operator: string, value?: string): string => {
   const parsedTimestamp = value === undefined ? undefined : parseTimestamp(value) ?? undefined;
-  const expressionTree: NormalizedExpressionTreeExpression = {
+  const expressionTree: NormalizedExpressionTree = {
     type: 'expression',
     operator: 'AND',
     clauses: [
@@ -49,9 +53,60 @@ describe('expression-evaluation', () => {
     Sinon.restore();
   });
 
+  describe('published and upload-review evidence boundaries', () => {
+    const equality = (value: string) => normalizedPredicate(46, null, { type: 'string', operator: 'Equals', value });
+    const multiValue: NormalizedExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [equality('elk'), equality('deer')]
+    };
+    const expressions: NormalizedExpressionTree[] = [
+      { type: 'expression', operator: 'OR', clauses: [equality('elk'), equality('deer')] },
+      multiValue,
+      {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          multiValue,
+          {
+            type: 'expression',
+            operator: 'OR',
+            clauses: [
+              normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 }),
+              equality('moose')
+            ]
+          }
+        ]
+      }
+    ];
+    for (const [index, expression] of expressions.entries()) {
+      it(`keeps visibility and relationships separate for expression shape ${index + 1}`, () => {
+        const published = buildExpressionTreeFeatureIdsSubquery('survey', expression, null).toString();
+        const upload = buildSubmissionUploadFeatureIdsSubquery(
+          1,
+          '00000000-0000-0000-0000-000000000001',
+          expression
+        ).toString();
+        expect(published).to.include('submission_feature_closure');
+        expect(published).to.include('anchor_sf.successor_submission_feature_id IS NULL');
+        expect(published).to.include('anchor_sf.record_end_date IS NULL OR now() < anchor_sf.record_end_date');
+        expect(published).to.include('submission_feature_security');
+        expect(published).not.to.include('upload_evidence');
+        expect(upload).to.include('"upload_evidence" as materialized');
+        expect(upload).to.include('"upload_ancestors"');
+        expect(upload).to.include('"upload_descendants"');
+        expect(upload).not.to.include('submission_feature_closure');
+        expect(upload).not.to.include('submission_feature_security');
+        if (index > 0) {
+          expect(upload).to.include('count(DISTINCT upload_grouped_evidence.matched_value) = 2');
+        }
+      });
+    }
+  });
+
   describe('buildExpressionTreeFeatureIdsSubquery', () => {
-    it('should build typed property SQL that matches shared properties through feature_type_property', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+    it('should build typed property SQL that matches shared properties through their Blueprint assignments', () => {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -76,16 +131,84 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('submission_feature_property_number');
       expect(sql).to.include('submission_feature_property_string');
-      expect(sql).to.include('inner join "feature_type_property" as "ftp"');
-      expect(sql).to.include('"ftp"."feature_property_id"');
+      expect(sql).to.include('from "blueprint_feature_type_property" as "bftp"');
+      expect(sql).to.include('"bftp"."feature_property_id"');
       expect(sql).to.include('"anchor_ft"."name" = \'survey\'');
-      expect(sql).to.include('from (with "evidence"');
-      expect(sql).to.include('intersect');
+      expect(sql).to.not.include(' union ');
+      expect(sql).to.not.include(' intersect ');
+      expect(sql.match(/\) IS TRUE/g)).to.have.length.greaterThan(1);
       expect(sql).to.include('feature_property_id');
     });
 
+    it('should check uncorrelated typed evidence availability before scanning anchors', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
+      const guardPosition = sql.indexOf('evidence_available_self');
+
+      expect(guardPosition).to.be.greaterThan(-1);
+      expect(guardPosition).to.be.lessThan(sql.indexOf('closure_forward'));
+      expect(sql).to.match(
+        /evidence_available_self\.target_submission_feature_id = p\.submission_feature_id\s+limit 1\s+\) IS TRUE/i
+      );
+    });
+
+    it('should apply indexed ordering and pagination to the anchor scan', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null, {
+        sort: 'create_date',
+        order: 'desc',
+        limit: 10,
+        boundary: {
+          direction: 'next',
+          submission_feature_id: 20,
+          create_date: '2026-09-01T12:00:00Z'
+        }
+      }).toString();
+
+      expect(sql).to.include('("anchor_sf"."create_date", "anchor_sf"."submission_feature_id") <');
+      expect(sql).to.include(
+        'order by "anchor_sf"."create_date" desc, "anchor_sf"."submission_feature_id" desc limit 10'
+      );
+      expect(sql).to.not.include('offset');
+    });
+
+    it('should reverse the indexed traversal for a previous-page date cursor', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null, {
+        sort: 'create_date',
+        order: 'desc',
+        limit: 10,
+        boundary: {
+          direction: 'previous',
+          submission_feature_id: 20,
+          create_date: '2026-09-01T12:00:00Z'
+        }
+      }).toString();
+
+      expect(sql).to.include('("anchor_sf"."create_date", "anchor_sf"."submission_feature_id") >');
+      expect(sql).to.include(
+        'order by "anchor_sf"."create_date" asc, "anchor_sf"."submission_feature_id" asc limit 10'
+      );
+      expect(sql).to.not.include('offset');
+    });
+
     it('should apply anonymous security filtering to predicate evidence', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -100,12 +223,12 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
-      expect(sql).to.include('p"."submission_feature_id');
+      expect(sql).to.include('p.submission_feature_id');
       expect(sql).to.not.include('security_scope_anchor');
     });
 
     it('should apply authenticated security filtering to predicate evidence', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -120,14 +243,14 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, 42).toString();
 
-      expect(sql).to.include('p"."submission_feature_id');
+      expect(sql).to.include('p.submission_feature_id');
       expect(sql).to.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');
       expect(sql).to.include('42');
     });
 
     it('should also apply security filtering to projected target features (defense in depth)', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -143,11 +266,12 @@ describe('expression-evaluation', () => {
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, 42).toString();
 
       expect(sql).to.include('"anchor_sf"."submission_feature_id"');
-      expect(sql).to.match(/security_scope_anchor[\s\S]*"anchor_sf"\."submission_feature_id"/);
+      expect(sql).to.include('anchor_sf.submission_feature_id');
+      expect(sql.match(/security_scope_anchor/g)).to.have.length.greaterThan(1);
     });
 
-    it('should narrow predicate evidence by feature_type_property_id when provided', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+    it('should narrow predicate evidence by blueprint_feature_type_property_id when provided', () => {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -163,12 +287,12 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
-      expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('"p"."feature_type_property_id" = 123');
+      expect(sql).to.include('"bftp"."feature_property_id" = 46');
+      expect(sql).to.include('"bftp"."blueprint_feature_type_property_id" = 123');
     });
 
     it('should project related predicate evidence to anchor feature ids through closure probes', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -185,33 +309,13 @@ describe('expression-evaluation', () => {
       const sql = buildExpressionTreeFeatureIdsSubquery('telemetry', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_taxon');
-      expect(sql).to.include('with "evidence" as');
-
-      expect(sql).to.include('from "related_targets"');
-      expect(sql).to.include('inner join "submission_feature" as "anchor_sf"');
-      expect(sql).to.include('inner join "feature_type" as "anchor_ft"');
+      expect(sql).to.include('from "submission_feature" as "anchor_sf"');
       expect(sql).to.include('"anchor_ft"."name" = \'telemetry\'');
-      expect(sql).to.include('anchor_sf.record_effective_date <= now()');
-      expect(sql).to.include('now() < anchor_sf.record_end_date');
-
-      expect(sql).to.include('from "evidence"');
-      expect(sql).to.include('inner join "submission_feature" as "evidence_sf"');
-      expect(sql).to.include('inner join "feature_type" as "evidence_ft"');
-      expect(sql).to.include('evidence_sf.record_effective_date <= now()');
-      expect(sql).to.include('now() < evidence_sf.record_end_date');
-
-      expect(sql).to.include('from "typed_evidence"');
-      expect(sql).to.include('"typed_evidence"."feature_type_name" = \'telemetry\'');
-      expect(sql).to.include('not "typed_evidence"."feature_type_name" = \'telemetry\'');
-
-      expect(sql).to.include('inner join "submission_feature_closure" as "c_forward"');
-      expect(sql).to.include('"c_forward"."target_submission_feature_id" = "typed_evidence"."submission_feature_id"');
-
-      expect(sql).to.include('inner join "submission_feature_closure" as "c_reverse"');
-      expect(sql).to.include('"c_reverse"."source_submission_feature_id" = "typed_evidence"."submission_feature_id"');
-
-      // Regression guard: never compare every anchor candidate with every evidence row.
-      expect(sql).to.not.include('evidence_sf.submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('submission_feature_closure" as "closure_forward"');
+      expect(sql).to.include('closure_forward.source_submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('submission_feature_closure" as "closure_reverse"');
+      expect(sql).to.include('closure_reverse.target_submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('p.submission_feature_id = anchor_sf.submission_feature_id');
 
       expect(sql).to.not.include('"content_edges"');
       expect(sql).to.not.include('"content_reach"');
@@ -222,8 +326,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.not.include('root_feature_id');
     });
 
-    it('should union child target sets for OR expressions', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+    it('should compose nested OR expressions', () => {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'OR',
         clauses: [
@@ -246,13 +350,14 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
-      expect(sql).to.include(' union ');
+      expect(sql).to.include(' or ');
+      expect(sql).to.not.include(' union ');
       expect(sql).to.not.include(' intersect ');
       expect(sql).to.include('"anchor_ft"."name" = \'species_observation\'');
     });
 
     it('should recursively compose nested expression target sets', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -288,13 +393,15 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
-      expect(sql).to.include(' intersect ');
-      expect(sql).to.include(' union ');
+      expect(sql).to.include(' and ');
+      expect(sql).to.include(' or ');
+      expect(sql).to.not.include(' intersect ');
+      expect(sql).to.not.include(' union ');
       expect(sql).to.include('"anchor_ft"."name" = \'species_observation\'');
     });
 
     it('should use feature-level NotEquals evidence semantics for multi-value properties', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -313,8 +420,81 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('from "submission_feature_property_string" as "p"');
       expect(sql).to.include('not exists');
       expect(sql).to.include('p_not_equals.submission_feature_id = p.submission_feature_id');
-      expect(sql).to.include('"ftp_not_equals"."feature_property_id" = 48');
+      expect(sql).to.include('"bftp_not_equals"."feature_property_id" = 48');
       expect(sql).to.include('"p_not_equals"."value" = \'red\'');
+    });
+
+    it('should apply numeric range bounds to the same property row', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              normalizedPredicate(14, null, { type: 'number', operator: 'GreaterThan', value: 7 }),
+              normalizedPredicate(14, null, { type: 'number', operator: 'LessThan', value: 9 })
+            ]
+          },
+          {
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              normalizedPredicate(14, null, { type: 'number', operator: 'GreaterThan', value: 3 }),
+              normalizedPredicate(14, null, { type: 'number', operator: 'LessThan', value: 5 })
+            ]
+          }
+        ]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('p.value > 7');
+      expect(sql).to.include('p.value < 9');
+      expect(sql).to.include('p.value > 3');
+      expect(sql).to.include('p.value < 5');
+    });
+
+    it('should coalesce same-property equality predicates after mapping evidence to the anchor', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 77 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 100 })
+        ]
+      };
+
+      const optimizedExpression = optimizeExpression(expressionTree);
+      const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', optimizedExpression, null).toString();
+
+      expect(optimizedExpression).to.deep.include({ type: 'expression', operator: 'AND' });
+      expect(sql).to.include('in (100, 77)');
+      expect(sql).to.include('count(DISTINCT grouped_search_evidence.matched_value) = 2');
+    });
+
+    it('should compile same-property OR equalities to one IN evidence filter', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'OR',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 77 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 100 })
+        ]
+      };
+
+      const sql = buildExpressionTreeFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('"p"."value" in (100, 77)');
     });
 
     it('should compile timestamp date predicates against date_value instead of the removed value column', () => {
@@ -364,7 +544,7 @@ describe('expression-evaluation', () => {
     });
 
     it('should project predicate evidence to species_observation targets through same-type matching and closure probes', () => {
-      const expressionTree: NormalizedExpressionTreeExpression = {
+      const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -381,14 +561,10 @@ describe('expression-evaluation', () => {
       const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_string');
-      expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('with "evidence" as');
-      expect(sql).to.include('from "related_targets"');
-      expect(sql).to.include('inner join "submission_feature" as "anchor_sf"');
-      expect(sql).to.include('from "evidence"');
-      expect(sql).to.include('from "typed_evidence"');
-      expect(sql).to.include('inner join "submission_feature_closure" as "c_forward"');
-      expect(sql).to.include('inner join "submission_feature_closure" as "c_reverse"');
+      expect(sql).to.include('"bftp"."feature_property_id"');
+      expect(sql).to.include('from "submission_feature" as "anchor_sf"');
+      expect(sql).to.include('submission_feature_closure" as "closure_forward"');
+      expect(sql).to.include('submission_feature_closure" as "closure_reverse"');
       expect(sql).to.include('"anchor_ft"."name" = \'species_observation\'');
       expect(sql).to.not.include('"content_reach"');
       expect(sql).to.not.include('"content_edges"');
@@ -398,32 +574,70 @@ describe('expression-evaluation', () => {
   });
 
   describe('buildBroadFeatureTypeSubquery', () => {
-    it('emits SQL projecting submission_feature_id with the feature-type filter and security filter for an authenticated user', () => {
-      const sql = buildBroadFeatureTypeSubquery('fish', 42).toString();
+    it('uses the type-first limited path with the security filter for an authenticated search', () => {
+      const sql = buildBroadFeatureTypeSubquery('fish', 42, {
+        sort: 'submission_feature_id',
+        order: 'asc',
+        limit: 10
+      }).toString();
 
       expect(sql).to.include('"sf"."submission_feature_id"');
       expect(sql).to.include('from "submission_feature" as "sf"');
-      expect(sql).to.include('inner join "feature_type" as "ft"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+      expect(sql).to.not.include('inner join "feature_type" as "ft"');
+      expect(sql).to.include('"sf"."feature_type_id" = (select "ft"."feature_type_id"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      expect(sql).to.include('sf.record_effective_date <= now()');
-      expect(sql).to.include('now() < sf.record_end_date');
-      expect(sql).to.not.include('"ft"."record_end_date" is null');
+      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).to.include('SELECT true');
+      expect(sql).to.include('sfc.source_submission_feature_id = sf.submission_feature_id');
+      expect(sql).to.include('sfc.target_submission_feature_id = sf.submission_feature_id');
+      expect(sql).to.include('LIMIT 1');
+      expect(sql).to.include('IS TRUE');
       expect(sql).to.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');
       expect(sql).to.include('42');
     });
 
+    it('keeps the set-oriented closure join for an unpaginated export', () => {
+      const sql = buildBroadFeatureTypeSubquery('fish', 42).toString();
+
+      expect(sql).to.include('inner join "feature_type" as "ft"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+      expect(sql).to.include('sf.record_end_date IS NULL OR now() < sf.record_end_date');
+      expect(sql).to.include('exists');
+      expect(sql).to.not.include('SELECT true');
+      expect(sql).to.not.include('LIMIT 1');
+    });
+
     it('emits the anonymous-only NOT-secured filter when systemUserId is null', () => {
-      const sql = buildBroadFeatureTypeSubquery('fish', null).toString();
+      const sql = buildBroadFeatureTypeSubquery('fish', null, {
+        sort: 'submission_feature_id',
+        order: 'asc',
+        limit: 10
+      }).toString();
 
       expect(sql).to.include('"ft"."name" = \'fish\'');
+      expect(sql).to.include('"ft"."record_end_date" is null');
       expect(sql.toLowerCase()).to.include('not exists');
       expect(sql).to.not.include('security_scope_anchor');
     });
   });
 
+  describe('buildBroadFeatureTypeCountSubquery', () => {
+    it('removes the denied set once from current features', () => {
+      const sql = buildBroadFeatureTypeCountSubquery('fish', 42).toString();
+
+      expect(sql).to.include('with "denied" as');
+      expect(sql).to.include('from "submission_feature" as "sf"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+      expect(sql).to.include('denied.submission_feature_id = sf.submission_feature_id');
+      expect(sql).to.include(' except ');
+      expect(sql).to.not.include('self_closure');
+    });
+  });
+
   describe('buildUnfilteredExpressionTreeFeatureIdsSubquery', () => {
-    const expressionTree: NormalizedExpressionTreeExpression = {
+    const expressionTree: NormalizedExpressionTree = {
       type: 'expression',
       operator: 'AND',
       clauses: [
@@ -441,7 +655,7 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('"anchor_ft"."name" = \'dataset\'');
       expect(sql).to.include('submission_feature_property_number');
-      expect(sql).to.include('"p"."submission_feature_id"');
+      expect(sql).to.include('p.submission_feature_id');
     });
 
     it('applies NO security/access filter (the candidate set before access filtering)', () => {
@@ -450,6 +664,168 @@ describe('expression-evaluation', () => {
       expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.not.include('team_security_scope');
       expect(sql).to.not.include('submission_feature_security');
+    });
+  });
+
+  describe('buildExpressionTreeCountFeatureIdsSubquery', () => {
+    it('should aggregate coalesced AND equalities after mapping evidence to anchor IDs', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 77 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'Equals', value: 100 })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('in (100, 77)');
+      expect(sql).to.include('count(DISTINCT grouped_evidence.matched_value) = 2');
+    });
+
+    it('should apply numeric range bounds to the same property row', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(14, null, { type: 'number', operator: 'GreaterThan', value: 7 }),
+          normalizedPredicate(14, null, { type: 'number', operator: 'LessThan', value: 9 })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery(
+        'species_observation',
+        optimizeExpression(expressionTree),
+        null
+      ).toString();
+
+      expect(sql).to.include('p.value > 7 and p.value < 9');
+    });
+
+    it('checks evidence availability before evaluating matching anchor sets', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery('survey', expressionTree, null).toString();
+
+      expect(sql).to.include('evidence_available_self');
+      expect(sql).to.match(
+        /evidence_available_self\.target_submission_feature_id = p\.submission_feature_id\s+limit 1\s+\) IS TRUE/i
+      );
+    });
+
+    it('maps typed evidence to the requested anchor type before combining clauses', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 }),
+          normalizedPredicate(46, null, { type: 'string', operator: 'Contains', value: 'wetland' })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery('survey', expressionTree, null).toString();
+
+      expect(sql).to.include('submission_feature_property_number');
+      expect(sql).to.include('submission_feature_property_string');
+      expect(sql).to.include('intersect');
+      expect(sql).to.include('count_closure_forward');
+      expect(sql).to.include('count_closure_reverse');
+      expect(sql).to.include('count_anchor');
+      expect(sql).to.include('survey');
+      expect(sql).to.include('as "matching_anchors"');
+      expect(sql).to.include('with "denied" as');
+      expect(sql).to.not.include('as materialized');
+      expect(sql).to.not.include('from "submission_feature" as "anchor_sf"');
+    });
+
+    it('wraps complete child sets before combining a nested expression', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          {
+            type: 'expression',
+            operator: 'AND',
+            clauses: [
+              normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 }),
+              normalizedPredicate(48, null, { type: 'number', operator: 'LessThan', value: 10 })
+            ]
+          },
+          normalizedPredicate(49, null, { type: 'number', operator: 'Equals', value: 7 })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery('survey', expressionTree, null).toString();
+
+      expect(sql.match(/as "count_clause_0"/g)).to.have.length(2);
+      expect(sql.match(/as "count_clause_1"/g)).to.have.length(2);
+      expect(sql.match(/ intersect /g)).to.have.length(2);
+    });
+
+    it('unions OR anchor sets and removes denied anchors and related evidence as sets', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'OR',
+        clauses: [
+          normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 }),
+          normalizedPredicate(48, null, { type: 'number', operator: 'LessThan', value: 10 })
+        ]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery('survey', expressionTree, 42).toString();
+
+      expect(sql).to.include('union');
+      expect(sql).to.include('submission_feature_security');
+      expect(sql).to.include('security_closure');
+      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('team_security_scope');
+      expect(sql).to.include('access_closure');
+      expect(sql).to.include('"access_closure"."target_submission_feature_id" = "ssa"."anchor_submission_feature_id"');
+      expect(sql).to.include('from "team_member" as "tm"');
+      expect(sql).to.include(' except ');
+      expect(sql).to.include('anchor_self');
+      expect(sql).to.include('c.source_submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.not.include('security_closure.source_submission_feature_id = p.submission_feature_id');
+    });
+
+    it('requires closure eligibility for both anchors and related evidence', () => {
+      const expressionTree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 })]
+      };
+
+      const sql = buildExpressionTreeCountFeatureIdsSubquery('survey', expressionTree, null).toString();
+
+      expect(sql).to.include('submission_feature_security');
+      expect(sql).to.include('security_closure');
+      expect(sql).to.not.include('security_scope_anchor');
+      expect(sql).to.include(
+        '"count_direct_self" on "count_direct_self"."source_submission_feature_id" = "p"."submission_feature_id"'
+      );
+      expect(sql).to.include(
+        '(count_direct_self.source_submission_feature_id = count_direct_self.target_submission_feature_id) IS TRUE'
+      );
+      expect(sql).to.include('count_anchor_self');
+      expect(sql).to.include('count_evidence_self');
+      expect(sql).to.include(
+        'count_evidence_self.target_submission_feature_id = count_property_evidence.submission_feature_id'
+      );
+      expect(sql).to.match(
+        /count_anchor_self\.target_submission_feature_id = count_anchor\.submission_feature_id\s+limit 1\s+\) IS TRUE/i
+      );
+      expect(sql).to.match(
+        /count_evidence_self\.target_submission_feature_id = count_property_evidence\.submission_feature_id\s+limit 1\s+\) IS TRUE/i
+      );
     });
   });
 

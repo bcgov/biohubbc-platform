@@ -298,9 +298,7 @@ function validateMergeOrdering(config: ExportConfig): string[] {
  * references against the download's materialized data (AC8) — throwing
  * `ApiValidationError` when the recipe is invalid.
  *
- * Validation is one pass with two bands, deliberately kept together (mirroring
- * `ExpressionPredicateSemanticValidator`) so a recipe has a single validation
- * surface and a single error type:
+ * Validation is one pass with two bands so a recipe has a single validation surface and error type:
  * - Structural rules that need no data: `per_feature_type` cannot carry
  *   `merge_steps` (there is nothing to join); `denormalized` requires a
  *   `root_feature_type` that is one of `feature_types`. These previously lived

@@ -3,7 +3,6 @@ import { Dispatch, SetStateAction } from 'react';
 
 export interface IPortalTicketDetailPageContentProps {
   ticket: ITicketExtended;
-  isLoading: boolean;
   comment: string;
   setComment: Dispatch<SetStateAction<string>>;
   isSavingComment: boolean;

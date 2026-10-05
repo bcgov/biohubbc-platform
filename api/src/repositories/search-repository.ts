@@ -13,7 +13,7 @@ import {
 import { SearchParams, SearchTaxonFilters, WithCount } from '../services/search-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isSubmissionFeatureActive } from './sql-fragments';
+import { isSubmissionFeatureCurrent } from './sql-fragments';
 
 export class SearchRepository extends BaseRepository {
   /**
@@ -80,7 +80,7 @@ export class SearchRepository extends BaseRepository {
       .from(matches.as('matches'))
       .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .whereRaw(isSubmissionFeatureActive('sf'))
+      .whereRaw(isSubmissionFeatureCurrent('sf'))
       .whereIn('ft.name', [...LANDING_PAGE_FEATURE_TYPES, 'dataset'])
       .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name')
       .select(
@@ -102,7 +102,7 @@ export class SearchRepository extends BaseRepository {
     const knex = getKnex();
     return knex('submission as s')
       .leftJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureActive('sf')));
+        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureCurrent('sf')));
       })
       .leftJoin('submission_feature_property_string as sfps', 'sfps.submission_feature_id', 'sf.submission_feature_id')
       .whereNull('s.record_end_date')
@@ -292,7 +292,7 @@ export class SearchRepository extends BaseRepository {
          JOIN submission_feature sf ON sf.submission_feature_id = m.submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
     `;
-    query.append(` WHERE ${isSubmissionFeatureActive('sf')}`);
+    query.append(` WHERE ${isSubmissionFeatureCurrent('sf')}`);
     query.append(SQL`
            AND ft.name = ANY(${allowedTypes}::text[])
       ),

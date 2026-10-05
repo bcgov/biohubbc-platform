@@ -296,6 +296,25 @@ describe('DownloadRepository', () => {
       expect(result.downloads).to.have.length(1);
     });
 
+    it('applies requested sorting to the joined download query', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123, {
+        page: 1,
+        limit: 10,
+        sort: 'create_date',
+        order: 'desc'
+      });
+
+      const sqlText = knexStub.firstCall.args[0].toString();
+      expect(sqlText).to.include('order by "create_date" desc');
+    });
+
     it('returns empty array and zero count when no downloads exist', async () => {
       const mockResponse = {
         rowCount: 0,
@@ -669,7 +688,7 @@ describe('DownloadRepository', () => {
       const sqlText = String(queryStub.getCall(0).args[0]);
       expect(sqlText).to.include('submission_feature_artifact sfa');
       expect(sqlText).to.include("a.artifact_status = 'uploaded'");
-      expect(sqlText).to.include('artifact_ftp.feature_type_id = sf.feature_type_id');
+      expect(sqlText).to.include('artifact_bftp.feature_type_id = sf.feature_type_id');
       expect(sqlText).to.include("fpt.name = 'artifact_key'");
       expect(sqlText).to.include('HAVING COUNT(*) = 1');
     });

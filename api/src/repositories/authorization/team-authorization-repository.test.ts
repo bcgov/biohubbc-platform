@@ -204,21 +204,32 @@ describe('TeamAuthorizationRepository', () => {
       expect(result).to.be.false;
     });
 
-    it('scopes to the feature and submission and applies the active + ancestry-aware access checks', async () => {
+    it('requires terminal current authorization and evaluates current security over stored ancestry', async () => {
       const mockConnection = getMockDBConnection({
         knex: async (query: any) => {
           const compiled = query.toSQL();
           const sql = compiled.sql.toLowerCase();
-          // scoped to the requested feature within the requested submission
           expect(sql).to.include('"sf"."submission_feature_id" = ?');
           expect(sql).to.include('"sf"."submission_id" = ?');
-          // active-window guard on the feature itself
-          expect(sql).to.include('record_effective_date');
-          // ancestry-aware access fragment (closure walk + scope anchor)
+          expect(sql).to.include('sf.record_effective_date <= now()');
+          expect(sql).to.include('with recursive successor_chain');
+          expect(sql.match(/with recursive successor_chain/g) || []).to.have.lengthOf(1);
+          expect(sql).to.include('terminal.terminal_submission_feature_id');
+          expect(sql).to.include('successor.submission_id = chain.submission_id');
           expect(sql).to.include('submission_feature_closure');
           expect(sql).to.include('security_scope_anchor');
-          // bindings carry the feature id, submission id, and the bound systemUserId
+          expect(sql).to.include('with recursive historical_ancestry');
+          expect(sql).to.include('and not (sf.record_effective_date <= now()');
+          expect(sql).to.include('parent.submission_id = child.submission_id');
+          expect(sql).to.include('not parent.submission_feature_id = any(child.path)');
+          expect(sql).to.include('sfs.record_effective_date <= now()');
+          expect(sql).to.include('(sfs.record_end_date is null or now() < sfs.record_end_date)');
+          expect(sql).to.not.include('sfs.record_effective_date <= sf.record_end_date');
+          expect(sql).to.not.include('sf.record_end_date <= sfs.record_end_date');
+          expect(sql).to.include('team_security_scope');
+          expect(sql).to.include('tm.record_end_date is null');
           expect(compiled.bindings).to.include.members([100, 200, 1]);
+          expect(compiled.bindings.filter((binding: unknown) => binding === 1).length).to.be.at.least(2);
           return { rowCount: 0, rows: [] } as QueryResult<any>;
         }
       });
@@ -227,16 +238,20 @@ describe('TeamAuthorizationRepository', () => {
       await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
     });
 
-    it('applies the unsecured-only filter for anonymous users (no scope-anchor grant branch)', async () => {
+    it('requires both current and historical contexts to be unsecured for anonymous users', async () => {
       const mockConnection = getMockDBConnection({
         knex: async (query: any) => {
-          const sql = query.toSQL().sql.toLowerCase();
-          // still scoped and active-gated
+          const compiled = query.toSQL();
+          const sql = compiled.sql.toLowerCase();
           expect(sql).to.include('"sf"."submission_id" = ?');
-          expect(sql).to.include('record_effective_date');
-          // anonymous: unsecured-only — closure ancestry walk, but no scope-anchor grant branch
+          expect(sql).to.include('sf.record_effective_date <= now()');
+          expect(sql).to.include('with recursive successor_chain');
+          expect(sql).to.include('with recursive historical_ancestry');
           expect(sql).to.include('submission_feature_closure');
           expect(sql).to.not.include('security_scope_anchor');
+          expect(sql).to.not.include('team_security_scope');
+          expect(sql).to.not.match(/"?sf"?\."?record_end_date"? is not null/);
+          expect(compiled.bindings).to.include.members([100, 200]);
           return { rowCount: 1, rows: [{ '1': 1 }] } as unknown as QueryResult<any>;
         }
       });

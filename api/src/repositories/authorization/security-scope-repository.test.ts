@@ -146,6 +146,7 @@ describe('SecurityScopeRepository', () => {
 
       expect(result).to.eql({ pageLastId: 200 });
       expect(queryStub.getCall(0).args[0]).to.include('NOT EXISTS');
+      expect(queryStub.getCall(0).args[0]).to.include('closure_ready.source_submission_feature_id');
       expect(queryStub.getCall(1).args[0]).to.include('DELETE FROM security_scope_anchor');
       expect(queryStub.getCall(1).args[1]).to.include.deep.members(['scope-uuid-1', [101, 150]]);
     });
@@ -250,6 +251,14 @@ describe('SecurityScopeRepository', () => {
       const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0);
 
       expect(result).to.eql({ pageLastId: 102 });
+      const batchSql = queryStub.getCall(0).args[0];
+      expect(batchSql).to.include('closure_ready.source_submission_feature_id');
+      expect(batchSql).to.include('JOIN submission_feature_closure ancestry');
+      expect(batchSql).to.include('ancestry.is_ancestor = true');
+      expect(batchSql).to.include('ancestry.target_submission_feature_id <> b.submission_feature_id');
+      expect(batchSql).not.to.include('ancestor_walk');
+      expect(batchSql).not.to.include('parent_submission_feature_id');
+      expect(batchSql).not.to.include('WITH RECURSIVE');
       expect(queryStub.getCall(1).args[0]).to.include('INSERT INTO security_scope_anchor');
       expect(queryStub.getCall(1).args[1]).to.include.deep.members(['scope-uuid-1', [101, 102]]);
     });

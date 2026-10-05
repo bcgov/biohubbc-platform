@@ -6,22 +6,18 @@ import sinonChai from 'sinon-chai';
 import { v4 } from 'uuid';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
-import { HTTP401, HTTP403 } from '../../errors/http-error';
+import { HTTP401 } from '../../errors/http-error';
 import { ArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
-import { SubmissionUploadReviewStatus } from '../../models/submission-upload-review-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ICreateSubmission, ISubmissionModel } from '../../repositories/submission-repository';
-import { TeamAuthorizationService } from '../authorization/team-authorization-service';
 import { SubmissionService } from '../submission-service';
 import { TicketService } from '../ticket-service';
 import { UserService } from '../user-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
-import { SubmissionUploadReviewService } from './submission-upload-review-service';
-import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadIngestionService } from './upload-ingestion-service';
@@ -49,14 +45,8 @@ describe('UploadIngestionService', () => {
   beforeEach(() => {
     mockConnection = getMockDBConnection({ systemUserId: () => 1 });
     service = new UploadIngestionService(mockConnection);
-    sinon.stub(SubmissionUploadReviewService.prototype, 'createDefaultReviewsForUpload').resolves([]);
     sinon.stub(SubmissionUploadService.prototype, 'resolveBlueprintIdForUpload').resolves(mockBlueprintId);
     sinon.stub(SubmissionService.prototype, 'addSubmissionTeamMembers').resolves();
-    sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity').resolves(true);
-    sinon.stub(UserService.prototype, 'getUserById').resolves({
-      system_user_id: 1,
-      role_names: []
-    } as any);
   });
 
   afterEach(() => {
@@ -86,13 +76,6 @@ describe('UploadIngestionService', () => {
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      const createDefaultReviewsStub = SubmissionUploadReviewService.prototype
-        .createDefaultReviewsForUpload as sinon.SinonStub;
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-id-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -132,7 +115,6 @@ describe('UploadIngestionService', () => {
         mockSubmission.system_user_id,
         [mockHumanSubmitterSystemUserId, 43]
       );
-      expect(createDefaultReviewsStub).to.have.been.calledOnceWith(mockSubmissionId, 'submission-upload-id-1', 1);
       expect(result.submissionUuid).to.equal(mockSubmission.uuid);
       expect(result.uploadId).to.equal(mockUploadId);
       expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);
@@ -204,11 +186,6 @@ describe('UploadIngestionService', () => {
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-id-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
         .rejects(new Error('Database error: artifact insert failed'));
@@ -234,11 +211,6 @@ describe('UploadIngestionService', () => {
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-id-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-789' });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -257,6 +229,19 @@ describe('UploadIngestionService', () => {
   });
 
   describe('startArchiveUploadForExistingSubmissionByUuid', () => {
+    const submitters = [
+      { guid: '42-guid', identifier: 'jsmith', identitySource: 'IDIR' },
+      { guid: '43-guid', identifier: 'adoe', identitySource: 'BCEIDBUSINESS' }
+    ];
+    let ensureSystemUserStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      sinon.stub(SubmissionService.prototype, 'assertSubmissionContributorWriteAccess').resolves();
+      ensureSystemUserStub = sinon.stub(UserService.prototype, 'ensureSystemUser');
+      ensureSystemUserStub.withArgs('42-guid', 'jsmith', 'IDIR').resolves({ system_user_id: 42 });
+      ensureSystemUserStub.withArgs('43-guid', 'adoe', 'BCEIDBUSINESS').resolves({ system_user_id: 43 });
+    });
+
     it('should grant ticket visibility to the authenticated appending service account', async () => {
       const submissionUuid = mockSubmission.uuid;
       const existingSubmissionId = 456;
@@ -284,11 +269,6 @@ describe('UploadIngestionService', () => {
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-append-1' });
-      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
-        submission_upload_status_id: 1,
-        submission_upload_id: 'submission-upload-append-1',
-        status: 'submitted'
-      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -304,15 +284,12 @@ describe('UploadIngestionService', () => {
       // service account and the original submission owner.
       const appendingSystemUserId = 42;
 
-      const result = await service.startArchiveUploadForExistingSubmissionByUuid(mockBytes, submissionUuid, [
-        appendingSystemUserId,
-        43
-      ]);
-
-      expect(TeamAuthorizationService.prototype.isUserAuthorizedForTeamEntity).to.have.been.calledWith(1, {
-        entity: 'submission',
-        submissionId: existingSubmissionId
+      const result = await service.startArchiveUploadForExistingSubmissionByUuid({
+        bytes: mockBytes,
+        submissionUuid,
+        submitters
       });
+
       expect(SubmissionService.prototype.addSubmissionTeamMembers).to.have.been.calledWith(mockSubmissionTeamId, [
         1,
         appendingSystemUserId,
@@ -341,36 +318,6 @@ describe('UploadIngestionService', () => {
       expect(result.uploadId).to.equal(mockUploadId);
     });
 
-    it('rejects an upload when the authenticated service account is not a member of the submission team', async () => {
-      const submissionUuid = mockSubmission.uuid;
-      const existingSubmissionId = 456;
-      const appendingSystemUserId = 42;
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
-        .resolves({ submission_id: existingSubmissionId });
-      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
-        uuid: submissionUuid,
-        system_user_id: 99,
-        team_id: mockSubmissionTeamId
-      } as ISubmissionModel);
-      const insertUploadStub = sinon.stub(UploadService.prototype, 'insertUpload');
-      (TeamAuthorizationService.prototype.isUserAuthorizedForTeamEntity as sinon.SinonStub).resolves(false);
-
-      try {
-        await service.startArchiveUploadForExistingSubmissionByUuid(3_000_000, submissionUuid, [appendingSystemUserId]);
-        expect.fail('Expected authorization error');
-      } catch (error) {
-        expect(error).to.be.instanceOf(HTTP403);
-      }
-
-      expect(TeamAuthorizationService.prototype.isUserAuthorizedForTeamEntity).to.have.been.calledWith(1, {
-        entity: 'submission',
-        submissionId: existingSubmissionId
-      });
-      expect(insertUploadStub).not.to.have.been.called;
-    });
-
     it('grants append-upload access to only the authenticated user when no submitter is provided', async () => {
       const submissionUuid = mockSubmission.uuid;
       const existingSubmissionId = 456;
@@ -386,7 +333,7 @@ describe('UploadIngestionService', () => {
         comment: null
       } as ISubmissionModel);
 
-      await service.startArchiveUploadForExistingSubmissionByUuid(3_000_000, submissionUuid);
+      await service.startArchiveUploadForExistingSubmissionByUuid({ bytes: 3_000_000, submissionUuid });
 
       expect(SubmissionService.prototype.addSubmissionTeamMembers).to.have.been.calledWith(mockSubmissionTeamId, [1]);
       expect(startForSubmissionStub).to.have.been.calledWith(
@@ -400,43 +347,53 @@ describe('UploadIngestionService', () => {
       );
     });
 
-    it('allows a system administrator to append without submission-team membership', async () => {
-      const submissionUuid = mockSubmission.uuid;
-      const existingSubmissionId = 456;
-      const appendingSystemUserId = 42;
-      const startForSubmissionStub = sinon.stub(service, '_startArchiveUploadForSubmission').resolves({} as any);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
-        .resolves({ submission_id: existingSubmissionId });
+    it('resolves duplicate submitter GUIDs once and forwards the requested Blueprint', async () => {
+      sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 456 });
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
-        uuid: submissionUuid,
-        system_user_id: 99,
+        uuid: mockSubmission.uuid,
         team_id: mockSubmissionTeamId,
         comment: null
       } as ISubmissionModel);
-      (UserService.prototype.getUserById as sinon.SinonStub).resolves({
-        system_user_id: 1,
-        role_names: ['System Administrator']
+      const startForSubmissionStub = sinon.stub(service, '_startArchiveUploadForSubmission').resolves({} as any);
+
+      await service.startArchiveUploadForExistingSubmissionByUuid({
+        bytes: 3_000_000,
+        submissionUuid: mockSubmission.uuid,
+        submitters: [submitters[0], { ...submitters[0], guid: '42-GUID' }],
+        blueprintId: 7
       });
-      const teamAuthorizationStub = TeamAuthorizationService.prototype.isUserAuthorizedForTeamEntity as sinon.SinonStub;
 
-      await service.startArchiveUploadForExistingSubmissionByUuid(3_000_000, submissionUuid, [appendingSystemUserId]);
-
-      expect(teamAuthorizationStub).not.to.have.been.called;
-      expect(SubmissionService.prototype.addSubmissionTeamMembers).to.have.been.calledWith(mockSubmissionTeamId, [
-        1,
-        appendingSystemUserId
-      ]);
-      expect(startForSubmissionStub).to.have.been.calledWith(
-        3_000_000,
-        existingSubmissionId,
-        submissionUuid,
-        [1],
-        [appendingSystemUserId],
-        null,
-        undefined
+      expect(ensureSystemUserStub).to.have.been.calledOnceWith('42-guid', 'jsmith', 'IDIR');
+      expect(SubmissionService.prototype.addSubmissionTeamMembers).to.have.been.calledWith(
+        mockSubmissionTeamId,
+        [1, 42]
       );
+      expect(startForSubmissionStub).to.have.been.calledWith(3_000_000, 456, mockSubmission.uuid, [1], [42], null, 7);
+    });
+
+    it('does not add team members or start an upload when submitter resolution fails', async () => {
+      sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 456 });
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: mockSubmission.uuid,
+        team_id: mockSubmissionTeamId
+      } as ISubmissionModel);
+      const error = new Error('Failed to resolve submitter');
+      ensureSystemUserStub.withArgs('42-guid', 'jsmith', 'IDIR').rejects(error);
+      const startForSubmissionStub = sinon.stub(service, '_startArchiveUploadForSubmission');
+
+      try {
+        await service.startArchiveUploadForExistingSubmissionByUuid({
+          bytes: 3_000_000,
+          submissionUuid: mockSubmission.uuid,
+          submitters
+        });
+        expect.fail('Expected submitter resolution failure');
+      } catch (error_) {
+        expect(error_).to.equal(error);
+      }
+
+      expect(SubmissionService.prototype.addSubmissionTeamMembers).not.to.have.been.called;
+      expect(startForSubmissionStub).not.to.have.been.called;
     });
   });
 
@@ -523,22 +480,6 @@ describe('UploadIngestionService', () => {
       const invalidUpload = {
         ...mockUpload,
         s3_upload_id: 'wrong-s3-id'
-      };
-      sinon.stub(UploadService.prototype, 'getUpload').resolves(invalidUpload);
-
-      try {
-        await service.completeArchiveUpload(mockParams);
-        expect.fail('Expected HTTP401 error not thrown');
-      } catch (err) {
-        expect(err).to.be.instanceOf(HTTP401);
-        expect((err as HTTP401).message).to.equal('Access Denied');
-      }
-    });
-
-    it('should throw HTTP401 if upload creator does not match current user', async () => {
-      const invalidUpload = {
-        ...mockUpload,
-        create_user: 999
       };
       sinon.stub(UploadService.prototype, 'getUpload').resolves(invalidUpload);
 

@@ -1,6 +1,5 @@
 import type { SxProps, Theme } from '@mui/material/styles';
 import type { Feature } from 'geojson';
-import type { ReactNode, Ref } from 'react';
 import type {
   LayerSpecification,
   MapGeoJSONFeature,
@@ -9,6 +8,7 @@ import type {
   SourceSpecification,
   StyleSpecification
 } from 'maplibre-gl';
+import type { ReactNode, Ref } from 'react';
 
 /**
  * Draw modes supported by the `SlippyMap` drawing toolbar, one per supported GeoJSON geometry type.
@@ -25,6 +25,33 @@ export interface MapClickPosition {
 }
 
 /**
+ * A tile a source is asked for at the current viewport, and whether that source's `bounds` include it.
+ */
+export interface ISlippyMapTile {
+  z: number;
+  x: number;
+  y: number;
+  withinBounds: boolean;
+}
+
+/**
+ * The map's viewport, reported once the map has loaded and after every camera movement settles.
+ */
+export interface ISlippyMapViewport {
+  /**
+   * `[west, south, east, north]` in WGS84.
+   */
+  bounds: [number, number, number, number];
+  zoom: number;
+  /**
+   * The tiles MapLibre asks the named applied source for at this viewport, before that source's `bounds` filter:
+   * `withinBounds` says whether the source serves each. Tile size, zoom range and zoom rounding come from the source
+   * specification. Empty for an id that is not an applied tiled source.
+   */
+  coveringTiles: (sourceId: string) => ISlippyMapTile[];
+}
+
+/**
  * Imperative camera handle exposed through the component ref. Deliberately narrow: the map instance itself stays
  * inside the component.
  */
@@ -33,6 +60,13 @@ export interface SlippyMapHandle {
    * Smoothly move the camera. `zoom` is absolute and left unchanged when omitted.
    */
   easeTo: (options: { center: [number, number]; zoom?: number }) => void;
+  /**
+   * Fit the camera to bounds without exposing the underlying map instance.
+   */
+  fitBounds: (
+    bounds: [[number, number], [number, number]],
+    options: { maxZoom: number; padding: number; duration?: number }
+  ) => void;
   /**
    * Current zoom level, or undefined before the map exists.
    */
@@ -68,6 +102,9 @@ export interface ISlippyMapPopupContext extends SlippyMapHandle {
 export interface ISlippyMapLayer {
   /**
    * The MapLibre layer. Its `source` must name an entry in `tileSources`.
+   *
+   * A change to its `paint` is applied in place. Any other change replaces the applied sources and layers, which
+   * re-requests their tiles.
    */
   specification: LayerSpecification;
   /**
@@ -190,6 +227,12 @@ export interface ISlippyMapProps {
    * Fired once the map style has loaded and any sources/layers have been applied.
    */
   onMapLoad?: () => void;
+  /**
+   * Fired once the map has loaded and again after every camera movement or resize settles.
+   */
+  onViewportChange?: (viewport: ISlippyMapViewport) => void;
+  // Fired when a user gesture begins changing the zoom level.
+  onUserZoom?: () => void;
   /**
    * Fired when one of the applied sources fails to load, e.g. because a tile request was rejected. Lets the consumer
    * react to an expired credential, which `transformRequest` cannot observe because it never sees responses.

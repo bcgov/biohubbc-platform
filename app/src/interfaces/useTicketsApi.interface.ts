@@ -8,12 +8,14 @@ export type SubmissionUploadJobStatus =
   | 'uploaded'
   | 'ingesting'
   | 'ingested'
+  | 'reconciled'
+  | 'promoted'
   | 'indexing'
   | 'indexed'
   | 'invalid'
   | 'failed';
 export type SubmissionValidationStatus = 'pending' | 'started' | 'completed' | 'invalid' | 'failed';
-export type SubmissionUploadReviewStatus = 'submitted' | 'approved' | 'denied' | 'deleted';
+export type SubmissionUploadDecision = 'pending' | 'approved' | 'denied';
 export type SubmissionUploadReviewScope = 'validation' | 'security';
 export type SubmissionUploadReviewTaskStatus =
   | 'pending'
@@ -99,19 +101,18 @@ export interface ITicketSystemUser {
 export interface TicketSubmissionUploadReviewResponse {
   submission_upload_review_id: string;
   submission_upload_id: string;
+  name: string;
+  description: string | null;
   scope: SubmissionUploadReviewScope;
   status: SubmissionUploadReviewTaskStatus;
   requested_by: number | null;
 }
 
-export type TicketSubmissionUploadReviews = Record<
-  SubmissionUploadReviewScope,
-  TicketSubmissionUploadReviewResponse | null
->;
+export type TicketSubmissionUploadReviews = Record<SubmissionUploadReviewScope, TicketSubmissionUploadReviewResponse[]>;
 
 export interface TicketSubmissionUploadResponse {
   submission_upload_id: string;
-  submission_uuid: string;
+  submission_id: number;
   upload_id: string;
   create_date: string;
   submission_name: string | null;
@@ -119,7 +120,7 @@ export interface TicketSubmissionUploadResponse {
   submission_comment: string | null;
   submitted_by_identifier: string | null;
   upload_status: SubmissionUploadJobStatus;
-  review_status: SubmissionUploadReviewStatus;
+  decision: SubmissionUploadDecision;
   validation: {
     submission_validation_id: number;
     job_id: string;
@@ -182,21 +183,25 @@ export interface ITicketArtifactDownloadResponse {
   signed_url: string;
 }
 
-export interface IUpdateSubmissionUploadReviewStatusRequest {
-  status: 'submitted' | 'approved' | 'denied';
+export interface IUpdateSubmissionUploadDecisionRequest {
+  decision: SubmissionUploadDecision;
 }
 
-export interface ISubmissionUploadReviewStatusResponse {
+export interface ISubmissionUploadDecisionResponse {
+  submission_upload_id: string;
+  decision: SubmissionUploadDecision;
+}
+
+export interface ISubmissionUploadProcessingStatusHistoryItem {
   submission_upload_status_id: number;
   submission_upload_id: string;
-  status: SubmissionUploadReviewStatus;
-}
-
-export interface IUpdateSubmissionUploadReviewRequest {
-  status: SubmissionUploadReviewTaskStatus;
+  status: SubmissionUploadJobStatus;
+  create_date: string;
 }
 
 export interface ICreateSubmissionUploadReviewRequest {
+  name: string;
+  description: string | null;
   scope: SubmissionUploadReviewScope;
   status: SubmissionUploadReviewTaskStatus;
 }

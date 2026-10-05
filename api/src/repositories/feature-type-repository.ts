@@ -1,6 +1,7 @@
 import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { BlueprintCompositionOption } from '../models/blueprint-composition';
 import { CountResult } from '../models/count';
 import { CreateFeatureType, FeatureType, UpdateFeatureType } from '../models/feature-type';
 import { FeatureTypeFilters } from '../services/feature-type-service.interface';
@@ -32,7 +33,14 @@ export class FeatureTypeRepository extends BaseRepository {
         display_name: data.display_name,
         description: data.description ?? null
       })
-      .returning(['feature_type_id', 'name', 'display_name', 'description']);
+      .returning([
+        'feature_type_id',
+        'name',
+        'display_name',
+        'description',
+        'record_effective_date',
+        'record_end_date'
+      ]);
 
     const response = await this.connection.knex(query, FeatureType);
 
@@ -59,7 +67,7 @@ export class FeatureTypeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .from('feature_type')
-      .select(['feature_type_id', 'name', 'display_name', 'description'])
+      .select(['feature_type_id', 'name', 'display_name', 'description', 'record_effective_date', 'record_end_date'])
       .whereNull('record_end_date')
       .where('feature_type_id', featureTypeId);
 
@@ -83,7 +91,7 @@ export class FeatureTypeRepository extends BaseRepository {
   }
 
   /**
-   * Get active feature types with optional search and pagination.
+   * Get active and retired feature types with optional search and pagination.
    *
    * @param {FeatureTypeFilters} [filters] - Optional filter set.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
@@ -95,16 +103,17 @@ export class FeatureTypeRepository extends BaseRepository {
     const baseQuery = this.applyFilters(
       knex
         .from('feature_type')
-        .select(['feature_type_id', 'name', 'display_name', 'description'])
-        .whereNull('record_end_date'),
+        .select(['feature_type_id', 'name', 'display_name', 'description', 'record_effective_date', 'record_end_date']),
       filters
     );
 
-    baseQuery.orderBy('sort', 'asc');
-
-    if (pagination) {
+    if (pagination?.sort && pagination.order) {
+      this.applyPagination(baseQuery, pagination);
+    } else {
+      baseQuery.orderBy('sort', 'asc');
       this.applyPagination(baseQuery, pagination);
     }
+    baseQuery.orderBy('feature_type_id', 'asc');
 
     const response = await this.connection.knex(baseQuery, FeatureType);
 
@@ -112,7 +121,7 @@ export class FeatureTypeRepository extends BaseRepository {
   }
 
   /**
-   * Get count of active feature types matching optional filters.
+   * Get count of active and retired feature types matching optional filters.
    *
    * @param {FeatureTypeFilters} [filters] - Optional filter set.
    * @return {Promise<number>}
@@ -120,7 +129,7 @@ export class FeatureTypeRepository extends BaseRepository {
    */
   async getFeatureTypesCount(filters?: FeatureTypeFilters): Promise<number> {
     const knex = getKnex();
-    const baseQuery = this.applyFilters(knex.from('feature_type').whereNull('record_end_date'), filters);
+    const baseQuery = this.applyFilters(knex.from('feature_type'), filters);
 
     const countQuery = baseQuery.clone().select(knex.raw('coalesce(count(*), 0)::integer as count')).first();
     const countResult = await this.connection.knex(countQuery, CountResult);
@@ -128,7 +137,7 @@ export class FeatureTypeRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing feature type record.
+   * Update descriptive metadata on an active or retired feature type record.
    *
    * @param {number} featureTypeId - The ID of the feature type to update.
    * @param {UpdateFeatureType} data - The data to update.
@@ -141,12 +150,9 @@ export class FeatureTypeRepository extends BaseRepository {
     const query = knex
       .table('feature_type')
       .update({
-        name: data.name,
         display_name: data.display_name,
-        description: data.description,
-        record_end_date: data.record_end_date
+        description: data.description
       })
-      .whereNull('record_end_date')
       .where('feature_type_id', featureTypeId);
 
     const response = await this.connection.knex(query);
@@ -171,8 +177,7 @@ export class FeatureTypeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('feature_type')
-      .update({ record_end_date: knex.fn.now() })
-      .whereNull('record_end_date')
+      .update({ record_end_date: knex.raw('COALESCE(record_end_date, CURRENT_DATE)') })
       .where('feature_type_id', featureTypeId)
       .returning(['feature_type_id']);
 
@@ -205,5 +210,110 @@ export class FeatureTypeRepository extends BaseRepository {
     }
 
     return query;
+  }
+  /**
+   * Build contextual selector predicates before pagination.
+   *
+   * @param blueprintId Membership scope.
+   * @param query Global definition base query.
+   * @param keyword Global definition search.
+   * @returns Eligible global definition query.
+   */
+  private applyAvailableFeatureTypeForBlueprintFilters(
+    query: Knex.QueryBuilder,
+    blueprintId: number,
+    keyword?: string
+  ): Knex.QueryBuilder {
+    const knex = getKnex();
+    query
+      .whereNull('g.record_end_date')
+      .whereNotExists(
+        knex('blueprint_feature_type as a')
+          .select(1)
+          .where('a.blueprint_id', blueprintId)
+          .whereRaw('a.feature_type_id = g.feature_type_id')
+          .whereNull('a.record_end_date')
+      );
+    if (keyword) {
+      query.where(function () {
+        this.whereILike('g.name', `%${keyword}%`).orWhereILike('g.display_name', `%${keyword}%`);
+      });
+    }
+    return query;
+  }
+  /**
+   * Search eligible definitions without dropping items after pagination.
+   *
+   * @param blueprintId Membership scope.
+   * @param keyword Search term.
+   * @param pagination Requested page.
+   * @returns Selector options.
+   */
+  async getAvailableFeatureTypesForBlueprint(
+    blueprintId: number,
+    keyword: string | undefined,
+    pagination: ApiPaginationOptions
+  ) {
+    const knex = getKnex();
+    const query = knex('feature_type as g');
+    this.applyAvailableFeatureTypeForBlueprintFilters(query, blueprintId, keyword)
+      .select('g.feature_type_id as id', 'g.name', 'g.display_name')
+      .orderBy('g.name', pagination.order ?? 'asc')
+      .orderBy('g.feature_type_id', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+    const response = await this.connection.knex(query, BlueprintCompositionOption);
+    return response.rows;
+  }
+  /**
+   * Count eligible definitions using selector predicates.
+   *
+   * @param blueprintId Membership scope.
+   * @param keyword Search term.
+   * @returns Count row.
+   */
+  async getAvailableFeatureTypesForBlueprintCount(blueprintId: number, keyword?: string): Promise<CountResult> {
+    const knex = getKnex();
+    const query = knex('feature_type as g');
+    this.applyAvailableFeatureTypeForBlueprintFilters(query, blueprintId, keyword).select(
+      knex.raw('count(*)::integer as count')
+    );
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active or retired feature type by ID.
+   *
+   * @param {number} featureTypeId - The ID of the feature type to retrieve.
+   * @return {Promise<FeatureType>} The feature type record.
+   * @throws {ApiNotFoundError} If no feature type exists for the id.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeatureTypeRepository
+   */
+  async getAdminFeatureType(featureTypeId: number): Promise<FeatureType> {
+    const knex = getKnex();
+    const query = knex
+      .from('feature_type')
+      .select(['feature_type_id', 'name', 'display_name', 'description', 'record_effective_date', 'record_end_date'])
+      .where('feature_type_id', featureTypeId);
+
+    const response = await this.connection.knex(query, FeatureType);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature type not found', [
+        'FeatureTypeRepository->getAdminFeatureType',
+        { featureTypeId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeatureTypeRepository->getAdminFeatureType',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 }
