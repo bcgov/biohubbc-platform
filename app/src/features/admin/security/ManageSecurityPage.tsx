@@ -7,6 +7,10 @@ import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { securityQueryKeys } from 'utils/query-keys/security-query-keys';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { Link as RouterLink } from 'react-router-dom';
 import { CategoriesContainer } from './components/CategoriesContainer';
 import { ReasonsContainer } from './components/ReasonsContainer';
 
@@ -49,7 +53,19 @@ export const ManageSecurityPage = () => {
 
   return (
     <>
-      <PageHeader label="Manage Security" />
+      <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="security breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              Security
+            </Typography>
+          </Breadcrumbs>
+        }
+        label="Manage Security"
+      />
       <Box py={4}>
         <QueryErrorDialog error={categoriesQuery.error} label="security categories" />
         <CategoriesContainer

@@ -1,7 +1,12 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { SYSTEM_ROLE } from 'constants/roles';
-import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
+import {
+  getMockAuthState,
+  SystemAdminAuthState,
+  SystemUserAuthState,
+  UnauthenticatedUserAuthState
+} from 'test-helpers/auth-helpers';
 import { waitFor } from '@testing-library/react';
 import { render } from 'test-helpers/test-utils';
 import { AdminRouter } from './AdminRouter';
@@ -50,7 +55,7 @@ vi.mock('features/admin/configuration/blueprint/BlueprintPage', () => ({
   BlueprintPage: () => <div data-testid="blueprint-page" />
 }));
 
-describe('AdminRouter ticket route guard', () => {
+describe('AdminRouter access guards', () => {
   const renderAdminRouter = (authState: ReturnType<typeof getMockAuthState>, initialEntry = '/admin/tickets') =>
     render(
       <AuthStateContext.Provider value={authState}>
@@ -157,4 +162,37 @@ describe('AdminRouter ticket route guard', () => {
       expect(getByTestId('not-found-page')).toBeVisible();
     });
   });
+
+  for (const [path, testId] of [
+    ['/admin/users', 'manage-users-page'],
+    ['/admin/users?tab=contributors', 'manage-users-page']
+  ]) {
+    it(`allows system administrators to access ${path}`, async () => {
+      const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);
+      expect(await page.findByTestId(testId)).toBeVisible();
+    });
+
+    for (const roleNames of [[], [SYSTEM_ROLE.DATA_ADMINISTRATOR]]) {
+      it(`denies user management at ${path} with roles ${JSON.stringify(roleNames)}`, async () => {
+        const authState = getMockAuthState({
+          base: SystemUserAuthState,
+          overrides: { biohubUserWrapper: { roleNames } }
+        });
+        const page = renderAdminRouter(authState, path);
+        expect(await page.findByTestId('forbidden-page')).toBeVisible();
+        expect(page.queryByTestId(testId)).not.toBeInTheDocument();
+      });
+    }
+
+    it(`requires authentication at ${path}`, async () => {
+      const signinRedirect = vi.fn();
+      const authState = getMockAuthState({
+        base: UnauthenticatedUserAuthState,
+        overrides: { auth: { signinRedirect } }
+      });
+      const page = renderAdminRouter(authState, path);
+      await waitFor(() => expect(signinRedirect).toHaveBeenCalled());
+      expect(page.queryByTestId(testId)).not.toBeInTheDocument();
+    });
+  }
 });

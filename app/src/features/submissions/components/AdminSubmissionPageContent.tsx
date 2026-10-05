@@ -2,7 +2,11 @@ import { Paper } from '@mui/material';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import BaseHeader from 'components/layout/header/BaseHeader';
+import { PageHeader } from 'components/header/PageHeader';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { Link as RouterLink } from 'react-router';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { useMemo } from 'react';
@@ -57,9 +61,19 @@ export const AdminSubmissionPageContent = ({ submissionId }: AdminSubmissionPage
 
   return (
     <>
-      <BaseHeader
-        title={submission.name}
-        subTitle={
+      <PageHeader
+        breadcrumbs={
+          <Breadcrumbs aria-label="submission breadcrumb">
+            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+              Submissions
+            </Link>
+            <Typography variant="inherit" color="text.primary" aria-current="page">
+              {submission.name}
+            </Typography>
+          </Breadcrumbs>
+        }
+        label={submission.name}
+        subheader={
           <Stack direction="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
             <SubmissionHeaderSecurityStatus submission={submission} />
           </Stack>
