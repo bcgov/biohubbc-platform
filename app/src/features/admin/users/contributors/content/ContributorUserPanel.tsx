@@ -9,47 +9,52 @@ import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { refreshChangedQueries } from 'utils/query-client';
-import { IContributor } from 'interfaces/useContributorsApi.interface';
+import { IContributor, IContributorUser } from 'interfaces/useContributorsApi.interface';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ContributorDialog } from '../dialog/ContributorDialog';
-import { ContributorActions } from '../table/ContributorActions';
+import { ContributorUserDialog } from '../dialog/ContributorUserDialog';
+import { ContributorUserActions } from '../table/ContributorUserActions';
 
 /**
- * Paginated contributors with administrative create, edit and delete actions.
- *
+ * Paginated contributor users with administrative create, edit and delete actions.
+ * @param props - Contributor whose relationships are managed on its details page.
  * @returns Searchable administrative table and creation dialog.
  */
-export const ContributorPanel = () => {
+export const ContributorUserPanel = ({ contributor }: { contributor: IContributor }) => {
   const api = useApi();
-  const navigate = useNavigate();
-  const handleRowClick = (contributor: IContributor) => {
-    navigate(`/admin/users/contributor/${contributor.contributor_id}`);
-  };
   const [adding, setAdding] = useState(false);
   const queryClient = useQueryClient();
-  const grid = useServerPaginatedGridState({ defaultSort: { field: 'client_id', sort: 'asc' } });
+  const grid = useServerPaginatedGridState({ defaultSort: { field: 'user_identifier', sort: 'asc' } });
+  const scopeKey = ['administration', 'contributors', contributor.contributor_id, 'users'];
   const query = useQuery({
-    queryKey: ['administration', 'contributors', grid.debouncedSearchTerm, grid.apiPagination],
-    queryFn: () => api.contributors.listContributors({ keyword: grid.debouncedSearchTerm }, grid.apiPagination),
+    queryKey: [...scopeKey, grid.debouncedSearchTerm, grid.apiPagination],
+    queryFn: () =>
+      api.contributors.listContributorUsers(
+        { keyword: grid.debouncedSearchTerm, contributor_id: contributor.contributor_id },
+        grid.apiPagination
+      ),
     placeholderData: keepPreviousData
   });
 
   /**
-   * Refresh contributor lists after administrative changes.
+   * Refresh this contributor's relationships after administrative changes.
    *
-   * @returns Resolves after mounted contributor lists refresh.
+   * @returns Resolves after mounted relationship lists refresh.
    */
-  const refresh = () => refreshChangedQueries(queryClient, [['administration', 'contributors']]);
-  const columns: GridColDef<IContributor>[] = [
-    { field: 'contributor_id', headerName: 'Contributor ID', width: 140 },
+  const refresh = () => refreshChangedQueries(queryClient, [scopeKey]);
+  const columns: GridColDef<IContributorUser>[] = [
     {
-      field: 'client_id',
-      headerName: 'Client ID',
-      minWidth: 200,
-      flex: 1
+      field: 'system_user_id',
+      headerName: 'System user ID',
+      minWidth: 160,
+      sortable: false
     },
-    { field: 'description', headerName: 'Description', minWidth: 250, flex: 1 },
+    {
+      field: 'user_identifier',
+      headerName: 'System user',
+      minWidth: 220,
+      flex: 1,
+      renderCell: ({ row }) => row.display_name || row.user_identifier
+    },
     {
       field: 'record_end_date',
       headerName: 'Status',
@@ -65,19 +70,19 @@ export const ContributorPanel = () => {
       headerName: 'Actions',
       width: 100,
       sortable: false,
-      renderCell: ({ row }) => <ContributorActions record={row} onChanged={refresh} />
+      renderCell: ({ row }) => <ContributorUserActions record={row} onChanged={refresh} />
     }
   ];
   return (
     <PageSection
-      id="contributors"
-      label="Contributors"
-      onAdd={() => setAdding(true)}
-      addLabel="Add Contributor"
+      id="contributor_users"
+      label="Users"
+      onAdd={contributor.record_end_date ? undefined : () => setAdding(true)}
+      addLabel="Add Contributor User"
       headerContent={
         <SearchTextField
           size="small"
-          placeholder="Search contributors"
+          placeholder="Search contributor users"
           value={grid.searchTerm}
           onChange={(event) => grid.handleSearch(event.target.value)}
         />
@@ -88,19 +93,19 @@ export const ContributorPanel = () => {
         </Alert>
       )}
       {query.isPending ? (
-        <Stack gap={1} aria-label="Loading contributors">
+        <Stack gap={1} aria-label="Loading contributor users">
           {Array.from({ length: 10 }, (_, index) => (
             <Skeleton key={index} variant="rectangular" height={48} />
           ))}
         </Stack>
       ) : (
         <ServerPaginatedDataGrid
-          onRowClick={handleRowClick}
-          rows={query.data?.contributors ?? []}
+          sx={{ '& .MuiDataGrid-cell': { cursor: 'default' } }}
+          rows={query.data?.contributor_users ?? []}
           columns={columns}
-          getRowId={(row) => row.contributor_id}
-          dataTestId="contributors-table"
-          noRowsMessage="No contributors"
+          getRowId={(row) => row.contributor_system_user_id}
+          dataTestId="contributor_users-table"
+          noRowsMessage="No contributor users"
           rowCount={query.data?.pagination.total ?? 0}
           paginationModel={grid.paginationModel}
           setPaginationModel={grid.handlePaginationChange}
@@ -109,7 +114,8 @@ export const ContributorPanel = () => {
         />
       )}
       {adding && (
-        <ContributorDialog
+        <ContributorUserDialog
+          contributor={contributor}
           onClose={() => setAdding(false)}
           onSaved={async () => {
             grid.handlePaginationChange({ ...grid.paginationModel, page: 0 });

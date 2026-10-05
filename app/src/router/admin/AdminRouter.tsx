@@ -9,6 +9,7 @@ import { SubmissionUploadReviewPage } from 'features/admin/reviews/SubmissionUpl
 import { SubmissionReviewFeaturePage } from 'features/admin/reviews/SubmissionReviewFeaturePage';
 import { ManageSecurityPage } from 'features/admin/security/ManageSecurityPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
+import { ContributorDetailPage } from 'features/admin/users/contributors/ContributorDetailPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -77,6 +78,21 @@ export const AdminRouter = () => {
         }
       />
 
+      <Route
+        path="users/contributor/:contributorId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Contributor" description="Manage contributor and associated users" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <ContributorDetailPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
       {/* Manage Users route */}
       <Route
         path="users"

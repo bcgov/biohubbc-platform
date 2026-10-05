@@ -6,12 +6,16 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/
 import { dbDependencies } from '../../../database/db';
 import { ApiConflictError, ApiExecuteSQLError } from '../../../errors/api-error';
 import { ContributorInputSchema } from '../../../openapi/schemas/contributor-administration';
+import { ContributorSystemUserInputSchema } from '../../../openapi/schemas/contributor-system-user-administration';
 import { authorizationDependencies } from '../../../request-handlers/security/authorization';
 import { ContributorService } from '../../../services/contributor-service';
+import { GET as userOptionsGet } from '../contributor-users/available-users/index';
+import { GET as linksGet, POST as linksPost } from '../contributor-users/index';
+import { DELETE as linkDelete, GET as linkGet } from '../contributor-users/{contributorSystemUserId}/index';
 import { GET, insertAdministrativeContributor, listAdministrativeContributors, POST } from './index';
 import { GET as contributorGet, DELETE, deleteAdministrativeContributor, PUT } from './{contributorId}/index';
 
-const operations = [GET, POST, contributorGet, PUT, DELETE];
+const operations = [GET, POST, contributorGet, PUT, DELETE, linksGet, linksPost, linkGet, linkDelete, userOptionsGet];
 
 describe('Contributor administrative endpoints', () => {
   afterEach(() => sinon.restore());
@@ -111,5 +115,9 @@ describe('Contributor administrative endpoints', () => {
     ]) {
       expect(contributor(body)).is.false;
     }
+    const relationship = ajv.compile(ContributorSystemUserInputSchema);
+    expect(relationship({ contributorId: 1, systemUserId: 2 })).is.true;
+    expect(relationship({ contributorId: 0, systemUserId: 2 })).is.false;
+    expect(relationship({ contributorId: 1, systemUserId: 1.5 })).is.false;
   });
 });
