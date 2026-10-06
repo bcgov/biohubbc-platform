@@ -17,6 +17,7 @@
     "migrate-rollback": "knex migrate:rollback --knexfile ./src/knexfile.ts",
     "migration-create": "./scripts/create-migration.sh",
     "seed": "knex seed:run --knexfile ./src/knexfile.ts",
+    "test:bcgw": "node tests/bcgw/verify.cjs",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix",
     "format": "prettier --loglevel=warn --check \"./src/**/*.{js,jsx,ts,tsx,css,scss}\"",
