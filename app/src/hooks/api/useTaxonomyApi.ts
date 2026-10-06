@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { ITaxonomyListResponse, ITaxonomySearchResponse } from 'interfaces/useTaxonomyApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -14,17 +14,20 @@ export const useTaxonomyApi = (axios: AxiosInstance) => {
    *
    * @param {string} searchTerm - Keyword(s) to search species
    * @param {ApiPaginationRequestOptions} pagination
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<ITaxonomySearchResponse>}
    */
   const searchSpecies = async (
     searchTerm: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ITaxonomySearchResponse> => {
     const params = { terms: searchTerm, ...pagination };
 
     const { data } = await axios.get<ITaxonomySearchResponse>('/api/taxonomy/taxon', {
       params,
-      paramsSerializer: (p) => qs.stringify(p)
+      paramsSerializer: (p) => qs.stringify(p),
+      ...options
     });
 
     return data;

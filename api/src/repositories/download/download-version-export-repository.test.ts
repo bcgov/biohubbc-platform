@@ -3,7 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
-import { createMockDownloadVersionExport, createMockExportArtifactGroup } from '../../__mocks__/download';
+import {
+  createMockDownloadVersionExport,
+  createMockDownloadVersionExportListRow,
+  createMockExportArtifactGroup
+} from '../../__mocks__/download';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { ExportConfig } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -400,30 +404,55 @@ describe('DownloadVersionExportRepository', () => {
     });
   });
 
-  describe('listDownloadVersionExportsByDownloadId', () => {
-    it('JOINs the group for status, computes part_count, walks export→version→download, orders by create_date DESC', async () => {
-      // Verifies: the single-download list surfaces group status + a derived part_count and resolves download_id
+  describe('listDownloadVersionExports', () => {
+    it('returns rows from the paginated list query', async () => {
+      // Verifies: the repository returns the parsed query rows without service-layer shaping.
 
-      // Step 1: Setup mock DB to return an empty row set
-      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const row = createMockDownloadVersionExportListRow();
+      const knexStub = sinon.stub().resolves(mockQueryResult([row]));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
-      // Step 2: Create repository with mocked connection
       const repo = new DownloadVersionExportRepository(mockDBConnection);
 
-      // Step 3: Call listDownloadVersionExportsByDownloadId
-      await repo.listDownloadVersionExportsByDownloadId(DOWNLOAD_ID);
+      const result = await repo.listDownloadVersionExports(DOWNLOAD_ID, { page: 1, limit: 10 });
 
-      // Step 4: Verify the joins, the COUNT-derived part_count, and the ordering
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('g.status');
-      expect(sqlText).to.include('COUNT');
-      expect(sqlText).to.include('part_count');
-      expect(sqlText).to.include('dv.download_id');
-      expect(sqlText).to.match(/ORDER BY[\s\S]*de\.create_date[\s\S]*DESC/i);
+      expect(knexStub).to.have.been.calledOnce;
+      expect(result).to.eql([row]);
+    });
 
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(DOWNLOAD_ID);
+    it('filters the collection by download version when provided', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([]));
+      const repo = new DownloadVersionExportRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repo.listDownloadVersionExports(DOWNLOAD_ID, undefined, VERSION_ID);
+
+      const query = knexStub.firstCall.args[0].toSQL();
+      expect(query.bindings).to.include(DOWNLOAD_ID);
+      expect(query.bindings).to.include(VERSION_ID);
+    });
+  });
+
+  describe('listDownloadVersionExportsCount', () => {
+    it('returns the export count for a download', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 2 }]));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadVersionExportRepository(mockDBConnection);
+      const result = await repo.listDownloadVersionExportsCount(DOWNLOAD_ID);
+
+      expect(knexStub).to.have.been.calledOnce;
+      expect(result).to.equal(2);
+    });
+
+    it('filters the count by download version when provided', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 1 }]));
+      const repo = new DownloadVersionExportRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repo.listDownloadVersionExportsCount(DOWNLOAD_ID, VERSION_ID);
+
+      const query = knexStub.firstCall.args[0].toSQL();
+      expect(query.bindings).to.include(DOWNLOAD_ID);
+      expect(query.bindings).to.include(VERSION_ID);
     });
   });
 
@@ -543,7 +572,7 @@ describe('DownloadVersionExportRepository', () => {
     });
   });
 
-  describe('getDownloadVersionExportById', () => {
+  describe('getDownloadVersionExport', () => {
     it('the find SQL JOINs the group and the version→download chain', async () => {
       // Verifies: the full-record lookup reaches lifecycle fields via the group and download_id via the version chain
 
@@ -563,8 +592,8 @@ describe('DownloadVersionExportRepository', () => {
       // Step 2: Create repository with mocked connection
       const repo = new DownloadVersionExportRepository(mockDBConnection);
 
-      // Step 3: Call getDownloadVersionExportById
-      await repo.getDownloadVersionExportById(EXPORT_ID);
+      // Step 3: Call getDownloadVersionExport
+      await repo.getDownloadVersionExport(EXPORT_ID);
 
       // Step 4: Verify the joins to the group and to the version→download chain
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -585,7 +614,7 @@ describe('DownloadVersionExportRepository', () => {
 
       // Step 3 + 4: Call and assert it rejects with ApiNotFoundError
       try {
-        await repo.getDownloadVersionExportById(EXPORT_ID);
+        await repo.getDownloadVersionExport(EXPORT_ID);
         expect.fail('Expected error');
       } catch (err: any) {
         expect(err).to.be.instanceOf(ApiNotFoundError);

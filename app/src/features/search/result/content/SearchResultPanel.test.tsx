@@ -1,5 +1,6 @@
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
 import { cleanup, render, screen } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { SearchResultPanel } from './SearchResultPanel';
 
 vi.mock('./option/SearchResultOptions', () => ({
@@ -10,8 +11,10 @@ const panel = (view: SEARCH_RESULT_VIEW) => (
   <SearchResultPanel
     rows={[]}
     featureTypeProperties={[]}
+    pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission')}
     isLoading={false}
-    pagination={{ current_page: 1, per_page: 10, total: 42, last_page: 5, sort: undefined, order: undefined }}
+    cursor={{ limit: 10, sort: 'relevancy_score', order: 'desc', next: 'next-token', previous: null }}
+    totalCount={42}
     sortOptions={[]}
     activeSort=""
     view={view}
@@ -55,6 +58,7 @@ describe('SearchResultPanel', () => {
 
       expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Table' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'List' })).not.toBeInTheDocument();
     });
 
     it('does not build the map until the map view is first opened', () => {
@@ -82,13 +86,41 @@ describe('SearchResultPanel', () => {
     });
   });
 
-  describe('table and list views', () => {
-    it.each([SEARCH_RESULT_VIEW.TABLE, SEARCH_RESULT_VIEW.LIST])('renders results and pagination for %s', (view) => {
-      renderPanel(view);
+  describe('table view', () => {
+    it('renders results and pagination', () => {
+      renderPanel(SEARCH_RESULT_VIEW.TABLE);
 
       expect(screen.getByTestId('search-result-options')).toBeInTheDocument();
       expect(screen.queryByTestId('map-content')).not.toBeInTheDocument();
       expect(screen.getByRole('navigation')).toBeInTheDocument();
+    });
+
+    it('renders arrow-only pagination while total metadata is unavailable', () => {
+      render(
+        <SearchResultPanel
+          rows={[]}
+          featureTypeProperties={[]}
+          pathResolvers={buildSubmissionPropertyValuePathResolvers('/submission')}
+          isLoading={false}
+          cursor={{ limit: 10, sort: 'relevancy_score', order: 'desc', next: 'next-token', previous: null }}
+          sortOptions={[]}
+          activeSort=""
+          view={SEARCH_RESULT_VIEW.TABLE}
+          viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
+          isCreateDownloadDisabled={false}
+          onCreateDownloadClick={vi.fn()}
+          onSortChange={vi.fn()}
+          onViewChange={vi.fn()}
+          onResultClick={vi.fn()}
+          onPageChange={vi.fn()}
+          onPageSizeChange={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Showing 0 rows')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /go to previous page/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /go to next page/i })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: /^page \d+$/i })).not.toBeInTheDocument();
     });
   });
 });

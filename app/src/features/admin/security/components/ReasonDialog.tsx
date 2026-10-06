@@ -1,9 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
 import { ICustomAutocompleteOption } from 'components/fields/CustomAutocomplete';
-import useDataLoader from 'hooks/useDataLoader';
+import { SECURITY_CATEGORY_OPTIONS_PAGINATION } from 'constants/security';
 import { useApi } from 'hooks/useApi';
 import { useEffect, useMemo } from 'react';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { securityQueryKeys } from 'utils/query-keys/security-query-keys';
 import { AddReasonForm, AddReasonFormYupSchema, IAddReasonFormValues } from './AddReasonForm';
 
 export { AddReasonFormInitialValues } from './AddReasonForm';
@@ -30,13 +31,6 @@ export interface IReasonDialogProps {
   onSave: (values: IAddReasonFormValues) => void;
 }
 
-const CATEGORY_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
-  page: 1,
-  limit: 100,
-  sort: 'name',
-  order: 'asc'
-};
-
 /**
  * Dialog for creating or editing a security reason.
  *
@@ -49,26 +43,27 @@ export const ReasonDialog = (props: IReasonDialogProps) => {
   const { open, isLoading, dialogTitle, dialogSaveButtonLabel, initialValues, onLoadError, onCancel, onSave } = props;
   const biohubApi = useApi();
 
-  const categoriesDataLoader = useDataLoader(
-    (search?: string) => biohubApi.security.getSecurityCategories({ search }, CATEGORY_OPTIONS_PAGINATION),
-    (error) => onLoadError('Failed to Load Categories', 'An error occurred while loading categories.', error)
-  );
+  const categoriesQuery = useQuery({
+    queryKey: securityQueryKeys.categories({}, SECURITY_CATEGORY_OPTIONS_PAGINATION),
+    queryFn: ({ signal }) =>
+      biohubApi.security.getSecurityCategories({}, SECURITY_CATEGORY_OPTIONS_PAGINATION, { signal }),
+    enabled: open
+  });
 
+  const { error: categoriesError } = categoriesQuery;
   useEffect(() => {
-    if (!open) {
-      return;
+    if (categoriesError) {
+      onLoadError('Failed to Load Categories', 'An error occurred while loading categories.', categoriesError);
     }
-    categoriesDataLoader.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [categoriesError, onLoadError]);
 
   const categoryOptions: ICustomAutocompleteOption<number>[] = useMemo(
     () =>
-      (categoriesDataLoader.data?.categories ?? []).map((category) => ({
+      (categoriesQuery.data?.categories ?? []).map((category) => ({
         label: category.name,
         value: category.security_category_id
       })),
-    [categoriesDataLoader.data?.categories]
+    [categoriesQuery.data?.categories]
   );
 
   return (

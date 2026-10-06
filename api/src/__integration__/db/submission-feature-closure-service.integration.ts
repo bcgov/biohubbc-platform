@@ -1,23 +1,25 @@
 // Service-level integration tests for the derived submission-feature reachability closure.
 //
-// Drives SubmissionFeatureClosureService.computeClosureForUpload(submissionUploadId) against a real
+// Drives SubmissionFeatureClosureService.computeClosureForUpload(submissionUploadId) — a thin
+// wrapper over computeClosureForSubmission for the upload's owning submission — against a real
 // database and asserts on the rows the recompute writes into submission_feature_closure. The
 // closure is the "evidence" reach used by search: reachability over the UNION of two edge kinds —
 // parent (submission_feature.parent_*) and property (submission_feature_property_feature) — plus a
-// self row for every active feature in the upload. Content edges (submission_feature_feature) are
-// intentionally EXCLUDED from the reach: content is the parent tree reversed, so closing over
-// parent + content yields the complete same-upload digraph (O(N^2)); the down/descendant direction
-// is recovered via the reverse (target, source) index instead. The recursive CTE composes parent and
-// property edges and uses UNION (not UNION ALL) so cycles terminate and multi-path pairs collapse to
-// one row. Each row also carries is_ancestor: true for pure parent-ancestry pairs (the authorization
-// reach), false for pairs reachable only via a property edge. Search reads all rows; auth reads
-// WHERE is_ancestor.
+// self row for every active feature of the SUBMISSION, across all its uploads (reconciled
+// uploads only carry new/changed features, so cross-upload edges are part of the reach). Content
+// edges (submission_feature_feature) are intentionally EXCLUDED from the reach: content is the
+// parent tree reversed, so closing over parent + content yields the complete digraph (O(N^2)); the
+// down/descendant direction is recovered via the reverse (target, source) index instead. The
+// recursive CTE composes parent and property edges and uses UNION (not UNION ALL) so cycles
+// terminate and multi-path pairs collapse to one row. Each row also carries is_ancestor: true for
+// pure parent-ancestry pairs (the authorization reach), false for pairs reachable only via a
+// property edge. Search reads all rows; auth reads WHERE is_ancestor.
 //
-// Each test seeds its own upload-scoped fixture and rolls back after, so nothing is persisted.
+// Each test seeds its own submission-scoped fixture and rolls back after, so nothing is persisted.
 //
 // SCOPING NOTE: the local database already holds pre-existing submission_feature_closure rows from
 // other data, so a bare count(*) on the table is meaningless. Every row-set assertion is scoped to
-// the test's own fixture feature ids (source AND target IN <fixtureIds>); the upload-scoped
+// the test's own fixture feature ids (source AND target IN <fixtureIds>); the submission-scoped
 // insertedCount returned by the service is the reliable total.
 //
 // Run: docker compose exec api npm run test:mocha -- --no-config --extension ts \
@@ -29,7 +31,7 @@ import { describe } from 'mocha';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
-import { createFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
+import { createBlueprintFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
 
 /**
@@ -67,15 +69,14 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
   /**
    * Insert one submission_feature bound to a SPECIFIC upload, returning its submission_feature_id.
    *
-   * The closure recompute is upload-scoped and only walks edges whose BOTH endpoints are active
-   * features of the same upload, so a parent + its children must share one submission_upload_id.
+   * The closure recompute is submission-scoped and only walks edges whose BOTH endpoints are live
+   * features of the same submission, so fixtures control feature placement explicitly.
    * createTestFeature / createTestFeaturesInBulk each mint their OWN upload internally and cannot
    * place a parent and child under one upload, so the closure suite inserts features directly.
    *
-   * Feature type is irrelevant to closure semantics (the function never reads it), so any seeded
-   * type id satisfies the NOT NULL FK. `record_end_date` (a date) marks a feature inactive: an
-   * inactive feature is excluded from the active-feature universe, so it never appears in any
-   * closure row and any edge touching it is dropped.
+   * All features use mortality so property-edge assignments belong to their source type.
+   * `record_end_date` (a date) marks a feature inactive: an inactive feature is excluded from the
+   * active-feature universe, so it never appears in any closure row and any edge touching it is dropped.
    *
    * @returns The new submission_feature_id.
    */
@@ -84,6 +85,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     submissionUploadId: string;
     parentFeatureId?: number;
     recordEndDate?: boolean;
+    pending?: boolean;
   }): Promise<number> {
     const systemUserId = connection.systemUserId();
 
@@ -102,11 +104,11 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
       VALUES (
         ${params.submissionId},
         ${params.submissionUploadId}::uuid,
-        (SELECT feature_type_id FROM feature_type LIMIT 1),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'mortality' AND record_end_date IS NULL),
         ${params.parentFeatureId ?? null},
         '{}'::jsonb,
         500,
-        now(),
+        ${params.pending ? null : 'now()'},
         ${params.recordEndDate ? 'now()' : null},
         ${systemUserId}
       )
@@ -133,38 +135,23 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
   }
 
   /**
-   * Insert a property edge (submission_feature_property_feature) source -> referenced, using the
-   * supplied feature_type_property_id (which must reference a real feature_type_property row).
+   * Insert a property edge (submission_feature_property_feature) source -> referenced, under the
+   * supplied Blueprint assignment (which must belong to the source feature's type and Blueprint).
    */
   async function insertPropertyEdge(
     sourceFeatureId: number,
     referencedFeatureId: number,
-    featureTypePropertyId: number
+    blueprintFeatureTypePropertyId: number
   ): Promise<void> {
     const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         referenced_submission_feature_id,
         create_user
       )
-      SELECT
-        ${sourceFeatureId},
-        ${featureTypePropertyId},
-        bftp.blueprint_feature_type_property_id,
-        ${referencedFeatureId},
-        ${systemUserId}
-      FROM submission_feature sf
-      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
-      JOIN blueprint_feature_type bft
-        ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
-      JOIN blueprint_feature_type_property bftp
-        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-       AND bftp.feature_type_property_id = ${featureTypePropertyId}
-       AND bftp.record_end_date IS NULL
-      WHERE sf.submission_feature_id = ${sourceFeatureId};
+      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
     `);
   }
 
@@ -195,10 +182,14 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     return result.rows[0]?.is_ancestor ?? null;
   }
 
-  /** Mint a real feature_type_property id usable as a property-edge label (the value is irrelevant to closure). */
+  /** Mint a real Blueprint assignment usable as a property-edge label (the value is irrelevant to closure). */
   async function createPropertyEdgeLabel(): Promise<number> {
-    const { featureTypePropertyId } = await createFeatureTypeProperty(connection, 'mortality', 'observation_subcount');
-    return featureTypePropertyId;
+    const { blueprintFeatureTypePropertyId } = await createBlueprintFeatureTypeProperty(
+      connection,
+      'mortality',
+      'mortality'
+    );
+    return blueprintFeatureTypePropertyId;
   }
 
   // --- scenarios -----------------------------------------------------------
@@ -320,10 +311,27 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     expect(bRows.rows).to.have.lengthOf(0);
   });
 
-  // Intra-upload filter: a property edge from A (in U1) to X (in U2) crosses uploads, so the recompute
-  // of U1 drops it (X is not an active feature of U1). A's closure is just its self row, and the
-  // cross-upload pair (A, X) never appears. Guards the af_tgt join on the property_edges CTE.
-  it('5: cross-upload edge filtered — pair (A, X) absent from U1 closure', async () => {
+  it('4b: pending feature excluded — appears in no closure row', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const propertyLabelId = await createPropertyEdgeLabel();
+
+    const active = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
+    const pending = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, pending: true });
+    await insertPropertyEdge(active, pending, propertyLabelId);
+
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
+
+    expect(insertedCount).to.equal(1);
+    expect(await getScopedClosurePairs([active, pending])).to.deep.equal(expectedPairs([[active, active]]));
+  });
+
+  // Cross-upload reach: a property edge from A (in U1) to X (in U2) crosses uploads within ONE
+  // submission. The closure universe is the submission's active rows across all uploads (reconciled
+  // uploads only carry new/changed features, so a reference may target an unchanged feature owned by
+  // an earlier upload), so the recompute includes both features' self rows AND the cross-upload pair
+  // (A, X). Guards the submission-wide universe of the edge CTEs.
+  it('5: cross-upload edge within one submission is part of the reach', async () => {
     const submissionId = await createTestSubmission(connection);
     const uploadOne = await createTestUpload(connection, submissionId);
     const uploadTwo = await createTestUpload(connection, submissionId);
@@ -335,8 +343,14 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
 
     const { insertedCount } = await service.computeClosureForUpload(uploadOne);
 
-    expect(insertedCount).to.equal(1);
-    expect(await getScopedClosurePairs([a, x])).to.deep.equal(expectedPairs([[a, a]]));
+    expect(insertedCount).to.equal(3);
+    expect(await getScopedClosurePairs([a, x])).to.deep.equal(
+      expectedPairs([
+        [a, a],
+        [a, x],
+        [x, x]
+      ])
+    );
   });
 
   // Empty-upload safety: an upload with no active features produces zero closure rows and must not
@@ -354,8 +368,8 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     expect(await getScopedClosurePairs([f1])).to.deep.equal([]);
   });
 
-  // Stale-row removal: a feature with closure rows is deactivated, then the upload is recomputed. The
-  // leading DELETE scopes by submission_upload_id (not active-only), so the now-inactive feature's
+  // Stale-row removal: a feature with closure rows is deactivated, then the closure is recomputed. The
+  // leading DELETE scopes by submission_id (not live-only), so the now-inactive feature's
   // prior rows are removed even though it is no longer in the active universe.
   it('7: recompute removes a deactivated feature’s stale rows', async () => {
     const submissionId = await createTestSubmission(connection);

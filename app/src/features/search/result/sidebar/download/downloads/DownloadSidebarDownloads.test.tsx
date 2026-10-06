@@ -4,7 +4,6 @@ import { DownloadFeatureType } from 'interfaces/useDownloadExportApi.interface';
 import { makeDownload, makeExport } from 'test-helpers/download-helpers';
 import { render } from 'test-helpers/test-utils';
 import { DownloadSidebarDownloads } from './DownloadSidebarDownloads';
-import { isExportReady, triggerIframeDownload } from './download-export-utils';
 
 const mockGetDownloads = vi.fn();
 const mockCreateExport = vi.fn();
@@ -50,17 +49,6 @@ describe('DownloadSidebarDownloads', () => {
 
   const mockPagination = (overrides = {}) => ({ total: 1, current_page: 1, last_page: 1, ...overrides });
 
-  describe('isExportReady', () => {
-    it.each([
-      { status: 'pending', expected: false },
-      { status: 'processing', expected: false },
-      { status: 'ready', expected: true },
-      { status: 'failed', expected: false }
-    ] as const)('returns $expected for status "$status"', ({ status, expected }) => {
-      expect(isExportReady(status)).toBe(expected);
-    });
-  });
-
   describe('list rendering', () => {
     it('renders download cards when data loads', async () => {
       mockGetDownloads.mockResolvedValue({
@@ -94,7 +82,9 @@ describe('DownloadSidebarDownloads', () => {
       render(<DownloadSidebarDownloads />);
 
       await waitFor(() => {
-        expect(mockGetDownloads).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 }));
+        expect(mockGetDownloads).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 }), {
+          signal: expect.any(AbortSignal)
+        });
       });
     });
 
@@ -178,14 +168,12 @@ describe('DownloadSidebarDownloads', () => {
 
       // Step 3: Feature types are fetched for THIS download before building the recipe.
       await waitFor(() => {
-        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123');
+        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123', { signal: expect.any(AbortSignal) });
       });
 
-      // Step 4: createExport gets the all-types per_feature_type recipe (type names from the fixture,
-      // empty merge_steps).
+      // Step 4: createExport gets the selected version id plus the all-types per_feature_type recipe.
       await waitFor(() => {
-        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', {
-          download_version_id: 'ver-abc-123',
+        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', 'ver-abc-123', {
           version: 1,
           export_type: 'csv',
           mode: 'per_feature_type',
@@ -241,7 +229,7 @@ describe('DownloadSidebarDownloads', () => {
 
       // Step 3: Feature types are fetched for the configured download.
       await waitFor(() => {
-        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123');
+        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123', { signal: expect.any(AbortSignal) });
       });
 
       // Step 4: The dialog mounts (title only renders when EditDialog is open).
@@ -279,10 +267,9 @@ describe('DownloadSidebarDownloads', () => {
       // Step 4: Click the dialog's Create button to submit.
       fireEvent.click(getByTestId('edit-dialog-save-button'));
 
-      // Step 5: createExport is called with the form-derived denormalized recipe (all types + the root).
+      // Step 5: createExport is called with the selected version id plus the form-derived recipe.
       await waitFor(() => {
-        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', {
-          download_version_id: 'ver-abc-123',
+        expect(mockCreateExport).toHaveBeenCalledWith('abc-123', 'ver-abc-123', {
           version: 1,
           export_type: 'csv',
           mode: 'denormalized',
@@ -479,23 +466,6 @@ describe('DownloadSidebarDownloads', () => {
           expect.objectContaining({ dialogTitle: 'Nothing to download' })
         );
       });
-    });
-  });
-
-  describe('triggerIframeDownload', () => {
-    it('removes the injected iframe after 30s', () => {
-      vi.useFakeTimers();
-      try {
-        triggerIframeDownload('https://s3.example.com/test');
-
-        expect(document.querySelectorAll('iframe').length).toBe(1);
-
-        vi.advanceTimersByTime(31000);
-
-        expect(document.querySelectorAll('iframe').length).toBe(0);
-      } finally {
-        vi.useRealTimers();
-      }
     });
   });
 });

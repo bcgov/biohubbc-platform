@@ -43,32 +43,37 @@ interface SnapshotFeature {
 
 interface SnapshotScalarProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   value: string | number | boolean | null;
 }
 
 interface SnapshotTimestampProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   date_value: string | null;
   time_value: string | null;
 }
 
 interface SnapshotTaxonProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   taxon_id: number;
 }
 
 interface SnapshotGeometryProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   geojson: unknown;
 }
 
 interface SnapshotFeatureProperty {
   feature_uuid: string;
-  feature_type_property_id: number;
+  feature_type_name: string;
+  property_name: string;
   referenced_feature_uuid: string;
 }
 
@@ -140,6 +145,7 @@ interface SeedContext {
   contributorId: number;
   blueprintId: number;
   featureTypeIdByName: Map<string, number>;
+  blueprintFeatureTypePropertyIdByNaturalKey: Map<string, number>;
 }
 
 /** The FK-chain ids created for one snapshot submission. */
@@ -373,11 +379,45 @@ async function resolveSeedContext(knex: Knex, fixture: SnapshotFixture): Promise
     featureTypeIdByName.set(name, row.feature_type_id);
   }
 
+  const propertyKeys = new Set(
+    [
+      ...fixture.property_string,
+      ...fixture.property_number,
+      ...fixture.property_boolean,
+      ...fixture.property_timestamp,
+      ...fixture.property_geometry,
+      ...fixture.property_feature
+    ].map((property) => featureTypePropertyNaturalKey(property.feature_type_name, property.property_name))
+  );
+  // The snapshot's property values are stored under the seeded Blueprint's assignments, so each
+  // (feature type, property) key resolves to that Blueprint's active assignment.
+  const blueprintFeatureTypePropertyIdByNaturalKey = new Map<string, number>();
+  const propertyRows = await knex('blueprint_feature_type_property as bftp')
+    .join('blueprint_feature_type as bft', 'bft.blueprint_feature_type_id', 'bftp.blueprint_feature_type_id')
+    .join('feature_type as ft', 'ft.feature_type_id', 'bft.feature_type_id')
+    .join('feature_property as fp', 'fp.feature_property_id', 'bftp.feature_property_id')
+    .select('bftp.blueprint_feature_type_property_id', 'ft.name as feature_type_name', 'fp.name as property_name')
+    .where('bft.blueprint_id', blueprint.blueprint_id)
+    .whereNull('bft.record_end_date')
+    .whereNull('bftp.record_end_date');
+
+  for (const row of propertyRows) {
+    const key = featureTypePropertyNaturalKey(row.feature_type_name, row.property_name);
+    if (propertyKeys.has(key)) {
+      blueprintFeatureTypePropertyIdByNaturalKey.set(key, row.blueprint_feature_type_property_id);
+    }
+  }
+
+  for (const key of propertyKeys) {
+    resolveOrThrow(blueprintFeatureTypePropertyIdByNaturalKey, key, 'blueprint feature_type/property');
+  }
+
   return {
     systemUserId: contributor.system_user_id,
     contributorId: contributor.contributor_id,
     blueprintId: blueprint.blueprint_id,
-    featureTypeIdByName
+    featureTypeIdByName,
+    blueprintFeatureTypePropertyIdByNaturalKey
   };
 }
 
@@ -646,7 +686,7 @@ async function insertScalarProperty(
 ): Promise<void> {
   const rows = properties.map((property) => ({
     submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'property feature'),
-    feature_type_property_id: property.feature_type_property_id,
+    blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
     value: property.value,
     create_user: context.systemUserId
   }));
@@ -663,7 +703,7 @@ async function insertTimestampProperty(
 ): Promise<void> {
   const rows = fixture.property_timestamp.map((property) => ({
     submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'timestamp property feature'),
-    feature_type_property_id: property.feature_type_property_id,
+    blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
     date_value: property.date_value,
     time_value: property.time_value,
     create_user: context.systemUserId
@@ -689,7 +729,7 @@ async function insertGeometryProperty(
   for (const chunk of toChunks(fixture.property_geometry, BATCH_SIZE)) {
     const rows = chunk.map((property) => ({
       submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'geometry property feature'),
-      feature_type_property_id: property.feature_type_property_id,
+      blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
       value: knex.raw('public.ST_Force2D(public.ST_GeomFromGeoJSON(?))', [JSON.stringify(property.geojson)]),
       create_user: context.systemUserId
     }));
@@ -707,7 +747,7 @@ async function insertFeatureProperty(
 ): Promise<void> {
   const rows = fixture.property_feature.map((property) => ({
     submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'feature property owner'),
-    feature_type_property_id: property.feature_type_property_id,
+    blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
     referenced_submission_feature_id: resolveOrThrow(
       idMap,
       property.referenced_feature_uuid,
@@ -845,6 +885,20 @@ export function resolveOrThrow<T>(map: Map<string, T>, key: string, context: str
   }
 
   return value;
+}
+
+/** Build the stable natural key used to resolve a feature-type property in the live catalog. */
+function featureTypePropertyNaturalKey(featureTypeName: string, propertyName: string): string {
+  return `${featureTypeName}\u0000${propertyName}`;
+}
+
+/** Resolve a snapshot property's stable feature-type/property key to the seeded Blueprint's assignment id. */
+function resolveBlueprintFeatureTypePropertyId(
+  context: SeedContext,
+  property: { feature_type_name: string; property_name: string }
+): number {
+  const key = featureTypePropertyNaturalKey(property.feature_type_name, property.property_name);
+  return resolveOrThrow(context.blueprintFeatureTypePropertyIdByNaturalKey, key, 'blueprint feature_type/property');
 }
 
 /** Remap anchor rows to live scope ids + feature ids, throwing on any unresolved scope_hash or uuid. */

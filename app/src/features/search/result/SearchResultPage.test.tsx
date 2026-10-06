@@ -1,7 +1,8 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useCodesQuery } from 'hooks/useCodesQuery';
+import { useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { SearchResultPage } from './SearchResultPage';
@@ -34,6 +35,7 @@ vi.mock('react-router-dom', async () => {
 vi.mock('hooks/useApi');
 vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
+vi.mock('hooks/useCodesQuery');
 vi.mock('./hooks/useSearchResults');
 // The map container owns its own Martin session and renders MapLibre; the page test only cares that it is handed the
 // current search, so it is replaced with a marker.
@@ -59,7 +61,7 @@ vi.mock('./header/SearchResultSearch', () => ({
               {
                 type: 'predicate',
                 feature_property_id: 10,
-                feature_type_property_id: null,
+                blueprint_feature_type_property_id: null,
                 operator: 'ILike',
                 value: 'salmon'
               }
@@ -79,7 +81,8 @@ import { useSearchResults } from './hooks/useSearchResults';
 
 const mockUseApi = useApi as Mock;
 const mockUseAuthStateContext = useAuthStateContext as Mock;
-const mockUseCodesContext = useCodesContext as Mock;
+const mockUseCodesQuery = useCodesQuery as Mock;
+const mockReload = vi.fn();
 const mockUseDialogContext = useDialogContext as Mock;
 const mockUseSearchResults = useSearchResults as Mock;
 
@@ -89,6 +92,13 @@ const mockGetAvailableUsers = vi.fn();
 const mockSetSnackbar = vi.fn();
 const mockSetOkDialog = vi.fn();
 const mockSetResultSearchParams = vi.fn();
+const defaultCursor = {
+  limit: 10,
+  sort: 'relevancy_score',
+  order: 'desc' as const,
+  next: null,
+  previous: null
+};
 
 const codesPayload = {
   feature_type_with_properties: [
@@ -116,18 +126,15 @@ describe('SearchResultPage', () => {
     });
 
     mockGetAvailableUsers.mockResolvedValue({ users: [] });
-    // Default to authenticated: the create-download tests below assert the authenticated
-    // snackbar + Downloads-sidebar path. Anonymous-branch behavior is covered in
-    // useSearchResultDownload.test.tsx.
+    // Default to authenticated; successful create-download behavior should still
+    // navigate to the download page.
     mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload },
       dataRequest: { createDataRequest: mockCreateDataRequest },
       teams: { getAvailableUsers: mockGetAvailableUsers }
     });
-    mockUseCodesContext.mockReturnValue({
-      codesDataLoader: { isReady: true, data: codesPayload }
-    });
+    mockUseCodesQuery.mockReturnValue({ isFetched: true, data: codesPayload });
     mockUseDialogContext.mockReturnValue({
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
@@ -139,7 +146,9 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: mockSetResultSearchParams,
-      pagination: { total: 5, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 5,
+      cursor: defaultCursor,
+      reload: mockReload
     });
   });
 
@@ -159,6 +168,24 @@ describe('SearchResultPage', () => {
     expect(mockSetResultSearchParams).toHaveBeenCalledWith({ limit: '25' });
   });
 
+  it('uses URL pagination while count metadata is unavailable', () => {
+    mockUseSearchResults.mockReturnValue({
+      rows: [{ uuid: 'result-1', submission_feature_id: 1 }],
+      properties: [],
+      isLoading: false,
+      searchParams: new URLSearchParams('cursor=current-token&limit=25'),
+      setSearchParams: mockSetResultSearchParams,
+      totalCount: undefined,
+      cursor: { ...defaultCursor, limit: 25, previous: 'previous-token' }
+    });
+
+    const { getByRole, getByText } = renderPage();
+
+    expect(getByText('Showing 1 row')).toBeInTheDocument();
+    fireEvent.click(getByRole('button', { name: /go to previous page/i }));
+    expect(mockSetResultSearchParams).toHaveBeenCalledWith({ cursor: 'previous-token' });
+  });
+
   it('opens an OkDialog when Create Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
@@ -166,7 +193,8 @@ describe('SearchResultPage', () => {
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 0,
+      cursor: defaultCursor
     });
 
     const { getByRole, queryByRole } = renderPage();
@@ -224,12 +252,8 @@ describe('SearchResultPage', () => {
         expression: null
       })
     );
-    expect(mockSetSnackbar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        open: true,
-        snackbarMessage: expect.stringMatching(/track its progress in the downloads sidebar/i)
-      })
-    );
+    expect(mockNavigate).toHaveBeenCalledWith('/download/new-uuid');
+    expect(mockSetSnackbar).not.toHaveBeenCalled();
   });
 
   it('does not fire createDownload twice when the save button is double-clicked while in flight', async () => {
@@ -256,13 +280,7 @@ describe('SearchResultPage', () => {
 
     resolveCreate({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
 
-    await waitFor(() =>
-      expect(mockSetSnackbar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          snackbarMessage: expect.stringMatching(/track its progress in the downloads sidebar/i)
-        })
-      )
-    );
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/download/new-uuid'));
     expect(mockCreateDownload).toHaveBeenCalledTimes(1);
   });
 
@@ -273,7 +291,8 @@ describe('SearchResultPage', () => {
       isLoading: true,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: undefined
+      totalCount: undefined,
+      cursor: defaultCursor
     });
 
     const { getByRole } = renderPage();
@@ -310,8 +329,7 @@ describe('SearchResultPage', () => {
         expect.objectContaining({
           type: 'expression',
           operator: 'AND'
-        }),
-        expect.any(Number)
+        })
       );
     });
 
@@ -325,23 +343,18 @@ describe('SearchResultPage', () => {
         expect.objectContaining({
           type: 'expression',
           operator: 'AND'
-        }),
-        expect.any(Number)
+        })
       );
     });
   });
 
-  it('refreshes with a null expression when applying no expression filters', async () => {
-    const { getByRole, rerender } = renderPage();
-    const callCountBeforeApply = mockUseSearchResults.mock.calls.length;
+  it('searches again when the filters already applied are applied again', () => {
+    const { getByRole } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /apply empty expression/i }));
-    rerender(<SearchResultPage />);
 
-    await waitFor(() => {
-      expect(mockUseSearchResults.mock.calls.length).toBeGreaterThan(callCountBeforeApply);
-      expect(mockUseSearchResults).toHaveBeenLastCalledWith('survey', true, null, expect.any(Number));
-    });
+    expect(mockReload).toHaveBeenCalledOnce();
+    expect(mockUseSearchResults).toHaveBeenLastCalledWith('survey', true, null);
   });
 
   it('surfaces the API error message in a snackbar when submit fails', async () => {
@@ -372,11 +385,12 @@ describe('SearchResultPage', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: true }],
       properties: [],
-      hasMoreSecuredFeatures: false,
+      hasInaccessibleSecuredFeatures: false,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 1,
+      cursor: defaultCursor
     });
 
     const { queryByRole } = renderPage();
@@ -388,11 +402,12 @@ describe('SearchResultPage', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
       properties: [],
-      hasMoreSecuredFeatures: true,
+      hasInaccessibleSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 2, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 2,
+      cursor: defaultCursor
     });
 
     const { getByRole, findByRole } = renderPage();
@@ -410,11 +425,12 @@ describe('SearchResultPage', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
       properties: [],
-      hasMoreSecuredFeatures: true,
+      hasInaccessibleSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole, findByLabelText, getByTestId, findByRole } = renderPage();
@@ -438,11 +454,12 @@ describe('SearchResultPage', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [{ uuid: 'result-1', submission_feature_id: 1, is_secured: false }],
       properties: [],
-      hasMoreSecuredFeatures: true,
+      hasInaccessibleSecuredFeatures: true,
       isLoading: false,
       searchParams: new URLSearchParams(),
       setSearchParams: vi.fn(),
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      totalCount: 1,
+      cursor: defaultCursor
     });
 
     const { getByRole, findByLabelText, getByTestId, findByRole } = renderPage();

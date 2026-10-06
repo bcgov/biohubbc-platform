@@ -158,7 +158,12 @@ describe('Seed snapshot access (integration)', function () {
     submissionId: number,
     systemUserId?: number | null
   ): Promise<{ submission_feature_id: number; is_secured: boolean }[]> {
-    const results = await searchRepo.searchFeaturesByExpressionTree('telemetry', undefined, undefined, systemUserId);
+    const results = await searchRepo.searchFeaturesByExpressionTree(
+      'telemetry',
+      null,
+      undefined,
+      systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId: systemUserId }
+    );
     return results
       .filter((r) => r.submission_id === submissionId)
       .map((r) => ({ submission_feature_id: r.submission_feature_id, is_secured: r.is_secured }));

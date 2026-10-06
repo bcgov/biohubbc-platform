@@ -9,7 +9,7 @@ export interface SubmissionFeatureTableProps {
   rows: SubmissionFeatureRow[];
   rowCount: number;
   isLoading: boolean;
-  onRowClick: (params: GridRowParams<SubmissionFeatureRow>, event: MuiEvent<React.MouseEvent>) => void;
+  onRowClick?: (params: GridRowParams<SubmissionFeatureRow>, event: MuiEvent<React.MouseEvent>) => void;
   paginationModel: GridPaginationModel;
   onPaginationModelChange: (model: GridPaginationModel) => void;
   sortModel: GridSortModel;

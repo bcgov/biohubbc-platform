@@ -86,6 +86,39 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('getSubmissionUploadBySubmissionId', () => {
+    it('throws ApiNotFoundError when no matching record found', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.getSubmissionUploadBySubmissionId(17, 'upload-id');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
+      }
+    });
+
+    it('returns the submission upload when it belongs to the submission', async () => {
+      const mockRow = {
+        submission_upload_id: 'upload-id',
+        submission_id: 17,
+        upload_id: 'upload-uuid',
+        team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.getSubmissionUploadBySubmissionId(17, 'upload-id');
+      expect(result).to.eql(mockRow);
+    });
+  });
+
   describe('getSubmissionUploadsBySubmissionId', () => {
     it('returns an array of records without filters', async () => {
       const mockQueryResponse = {
@@ -207,7 +240,7 @@ describe('SubmissionUploadRepository', () => {
   });
 
   describe('findSubmissionUploadsByTicketId', () => {
-    it('uses the latest submission upload status row for each upload', async () => {
+    it('reads the decision from submission_upload and does not join the processing status log', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -216,11 +249,10 @@ describe('SubmissionUploadRepository', () => {
       await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
 
       expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('INNER JOIN LATERAL');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_status sus');
-      expect(sqlStub.firstCall.args[0].text).to.contain('sus.create_date DESC');
-      expect(sqlStub.firstCall.args[0].text).to.contain('sus.submission_upload_status_id DESC');
-      expect(sqlStub.firstCall.args[0].text).to.contain('LIMIT 1');
+      expect(sqlStub.firstCall.args[0].text).to.contain('su.submission_id');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('AS submission_uuid');
+      expect(sqlStub.firstCall.args[0].text).to.contain('su.decision');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('submission_upload_status');
       expect(sqlStub.firstCall.args[0].text).to.contain('sv.validation');
     });
 
@@ -236,7 +268,7 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].text).not.to.contain('validation.validation');
     });
 
-    it('returns scoped reviews as explicit keyed objects', async () => {
+    it('returns every active review grouped by scope without multiplying upload rows', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -245,10 +277,15 @@ describe('SubmissionUploadRepository', () => {
       await repo.findSubmissionUploadsByTicketId('11111111-1111-1111-1111-111111111111');
 
       expect(sqlStub.firstCall.args[0].text).not.to.contain('json_object_agg');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_review validation_review');
-      expect(sqlStub.firstCall.args[0].text).to.contain('submission_upload_review security_review');
-      expect(sqlStub.firstCall.args[0].text).to.contain("'validation'");
-      expect(sqlStub.firstCall.args[0].text).to.contain("'security'");
+      expect(sqlStub.firstCall.args[0].text).to.contain(') reviews ON TRUE');
+      expect(sqlStub.firstCall.args[0].text).to.contain("FILTER (WHERE sur.scope = 'validation')");
+      expect(sqlStub.firstCall.args[0].text).to.contain("FILTER (WHERE sur.scope = 'security')");
+      expect(sqlStub.firstCall.args[0].text).to.contain("COALESCE(reviews.validation, '[]'::json)");
+      expect(sqlStub.firstCall.args[0].text).to.contain("COALESCE(reviews.security, '[]'::json)");
+      expect(sqlStub.firstCall.args[0].text.match(/LEFT JOIN LATERAL/g)).to.have.length(2);
+      expect(sqlStub.firstCall.args[0].text.match(/sur\.create_date DESC/g)).to.have.length(2);
+      expect(sqlStub.firstCall.args[0].text.match(/sur\.submission_upload_review_id DESC/g)).to.have.length(2);
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('LIMIT 1\n      ) reviews');
     });
   });
 
@@ -301,6 +338,7 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].values).to.include(7);
       expect(sqlStub.firstCall.args[0].text).to.contain('team_id');
       expect(sqlStub.firstCall.args[0].values).to.include('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+      expect(sqlStub.firstCall.args[0].text).to.contain('successor_submission_upload_id');
     });
   });
 
@@ -360,6 +398,97 @@ describe('SubmissionUploadRepository', () => {
       const result = await repo.updateSubmissionUpload('id-1', payload);
 
       expect(result).to.eql(mockRow);
+    });
+  });
+
+  describe('updateSubmissionUploadDecision', () => {
+    it('throws an error if no active record was updated', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.updateSubmissionUploadDecision('id-1', 'approved');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update submission_upload decision');
+      }
+    });
+
+    it('returns the decision and audit revision of the active record', async () => {
+      const mockRow = { submission_upload_id: 'id-1', decision: 'approved', revision_count: 4 };
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.updateSubmissionUploadDecision('id-1', 'approved');
+
+      expect(result).to.eql(mockRow);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date IS NULL');
+      expect(sqlStub.firstCall.args[0].text).to.contain('revision_count');
+      expect(sqlStub.firstCall.args[0].values).to.eql(['approved', 'id-1']);
+    });
+  });
+
+  describe('findSubmissionUploadDecisionHistoryBySubmissionUuid', () => {
+    it('returns every upload of the submission, deleted ones included, newest first', async () => {
+      const rows = [
+        {
+          submission_id: 7,
+          submission_upload_id: 'id-2',
+          decision: 'pending',
+          record_end_date: '2026-09-03T01:00:00.000Z',
+          create_date: '2026-09-03T00:30:00.000Z'
+        },
+        {
+          submission_id: 7,
+          submission_upload_id: 'id-1',
+          decision: 'approved',
+          record_end_date: null,
+          create_date: '2026-09-03T00:00:00.000Z'
+        }
+      ];
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.findSubmissionUploadDecisionHistoryBySubmissionUuid('uuid-1');
+
+      expect(result).to.eql(rows);
+      const statement = sqlStub.firstCall.args[0];
+      expect(statement.text).not.to.contain('su.record_end_date IS NULL');
+      expect(statement.text).to.contain('ORDER BY\n        su.create_date DESC');
+      expect(statement.values).to.eql(['uuid-1']);
+    });
+  });
+
+  describe('updateSubmissionUploadStatus', () => {
+    it('throws an error if no active record was updated', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.updateSubmissionUploadStatus('id-1', 'ingesting');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update submission_upload status');
+      }
+    });
+
+    it('returns the updated record ID and binds the status', async () => {
+      const mockRow = { submission_upload_id: 'id-1' };
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.updateSubmissionUploadStatus('id-1', 'ingesting');
+
+      expect(result).to.eql(mockRow);
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date IS NULL');
+      expect(sqlStub.firstCall.args[0].values).to.eql(['ingesting', 'id-1']);
     });
   });
 
@@ -425,6 +554,19 @@ describe('SubmissionUploadRepository', () => {
 
       expect(result).to.equal(2);
       expect(sqlStub.firstCall.args[0].text).to.contain('RETURNING submission_upload_id');
+    });
+  });
+
+  describe('lockSubmissionUploadsForSubmissionId', () => {
+    it('locks active upload rows in deterministic order', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ sql: sqlStub }));
+
+      await repo.lockSubmissionUploadsForSubmissionId(123);
+
+      const text = sqlStub.firstCall.args[0].text as string;
+      expect(text).to.include('ORDER BY submission_upload_id');
+      expect(text).to.include('FOR UPDATE');
     });
   });
 });

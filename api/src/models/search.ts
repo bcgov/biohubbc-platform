@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import type { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
+import type { ApiCursorPaginationResults } from '../zod-schema/pagination';
+import type { ExpressionTree } from './expression-tree';
+import type { NormalizedExpressionTree } from './expression-tree-internal';
 
 export const WithCount = <T extends z.ZodTypeAny>(model: T) =>
   z.object({
@@ -72,3 +76,44 @@ export const SearchSummaryResponse = z.object({
   taxonomy: SearchSummaryTaxon
 });
 export type SearchSummaryResponse = z.infer<typeof SearchSummaryResponse>;
+
+/**
+ * Submission-scoped filters applied alongside an expression-tree feature search.
+ *
+ * These filters constrain which submissions or submission uploads are eligible to
+ * participate in the search. They are query-scope constraints only and must not
+ * duplicate criteria that belong in the expression tree.
+ *
+ * Properties describing feature types, feature properties, values, spatial criteria,
+ * or other feature-level matching semantics belong in the expression-tree model and
+ * should not be added here.
+ *
+ * Keep this interface limited to submission-domain boundaries that cannot be
+ * represented as feature expressions, such as submission IDs and submission upload IDs.
+ */
+export interface SearchFeatureFilters {
+  submissionIds?: number[];
+  submissionUploadIds?: string[];
+}
+
+/** Caller identity and access mode for generic feature search. */
+export type SearchFeatureSecurityContext =
+  | { type: 'anonymous' }
+  | { type: 'user'; systemUserId: number }
+  | { type: 'unrestricted' };
+
+/** A page of feature results without feature-type property metadata. */
+export interface SearchFeaturePage {
+  features: SearchFeatureResultWithRelevancy[];
+  pagination: ApiCursorPaginationResults;
+}
+
+/** Matching criteria within a required submission-upload boundary. */
+export interface SubmissionUploadFeatureSearchFilters {
+  expression?: ExpressionTree | null;
+}
+
+/** Normalized matching criteria for upload-search persistence queries. */
+export interface NormalizedSubmissionUploadFeatureSearchFilters {
+  expression?: NormalizedExpressionTree | null;
+}

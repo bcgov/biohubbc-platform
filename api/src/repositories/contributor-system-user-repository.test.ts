@@ -26,7 +26,7 @@ describe('ContributorSystemUserRepository', () => {
 
       const repository = new ContributorSystemUserRepository(mockDBConnection);
 
-      const result = await repository.findContributorSystemUser(456);
+      const result = await repository.findContributorSystemUser(123, 456);
 
       expect(result).to.eql({ contributor_system_user_id: 1, contributor_id: 123, system_user_id: 456 });
     });
@@ -43,7 +43,7 @@ describe('ContributorSystemUserRepository', () => {
 
       const repository = new ContributorSystemUserRepository(mockDBConnection);
 
-      const result = await repository.findContributorSystemUser(456);
+      const result = await repository.findContributorSystemUser(123, 456);
 
       expect(result).to.equal(null);
     });
@@ -64,7 +64,7 @@ describe('ContributorSystemUserRepository', () => {
       const repository = new ContributorSystemUserRepository(mockDBConnection);
 
       try {
-        await repository.findContributorSystemUser(456);
+        await repository.findContributorSystemUser(123, 456);
         expect.fail('Expected error to be thrown');
       } catch (err) {
         expect(err).to.be.instanceOf(ApiExecuteSQLError);

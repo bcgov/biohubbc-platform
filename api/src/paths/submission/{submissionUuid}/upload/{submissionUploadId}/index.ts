@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
@@ -11,13 +10,12 @@ const defaultLog = getLogger('paths/submission/{submissionUuid}/upload/{submissi
 
 export const DELETE: Operation = [
   authorizeRequestHandler((req) => ({
-    or: [
+    and: [
       {
         discriminator: 'Team',
         entity: 'submission_upload',
         submissionUploadId: req.params.submissionUploadId
-      },
-      { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+      }
     ]
   })),
   deleteSubmissionUpload()
@@ -25,7 +23,7 @@ export const DELETE: Operation = [
 
 DELETE.apiDoc = {
   description:
-    'Soft-delete a submission upload. The bearer token must identify a member of the upload team, or a system administrator. Deletion is only allowed when the upload has a status of "submitted" (unreviewed).',
+    'Soft-delete a submission upload. The bearer token must identify an active member of the submission contributor and the upload team, or a system administrator. Deletion is only allowed while the upload decision is still pending (unreviewed).',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -57,7 +55,7 @@ DELETE.apiDoc = {
     ...defaultErrorResponses,
     404: {
       description:
-        'Submission not found (invalid submissionUuid) or submission upload not found (invalid submissionUploadId, no status record, or upload does not belong to this submission).'
+        'Submission not found (invalid submissionUuid) or submission upload not found (invalid submissionUploadId, or upload does not belong to this submission).'
     },
     409: {
       description: 'Cannot delete a submission upload that has already been reviewed (approved or denied).'

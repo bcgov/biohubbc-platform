@@ -14,40 +14,43 @@ describe('SecurityRuleRepository', () => {
     sinon.restore();
   });
 
-  describe('getActiveSecurityRules', () => {
-    it('returns an array of security rules', async () => {
-      const mockRow = {
-        security_rule_id: 1,
-        policy_id: null,
-        name: 'rule-a',
-        description: 'desc',
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => ({ rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>)
-      });
+  describe('getScreenableSecurityRules', () => {
+    it('returns active rules with their current expression ids', async () => {
+      const rows = [
+        { security_rule_id: 1, name: 'rule-a', expression_ids: ['2b7d1f7c-5d0f-4a46-a2c9-6f1f3a5d8e10'] },
+        { security_rule_id: 2, name: 'rule-b', expression_ids: [] }
+      ];
+      const sql = sinon.stub().resolves({ rowCount: 2, rows });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ sql }));
 
-      const repo = new SecurityRuleRepository(mockDBConnection);
-      const result = await repo.getActiveSecurityRules();
+      const result = await repo.getScreenableSecurityRules();
 
-      expect(result).to.have.length(1);
+      const text = sql.firstCall.args[0].text as string;
+      expect(text).to.include('sr.is_active = true');
+      expect(text).to.include('sr.record_end_date IS NULL');
+      expect(text).to.include('sc.record_end_date IS NULL');
+      expect(text).to.include('sre.record_end_date IS NULL');
+      expect(text).to.include('e.record_end_date IS NULL');
+      expect(result).to.eql(rows);
     });
+  });
 
-    it('returns an empty array when there are no active rules', async () => {
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => ({ rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>)
-      });
+  describe('getSecurityRulesWithCategory', () => {
+    it('reads every requested rule with its category in one query', async () => {
+      const rows = [
+        { security_rule_id: 1, record_end_date: null, category_record_end_date: null },
+        { security_rule_id: 2, record_end_date: '2026-02-01', category_record_end_date: null }
+      ];
+      const knex = sinon.stub().resolves({ rowCount: 2, rows });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ knex }));
 
-      const repo = new SecurityRuleRepository(mockDBConnection);
-      const result = await repo.getActiveSecurityRules();
+      const result = await repo.getSecurityRulesWithCategory([1, 2]);
 
-      expect(result).to.eql([]);
+      expect(knex).to.have.been.calledOnce;
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"sr"."security_rule_id" in ($1, $2)');
+      expect(bindings).to.eql([1, 2]);
+      expect(result).to.eql(rows);
     });
   });
 
@@ -190,7 +193,7 @@ describe('SecurityRuleRepository', () => {
       expect(count).to.equal(4);
     });
 
-    it("filters on status = 'active' so draft screening rows do not block deletion", async () => {
+    it('counts every current assignment, including automatic screening', async () => {
       let capturedSql = '';
       let capturedBindings: readonly unknown[] = [];
       const mockDBConnection = getMockDBConnection({
@@ -205,8 +208,8 @@ describe('SecurityRuleRepository', () => {
       const repo = new SecurityRuleRepository(mockDBConnection);
       await repo.getActiveAppliedFeatureCount(1);
 
-      expect(capturedSql).to.contain('status');
-      expect(capturedBindings).to.include('active');
+      expect(capturedSql).not.to.contain('status');
+      expect(capturedBindings).not.to.include('active');
     });
 
     it('returns 0 when no active applications exist', async () => {

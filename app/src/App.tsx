@@ -3,12 +3,18 @@ import { ThemeProvider } from '@mui/material/styles';
 import { AuthStateContext, AuthStateContextProvider } from 'contexts/authStateContext';
 import { ConfigContext, ConfigContextProvider } from 'contexts/configContext';
 import { WebStorageStateStore } from 'oidc-client-ts';
-import { AuthProvider, AuthProviderProps } from 'react-oidc-context';
+import { AuthContext, AuthProvider, AuthProviderProps } from 'react-oidc-context';
 import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from 'router/AppRouter';
 import appTheme from 'themes/appTheme';
+import { QueryClientContextProvider } from 'contexts/queryClientContext';
 import { buildUrl, getPostLoginReturnTo, stripOidcParams } from 'utils/Utils';
 
+/**
+ * Root component: theme, server-state cache, runtime config, authentication and routing.
+ *
+ * @returns {JSX.Element} The application.
+ */
 const App = () => {
   return (
     <ThemeProvider theme={appTheme}>
@@ -52,20 +58,31 @@ const App = () => {
 
             return (
               <AuthProvider {...authConfig}>
-                <AuthStateContextProvider>
-                  <AuthStateContext.Consumer>
-                    {(authState) => {
-                      if (!authState || authState.auth.isLoading) {
-                        return <CircularProgress className="pageProgress" size={40} />;
-                      }
-                      return (
-                        <BrowserRouter>
-                          <AppRouter />
-                        </BrowserRouter>
-                      );
-                    }}
-                  </AuthStateContext.Consumer>
-                </AuthStateContextProvider>
+                <AuthContext.Consumer>
+                  {(auth) => (
+                    <QueryClientContextProvider
+                      key={
+                        auth?.isAuthenticated
+                          ? JSON.stringify([auth.user?.profile.iss, auth.user?.profile.sub])
+                          : 'anonymous'
+                      }>
+                      <AuthStateContextProvider>
+                        <AuthStateContext.Consumer>
+                          {(authState) => {
+                            if (!authState || authState.auth.isLoading) {
+                              return <CircularProgress className="pageProgress" size={40} />;
+                            }
+                            return (
+                              <BrowserRouter>
+                                <AppRouter />
+                              </BrowserRouter>
+                            );
+                          }}
+                        </AuthStateContext.Consumer>
+                      </AuthStateContextProvider>
+                    </QueryClientContextProvider>
+                  )}
+                </AuthContext.Consumer>
               </AuthProvider>
             );
           }}

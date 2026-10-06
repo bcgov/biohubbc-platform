@@ -3,12 +3,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
-  ISubmissionFeature,
   ISubmissionModel,
-  PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
@@ -129,232 +126,6 @@ describe('SubmissionService', () => {
         '11111111-1111-1111-1111-111111111111'
       );
       expect(response).to.be.eql(mockSubmissionRecord);
-    });
-  });
-
-  describe('insertSubmissionFeatureRecords', () => {
-    it('inserts submission feature records', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const submissionId = 1;
-      const parentSubmissionFeatureId = 2;
-
-      const insertSubmissionFeatureRecordStub = sinon
-        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecord')
-        .resolves({ submission_feature_id: parentSubmissionFeatureId });
-
-      const submissionFeatures: ISubmissionFeature[] = [
-        {
-          id: '1-1',
-          type: 'survey',
-          properties: {
-            name: 'Survey1'
-          },
-          child_features: [
-            {
-              id: '2-1',
-              type: 'sample_site',
-              properties: {
-                name: 'SampleSite1'
-              },
-              child_features: [
-                {
-                  id: '3-1',
-                  type: 'observation',
-                  properties: {
-                    count: 11,
-                    geometry: {
-                      type: 'Feature',
-                      properties: {},
-                      geometry: {
-                        coordinates: [-125.81103991280563, 49.82351418845636],
-                        type: 'Point'
-                      }
-                    }
-                  },
-                  child_features: []
-                },
-                {
-                  id: '3-2',
-                  type: 'observation',
-                  properties: {
-                    count: 12
-                  },
-                  child_features: []
-                }
-              ]
-            },
-            {
-              id: '2-2',
-              type: 'sample_site',
-              properties: {
-                name: 'SampleSite2',
-                dateRange: {
-                  start_date: '2024-01-01',
-                  end_date: '2024-02-01'
-                }
-              },
-              child_features: [
-                {
-                  id: '3-3',
-                  type: 'observation',
-                  properties: {
-                    count: 13
-                  },
-                  child_features: []
-                },
-                {
-                  id: '3-4',
-                  type: 'observation',
-                  properties: {
-                    count: 14
-                  },
-                  child_features: []
-                }
-              ]
-            },
-            {
-              id: '2-3',
-              type: 'artifact',
-              properties: {
-                filename: 'Artifact1.txt'
-              },
-              child_features: []
-            },
-            {
-              id: '2-4',
-              type: 'artifact',
-              properties: {
-                filename: 'Artifact2.txt'
-              },
-              child_features: []
-            }
-          ]
-        }
-      ];
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.insertSubmissionFeatureRecords(
-        submissionId,
-        'some-uuid',
-        submissionFeatures
-      );
-
-      expect(response).to.be.undefined;
-
-      expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId: null,
-        featureSourceId: '1-1',
-        featureTypeName: 'survey',
-        featureProperties: {
-          name: 'Survey1'
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '2-1',
-        featureTypeName: 'sample_site',
-        featureProperties: {
-          name: 'SampleSite1'
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '3-1',
-        featureTypeName: 'observation',
-        featureProperties: {
-          count: 11,
-          geometry: {
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              coordinates: [-125.81103991280563, 49.82351418845636],
-              type: 'Point'
-            }
-          }
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '3-2',
-        featureTypeName: 'observation',
-        featureProperties: {
-          count: 12
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '2-2',
-        featureTypeName: 'sample_site',
-        featureProperties: {
-          name: 'SampleSite2',
-          dateRange: {
-            start_date: '2024-01-01',
-            end_date: '2024-02-01'
-          }
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '3-3',
-        featureTypeName: 'observation',
-        featureProperties: {
-          count: 13
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '3-4',
-        featureTypeName: 'observation',
-        featureProperties: {
-          count: 14
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '2-3',
-        featureTypeName: 'artifact',
-        featureProperties: {
-          filename: 'Artifact1.txt'
-        },
-        dataByteSizeBytes: 0
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
-        submissionId,
-        submissionUploadId: 'some-uuid',
-        parentSubmissionFeatureId,
-        featureSourceId: '2-4',
-        featureTypeName: 'artifact',
-        featureProperties: {
-          filename: 'Artifact2.txt'
-        },
-        dataByteSizeBytes: 0
-      });
     });
   });
 
@@ -798,7 +569,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'survey',
-          feature_type_display_name: 'Survey',
           submission_feature_security_ids: []
         },
         {
@@ -818,7 +588,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'observation',
-          feature_type_display_name: 'Observation',
           submission_feature_security_ids: []
         },
         {
@@ -838,7 +607,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'observation',
-          feature_type_display_name: 'Observation',
           submission_feature_security_ids: []
         },
         {
@@ -858,7 +626,6 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_name: 'artifact',
-          feature_type_display_name: 'Artifact',
           submission_feature_security_ids: []
         }
       ];
@@ -875,17 +642,14 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql([
         {
           feature_type_name: 'survey',
-          feature_type_display_name: 'Survey',
           features: [{ ...mockSubmissionRecords[0] }]
         },
         {
           feature_type_name: 'observation',
-          feature_type_display_name: 'Observation',
           features: [{ ...mockSubmissionRecords[1] }, { ...mockSubmissionRecords[2] }]
         },
         {
           feature_type_name: 'artifact',
-          feature_type_display_name: 'Artifact',
           features: [{ ...mockSubmissionRecords[3] }]
         }
       ]);
@@ -944,45 +708,6 @@ describe('SubmissionService', () => {
         }
       ]);
       expect(response).to.be.undefined;
-    });
-  });
-
-  describe('patchSubmissionRecord', () => {
-    it('should patch the submission record and return the updated record', async () => {
-      const submissionId = 1;
-
-      const patch: PatchSubmissionRecord = { security_reviewed: true };
-
-      const mockSubmissionRecord: SubmissionRecord = {
-        submission_id: 1,
-        uuid: '123-456-789',
-        security_review_timestamp: '2023-12-12',
-        submitted_timestamp: '2023-12-12',
-        system_user_id: 3,
-        contributor_id: 1,
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        publish_timestamp: '2023-12-12',
-        record_end_date: '2023-12-12',
-        create_date: '2023-12-12',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-      const mockDBConnection = getMockDBConnection();
-
-      const patchSubmissionRecordStub = sinon
-        .stub(SubmissionRepository.prototype, 'patchSubmissionRecord')
-        .resolves(mockSubmissionRecord);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.patchSubmissionRecord(submissionId, patch);
-
-      expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
-      expect(response).to.be.eql(mockSubmissionRecord);
     });
   });
 

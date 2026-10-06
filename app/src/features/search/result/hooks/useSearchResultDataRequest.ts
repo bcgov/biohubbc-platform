@@ -1,12 +1,12 @@
-import { APIError } from 'hooks/api/useAxios';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
-import useIsMounted from 'hooks/useIsMounted';
-import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { CreateDataRequestDialogValues } from 'features/data-request/components/CreateDataRequestDialog';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 interface UseSearchResultDataRequestProps {
   /** Canonical feature-type name (already normalized via routeConfig); sent verbatim to the API and used to close the dialog on tab change. */
@@ -25,11 +25,25 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
   const api = useApi();
   const { auth } = useAuthStateContext();
   const dialogContext = useDialogContext();
-  const isMounted = useIsMounted();
-  const { runSerialized } = useSerializedAsync();
+  const queryClient = useQueryClient();
+  // Scopes the in-flight check below to this hook instance.
+  const createDataRequestMutationKey = ['search-result', 'create-data-request', useId()];
+  const createDataRequestMutation = useMutation({
+    mutationKey: createDataRequestMutationKey,
+    mutationFn: ({ values, featureTypeName }: { values: CreateDataRequestDialogValues; featureTypeName: string }) =>
+      api.dataRequest.createDataRequest({
+        reason: values.reason,
+        system_user_ids: values.system_user_ids,
+        featureTypes: [featureTypeName],
+        expression: expressionTree
+      }),
+    // A data request opens a ticket for its policy.
+    onSuccess: () =>
+      refreshChangedQueries(queryClient, [...changedQueryKeys.ticketLists(), ...changedQueryKeys.policy()])
+  });
+  const { mutate: createDataRequest } = createDataRequestMutation;
 
   const [isCreateDataRequestDialogOpen, setIsCreateDataRequestDialogOpen] = useState(false);
-  const [isSubmittingDataRequest, setIsSubmittingDataRequest] = useState(false);
 
   useEffect(() => {
     setIsCreateDataRequestDialogOpen(false);
@@ -56,51 +70,29 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
 
   /**
    * Submits the create-data-request form for the current expression search.
-   * Serialized to prevent duplicate submissions. Success closes the dialog and
-   * shows a confirmation snackbar; failure keeps the dialog open and surfaces
-   * the API error. State updates are skipped after unmount.
+   * Ignored while a submission from this hook is in flight, so a double submit creates one request. Success closes
+   * the dialog and shows a confirmation snackbar; failure keeps the dialog open and surfaces the API error. Neither
+   * runs once the page has unmounted.
    *
    * @param {CreateDataRequestDialogValues} values - Reason and selected collaborator system user IDs from the dialog.
-   * @returns Promise from the serialized create-data-request operation, or `undefined` when another submission is already running.
+   * @returns {void}
    */
-  const handleCreateDataRequest = useCallback(
-    (values: CreateDataRequestDialogValues) =>
-      runSerialized(async () => {
-        if (!featureType) {
-          return undefined;
-        }
-        setIsSubmittingDataRequest(true);
-        try {
-          await api.dataRequest.createDataRequest({
-            reason: values.reason,
-            system_user_ids: values.system_user_ids,
-            featureTypes: [featureType],
-            expression: expressionTree
-          });
-          if (!isMounted()) {
-            return;
-          }
+  const handleCreateDataRequest = (values: CreateDataRequestDialogValues) => {
+    if (!featureType || queryClient.isMutating({ mutationKey: createDataRequestMutationKey }) > 0) {
+      return;
+    }
+
+    createDataRequest(
+      { values, featureTypeName: featureType },
+      {
+        onSuccess: () => {
           setIsCreateDataRequestDialogOpen(false);
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: 'Data request created'
-          });
-        } catch (error) {
-          if (!isMounted()) {
-            return;
-          }
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: (error as APIError).message
-          });
-        } finally {
-          if (isMounted()) {
-            setIsSubmittingDataRequest(false);
-          }
-        }
-      }),
-    [api.dataRequest, dialogContext, expressionTree, featureType, runSerialized, isMounted]
-  );
+          dialogContext.setSnackbar({ open: true, snackbarMessage: 'Data request created' });
+        },
+        onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+      }
+    );
+  };
 
   /**
    * Closes the create-data-request dialog without submitting.
@@ -111,7 +103,7 @@ export const useSearchResultDataRequest = ({ featureType, expressionTree }: UseS
 
   return {
     isCreateDataRequestDialogOpen,
-    isSubmittingDataRequest,
+    isSubmittingDataRequest: createDataRequestMutation.isPending,
     handleOpenCreateDataRequest,
     handleCreateDataRequest,
     handleCancelCreateDataRequest

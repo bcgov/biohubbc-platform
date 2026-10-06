@@ -1,14 +1,16 @@
 import Stack from '@mui/material/Stack';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { TicketSystemUserDialog } from 'features/admin/tickets/components/dialog/system-user/TicketSystemUserDialog';
 import { TicketTeamDialog } from 'features/admin/tickets/components/dialog/team/TicketTeamDialog';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
-import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
-import { ITeamMember } from 'interfaces/useTeamsApi.interface';
+import { useDialogContext } from 'hooks/useContext';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
+import { useRemoveTeamMemberMutation } from '../../hooks/useRemoveTeamMemberMutation';
+import { useRemoveTicketSystemUserMutation } from '../../hooks/useRemoveTicketSystemUserMutation';
+import { useTicketQuery } from '../../hooks/useTicketQuery';
+import { useUpdateTicketSystemUserStatusMutation } from '../../hooks/useUpdateTicketSystemUserStatusMutation';
 import { TicketSidebarSystemUsers } from './TicketSidebarSystemUsers';
 import { TicketSidebarDataRequests } from './TicketSidebarDataRequests';
 import { TicketSidebarReferences } from './TicketSidebarReferences';
@@ -23,130 +25,24 @@ import { TicketSidebarUploads } from './TicketSidebarUploads';
 export const TicketSidebar = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
-  const ticket = ticketDataLoader.data;
+  const ticket = useTicketQuery().data;
   const [isParticipantsDialogOpen, setIsParticipantsDialogOpen] = useState(false);
   const [isTicketSystemUserDialogOpen, setIsTicketSystemUserDialogOpen] = useState(false);
+  const removeTeamMemberMutation = useRemoveTeamMemberMutation();
+  const updateSystemUserStatusMutation = useUpdateTicketSystemUserStatusMutation();
+  const removeSystemUserMutation = useRemoveTicketSystemUserMutation();
 
-  const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
-  const optimisticTeamMembersLoader = useOptimisticDataLoader(teamMembersLoader);
-  const optimisticTicketLoader = useOptimisticDataLoader(ticketDataLoader);
-  const showApiErrorSnackbar = (error: unknown) => {
-    const apiError = error as APIError;
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: apiError.message
-    });
-  };
+  const teamId = ticket?.team_id;
+  const teamMembersQuery = useQuery({
+    queryKey: teamQueryKeys.members(teamId ?? ''),
+    queryFn: teamId ? ({ signal }) => api.teams.getTeamMembers(teamId, { signal }) : skipToken
+  });
 
-  useEffect(() => {
-    if (ticket?.team_id) {
-      teamMembersLoader.load(ticket.team_id);
-    }
-  }, [ticket?.team_id, teamMembersLoader]);
-
-  const members = teamMembersLoader.data?.members ?? [];
+  const members = teamMembersQuery.data?.members ?? [];
 
   if (!ticket) {
     return null;
   }
-
-  // Optimistically insert a member into local state unless already present.
-  const handleMemberAdd = (member: ITeamMember) => {
-    const currentData = teamMembersLoader.data ?? { members: [] };
-    const existingMembers = currentData.members;
-    const existingMemberIds = new Set(existingMembers.map((existingMember) => existingMember.team_member_id));
-    const nextMembers = existingMemberIds.has(member.team_member_id) ? existingMembers : [...existingMembers, member];
-
-    teamMembersLoader.setData({
-      ...currentData,
-      members: nextMembers
-    });
-  };
-
-  // Remove a member from local state by id.
-  const handleMemberRemove = (teamMemberId: string) => {
-    const currentData = teamMembersLoader.data;
-
-    if (!currentData) {
-      return;
-    }
-
-    teamMembersLoader.setData({
-      ...currentData,
-      members: currentData.members.filter((existingMember) => existingMember.team_member_id !== teamMemberId)
-    });
-  };
-
-  // Optimistically remove, persist deletion, and rollback if API delete fails.
-  const handleRemoveUser = async (teamMemberId: string) => {
-    await optimisticTeamMembersLoader.refresh((currentData) => ({
-      optimisticState: {
-        ...currentData,
-        members: currentData.members.filter((member) => member.team_member_id !== teamMemberId)
-      },
-      mutation: () => api.teams.deleteTeamMember(ticket.team_id, teamMemberId),
-      onRollback: showApiErrorSnackbar
-    }));
-  };
-
-  /**
-   * Updates a ticket system user status without refetching ticket detail.
-   *
-   * Persists the status change through the API, then patches local ticket
-   * context state so ticket system users update immediately in the sidebar.
-   *
-   * @param {string} ticketSystemUserId
-   * @param {TicketSystemUserStatus} status
-   * @return {Promise<void>}
-   */
-  const handleUpdateTicketSystemUserStatus = async (
-    ticketSystemUserId: string,
-    status: TicketSystemUserStatus
-  ): Promise<void> => {
-    await optimisticTicketLoader.refresh((currentTicket) => {
-      const currentTicketSystemUsers = currentTicket.ticket_system_users ?? [];
-
-      return {
-        optimisticState: {
-          ...currentTicket,
-          ticket_system_users: currentTicketSystemUsers.map((ticketSystemUser) =>
-            ticketSystemUser.ticket_system_user_id === ticketSystemUserId
-              ? { ...ticketSystemUser, status }
-              : ticketSystemUser
-          )
-        },
-        mutation: () => api.tickets.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status }),
-        onRollback: showApiErrorSnackbar
-      };
-    });
-  };
-
-  /**
-   * Soft deletes a ticket system user without refetching ticket detail.
-   *
-   * Calls the delete endpoint, then removes the ticket system user from local ticket
-   * context state to keep UI in sync.
-   *
-   * @param {string} ticketSystemUserId
-   * @return {Promise<void>}
-   */
-  const handleRemoveTicketSystemUser = async (ticketSystemUserId: string): Promise<void> => {
-    await optimisticTicketLoader.refresh((currentTicket) => {
-      const currentTicketSystemUsers = currentTicket.ticket_system_users ?? [];
-
-      return {
-        optimisticState: {
-          ...currentTicket,
-          ticket_system_users: currentTicketSystemUsers.filter(
-            (ticketSystemUser) => ticketSystemUser.ticket_system_user_id !== ticketSystemUserId
-          )
-        },
-        mutation: () => api.tickets.deleteTicketSystemUser(ticketId, ticketSystemUserId),
-        onRollback: showApiErrorSnackbar
-      };
-    });
-  };
 
   /**
    * Closes the ticket system user delete confirmation dialog.
@@ -172,9 +68,9 @@ export const TicketSidebar = () => {
       noButtonLabel: 'Cancel',
       onClose: closeTicketSystemUserDeleteDialog,
       onNo: closeTicketSystemUserDeleteDialog,
-      onYes: async () => {
+      onYes: () => {
         closeTicketSystemUserDeleteDialog();
-        await handleRemoveTicketSystemUser(ticketSystemUserId);
+        removeSystemUserMutation.mutate(ticketSystemUserId);
       }
     });
   };
@@ -184,14 +80,18 @@ export const TicketSidebar = () => {
       <TicketSidebarSystemUsers
         ticketSystemUsers={ticket.ticket_system_users}
         onOpenDialog={() => setIsTicketSystemUserDialogOpen(true)}
-        onUpdateTicketSystemUserStatus={handleUpdateTicketSystemUserStatus}
+        onUpdateTicketSystemUserStatus={(ticketSystemUserId: string, status: TicketSystemUserStatus) =>
+          updateSystemUserStatusMutation.mutate({ ticketSystemUserId, status })
+        }
         onRemoveTicketSystemUser={handleConfirmRemoveTicketSystemUser}
       />
       <TicketSidebarTeam
         members={members}
-        isLoading={teamMembersLoader.isLoading}
+        isLoading={teamMembersQuery.isFetching}
         onOpenDialog={() => setIsParticipantsDialogOpen(true)}
-        onRemoveUser={handleRemoveUser}
+        onRemoveUser={(teamMemberId: string) =>
+          removeTeamMemberMutation.mutate({ teamId: ticket.team_id, teamMemberId })
+        }
       />
       <TicketSidebarDataRequests />
       <TicketSidebarUploads />
@@ -202,8 +102,6 @@ export const TicketSidebar = () => {
         teamId={ticket.team_id}
         members={members}
         onClose={() => setIsParticipantsDialogOpen(false)}
-        onMemberAdd={handleMemberAdd}
-        onMemberRemove={handleMemberRemove}
       />
       <TicketSystemUserDialog
         open={isTicketSystemUserDialogOpen}

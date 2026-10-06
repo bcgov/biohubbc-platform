@@ -1,13 +1,23 @@
+import { skipToken, useQuery } from '@tanstack/react-query';
+import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useMemo } from 'react';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { parseRouteId } from 'utils/routes';
-import { SubmissionFeatureDetailContent } from './components/SubmissionFeatureDetailContent';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { useMemo } from 'react';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
+import { keepPreviousDataWithin } from 'utils/query-client';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
+import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
+import { SubmissionFeatureLayout } from './components/SubmissionFeatureLayout';
 
+/**
+ * Render a public submission feature detail page.
+ *
+ * Owns route parsing, feature loading, authorization error handling, and standard submission feature properties content.
+ *
+ * @returns {JSX.Element} Submission feature detail page.
+ */
 export const SubmissionFeaturePage = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const biohubApi = useApi();
 
@@ -15,43 +25,63 @@ export const SubmissionFeaturePage = () => {
   const submissionId = parseRouteId(params.submissionId);
   const submissionFeatureId = parseRouteId(params.submissionFeatureId);
 
-  const featureDataLoader = useDataLoader(
-    (submissionId, submissionFeatureId) =>
-      biohubApi.features.getSubmissionFeatureById(submissionId, submissionFeatureId),
-    (error: unknown) => {
-      const status = (error as APIError)?.status;
-      if (status === 401 || status === 403) {
-        navigate('/forbidden', { replace: true });
-      }
-    }
+  const featureQuery = useQuery({
+    queryKey: submissionQueryKeys.featureDetail(submissionId ?? 0, submissionFeatureId ?? 0),
+    queryFn:
+      submissionId === null || submissionFeatureId === null
+        ? skipToken
+        : ({ signal }) => biohubApi.features.getSubmissionFeatureById(submissionId, submissionFeatureId, { signal })
+  });
+  const feature = featureQuery.data?.feature;
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
+    [location.search]
   );
-  useEffect(() => {
-    if (submissionId === null || submissionFeatureId === null) {
-      return;
-    }
 
-    featureDataLoader.refresh(submissionId, submissionFeatureId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId, submissionFeatureId]);
+  const propertyGrid = useServerPaginatedGridState({ defaultSort: { field: 'property', sort: 'asc' } });
+  const propertyParams = { search: propertyGrid.debouncedSearchTerm, ...propertyGrid.apiPagination };
+  const propertiesQuery = useQuery({
+    queryKey: submissionQueryKeys.featureProperties(submissionId ?? 0, submissionFeatureId ?? 0, propertyParams),
+    queryFn:
+      submissionId === null || submissionFeatureId === null
+        ? skipToken
+        : ({ signal }) =>
+            biohubApi.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, propertyParams, {
+              signal
+            }),
+    placeholderData: keepPreviousDataWithin(submissionQueryKeys.feature(submissionId ?? 0, submissionFeatureId ?? 0))
+  });
 
-  const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
-  const isLoading = featureDataLoader.isLoading;
+  const featureErrorStatus = (featureQuery.error as APIError | null)?.status;
+  if (featureErrorStatus === 401 || featureErrorStatus === 403) {
+    return <Navigate to="/forbidden" replace />;
+  }
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
   }
 
   return (
-    <SubmissionFeatureDetailContent
-      isLoading={isLoading}
+    <SubmissionFeatureLayout
+      isLoading={featureQuery.isLoading}
       feature={feature}
-      submissionId={submissionId}
-      submissionFeatureId={submissionFeatureId}
       rootBreadcrumbLabel="Search"
       rootBreadcrumbTo={`/search/${location.search}`}
       submissionDetailBasePath="/submission"
-      featureRouteBasePath="/submission"
-      queryString={location.search}
-    />
+      queryString={location.search}>
+      <SubmissionFeaturePropertiesSection
+        submissionId={submissionId}
+        pathResolvers={pathResolvers}
+        rows={propertiesQuery.data?.properties ?? []}
+        rowCount={propertiesQuery.data?.pagination.total ?? 0}
+        isLoading={propertiesQuery.isFetching && !propertiesQuery.data}
+        paginationModel={propertyGrid.paginationModel}
+        setPaginationModel={propertyGrid.handlePaginationChange}
+        sortModel={propertyGrid.sortModel}
+        setSortModel={propertyGrid.handleSortChange}
+        searchTerm={propertyGrid.searchTerm}
+        onSearch={propertyGrid.handleSearch}
+      />
+    </SubmissionFeatureLayout>
   );
 };

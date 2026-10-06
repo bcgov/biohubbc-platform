@@ -39,7 +39,8 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   type: z.string().min(1, 'Feature entry is missing required string field: type'),
   properties: z.record(z.unknown()),
   content: z.array(z.string()),
-  parent: z.string().nullable()
+  parent: z.string().nullable(),
+  universal_id: z.string().min(1).max(200).optional()
 });
 const defaultLog = getLogger('utils/biohub-tar-parser');
 

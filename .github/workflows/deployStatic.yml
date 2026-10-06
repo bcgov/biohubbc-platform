@@ -119,6 +119,7 @@ jobs:
           docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
           docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
 
+<<<<<<< HEAD
   # Build the Database image
   buildAndPushDatabase:
     name: Build Database Image
@@ -170,6 +171,8 @@ jobs:
           docker build -t ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }} .
           docker push ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:${{ env.IMAGE_TAG }}
 
+=======
+>>>>>>> 717363b51d83c90fa8d19858f34f3208b4891726
   # Build the Database Setup image
   buildAndPushDatabaseSetup:
     name: Build Database Setup Image
@@ -328,7 +331,6 @@ jobs:
     needs:
       - checkoutRepo
       - buildAndPushApp
-      - buildAndPushDatabase
       - buildAndPushDatabaseSetup
       - buildAndPushAPI
       - buildAndPushMartinGateway
@@ -383,17 +385,6 @@ jobs:
             -f ./infrastructure/biohub-platform/values-$BRANCH.yaml \
             --set-string biohub-platform-app.environment.ts=$TS \
             --set-string biohub-platform-app.environment.changeId=$BUILD_TAG \
-            --set-string biohub-platform-db.environment.ts=$TS \
-            --set-string biohub-platform-db.environment.changeId=$BUILD_TAG \
-            --set-string biohub-platform-db.app.postgresAdmin=${{ secrets.DATABASE_ADMIN }} \
-            --set-string biohub-platform-db.app.postgresAdminPassword=${{ secrets.DATABASE_ADMIN_PASSWORD }} \
-            --set-string biohub-platform-db.app.postgresUser=${{ secrets.DATABASE_USER }} \
-            --set-string biohub-platform-db.app.postgresUserPassword=${{ secrets.DATABASE_USER_PASSWORD }} \
-            --set-string biohub-platform-db.app.postgresUserApi=${{ secrets.DATABASE_USER_API }} \
-            --set-string biohub-platform-db.app.postgresUserApiPassword=${{ secrets.DATABASE_USER_API_PASSWORD }} \
-            --set-string biohub-platform-db.app.postgresUserMartin=${{ secrets.DATABASE_USER_MARTIN }} \
-            --set-string biohub-platform-db.app.postgresUserMartinPassword=${{ secrets.DATABASE_USER_MARTIN_PASSWORD }} \
-            --set-string biohub-platform-db.app.postgresDb=${{ secrets.DATABASE_NAME }} \
             --set-string biohub-platform-db-setup.environment.ts=$TS \
             --set-string biohub-platform-db-setup.environment.changeId=$BUILD_TAG \
             --set-string biohub-platform-cronjobs.image.tag="build-1.0.0-${BUILD_TAG}-${BRANCH}" \
@@ -437,7 +428,7 @@ jobs:
           set -e
           KEEP=3
           SUFFIX="-$BRANCH"
-          IMAGES="biohub-platform-app biohub-platform-api biohub-platform-db biohub-platform-db-setup biohub-platform-martin-gateway"
+          IMAGES="biohub-platform-app biohub-platform-api biohub-platform-db-setup biohub-platform-martin-gateway"
           echo "Pruning image tags for environment $BRANCH in $TOOLS_NAMESPACE (keeping $KEEP most recent by date)"
           for IMAGE in $IMAGES; do
             echo "Checking image stream $IMAGE..."

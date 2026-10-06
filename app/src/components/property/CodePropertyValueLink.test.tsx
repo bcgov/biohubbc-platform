@@ -1,6 +1,7 @@
 import { CodePropertyValue } from 'interfaces/property-value.interface';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
+import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
 import { CodePropertyValueLink } from './CodePropertyValueLink';
 
 const code: CodePropertyValue = {
@@ -13,30 +14,37 @@ const code: CodePropertyValue = {
 
 interface RenderOptions {
   submissionId?: number;
-  featureRouteBasePath?: string;
-  initialEntry?: string;
+  getSubmissionCodePath?: (submissionId: number, codesetKey: string, codeKey: string) => string;
 }
 
 const renderLink = (value: CodePropertyValue, options: RenderOptions = {}) => {
-  const { submissionId = 3, featureRouteBasePath = '/submission', initialEntry = '/x' } = options;
+  const {
+    submissionId = 3,
+    getSubmissionCodePath = buildSubmissionPropertyValuePathResolvers('/submission').getSubmissionCodePath
+  } = options;
 
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <CodePropertyValueLink value={value} submissionId={submissionId} featureRouteBasePath={featureRouteBasePath} />
+    <MemoryRouter>
+      <CodePropertyValueLink value={value} submissionId={submissionId} getSubmissionCodePath={getSubmissionCodePath} />
     </MemoryRouter>
   );
 };
 
 describe('CodePropertyValueLink', () => {
-  it('links the label to the code page under the referencing submission, keeping the query string', () => {
-    const { getByRole } = renderLink(code, { submissionId: 3, initialEntry: '/x?view=table' });
+  it('links the label to the code path provided by the caller', () => {
+    const getSubmissionCodePath = vi.fn(() => '/submission/3/code/sign/track?view=table');
+    const { getByRole } = renderLink(code, { submissionId: 3, getSubmissionCodePath });
 
     const link = getByRole('link', { name: 'Track' });
     expect(link).toHaveAttribute('href', '/submission/3/code/sign/track?view=table');
+    expect(getSubmissionCodePath).toHaveBeenCalledWith(3, 'sign', 'track');
   });
 
   it('uses the portal route base when given', () => {
-    const { getByRole } = renderLink(code, { submissionId: 3, featureRouteBasePath: '/portal/submission' });
+    const { getByRole } = renderLink(code, {
+      submissionId: 3,
+      getSubmissionCodePath: buildSubmissionPropertyValuePathResolvers('/portal/submission').getSubmissionCodePath
+    });
 
     expect(getByRole('link', { name: 'Track' })).toHaveAttribute('href', '/portal/submission/3/code/sign/track');
   });

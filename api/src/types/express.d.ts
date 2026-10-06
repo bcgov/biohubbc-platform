@@ -24,9 +24,7 @@ declare module 'express-serve-static-core' {
      */
     authorization_scheme?: AuthorizationScheme;
 
-    /**
-     * Contributor id resolved during contributor authorization.
-     */
+    /** Contributor ID resolved by the explicit contributor membership check. */
     contributor_id?: number;
 
     /**

@@ -1,12 +1,10 @@
-import { JSONPath } from 'jsonpath-plus';
+import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
+import { HTTP403 } from '../errors/http-error';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
-import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import {
   ICreateSubmission,
-  ISubmissionFeature,
   ISubmissionModel,
-  PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
@@ -18,24 +16,57 @@ import {
   SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository
 } from '../repositories/submission-repository';
-import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
-
-const defaultLog = getLogger('submission-service');
+import { UserService } from './user-service';
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
-  ingestionRepository: FeatureIngestionRepository;
   teamService: TeamService;
+  userService: UserService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
-    this.ingestionRepository = new FeatureIngestionRepository(connection);
     this.teamService = new TeamService(connection);
+    this.userService = new UserService(connection);
+  }
+
+  /**
+   * Require owning-contributor membership for submission writes, with a system-administrator exception.
+   * Ownership comes from the stored submission. Team access is checked by middleware.
+   *
+   * @param {string} submissionUuid Submission whose contributor owns the operation.
+   * @returns {Promise<void>} Resolves when contributor write access is allowed.
+   * @throws {HTTP403} If the caller has no contributor write access.
+   */
+  async assertSubmissionContributorWriteAccess(submissionUuid: string): Promise<void> {
+    const systemUserId = this.connection.systemUserId();
+    const contributor = await this.submissionRepository.findSubmissionContributorMembership(
+      submissionUuid,
+      systemUserId
+    );
+    if (contributor?.is_member) {
+      return;
+    }
+
+    const user = await this.userService.getUserById(systemUserId);
+    if (!user.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN)) {
+      throw new HTTP403('No active membership in the submission contributor');
+    }
+  }
+
+  /**
+   * Lock the submission's current feature state for the active transaction.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<void>} Resolves after acquiring the submission-scoped transaction lock.
+   * @memberof SubmissionService
+   */
+  async lockSubmissionFeatureStateForSubmissionId(submissionId: number): Promise<void> {
+    await this.submissionRepository.lockSubmissionFeatureStateForSubmissionId(submissionId);
   }
 
   /**
@@ -110,74 +141,6 @@ export class SubmissionService extends DBService {
       contributorId,
       team.team_id
     );
-  }
-
-  /**
-   * Insert submission features.
-   *
-   * @param {number} submissionId
-   * @param {string} submissionUploadId - The submission_upload_id that produced these features.
-   * @param {ISubmissionFeature[]} submissionFeatures
-   * @returns {Promise<void>}
-   * @memberof SubmissionService
-   */
-  async insertSubmissionFeatureRecords(
-    submissionId: number,
-    submissionUploadId: string,
-    submissionFeatures: ISubmissionFeature[]
-  ): Promise<void> {
-    try {
-      // Generate paths to all non-null nodes which contain a 'child_features' property
-      const submissionFeatureJsonPaths: string[] = JSONPath({
-        path: '$..[?(@ && @.child_features)]',
-        flatten: true,
-        resultType: 'path',
-        json: submissionFeatures
-      });
-
-      // Store a mapping of jsonPath to submission_feature_id
-      const parentSubmissionFeatureIdMap: Map<string, number> = new Map();
-
-      // Match the last path segment of a jsonPath that ends with 'child_features[<index>]'
-      const matchLastJsonPathSegment = /\['child_features'\]\[\d+\]$/;
-
-      for (const jsonPath of submissionFeatureJsonPaths) {
-        // Fetch a submissionFeature object
-        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
-
-        if (!node?.length) {
-          continue;
-        }
-
-        // We expect the 'path' to resolve an array of 1 item
-        const featureNode = node[0];
-
-        // Get the parent jsonPath by stripping the last path segment from the current jsonPath
-        const parentJsonPath = jsonPath.replace(matchLastJsonPathSegment, '');
-
-        // Get the submission_feature_id of the parent submissionFeature object, or null if the current node is the root
-        const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
-
-        // Validate the submissionFeature object
-        const response = await this.ingestionRepository.insertSubmissionFeatureRecord({
-          submissionId,
-          submissionUploadId,
-          parentSubmissionFeatureId,
-          featureSourceId: featureNode.id,
-          featureTypeName: featureNode.type,
-          featureProperties: featureNode.properties,
-          dataByteSizeBytes: 0 // Legacy tree path — byte size not computed
-        });
-
-        // Cache the submission_feature_id for the current jsonPath
-        parentSubmissionFeatureIdMap.set(jsonPath, response.submission_feature_id);
-      }
-
-      defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success' });
-    } catch (error) {
-      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
-      throw error;
-    }
   }
 
   /**
@@ -378,7 +341,6 @@ export class SubmissionService extends DBService {
    * @returns {Promise<
    *     {
    *       feature_type_name: string;
-   *       feature_type_display_name: string;
    *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
    *     }[]
    *   >}
@@ -387,7 +349,6 @@ export class SubmissionService extends DBService {
   async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
     {
       feature_type_name: string;
-      feature_type_display_name: string;
       features: SubmissionFeatureRecordWithTypeAndSecurity[];
     }[]
   > {
@@ -409,7 +370,6 @@ export class SubmissionService extends DBService {
 
     const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
       feature_type_name: featureType,
-      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
       features: submissionFeatures
     }));
 
@@ -446,6 +406,32 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get all paginated features belonging to one submission upload.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting parameters.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Features belonging to the upload.
+   * @memberof SubmissionService
+   */
+  async getSubmissionUploadFeatures(
+    submissionUploadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    return this.submissionRepository.getSubmissionUploadFeatures(submissionUploadId, pagination);
+  }
+
+  /**
+   * Count all features belonging to one submission upload.
+   *
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @returns {Promise<number>} Number of features belonging to the upload.
+   * @memberof SubmissionService
+   */
+  async getSubmissionUploadFeaturesCount(submissionUploadId: string): Promise<number> {
+    return this.submissionRepository.getSubmissionUploadFeaturesCount(submissionUploadId);
+  }
+
+  /**
    * Get all messages for a submission.
    *
    * @param {number} submissionId
@@ -472,18 +458,6 @@ export class SubmissionService extends DBService {
     const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
 
     return this.submissionRepository.createMessages(messagesToInsert);
-  }
-
-  /**
-   * Patch a submission record.
-   *
-   * @param {number} submissionId
-   * @param {PatchSubmissionRecord} patch
-   * @returns {Promise<SubmissionRecord>}
-   * @memberof SubmissionServiceF
-   */
-  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
-    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
   }
 
   /**

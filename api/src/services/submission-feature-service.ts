@@ -19,39 +19,6 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
-   * Publish active features from a submission upload by setting record_effective_date.
-   *
-   * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<void>}
-   * @memberof SubmissionFeatureService
-   */
-  async setRecordEffectiveDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    return this.submissionFeatureRepository.setRecordEffectiveDateBySubmissionUploadId(submissionUploadId);
-  }
-
-  /**
-   * Reject active features from a submission upload by setting record_end_date.
-   *
-   * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<void>}
-   * @memberof SubmissionFeatureService
-   */
-  async setRecordEndDateBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    return this.submissionFeatureRepository.setRecordEndDateBySubmissionUploadId(submissionUploadId);
-  }
-
-  /**
-   * Reset publication/rejection dates for features from a submitted upload.
-   *
-   * @param {string} submissionUploadId The submission upload scope.
-   * @returns {Promise<void>}
-   * @memberof SubmissionFeatureService
-   */
-  async unsetRecordDatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    return this.submissionFeatureRepository.unsetRecordDatesBySubmissionUploadId(submissionUploadId);
-  }
-
-  /**
    * Get a submission feature record by uuid.
    *
    * @param {string} submissionFeatureUuid
@@ -71,5 +38,48 @@ export class SubmissionFeatureService extends DBService {
    */
   async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
     return this.submissionFeatureRepository.getSubmissionFeatureById(submissionFeatureId);
+  }
+
+  /**
+   * Get any feature row owned by an upload for administrative review.
+   *
+   * @param {number} submissionId ID of the submission that owns the upload.
+   * @param {string} submissionUploadId UUID of the submission upload.
+   * @param {number} submissionFeatureId ID of the feature to return.
+   * @returns {Promise<SubmissionFeature>} The requested submission feature.
+   * @memberof SubmissionFeatureService
+   */
+  async getSubmissionUploadFeature(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeatureId: number
+  ): Promise<SubmissionFeature> {
+    return this.submissionFeatureRepository.getSubmissionUploadFeature(
+      submissionId,
+      submissionUploadId,
+      submissionFeatureId
+    );
+  }
+
+  /**
+   * Count features owned by an upload that have ever been activated.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<number>} Number of upload-owned features with an effective date.
+   * @memberof SubmissionFeatureService
+   */
+  async getActivatedSubmissionFeatureCountBySubmissionUploadId(submissionUploadId: string): Promise<number> {
+    return this.submissionFeatureRepository.getActivatedSubmissionFeatureCountBySubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Count features in a submission that have ever been activated.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<number>} Number of submission features with an effective date.
+   * @memberof SubmissionFeatureService
+   */
+  async getActivatedSubmissionFeatureCountBySubmissionId(submissionId: number): Promise<number> {
+    return this.submissionFeatureRepository.getActivatedSubmissionFeatureCountBySubmissionId(submissionId);
   }
 }

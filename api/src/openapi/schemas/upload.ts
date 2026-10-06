@@ -1,5 +1,7 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
+import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../models/submission-upload';
+import { SubmissionUploadHistoryStatus } from '../../models/submission-upload-decision';
 
 /**
  * Optional identity claims for a person on whose behalf an upload is initiated. The authenticated
@@ -34,6 +36,13 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes', 'name', 'description', 'comment'],
   properties: {
+    client_id: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Contributor client ID that owns the new submission. When omitted, defaults to the token's clientId or azp. Active membership in the selected contributor is required; supply client_id when submitting for a different contributor."
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -54,7 +63,8 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     },
     submitters: {
       type: 'array',
-      description: 'Optional people to add to the submission and upload teams.',
+      description:
+        'Optional people the caller grants ongoing submission-list and history access, plus access to this upload team. Active existing users are reused and missing users are created. Recipients need not belong to the contributor; adding them does not grant contributor membership.',
       maxItems: 100,
       items: SubmitterSchema
     },
@@ -167,7 +177,8 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     },
     submitters: {
       type: 'array',
-      description: 'Optional people to add to the submission and upload teams.',
+      description:
+        'Optional people the caller grants ongoing submission-list and history access, plus access to this upload team. Active existing users are reused and missing users are created. Recipients need not belong to the contributor; adding them does not grant contributor membership.',
       maxItems: 100,
       items: SubmitterSchema
     },
@@ -180,32 +191,31 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Response for updating a submission upload review status (PATCH /administrative/...)
+ * Response for recording a submission upload decision (PATCH /administrative/.../status)
  */
-export const SubmissionUploadReviewStatusResponseSchema: OpenAPIV3.SchemaObject = {
+export const SubmissionUploadDecisionResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['submission_upload_status_id', 'submission_upload_id', 'status'],
+  required: ['submission_upload_id', 'decision'],
   properties: {
-    submission_upload_status_id: {
-      type: 'integer',
-      description: 'Primary key of the submission_upload_status record.'
-    },
     submission_upload_id: {
       type: 'string',
       format: 'uuid',
-      description: 'Foreign key to the submission_upload record.'
+      description: 'Primary key of the submission_upload record.'
     },
-    status: {
+    decision: {
       type: 'string',
-      enum: ['submitted', 'approved', 'denied', 'deleted'],
-      description: 'The review status of the submission upload.'
+      enum: SubmissionUploadDecision.options,
+      description: 'The human review decision on the submission upload.'
     }
   }
 };
 
 /**
- * Response for GET /submission/{submissionUuid}/history (publish history from submission_upload_status).
+ * One upload in GET /submission/{submissionUuid}/history.
+ *
+ * The wire values predate the `submission_upload.decision` column and are kept stable for external
+ * consumers: `submitted` is the pending decision and `deleted` is a soft-deleted upload.
  */
 export const SubmissionUploadStatusHistoryItemSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -219,20 +229,21 @@ export const SubmissionUploadStatusHistoryItemSchema: OpenAPIV3.SchemaObject = {
     },
     status: {
       type: 'string',
-      enum: ['submitted', 'approved', 'denied', 'deleted'],
-      description: 'Review status of the submission upload at this point in history.'
+      enum: SubmissionUploadHistoryStatus.options,
+      description:
+        'Review state of the upload: submitted=awaiting a decision, approved, denied, deleted=the upload was removed.'
     },
     createDate: {
       type: 'string',
       format: 'date-time',
-      description: 'When this status record was created.'
+      description: 'When the upload was created.'
     }
   }
 };
 
 export const SubmissionUploadStatusHistoryResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  description: 'Publish history for the submission, newest first.',
+  description: 'Uploads of the submission with their current review state, newest first.',
   required: ['submissionId', 'history'],
   properties: {
     submissionId: {
@@ -249,17 +260,48 @@ export const SubmissionUploadStatusHistoryResponseSchema: OpenAPIV3.SchemaObject
 };
 
 /**
- * Request body for updating a submission upload review status
+ * One entry of an upload's processing status history
+ * (GET /administrative/submission/{submissionId}/upload/{submissionUploadId}/status/history).
  */
-export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaObject = {
+export const SubmissionUploadProcessingStatusHistoryItemSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['status'],
+  required: ['submission_upload_status_id', 'submission_upload_id', 'status', 'create_date'],
   properties: {
+    submission_upload_status_id: {
+      type: 'integer',
+      description: 'Primary key of the submission_upload_status record.'
+    },
+    submission_upload_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Foreign key to the submission_upload record.'
+    },
     status: {
       type: 'string',
-      enum: ['submitted', 'approved', 'denied'],
-      description: 'The new review status for the submission upload.'
+      enum: SubmissionUploadJobStatus.options,
+      description: 'Processing status the upload entered.'
+    },
+    create_date: {
+      type: 'string',
+      format: 'date-time',
+      description: 'When the upload entered this status.'
+    }
+  }
+};
+
+/**
+ * Request body for recording a submission upload decision
+ */
+export const UpdateSubmissionUploadDecisionRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['decision'],
+  properties: {
+    decision: {
+      type: 'string',
+      enum: SubmissionUploadDecision.options,
+      description: 'The new decision for the submission upload; pending clears a prior decision.'
     }
   }
 };
@@ -267,10 +309,20 @@ export const UpdateSubmissionUploadReviewStatusRequestSchema: OpenAPIV3.SchemaOb
 export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['submission_upload_review_id', 'submission_upload_id', 'scope', 'status', 'requested_by'],
+  required: [
+    'submission_upload_review_id',
+    'submission_upload_id',
+    'name',
+    'description',
+    'scope',
+    'status',
+    'requested_by'
+  ],
   properties: {
     submission_upload_review_id: { type: 'string', format: 'uuid' },
     submission_upload_id: { type: 'string', format: 'uuid' },
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    description: { type: 'string', maxLength: 500, nullable: true },
     scope: { type: 'string', enum: ['validation', 'security'] },
     status: {
       type: 'string',
@@ -283,8 +335,10 @@ export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
 export const RequestSubmissionUploadReviewRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['scope', 'status'],
+  required: ['name', 'description', 'scope', 'status'],
   properties: {
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    description: { type: 'string', maxLength: 500, nullable: true },
     scope: { type: 'string', enum: ['validation', 'security'] },
     status: {
       type: 'string',

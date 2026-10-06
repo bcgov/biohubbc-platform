@@ -4,7 +4,7 @@ import Snackbar from '@mui/material/Snackbar';
 import { ErrorDialog, IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { IOkDialogProps, OkDialog } from 'components/dialog/OkDialog';
 import YesNoDialog, { IYesNoDialogProps } from 'components/dialog/YesNoDialog';
-import { createContext, ReactNode, useState } from 'react';
+import { createContext, ReactNode, useCallback, useState } from 'react';
 
 export interface IDialogContext {
   /**
@@ -148,21 +148,23 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
 
   const [snackbarProps, setSnackbarProps] = useState<ISnackbarProps>(defaultSnackbarProps);
 
-  const setYesNoDialog = function (partialProps: Partial<IYesNoDialogProps>) {
-    setYesNoDialogProps({ ...yesNoDialogProps, ...partialProps });
-  };
+  // The setters keep their identity across renders, so an effect can depend on one without re-running each time
+  // any dialog changes.
+  const setYesNoDialog = useCallback((partialProps: Partial<IYesNoDialogProps>) => {
+    setYesNoDialogProps((previous) => ({ ...previous, ...partialProps }));
+  }, []);
 
-  const setSnackbar = function (partialProps: Partial<ISnackbarProps>) {
-    setSnackbarProps({ ...snackbarProps, ...partialProps });
-  };
+  const setSnackbar = useCallback((partialProps: Partial<ISnackbarProps>) => {
+    setSnackbarProps((previous) => ({ ...previous, ...partialProps }));
+  }, []);
 
-  const setErrorDialog = function (partialProps: Partial<IErrorDialogProps>) {
-    setErrorDialogProps({ ...errorDialogProps, ...partialProps });
-  };
+  const setErrorDialog = useCallback((partialProps: Partial<IErrorDialogProps>) => {
+    setErrorDialogProps((previous) => ({ ...previous, ...partialProps }));
+  }, []);
 
-  const setOkDialog = function (partialProps: Partial<IOkDialogProps>) {
-    setOkDialogProps({ ...okDialogProps, ...partialProps });
-  };
+  const setOkDialog = useCallback((partialProps: Partial<IOkDialogProps>) => {
+    setOkDialogProps((previous) => ({ ...previous, ...partialProps }));
+  }, []);
 
   return (
     <DialogContext.Provider

@@ -22,6 +22,7 @@ const getDbDatabase = () => process.env.DB_DATABASE;
 const DB_POOL_SIZE = 20;
 const DB_CONNECTION_TIMEOUT = 0;
 const DB_IDLE_TIMEOUT = 10000;
+const DB_CANCELLATION_TIMEOUT = 10000;
 
 export const DB_CLIENT = 'pg';
 
@@ -81,12 +82,17 @@ const dbGlobal = globalThis as DBGlobal;
  */
 export interface DBDependencies {
   getDBPool: () => pg.Pool | undefined;
-  getDBConnection: (keycloakToken: object) => IDBConnection;
-  getAPIUserDBConnection: () => IDBConnection;
+  getDBConnection: (keycloakToken: object, options?: IDBConnectionOptions) => IDBConnection;
+  getAPIUserDBConnection: (options?: IDBConnectionOptions) => IDBConnection;
   getServiceAccountDBConnection: (systemUser: SystemUser) => IDBConnection;
   getUserGuid: typeof getUserGuid;
   getUserIdentitySource: typeof getUserIdentitySource;
   getServiceClientSystemUser: typeof getServiceClientSystemUser;
+}
+
+export interface IDBConnectionOptions {
+  /** Cancels request-owned database work when aborted. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -137,7 +143,15 @@ export interface IDBConnection {
    *
    * @memberof IDBConnection
    */
-  release: () => void;
+  release: () => void | Promise<void>;
+  /**
+   * Cancels the query currently executing on this connection.
+   *
+   * Note: Does nothing if the connection is not open.
+   *
+   * @memberof IDBConnection
+   */
+  cancel: () => Promise<void>;
   /**
    * Commits the transaction that was opened by calling `.open()`.
    *
@@ -219,7 +233,7 @@ export interface IDBConnection {
  * @param {object} keycloakToken
  * @return {*} {IDBConnection}
  */
-const getDBConnectionInternal = function (keycloakToken: object): IDBConnection {
+const getDBConnectionInternal = function (keycloakToken: object, options: IDBConnectionOptions = {}): IDBConnection {
   if (!keycloakToken) {
     throw Error('Keycloak token is undefined');
   }
@@ -228,10 +242,34 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
 
   let _isOpen = false;
   let _isReleased = false;
+  let _isAborted = options.signal?.aborted ?? false;
+  let _cancellationPromise: Promise<void> | undefined;
 
   let _systemUserId: number | null = null;
 
   const _token = keycloakToken;
+
+  /**
+   * Creates the error returned when request-owned database work has been aborted.
+   *
+   * @return {Error} Abort error
+   */
+  const _getAbortError = () => {
+    const error = new Error('Database work was aborted');
+    error.name = 'AbortError';
+    return error;
+  };
+
+  /**
+   * Throws when the connection's cancellation signal has been aborted.
+   *
+   * @throws {Error} If request-owned database work has been aborted
+   */
+  const _throwIfAborted = () => {
+    if (_isAborted) {
+      throw _getAbortError();
+    }
+  };
 
   /**
    * Opens a new connection, begins a transaction, and sets the user context.
@@ -241,6 +279,8 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
    * @throws {Error} if called when the DBPool has not been initialized via `initDBPool`
    */
   const _open = async () => {
+    _throwIfAborted();
+
     if (_client || _isOpen) {
       return;
     }
@@ -253,20 +293,30 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
 
     _client = await pool.connect();
 
+    if (_isAborted) {
+      _client.release();
+      _isReleased = true;
+      throw _getAbortError();
+    }
+
     _isOpen = true;
     _isReleased = false;
 
     await _setUserContext();
 
+    _throwIfAborted();
+
     await _client.query('BEGIN');
+
+    _throwIfAborted();
   };
 
   /**
-   * Releases (closes) the connection.
+   * Returns the PostgreSQL client to the application pool.
    *
    * Note: Does nothing if the connection is already released.
    */
-  const _release = () => {
+  const _releaseClient = () => {
     if (_isReleased) {
       return;
     }
@@ -282,11 +332,79 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
   };
 
   /**
+   * Removes the cancellation listener and releases the connection after any active cancellation has settled.
+   *
+   * @return {void | Promise<void>} Resolves after cancellation cleanup and client release are complete
+   */
+  const _release = (): void | Promise<void> => {
+    options.signal?.removeEventListener('abort', _onAbort);
+
+    if (_cancellationPromise) {
+      return _cancellationPromise.catch(() => undefined).finally(_releaseClient);
+    }
+
+    _releaseClient();
+  };
+
+  /**
+   * Cancels the query currently executing on this connection using a separate PostgreSQL session.
+   *
+   * Note: Does nothing if the connection is not open.
+   *
+   * @throws {Error} if the cancellation session fails to connect or execute
+   */
+  const _cancelActiveQuery = async () => {
+    const processID = (_client as (pg.PoolClient & { processID?: number }) | undefined)?.processID;
+
+    if (!_isOpen || !processID) {
+      return;
+    }
+
+    const cancellationClient = new pg.Client({
+      ...getDefaultPoolConfig(),
+      connectionTimeoutMillis: DB_CANCELLATION_TIMEOUT,
+      query_timeout: DB_CANCELLATION_TIMEOUT
+    });
+
+    try {
+      await cancellationClient.connect();
+      await cancellationClient.query('SELECT pg_cancel_backend($1)', [processID]);
+    } finally {
+      await cancellationClient.end();
+    }
+  };
+
+  /**
+   * Starts at most one cancellation operation for this logical connection.
+   *
+   * @return {Promise<void>} Resolves after cancellation has been dispatched
+   */
+  const _cancel = (): Promise<void> => {
+    _cancellationPromise ??= _cancelActiveQuery();
+    return _cancellationPromise;
+  };
+
+  /**
+   * Marks the logical connection aborted and attempts to cancel its active PostgreSQL query.
+   */
+  const _onAbort = () => {
+    _isAborted = true;
+
+    void _cancel().catch((error) => {
+      defaultLog.error({ label: '_onAbort', message: 'Failed to cancel database work', error });
+    });
+  };
+
+  options.signal?.addEventListener('abort', _onAbort, { once: true });
+
+  /**
    * Commits the transaction that was opened by calling `.open()`.
    *
    * @throws {Error} if the connection is not open
    */
   const _commit = async () => {
+    _throwIfAborted();
+
     if (!_client || !_isOpen) {
       throw Error('DBConnection is not open');
     }
@@ -300,10 +418,18 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
    * @throws {Error} if the connection is not open
    */
   const _rollback = async () => {
+    // An abort before acquisition leaves no transaction to clean up. Request handlers
+    // may still invoke their normal rollback path after open() rejects.
+    if (_isAborted && (!_client || !_isOpen)) {
+      return;
+    }
+
     if (!_client || !_isOpen) {
       throw Error('DBConnection is not open');
     }
 
+    // Do not let a delayed backend cancellation target the rollback statement.
+    await _cancellationPromise?.catch(() => undefined);
     await _client.query('ROLLBACK');
   };
 
@@ -320,6 +446,8 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
     text: string,
     values?: any[]
   ): Promise<pg.QueryResult<T>> => {
+    _throwIfAborted();
+
     if (!_client || !_isOpen) {
       throw Error('DBConnection is not open');
     }
@@ -509,6 +637,7 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
 
   return {
     open: asyncErrorWrapper(_open),
+    cancel: asyncErrorWrapper(_cancel),
     query: asyncErrorWrapper(_query),
     sql: asyncErrorWrapper(_sql),
     knex: asyncErrorWrapper(_knex),
@@ -519,8 +648,8 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
   };
 };
 
-export const getDBConnection = function (keycloakToken: object): IDBConnection {
-  return dbDependencies.getDBConnection(keycloakToken);
+export const getDBConnection = function (keycloakToken: object, options?: IDBConnectionOptions): IDBConnection {
+  return dbDependencies.getDBConnection(keycloakToken, options);
 };
 
 /**
@@ -531,11 +660,14 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  *
  * @return {*}  {IDBConnection}
  */
-const getAPIUserDBConnectionInternal = (): IDBConnection => {
-  return getDBConnection({
-    preferred_username: `${getDbUsername()}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
-    identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
-  });
+const getAPIUserDBConnectionInternal = (options?: IDBConnectionOptions): IDBConnection => {
+  return getDBConnection(
+    {
+      preferred_username: `${getDbUsername()}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
+      identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
+    },
+    options
+  );
 };
 
 /**
@@ -564,8 +696,8 @@ export const dbDependencies: DBDependencies = {
   getServiceClientSystemUser
 };
 
-export const getAPIUserDBConnection = (): IDBConnection => {
-  return dbDependencies.getAPIUserDBConnection();
+export const getAPIUserDBConnection = (options?: IDBConnectionOptions): IDBConnection => {
+  return dbDependencies.getAPIUserDBConnection(options);
 };
 
 export const getServiceAccountDBConnection = (systemUser: SystemUser): IDBConnection => {

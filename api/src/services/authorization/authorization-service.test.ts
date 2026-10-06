@@ -7,7 +7,8 @@ import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../models/system-user';
-import { ContributorSystemUserService } from '../contributor-system-user-service';
+import { ContributorService } from '../contributor-service';
+import { DownloadService } from '../download/download-service';
 import { UserService } from '../user-service';
 import {
   AuthorizationScheme,
@@ -82,6 +83,39 @@ describe('executeAuthorizeConfig', function () {
     sinon.restore();
   });
 
+  it('waits for every rule before propagating a rejection', async () => {
+    const service = new AuthorizationService(getMockDBConnection());
+    const failure = new Error('Authorization failed');
+    let finishPending!: (value: boolean) => void;
+    const pending = new Promise<boolean>((resolve) => {
+      finishPending = resolve;
+    });
+    sinon.stub(service, 'authorizeBySystemUser').rejects(failure);
+    sinon.stub(service, 'authorizeByDownload').returns(pending);
+    let settled = false;
+    const operation = (async () => {
+      try {
+        await service.executeAuthorizeConfig([
+          { discriminator: 'SystemUser' },
+          { discriminator: 'Download', downloadId: 'download' }
+        ]);
+        return undefined;
+      } catch (error_) {
+        return error_;
+      } finally {
+        settled = true;
+      }
+    })();
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const settledBeforePendingFinished = settled;
+    finishPending(true);
+    const error = await operation;
+
+    expect(settledBeforePendingFinished).to.be.false;
+    expect(error).to.equal(failure);
+  });
+
   it('returns an array of authorizeRule results', async function () {
     const mockAuthorizeRules: AuthorizeRule[] = [
       {
@@ -92,7 +126,12 @@ describe('executeAuthorizeConfig', function () {
         discriminator: 'SystemUser'
       },
       {
-        discriminator: 'Contributor'
+        discriminator: 'Download',
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      },
+      {
+        discriminator: 'Contributor',
+        clientId: 'selected'
       },
       {
         discriminator: 'Policy',
@@ -104,6 +143,7 @@ describe('executeAuthorizeConfig', function () {
 
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemRole').resolves(false);
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemUser').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'authorizeByDownload').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByContributor').resolves(true);
     sinon.stub(AuthorizationService.prototype, 'authorizeByPolicy').resolves(true);
 
@@ -111,7 +151,7 @@ describe('executeAuthorizeConfig', function () {
 
     const authorizeResults = await authorizationService.executeAuthorizeConfig(mockAuthorizeRules);
 
-    expect(authorizeResults).to.eql([false, true, true, true]);
+    expect(authorizeResults).to.eql([false, true, true, true, true]);
   });
 });
 
@@ -356,78 +396,92 @@ describe('authorizeBySystemUser', function () {
   });
 });
 
-describe('authorizeByContributor', function () {
+describe('authorizeByDownload', function () {
   afterEach(() => {
     sinon.restore();
   });
 
-  it('returns false if the keycloak token is null', async function () {
+  it('delegates anonymous download authorization with a null system user ID', async function () {
     const mockDBConnection = getMockDBConnection();
+    const downloadAccessStub = sinon.stub(DownloadService.prototype, 'isUserAuthorizedForDownload').resolves(true);
+    const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: undefined
+    const result = await authorizationService.authorizeByDownload({
+      discriminator: 'Download',
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
     });
-
-    const result = await authorizationService.authorizeByContributor();
-
-    expect(result).to.be.false;
-  });
-
-  it('returns false when no system user is available on the authorization context', async function () {
-    const mockDBConnection = getMockDBConnection();
-    const findContributorSystemUserStub = sinon.stub(
-      ContributorSystemUserService.prototype,
-      'findContributorSystemUser'
-    );
-
-    const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { sub: 'some-guid' }
-    });
-
-    const result = await authorizationService.authorizeByContributor();
-
-    expect(result).to.be.false;
-    expect(findContributorSystemUserStub).not.to.have.been.called;
-  });
-
-  it('returns false when no contributor mapping exists for system user', async function () {
-    const mockDBConnection = getMockDBConnection();
-    const findContributorSystemUserStub = sinon
-      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
-      .resolves(null);
-
-    const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { sub: 'some-guid' },
-      systemUser: { system_user_id: 9 } as SystemUserExtended
-    });
-
-    const result = await authorizationService.authorizeByContributor();
-
-    expect(result).to.be.false;
-    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(9);
-  });
-
-  it('returns true and sets contributorId when system user maps to contributor', async function () {
-    const mockDBConnection = getMockDBConnection();
-    const findContributorSystemUserStub = sinon
-      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
-      .resolves({
-        contributor_system_user_id: 1,
-        contributor_id: 77,
-        system_user_id: 12
-      });
-
-    const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { sub: 'some-guid' },
-      systemUser: { system_user_id: 12 } as SystemUserExtended
-    });
-
-    const result = await authorizationService.authorizeByContributor();
 
     expect(result).to.be.true;
-    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(12);
-    expect(authorizationService.contributorId).to.equal(77);
+    expect(downloadAccessStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', null);
   });
+
+  it('delegates authenticated download authorization with the current system user ID', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const downloadAccessStub = sinon.stub(DownloadService.prototype, 'isUserAuthorizedForDownload').resolves(true);
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      systemUser: { system_user_id: 42, record_end_date: null } as SystemUserExtended
+    });
+
+    const result = await authorizationService.authorizeByDownload({
+      discriminator: 'Download',
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+    });
+
+    expect(result).to.be.true;
+    expect(downloadAccessStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 42);
+  });
+
+  it('returns false when download authorization is denied', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(DownloadService.prototype, 'isUserAuthorizedForDownload').resolves(false);
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByDownload({
+      discriminator: 'Download',
+      downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+    });
+
+    expect(result).to.be.false;
+  });
+});
+
+describe('authorizeByContributor', () => {
+  afterEach(() => sinon.restore());
+
+  it('checks the selected contributor using the authenticated user', async () => {
+    const membership = sinon.stub(ContributorService.prototype, 'resolveAuthorizedContributorId').resolves(77);
+    const service = new AuthorizationService(getMockDBConnection(), {
+      keycloakToken: { sub: 'guid' },
+      systemUser: { system_user_id: 12 } as SystemUserExtended
+    });
+    expect(await service.authorizeByContributor({ discriminator: 'Contributor', clientId: 'selected' })).to.be.true;
+    expect(membership).to.have.been.calledOnceWithExactly('selected', 12);
+  });
+
+  it('rejects an unauthorized selected contributor', async () => {
+    const failure = new Error('Membership denied');
+    sinon.stub(ContributorService.prototype, 'resolveAuthorizedContributorId').rejects(failure);
+    const service = new AuthorizationService(getMockDBConnection(), {
+      keycloakToken: { sub: 'guid' },
+      systemUser: { system_user_id: 12 } as SystemUserExtended
+    });
+    try {
+      await service.authorizeByContributor({ discriminator: 'Contributor', clientId: 'selected' });
+      expect.fail('Expected rejection');
+    } catch (error_) {
+      expect(error_).to.equal(failure);
+    }
+  });
+
+  for (const token of [undefined, { sub: 'guid' }]) {
+    it('rejects missing authentication without checking contributor membership', async () => {
+      const membership = sinon.stub(ContributorService.prototype, 'resolveAuthorizedContributorId');
+      const service = new AuthorizationService(getMockDBConnection(), { keycloakToken: token });
+      sinon.stub(service, 'getCachedSystemUser').resolves(null);
+      expect(await service.authorizeByContributor({ discriminator: 'Contributor', clientId: 'selected' })).to.be.false;
+      expect(membership).not.to.have.been.called;
+    });
+  }
 });
 
 describe('getCachedSystemUser', function () {
@@ -625,6 +679,7 @@ describe('authorizeByTeam', function () {
   it('returns false if no system user is found', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const teamAuthorizationStub = sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity');
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
@@ -635,6 +690,7 @@ describe('authorizeByTeam', function () {
     });
 
     expect(result).to.be.false;
+    expect(teamAuthorizationStub).not.to.have.been.called;
   });
 
   it('returns true when TeamAuthorizationService grants access', async function () {

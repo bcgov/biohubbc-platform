@@ -1,4 +1,7 @@
-import { fireEvent, waitFor, within } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
+import { act, fireEvent, waitFor, within } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
@@ -54,13 +57,14 @@ const mockFeaturesResponse = {
   pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
 };
 
-const renderPage = () =>
+const renderPage = (queryClient?: QueryClient) =>
   render(
     <MemoryRouter initialEntries={['/portal/submission/1']}>
       <Routes>
         <Route path="/portal/submission/:submissionId" element={<PortalSubmissionDetailPage />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
+    { queryClient }
   );
 
 describe('PortalSubmissionDetailPage', () => {
@@ -75,6 +79,30 @@ describe('PortalSubmissionDetailPage', () => {
 
     mockGetSubmissionRecordWithSecurity.mockResolvedValue(mockSubmission);
     mockGetSubmissionFeatures.mockResolvedValue(mockFeaturesResponse);
+  });
+
+  it('keeps the existing submission and feature table mounted during background refresh', async () => {
+    const queryClient = createTestQueryClient();
+    const { findByText, getByRole } = renderPage(queryClient);
+    const originalRow = await findByText('Observation');
+    const originalTable = getByRole('grid');
+    let finishRefresh!: (value: typeof mockSubmission) => void;
+    mockGetSubmissionRecordWithSecurity.mockReturnValueOnce(
+      new Promise<typeof mockSubmission>((resolve) => (finishRefresh = resolve))
+    );
+    let refresh!: Promise<void>;
+    act(() => {
+      refresh = queryClient.invalidateQueries({ queryKey: submissionQueryKeys.record(1) });
+    });
+    await waitFor(() => expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledTimes(2));
+    expect(originalRow).toBeVisible();
+    expect(getByRole('grid')).toBe(originalTable);
+    await act(async () => {
+      finishRefresh({ ...mockSubmission, name: 'Updated Submission' });
+      await refresh;
+    });
+    expect(await findByText('Updated Submission', { selector: 'h1' })).toBeVisible();
+    expect(getByRole('grid')).toBe(originalTable);
   });
 
   it('renders feature rows', async () => {

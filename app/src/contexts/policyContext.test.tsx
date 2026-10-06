@@ -1,21 +1,12 @@
-import { waitFor } from '@testing-library/react';
+import { usePolicyQuery } from 'features/admin/policies/hooks/usePolicyQuery';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { ComponentType, PropsWithChildren } from 'react';
-import { cleanup, render } from 'test-helpers/test-utils';
+import { PropsWithChildren, useState } from 'react';
+import { act, cleanup, render, renderHook, waitFor } from 'test-helpers/test-utils';
+import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminPolicyContextProvider, IPolicyContext, PolicyContext } from './policyContext';
 
-const { mockUseParams, mockPoliciesApi, mockUseApi } = vi.hoisted(() => {
-  const useParams = vi.fn();
-
-  const policiesApi = {
-    getPolicy: vi.fn()
-  };
-
-  const useApi = vi.fn(() => ({ policies: policiesApi }));
-
-  return { mockUseParams: useParams, mockPoliciesApi: policiesApi, mockUseApi: useApi };
-});
+const { mockUseParams, mockGetPolicy } = vi.hoisted(() => ({ mockUseParams: vi.fn(), mockGetPolicy: vi.fn() }));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -23,7 +14,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('hooks/useApi', () => ({
-  useApi: () => mockUseApi()
+  useApi: () => ({ policies: { getPolicy: mockGetPolicy } })
 }));
 
 const POLICY_ID = '11111111-1111-1111-1111-111111111111';
@@ -37,83 +28,65 @@ const mockPolicy = {
   expressions: []
 };
 
-type ProviderHarness = {
-  getContext: () => IPolicyContext;
-};
-
-const renderProvider = (Provider: ComponentType<PropsWithChildren>): ProviderHarness => {
-  let capturedContext: IPolicyContext | undefined;
-
-  render(
-    <Provider>
-      <PolicyContext.Consumer>
-        {(value) => {
-          capturedContext = value;
-          return null;
-        }}
-      </PolicyContext.Consumer>
-    </Provider>
-  );
-
-  return {
-    getContext: () => {
-      if (!capturedContext) {
-        throw new Error('PolicyContext was never provided');
-      }
-
-      return capturedContext;
-    }
-  };
-};
+/**
+ * Wraps a hook under test in the policy context provider.
+ *
+ * @param {PropsWithChildren} props The hook's host.
+ * @returns {JSX.Element} The provider.
+ */
+const PolicyProvider = ({ children }: PropsWithChildren) => (
+  <AdminPolicyContextProvider>{children}</AdminPolicyContextProvider>
+);
 
 describe('AdminPolicyContextProvider', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
     mockUseParams.mockReturnValue({ policyId: POLICY_ID });
-    mockPoliciesApi.getPolicy.mockResolvedValue(mockPolicy);
+    mockGetPolicy.mockResolvedValue(mockPolicy);
   });
 
-  it('exposes the policyId from route params in context', async () => {
-    const { getContext } = renderProvider(AdminPolicyContextProvider);
-
-    await waitFor(() => {
-      expect(getContext().policyId).toBe(POLICY_ID);
-    });
+  it('resets drafts on record navigation and ignores completion from the previous record', () => {
+    const { result, rerender } = renderHook(() => useState(''), { wrapper: PolicyProvider });
+    act(() => result.current[1]('First draft'));
+    const finishPreviousSave = result.current[1];
+    mockUseParams.mockReturnValue({ policyId: 'other-record' });
+    rerender();
+    expect(result.current[0]).toBe('');
+    act(() => result.current[1]('Second draft'));
+    act(() => finishPreviousSave(''));
+    expect(result.current[0]).toBe('Second draft');
   });
 
-  it('exposes a policyDataLoader in context', async () => {
-    const { getContext } = renderProvider(AdminPolicyContextProvider);
+  it('provides the route policy id and the key its detail is cached under', () => {
+    let capturedContext: IPolicyContext | undefined;
+    render(
+      <AdminPolicyContextProvider>
+        <PolicyContext.Consumer>
+          {(value) => {
+            capturedContext = value;
+            return null;
+          }}
+        </PolicyContext.Consumer>
+      </AdminPolicyContextProvider>
+    );
 
-    await waitFor(() => {
-      expect(getContext().policyDataLoader).toBeDefined();
-    });
+    expect(capturedContext).toEqual({ policyId: POLICY_ID, policyQueryKey: policyQueryKeys.detail(POLICY_ID) });
   });
 
-  it('calls getPolicy with the policyId on mount', async () => {
-    renderProvider(AdminPolicyContextProvider);
+  it('loads the route policy through usePolicyQuery', async () => {
+    const { result } = renderHook(() => usePolicyQuery(), { wrapper: PolicyProvider });
 
-    await waitFor(() => {
-      expect(mockPoliciesApi.getPolicy).toHaveBeenCalledWith(POLICY_ID);
-    });
+    await waitFor(() => expect(result.current.data).toEqual(mockPolicy));
+    expect(mockGetPolicy).toHaveBeenCalledWith(POLICY_ID, { signal: expect.any(AbortSignal) });
   });
 
-  it('surfaces policy data in the data loader after a successful fetch', async () => {
-    const { getContext } = renderProvider(AdminPolicyContextProvider);
-
-    await waitFor(() => {
-      expect(getContext().policyDataLoader.data).toEqual(mockPolicy);
-    });
-  });
-
-  it('surfaces the error in the data loader when the fetch fails', async () => {
+  it('surfaces a failed load as the query error', async () => {
     const fetchError = new Error('policy fetch failed');
-    mockPoliciesApi.getPolicy.mockRejectedValueOnce(fetchError);
+    mockGetPolicy.mockRejectedValueOnce(fetchError);
 
-    const { getContext } = renderProvider(AdminPolicyContextProvider);
+    const { result } = renderHook(() => usePolicyQuery(), { wrapper: PolicyProvider });
 
-    await waitFor(() => {
-      expect(getContext().policyDataLoader.error).toBe(fetchError);
-    });
+    await waitFor(() => expect(result.current.error).toBe(fetchError));
   });
 });

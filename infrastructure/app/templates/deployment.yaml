@@ -34,11 +34,14 @@ spec:
               value: {{ include "apiHost" . }}
             - name: VITE_SITEMINDER_LOGOUT_URL
               value: {{ .Values.app.siteminderLogoutURL }}
-            # Map view basemap. Tiles themselves are same origin (/martin), so no tile host is needed here.
+            # Map view basemaps: the BC Government tiles, and the worldwide style shown wherever those have no tile.
+            # Data tiles themselves are same origin (/martin), so no tile host is needed here.
             - name: VITE_BASEMAP_URL
               value: {{ .Values.app.basemap.url | quote }}
             - name: VITE_BASEMAP_ATTRIBUTION
               value: {{ .Values.app.basemap.attribution | quote }}
+            - name: VITE_BASEMAP_FALLBACK_STYLE_URL
+              value: {{ .Values.app.basemap.fallbackStyleUrl | quote }}
             - name: VITE_MAX_UPLOAD_NUM_FILES
               value: {{ .Values.app.requestLimits.uploadNumFiles | quote }}
             - name: VITE_MAX_UPLOAD_FILE_SIZE

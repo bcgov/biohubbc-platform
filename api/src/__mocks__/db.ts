@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { EventEmitter } from 'node:events';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import * as db from '../database/db';
@@ -36,6 +37,9 @@ export const getMockDBConnection = (config?: Partial<IDBConnection>): IDBConnect
     release: () => {
       // do nothing
     },
+    cancel: async () => {
+      // do nothing
+    },
     commit: async () => {
       // do nothing
     },
@@ -56,7 +60,7 @@ export const getMockDBConnection = (config?: Partial<IDBConnection>): IDBConnect
 };
 
 export type ExtendedMockReq = MockReq & Request;
-export class MockReq {
+export class MockReq extends EventEmitter {
   query = {};
   params = {};
   body = {};
@@ -64,7 +68,7 @@ export class MockReq {
 }
 
 export type ExtendedMockRes = MockRes & Response;
-export class MockRes {
+export class MockRes extends EventEmitter {
   /**
    * The value of the last `.status(<value>)` call.
    *

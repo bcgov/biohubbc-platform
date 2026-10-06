@@ -1,120 +1,84 @@
-import { mdiLock } from '@mdi/js';
-import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Chip from '@mui/material/Chip';
-import Container from '@mui/material/Container';
-import Link from '@mui/material/Link';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import { PageHeader } from 'components/header/PageHeader';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonPage } from 'components/loading/SkeletonPage';
-import { FeaturePropertiesSection } from 'components/property/FeaturePropertiesSection';
-import { PageSection } from 'components/section/PageSection';
-import { SubmissionFeatureMap } from 'features/submissions/page/features/components/map/SubmissionFeatureMap';
+import { skipToken, useQuery } from '@tanstack/react-query';
+import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
+import { SubmissionFeatureLayout } from 'features/submissions/page/features/components/SubmissionFeatureLayout';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { parseRouteId } from 'utils/routes';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { useMemo } from 'react';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
+import { keepPreviousDataWithin } from 'utils/query-client';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
+import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 
 /**
  * Portal submission feature detail page scoped to the current user's submission.
  *
- * @returns {JSX.Element}
+ * Owns portal route parsing, feature loading, authorization error handling, and portal-scoped feature detail layout.
+ *
+ * @returns {JSX.Element} Portal submission feature detail page.
  */
 export const PortalSubmissionFeaturePage = () => {
-  const navigate = useNavigate();
+  const location = useLocation();
   const api = useApi();
   const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
   const submissionId = parseRouteId(params.submissionId);
   const submissionFeatureId = parseRouteId(params.submissionFeatureId);
 
-  const featureDataLoader = useDataLoader(
-    (id, featureId) => api.features.getSubmissionFeatureById(id, featureId),
-    (error: unknown) => {
-      const status = (error as APIError)?.status;
-      if (status === 401 || status === 403) {
-        navigate('/forbidden', { replace: true });
-      }
-    }
+  const featureQuery = useQuery({
+    queryKey: submissionQueryKeys.featureDetail(submissionId ?? 0, submissionFeatureId ?? 0),
+    queryFn:
+      submissionId === null || submissionFeatureId === null
+        ? skipToken
+        : ({ signal }) => api.features.getSubmissionFeatureById(submissionId, submissionFeatureId, { signal })
+  });
+  const feature = featureQuery.data?.feature;
+  const pathResolvers = useMemo(
+    () => buildSubmissionPropertyValuePathResolvers('/portal/submission', location.search),
+    [location.search]
   );
 
-  useEffect(() => {
-    if (submissionId === null || submissionFeatureId === null) {
-      return;
-    }
+  const propertyGrid = useServerPaginatedGridState({ defaultSort: { field: 'property', sort: 'asc' } });
+  const propertyParams = { search: propertyGrid.debouncedSearchTerm, ...propertyGrid.apiPagination };
+  const propertiesQuery = useQuery({
+    queryKey: submissionQueryKeys.featureProperties(submissionId ?? 0, submissionFeatureId ?? 0, propertyParams),
+    queryFn:
+      submissionId === null || submissionFeatureId === null
+        ? skipToken
+        : ({ signal }) =>
+            api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, propertyParams, { signal }),
+    placeholderData: keepPreviousDataWithin(submissionQueryKeys.feature(submissionId ?? 0, submissionFeatureId ?? 0))
+  });
 
-    featureDataLoader.refresh(submissionId, submissionFeatureId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId, submissionFeatureId]);
-
-  const { feature } = useMemo(() => featureDataLoader.data ?? { feature: undefined }, [featureDataLoader.data]);
+  const featureErrorStatus = (featureQuery.error as APIError | null)?.status;
+  if (featureErrorStatus === 401 || featureErrorStatus === 403) {
+    return <Navigate to="/forbidden" replace />;
+  }
 
   if (submissionId === null || submissionFeatureId === null) {
     return <Navigate to="/page-not-found" replace />;
   }
 
   return (
-    <LoadingGuard
-      isLoading={featureDataLoader.isLoading}
-      isLoadingFallback={<SkeletonPage />}
-      isLoadingFallbackDelay={300}
-      hasNoData={!feature}
-      hasNoDataFallback={
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-          <Typography color="text.secondary">No data available</Typography>
-        </Box>
-      }>
-      <PageHeader
-        breadcrumbs={
-          <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to="/portal/submission" underline="hover" color="inherit">
-              Portal
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`/portal/submission/${feature?.submission_id}`}
-              underline="hover"
-              color="inherit">
-              {feature?.submission_name}
-            </Link>
-            <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
-          </Breadcrumbs>
-        }
-        label={
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              {feature?.feature_type_display_name}
-            </Typography>
-          </Box>
-        }
-        subheader={
-          <Box display="flex" gap={1}>
-            <Chip label={feature?.feature_type_name} size="small" />
-            {feature?.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
-          </Box>
-        }
+    <SubmissionFeatureLayout
+      isLoading={featureQuery.isLoading}
+      feature={feature}
+      rootBreadcrumbLabel="Portal"
+      rootBreadcrumbTo="/portal/submission"
+      submissionDetailBasePath="/portal/submission"
+      queryString={location.search}>
+      <SubmissionFeaturePropertiesSection
+        submissionId={submissionId}
+        pathResolvers={pathResolvers}
+        rows={propertiesQuery.data?.properties ?? []}
+        rowCount={propertiesQuery.data?.pagination.total ?? 0}
+        isLoading={propertiesQuery.isFetching && !propertiesQuery.data}
+        paginationModel={propertyGrid.paginationModel}
+        setPaginationModel={propertyGrid.handlePaginationChange}
+        sortModel={propertyGrid.sortModel}
+        setSortModel={propertyGrid.handleSortChange}
+        searchTerm={propertyGrid.searchTerm}
+        onSearch={propertyGrid.handleSearch}
       />
-      <Container maxWidth="xl">
-        <Stack spacing={3} py={4}>
-          <FeaturePropertiesSection
-            submissionId={submissionId}
-            submissionFeatureId={submissionFeatureId}
-            featureRouteBasePath="/portal/submission"
-          />
-          <PageSection id="portal-submission-feature-map" label="Map">
-            {feature && (
-              <SubmissionFeatureMap
-                submissionId={feature.submission_id}
-                submissionFeatureId={feature.submission_feature_id}
-              />
-            )}
-          </PageSection>
-        </Stack>
-      </Container>
-    </LoadingGuard>
+    </SubmissionFeatureLayout>
   );
 };

@@ -1,5 +1,4 @@
 import { grey } from '@mui/material/colors';
-import { alpha } from '@mui/material/styles';
 import { DataGrid, type DataGridProps, type GridValidRowModel } from '@mui/x-data-grid';
 import { SkeletonTable } from 'components/loading/SkeletonLoaders';
 import React, { useCallback } from 'react';
@@ -12,6 +11,9 @@ export type ICustomDataGridProps<R extends GridValidRowModel = GridValidRowModel
 
 /**
  * Standardized DataGrid wrapper that applies shared table styles while preserving full MUI DataGrid API support.
+ *
+ * @param {ICustomDataGridProps<R>} props Grid data, columns, pagination, slots, and styling options.
+ * @returns {JSX.Element} Data grid with shared styling and loading and empty states.
  */
 const CustomDataGrid = <R extends GridValidRowModel = GridValidRowModel>(props: ICustomDataGridProps<R>) => {
   const { sx, noRowsMessage, noRowsOverlay, slots, ...rest } = props;
@@ -100,16 +102,6 @@ const CustomDataGrid = <R extends GridValidRowModel = GridValidRowModel>(props: 
               borderRight: `1px solid ${theme.palette.divider}`,
               cursor: rest.onRowClick ? 'pointer' : 'default'
             },
-            '& .MuiDataGrid-row.Mui-selected': {
-              bgcolor: `${alpha(theme.palette.primary.main, 0.14)} !important`
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              bgcolor: `${alpha(theme.palette.primary.main, 0.18)} !important`
-            },
-            '& .MuiDataGrid-row:hover:not(.Mui-selected)': {
-              bgcolor: theme.palette.action.hover
-            },
-
             '& .MuiDataGrid-cell': {
               bgcolor: 'inherit',
               border: 'none',

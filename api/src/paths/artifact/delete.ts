@@ -25,9 +25,6 @@ export const POST: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
           discriminator: 'SystemRole'
-        },
-        {
-          discriminator: 'Contributor'
         }
       ]
     };
@@ -36,7 +33,8 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Deletes artifacts for a given list of UUIDs.',
+  description:
+    'Deletes artifacts for a given list of UUIDs. Requires system administrator or data administrator access.',
   tags: ['artifact'],
   security: [
     {

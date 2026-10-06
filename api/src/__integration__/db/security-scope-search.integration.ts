@@ -102,7 +102,7 @@ describe('Security scope search (integration)', function () {
    *
    * Read-path security is now resolved via the precomputed `submission_feature_closure`, which is
    * UPLOAD-SCOPED and only links a parent and child when both share one submission_upload_id (both
-   * endpoints must be active features of the same upload). `createTestFeature` mints its OWN upload
+   * endpoints must be current features of the same upload). `createTestFeature` mints its OWN upload
    * per call and cannot place a parent + child under one upload, so the closure-driven search-security
    * fixtures insert features directly here under a shared upload. Mirrors the insertFeatureRow helper in
    * expression-evaluation.integration.ts.
@@ -155,7 +155,7 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
-   * Rebuild the closure for every upload that holds an active feature of the submission.
+   * Rebuild the closure for every upload that holds a current feature of the submission.
    *
    * The anchor-recompute write path now reads `isEffectivelySecured`, so a feature only reads
    * as effectively secured when its closure rows exist. `createTestFeature` / `createTestFeaturesInBulk`
@@ -307,6 +307,65 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
+   * Create a historical child feature and a terminal current successor.
+   *
+   * The historical parent edge is intentionally not copied to the successor. Rebuilding closure after the
+   * transition removes the historical feature as a closure source while retaining its durable parent FK.
+   */
+  async function seedHistoricalFeature(options: {
+    historicalSecured: boolean;
+    currentSecured: boolean;
+    rebuildCurrentClosure?: boolean;
+  }): Promise<{
+    submissionId: number;
+    historicalParentId: number;
+    historicalFeatureId: number;
+    currentFeatureId: number;
+  }> {
+    const submissionId = await createTestSubmission(connection);
+    const historicalUploadId = await createTestUpload(connection, submissionId);
+    const historicalParentId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: historicalUploadId,
+      featureTypeName: 'survey'
+    });
+    const historicalFeatureId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: historicalUploadId,
+      featureTypeName: 'sample_site',
+      parentFeatureId: historicalParentId
+    });
+
+    if (options.historicalSecured) {
+      await secureFeature(connection, historicalParentId);
+    }
+    await rebuildClosure(historicalUploadId);
+
+    const currentUploadId = await createTestUpload(connection, submissionId);
+    const currentFeatureId = await insertFeatureRow({
+      submissionId,
+      submissionUploadId: currentUploadId,
+      featureTypeName: 'sample_site'
+    });
+    if (options.currentSecured) {
+      await secureFeature(connection, currentFeatureId);
+    }
+
+    await connection.sql(SQL`
+      UPDATE submission_feature
+      SET successor_submission_feature_id = ${currentFeatureId},
+          record_end_date = clock_timestamp()
+      WHERE submission_feature_id = ${historicalFeatureId};
+    `);
+
+    if (options.rebuildCurrentClosure !== false) {
+      await rebuildClosure(currentUploadId);
+    }
+
+    return { submissionId, historicalParentId, historicalFeatureId, currentFeatureId };
+  }
+
+  /**
    * Query anchor feature IDs for a scope.
    */
   async function getAnchorIds(scopeId: string): Promise<number[]> {
@@ -345,7 +404,12 @@ describe('Security scope search (integration)', function () {
   ): Promise<{ submission_feature_id: number; is_secured: boolean }[]> {
     const all: { submission_id: number; submission_feature_id: number; is_secured: boolean }[] = [];
     for (const featureType of featureTypes) {
-      const results = await searchRepo.searchFeaturesByExpressionTree(featureType, undefined, undefined, systemUserId);
+      const results = await searchRepo.searchFeaturesByExpressionTree(
+        featureType,
+        null,
+        undefined,
+        systemUserId == null ? { type: 'anonymous' } : { type: 'user', systemUserId: systemUserId }
+      );
       all.push(...results);
     }
     return all
@@ -826,7 +890,7 @@ describe('Security scope search (integration)', function () {
     });
   });
 
-  // ── has_more_secured_features (hidden-secured-match signal) ───────────
+  // ── has_inaccessible_secured_features (hidden-secured-match signal) ───────────
   //
   // Drives the "Request Data" banner. True when the search matched secured features the caller
   // cannot access. Wildcard-grant holders are excluded via direct URN scope matching so anchor
@@ -835,8 +899,8 @@ describe('Security scope search (integration)', function () {
     it('is FALSE for a wildcard (urn:*:*:*) caller even when secured matches exist (AC3)', async () => {
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
-      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
-      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'dataset' });
+      const feat1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const feat2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
       await secureFeature(connection, feat1);
       await secureFeature(connection, feat2);
 
@@ -845,7 +909,10 @@ describe('Security scope search (integration)', function () {
       const userId = connection.systemUserId();
       await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, userId);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
+        type: 'user',
+        systemUserId: userId
+      });
 
       // The caller can access every secured match via the wildcard grant — nothing left to request.
       expect(hasHidden).to.be.false;
@@ -859,7 +926,7 @@ describe('Security scope search (integration)', function () {
       // Accepted tradeoff: a brief false-positive banner rather than a more permissive probe that would
       // hide the banner while the rows themselves stay filtered out.
       const submissionId = await createTestSubmission(connection);
-      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Lagged Secured' });
+      const feature = await createTestFeature(connection, submissionId, 'survey', { name: 'Lagged Secured' });
       await rebuildClosureForSubmission(submissionId);
 
       const wildcardUser = connection.systemUserId();
@@ -869,18 +936,17 @@ describe('Security scope search (integration)', function () {
       // Now secure it — effectively secured on the read path, but with no scope anchor.
       await secureFeature(connection, feature);
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree(
-        'dataset',
-        undefined,
-        wildcardUser
-      );
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
+        type: 'user',
+        systemUserId: wildcardUser
+      });
 
       expect(hasHidden).to.be.true;
     });
 
     it('is TRUE when a secured match is grantable to another team but not the caller (AC2)', async () => {
       const submissionId = await createTestSubmission(connection);
-      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Other Team Secured' });
+      const feature = await createTestFeature(connection, submissionId, 'survey', { name: 'Other Team Secured' });
       await secureFeature(connection, feature);
       await rebuildClosureForSubmission(submissionId);
 
@@ -890,7 +956,10 @@ describe('Security scope search (integration)', function () {
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, otherUser, 'Other Team');
 
       const caller = await createOtherUser(); // authenticated, but in no team
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
+        type: 'user',
+        systemUserId: caller
+      });
 
       expect(hasHidden).to.be.true;
     });
@@ -901,25 +970,30 @@ describe('Security scope search (integration)', function () {
       const feature = await insertFeatureRow({
         submissionId,
         submissionUploadId: uploadId,
-        featureTypeName: 'dataset'
+        featureTypeName: 'survey'
       });
       await secureFeature(connection, feature);
       await rebuildClosure(uploadId);
 
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, null);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
+        type: 'anonymous'
+      });
 
       expect(hasHidden).to.be.true;
     });
 
     it('is TRUE for an authenticated caller with no covering policy (AC2 — banner shows)', async () => {
       const submissionId = await createTestSubmission(connection);
-      const feature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Ungranted Secured' });
+      const feature = await createTestFeature(connection, submissionId, 'survey', { name: 'Ungranted Secured' });
       await secureFeature(connection, feature);
       await rebuildClosureForSubmission(submissionId);
 
       // Authenticated, but holds no team/policy/scope at all.
       const caller = await createOtherUser();
-      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('dataset', undefined, caller);
+      const hasHidden = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
+        type: 'user',
+        systemUserId: caller
+      });
 
       expect(hasHidden).to.be.true;
     });
@@ -1529,16 +1603,16 @@ describe('Security scope search (integration)', function () {
   // ── record_effective_date → search visibility ───────────────────────
 
   describe('record_effective_date → search visibility', () => {
-    // Read-path security reads the closure. The closure's active universe is record_end_date IS NULL only
-    // (it does NOT filter on record_effective_date), so the self-loop / ancestry rows exist regardless of
-    // approval; the effective-date predicate lives in isEffectivelySecured (sf_sec.record_effective_date
-    // <= now()). Each fixture seeds under a SHARED upload and rebuilds the closure before searching.
+    // Read-path security consumes closure ancestry as a materialized graph snapshot. Candidate search
+    // results still require a current feature, while ancestor targets are evaluated only through
+    // the lifecycle of their security assignments. Each fixture seeds under a shared upload and rebuilds
+    // the closure before searching.
     //
-    // Per SIMSBIOHUB-1080 (#499), search results are filtered to active features
-    // (isSubmissionFeatureActive: record_effective_date <= now() AND not end-dated). A draft (NULL) or
+    // Per SIMSBIOHUB-1080 (#499), search results are filtered to current features
+    // (isSubmissionFeatureCurrent: record_effective_date <= now(), not end-dated, no successor). A draft (NULL) or
     // not-yet-effective (future) feature is therefore never a search result, regardless of any security
     // rule on it — the effective-date exclusion applies before security is even considered.
-    // Matrix: an inactive feature (draft NULL date, or not-yet-effective future date) is never a search
+    // Matrix: an unpublished feature (draft NULL date, or not-yet-effective future date) is never a search
     // result, for anonymous and authenticated-without-scope callers alike — the active-feature filter
     // applies before security is even considered.
     const inactiveCallers: { caller: string; getUserId: () => Promise<number | null> }[] = [
@@ -1550,7 +1624,7 @@ describe('Security scope search (integration)', function () {
         { label: 'NULL', markFn: markFeatureUnapproved },
         { label: 'in the future', markFn: markFeatureFutureDate }
       ] as const) {
-        it(`excludes an inactive feature (record_effective_date ${label}) from search for ${caller}, even with a security rule`, async () => {
+        it(`excludes an unpublished feature (record_effective_date ${label}) from search for ${caller}, even with a security rule`, async () => {
           const submissionId = await createTestSubmission(connection);
           const uploadId = await createTestUpload(connection, submissionId);
           const featureId = await insertFeatureRow({
@@ -1591,10 +1665,10 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(featureId);
     });
 
-    it('does not hide an active child when its parent is secured but inactive (NULL date)', async () => {
-      // Parent has a security rule but NULL record_effective_date, so it is inactive: it is not a
-      // search result itself (SIMSBIOHUB-1080), and — because isEffectivelySecured only counts security
-      // from an active ancestor — it does not secure its child. The active, unsecured child stays visible.
+    it('hides an active child while its closure snapshot references a secured historical parent', async () => {
+      // The closure is built while the parent is current, then the parent is ended without rebuilding it.
+      // The historical parent is not itself a search result, but its enforcing security assignment still
+      // protects the child because the materialized snapshot establishes it as the child's ancestor.
       const submissionId = await createTestSubmission(connection);
       const uploadId = await createTestUpload(connection, submissionId);
       const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
@@ -1605,15 +1679,61 @@ describe('Security scope search (integration)', function () {
         parentFeatureId: parent
       });
       await secureFeature(connection, parent);
-      await markFeatureUnapproved(parent);
-
       await rebuildClosure(uploadId);
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now()
+        WHERE submission_feature_id = ${parent};
+      `);
 
       const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.not.include(parent); // inactive → not a search result
-      expect(featureIds).to.include(child); // active + not effectively secured → visible
+      expect(featureIds).to.not.include(parent); // historical → not a search result
+      expect(featureIds).to.not.include(child); // closure ancestor has enforcing security → hidden
+    });
+
+    it('does not enforce an ended security assignment from a historical closure target', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const uploadId = await createTestUpload(connection, submissionId);
+      const parent = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, featureTypeName: 'survey' });
+      const child = await insertFeatureRow({
+        submissionId,
+        submissionUploadId: uploadId,
+        featureTypeName: 'sample_site',
+        parentFeatureId: parent
+      });
+      await secureFeature(connection, parent);
+      await rebuildClosure(uploadId);
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now()
+        WHERE submission_feature_id = ${parent};
+      `);
+      // A stale self-loop must not make the ended parent a current search result or banner match.
+      const hiddenParent = await searchRepo.hasInaccessibleSecuredFeaturesByExpressionTree(
+        'survey',
+        null,
+        { type: 'anonymous' },
+        { submissionIds: [submissionId] }
+      );
+      expect(hiddenParent).to.be.false;
+      await unsecureFeature(parent);
+
+      const paginatedParents = await searchRepo.searchFeaturesByExpressionTree(
+        'survey',
+        null,
+        { limit: 25, sort: 'submission_feature_id', order: 'desc' },
+        { type: 'anonymous' },
+        { submissionIds: [submissionId] }
+      );
+      expect(paginatedParents).to.be.empty;
+
+      const results = await searchInSubmission(submissionId, ['survey', 'sample_site'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.not.include(parent);
+      expect(featureIds).to.include(child);
     });
 
     it('should hide child from anonymous when parent is secured and approved', async () => {
@@ -2306,6 +2426,211 @@ describe('Security scope search (integration)', function () {
       // Accessible under its real submission, but the submission-integrity guard denies a mismatched id.
       expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.true;
       expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId + 100000)).to.be.false;
+    });
+
+    it('reconstructs historical inherited security after closure drops the historical source', async () => {
+      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: true,
+        currentSecured: false
+      });
+      const closureRows = await connection.sql(SQL`
+        SELECT 1
+        FROM submission_feature_closure
+        WHERE source_submission_feature_id = ${historicalFeatureId};
+      `);
+      expect(closureRows.rowCount).to.equal(0);
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+    });
+
+    it('evaluates security on stored historical ancestry as it exists now', async () => {
+      const { submissionId, historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: true,
+        currentSecured: false
+      });
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+
+      await connection.sql(SQL`
+        UPDATE submission_feature_security
+        SET record_end_date = now() - interval '1 second'
+        WHERE submission_feature_id = ${historicalParentId};
+      `);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+    });
+
+    it('denies historical open content when its terminal current feature is secured', async () => {
+      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: false,
+        currentSecured: true
+      });
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+    });
+
+    it('does not revoke direct-ID access solely because a feature is superseded', async () => {
+      const { submissionId, historicalFeatureId, currentFeatureId } = await seedHistoricalFeature({
+        historicalSecured: false,
+        currentSecured: false
+      });
+      const repo = new TeamAuthorizationRepository(connection);
+
+      // The caller still passes both the historical and terminal-current access checks.
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+
+      // A later security change on the terminal current feature may legitimately revoke that access.
+      await secureFeature(connection, currentFeatureId);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+    });
+
+    it('reflects removal and reapplication of current security on historical ancestry', async () => {
+      const { submissionId, historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: true,
+        currentSecured: false
+      });
+      const repo = new TeamAuthorizationRepository(connection);
+
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+
+      await connection.sql(
+        SQL`DELETE FROM submission_feature_security WHERE submission_feature_id = ${historicalParentId} AND security_rule_id = 1`
+      );
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+
+      await secureFeature(connection, historicalParentId);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+    });
+
+    it('allows a superseded feature only when the caller passes historical and current access checks', async () => {
+      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: true,
+        currentSecured: true
+      });
+      const userId = connection.systemUserId();
+      await setupFullAccess(
+        connection,
+        scopeRepo,
+        `urn:${submissionId}:sample_site:*`,
+        userId,
+        'Historical dual-context team'
+      );
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId, submissionId)).to.be.true;
+    });
+
+    it('evaluates historical entitlement against current team membership', async () => {
+      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: true,
+        currentSecured: false
+      });
+      const userId = await createOtherUser();
+      const { teamId } = await setupFullAccess(
+        connection,
+        scopeRepo,
+        `urn:${submissionId}:sample_site:*`,
+        userId,
+        'Historical current-membership team'
+      );
+      const repo = new TeamAuthorizationRepository(connection);
+
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId, submissionId)).to.be.true;
+
+      await connection.sql(SQL`
+        UPDATE team_member
+        SET record_end_date = clock_timestamp()
+        WHERE team_id = ${teamId}::uuid
+          AND system_user_id = ${userId}
+          AND record_end_date IS NULL;
+      `);
+
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId, submissionId)).to.be.false;
+    });
+
+    it('walks a cyclic stored parent chain safely without leaving the submission', async () => {
+      const { submissionId, historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: false,
+        currentSecured: false
+      });
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET parent_submission_feature_id = ${historicalFeatureId}
+        WHERE submission_feature_id = ${historicalParentId};
+      `);
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+    });
+
+    it('fails closed for a cross-submission successor', async () => {
+      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+        historicalSecured: false,
+        currentSecured: false
+      });
+      const otherSubmissionId = await createTestSubmission(connection);
+      const otherUploadId = await createTestUpload(connection, otherSubmissionId);
+      const crossSubmissionFeatureId = await insertFeatureRow({
+        submissionId: otherSubmissionId,
+        submissionUploadId: otherUploadId,
+        featureTypeName: 'survey'
+      });
+      await rebuildClosure(otherUploadId);
+      const repo = new TeamAuthorizationRepository(connection);
+
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET successor_submission_feature_id = ${crossSubmissionFeatureId}
+        WHERE submission_feature_id = ${historicalFeatureId};
+      `);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+    });
+
+    it('uses lifecycle state for the authorization branch and fails closed while successor closure is missing', async () => {
+      const { submissionId, historicalFeatureId, currentFeatureId } = await seedHistoricalFeature({
+        historicalSecured: false,
+        currentSecured: false,
+        rebuildCurrentClosure: false
+      });
+      const closureState = await connection.sql(SQL`
+        SELECT
+          EXISTS (
+            SELECT 1
+            FROM submission_feature_closure
+            WHERE source_submission_feature_id = ${historicalFeatureId}
+              AND target_submission_feature_id = ${historicalFeatureId}
+          ) AS historical_self_loop,
+          EXISTS (
+            SELECT 1
+            FROM submission_feature_closure
+            WHERE source_submission_feature_id = ${currentFeatureId}
+              AND target_submission_feature_id = ${currentFeatureId}
+          ) AS current_self_loop;
+      `);
+      const lifecycleState = await connection.sql(SQL`
+        SELECT
+          submission_feature_id,
+          record_effective_date <= now()
+            AND (record_end_date IS NULL OR now() < record_end_date)
+            AND successor_submission_feature_id IS NULL AS current
+        FROM submission_feature
+        WHERE submission_feature_id IN (${historicalFeatureId}, ${currentFeatureId})
+        ORDER BY submission_feature_id;
+      `);
+
+      expect(closureState.rows[0]).to.deep.equal({ historical_self_loop: true, current_self_loop: false });
+      expect(lifecycleState.rows).to.deep.include({ submission_feature_id: historicalFeatureId, current: false });
+      expect(lifecycleState.rows).to.deep.include({ submission_feature_id: currentFeatureId, current: true });
+
+      const repo = new TeamAuthorizationRepository(connection);
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, currentFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+
+      await rebuildClosureForSubmission(submissionId);
+
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, currentFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
     });
   });
 });

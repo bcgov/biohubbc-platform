@@ -2,8 +2,10 @@ import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUserExtended, isSystemUserInactive } from '../../models/system-user';
 import { getUserGuid } from '../../utils/keycloak-utils';
-import { ContributorSystemUserService } from '../contributor-system-user-service';
+import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
+import { DownloadService } from '../download/download-service';
+import { UploadService } from '../upload/upload-service';
 import { UserService } from '../user-service';
 import { TeamAuthorizationService } from './team-authorization-service';
 
@@ -31,6 +33,20 @@ export interface AuthorizeBySystemRoles {
  */
 export interface AuthorizeBySystemUser {
   discriminator: 'SystemUser';
+}
+
+/**
+ * Authorization rule that checks UUID access for an unclaimed download or linked-team access for a claimed download.
+ */
+export interface AuthorizeByDownload {
+  discriminator: 'Download';
+  downloadId: string;
+}
+
+/** Authorization rule for upload completion by its creator with owning-contributor access. */
+export interface AuthorizeByUpload {
+  discriminator: 'Upload';
+  uploadId: string;
 }
 
 /**
@@ -81,18 +97,21 @@ export interface AuthorizeByPolicy {
 }
 
 /**
- * Authorization rule that checks if a jwt token maps to a known contributor by client id.
+ * Authorization rule that requires active membership in the contributor identified by clientId.
  *
  * @export
  * @interface AuthorizeByContributor
  */
 export interface AuthorizeByContributor {
   discriminator: 'Contributor';
+  clientId: string;
 }
 
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
+  | AuthorizeByDownload
+  | AuthorizeByUpload
   | AuthorizeByContributor
   | AuthorizeByTeam
   | AuthorizeByPolicy;
@@ -110,14 +129,18 @@ export type AuthorizeConfigAnd = {
 export type AuthorizationScheme = AuthorizeConfigAnd | AuthorizeConfigOr;
 
 export class AuthorizationService extends DBService {
+  _contributorService: ContributorService;
+  _uploadService: UploadService;
   _userService = new UserService(this.connection);
-  _contributorSystemUserService = new ContributorSystemUserService(this.connection);
+  _downloadService = new DownloadService(this.connection);
   _systemUser: SystemUserExtended | undefined = undefined;
   _keycloakToken: object | undefined = undefined;
   _contributorId: number | undefined = undefined;
 
   constructor(connection: IDBConnection, init?: { systemUser?: SystemUserExtended; keycloakToken?: object }) {
     super(connection);
+    this._contributorService = new ContributorService(connection);
+    this._uploadService = new UploadService(connection);
 
     this._systemUser = init?.systemUser;
     this._keycloakToken = init?.keycloakToken;
@@ -152,29 +175,34 @@ export class AuthorizationService extends DBService {
    * @return {*}  {Promise<boolean[]>}
    */
   async executeAuthorizeConfig(authorizeRules: AuthorizeRule[]): Promise<boolean[]> {
-    const authorizeResults: boolean[] = [];
+    // Finish all work on the shared connection before the caller can roll back or release it.
+    const results = await Promise.allSettled(
+      authorizeRules.map(async (authorizeRule) => {
+        switch (authorizeRule.discriminator) {
+          case 'SystemRole':
+            return this.authorizeBySystemRole(authorizeRule);
+          case 'SystemUser':
+            return this.authorizeBySystemUser();
+          case 'Download':
+            return this.authorizeByDownload(authorizeRule);
+          case 'Upload':
+            return this.authorizeByUpload(authorizeRule);
+          case 'Contributor':
+            return this.authorizeByContributor(authorizeRule);
+          case 'Team':
+            return this.authorizeByTeam(authorizeRule);
+          case 'Policy':
+            return this.authorizeByPolicy(authorizeRule);
+        }
+      })
+    );
 
-    for (const authorizeRule of authorizeRules) {
-      switch (authorizeRule.discriminator) {
-        case 'SystemRole':
-          authorizeResults.push(await this.authorizeBySystemRole(authorizeRule));
-          break;
-        case 'SystemUser':
-          authorizeResults.push(await this.authorizeBySystemUser());
-          break;
-        case 'Contributor':
-          authorizeResults.push(await this.authorizeByContributor());
-          break;
-        case 'Team':
-          authorizeResults.push(await this.authorizeByTeam(authorizeRule));
-          break;
-        case 'Policy':
-          authorizeResults.push(await this.authorizeByPolicy(authorizeRule));
-          break;
+    return results.map((result) => {
+      if (result.status === 'rejected') {
+        throw result.reason;
       }
-    }
-
-    return authorizeResults;
+      return result.value;
+    });
   }
 
   /**
@@ -229,6 +257,25 @@ export class AuthorizationService extends DBService {
     const user = await this.getCachedSystemUser();
 
     return !!user; // true if user exists, false otherwise
+  }
+
+  /**
+   * Check whether the current request can access a download.
+   *
+   * Unclaimed downloads are accessible by UUID. Claimed downloads require the current user to
+   * belong to a linked team. Anonymous requests are allowed to reach this check.
+   *
+   * @param {AuthorizeByDownload} authorizeRule
+   * @returns {Promise<boolean>}
+   */
+  async authorizeByDownload(authorizeRule: AuthorizeByDownload): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
+    }
+
+    const user = await this.getCachedSystemUser();
+
+    return this._downloadService.isUserAuthorizedForDownload(authorizeRule.downloadId, user?.system_user_id ?? null);
   }
 
   /**
@@ -306,32 +353,40 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user is a known contributor by token client id.
+   * Authorize upload completion for its creator with owning-contributor access.
    *
-   * Note: This is for submission-source attribution and authorization.
-   *
-   * @returns {Promise<boolean>}
+   * @param {AuthorizeByUpload} authorizeRule Upload session being completed.
+   * @returns {Promise<boolean>} Whether the creator has active contributor membership.
+   * @throws {HTTP403} If the upload is unavailable or belongs to another creator, including for administrators.
    */
-  async authorizeByContributor(): Promise<boolean> {
+  async authorizeByUpload(authorizeRule: AuthorizeByUpload): Promise<boolean> {
+    const user = await this.getCachedSystemUser();
+    if (!user) {
+      return false;
+    }
+    return this._uploadService.isUserAuthorizedForUploadCompletion(authorizeRule.uploadId, user.system_user_id);
+  }
+
+  /**
+   * Check active membership in the specified contributor and retain its ID for submission attribution.
+   *
+   * @param {AuthorizeByContributor} authorizeRule Required contributor client ID.
+   * @return {Promise<boolean>} Whether the authenticated caller has contributor access.
+   * @throws If the contributor is invalid, unavailable, or unauthorized.
+   * @memberof AuthorizationService
+   */
+  async authorizeByContributor(authorizeRule: AuthorizeByContributor): Promise<boolean> {
     if (!this._keycloakToken) {
       return false;
     }
-
-    const systemUser = await this.getCachedSystemUser();
-    const systemUserId = systemUser?.system_user_id;
-
-    if (!systemUserId) {
+    const user = await this.getCachedSystemUser();
+    if (!user) {
       return false;
     }
-
-    const contributorSystemUser = await this._contributorSystemUserService.findContributorSystemUser(systemUserId);
-
-    if (!contributorSystemUser) {
-      return false;
-    }
-
-    this._contributorId = contributorSystemUser.contributor_id;
-
+    this._contributorId = await this._contributorService.resolveAuthorizedContributorId(
+      authorizeRule.clientId,
+      user.system_user_id
+    );
     return true;
   }
 

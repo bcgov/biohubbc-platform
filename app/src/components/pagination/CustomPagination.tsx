@@ -1,27 +1,41 @@
-import { MenuItem, Pagination as MuiPagination, Select, SelectChangeEvent, Stack, Typography } from '@mui/material';
-
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
+import { MenuItem, PaginationItem, Select, SelectChangeEvent, Stack, Typography } from '@mui/material';
+import { PAGE_SIZE_OPTIONS } from 'constants/pagination';
+import { CursorPagination } from 'types/pagination';
 
 interface CustomPaginationProps {
-  currentPage: number;
-  pageSize: number;
-  totalCount: number;
-  lastPage: number;
-  onPageChange: (page: number) => void;
+  /** Cursor pagination state for the current result page. */
+  cursor: CursorPagination;
+  /** Number of rows displayed on the current page. */
+  rowCount: number;
+  /** Total number of matching rows from the separate count request. */
+  totalCount?: number;
+  /** Navigates to the supplied cursor position. */
+  onPageChange: (cursor: string) => void;
+  /** Applies a new row count per page. */
   onPageSizeChange: (pageSize: number) => void;
 }
 
+/**
+ * Renders a compact pagination footer with result count, page-size selection,
+ * and previous/next controls.
+ *
+ * @param {CustomPaginationProps} props - Current pagination state and change handlers.
+ * @returns {JSX.Element} Pagination footer for server-backed result lists.
+ */
 export const CustomPagination = ({
-  currentPage,
-  pageSize,
+  cursor,
+
+  rowCount,
   totalCount,
-  lastPage,
   onPageChange,
   onPageSizeChange
 }: CustomPaginationProps) => {
-  const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const lastItem = Math.min(currentPage * pageSize, totalCount);
-
+  /**
+   * Handles row-count selection changes from the page-size dropdown.
+   *
+   * @param {SelectChangeEvent<number>} event - MUI select change event containing the selected page size.
+   * @returns {void}
+   */
   const handlePageSizeChange = (event: SelectChangeEvent<number>) => {
     onPageSizeChange(Number(event.target.value));
   };
@@ -30,11 +44,12 @@ export const CustomPagination = ({
     <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="nowrap">
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2" color="text.secondary">
-          {firstItem}–{lastItem} of {totalCount}
+          Showing {rowCount}
+          {totalCount !== undefined && ` of ${totalCount}`} {rowCount === 1 ? 'row' : 'rows'}
         </Typography>
         <Select<number>
           size="small"
-          value={pageSize}
+          value={cursor.limit}
           onChange={handlePageSizeChange}
           inputProps={{ 'aria-label': 'rows per page' }}
           sx={{ fontSize: '0.875rem' }}>
@@ -46,14 +61,23 @@ export const CustomPagination = ({
         </Select>
       </Stack>
 
-      <MuiPagination
-        count={lastPage}
-        page={currentPage}
-        onChange={(_event, page) => onPageChange(page)}
-        shape="rounded"
-        siblingCount={0}
-        boundaryCount={0}
-      />
+      <Stack component="nav" aria-label="pagination navigation" direction="row" alignItems="center">
+        <PaginationItem
+          type="previous"
+          shape="rounded"
+          aria-label="Go to previous page"
+          disabled={!cursor.previous}
+          onClick={() => cursor.previous && onPageChange(cursor.previous)}
+        />
+
+        <PaginationItem
+          type="next"
+          shape="rounded"
+          aria-label="Go to next page"
+          disabled={!cursor.next}
+          onClick={() => cursor.next && onPageChange(cursor.next)}
+        />
+      </Stack>
     </Stack>
   );
 };

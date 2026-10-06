@@ -48,7 +48,7 @@ export const useTicketComment = () => {
         throw new Error('Failed to add comment.');
       }
 
-      appendCachedComment(createdComment);
+      await appendCachedComment(createdComment);
 
       setComment('');
     } catch (caughtError) {

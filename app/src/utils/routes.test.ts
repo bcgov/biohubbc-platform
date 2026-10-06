@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildSubmissionPropertyValuePathResolvers,
   buildSubmissionCodePath,
   buildSubmissionFeaturePath,
   buildSubmissionTaxonPath,
@@ -72,5 +73,17 @@ describe('buildSubmissionFeaturePath', () => {
     expect(buildSubmissionFeaturePath('/portal/submission', 18, 3339, '?view=table')).toBe(
       '/portal/submission/18/feature/3339?view=table'
     );
+  });
+});
+
+describe('buildSubmissionPropertyValuePathResolvers', () => {
+  it('builds path resolvers that bind the route base and query string', () => {
+    const pathResolvers = buildSubmissionPropertyValuePathResolvers('/portal/submission', '?view=table');
+
+    expect(pathResolvers.getSubmissionTaxonPath(18, 180543)).toBe('/portal/submission/18/taxon/180543?view=table');
+    expect(pathResolvers.getSubmissionCodePath(18, 'sign', 'track')).toBe(
+      '/portal/submission/18/code/sign/track?view=table'
+    );
+    expect(pathResolvers.getSubmissionFeaturePath(18, 3339)).toBe('/portal/submission/18/feature/3339?view=table');
   });
 });

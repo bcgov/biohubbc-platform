@@ -74,7 +74,7 @@ describe('SubmissionIngestionService', () => {
       setupTarballContext();
 
       const deleteFeaturesStub = sinon
-        .stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId')
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
         .resolves();
       const deleteUploadArtifactsStub = sinon
         .stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId')
@@ -118,7 +118,9 @@ describe('SubmissionIngestionService', () => {
       const service = new SubmissionIngestionService();
       setupTarballContext();
 
-      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
+        .resolves();
       sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
       sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(mockContributor);
       sinon
@@ -150,7 +152,9 @@ describe('SubmissionIngestionService', () => {
       const service = new SubmissionIngestionService();
       setupTarballContext();
 
-      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
+        .resolves();
       sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
       sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(mockContributor);
       sinon
@@ -169,7 +173,9 @@ describe('SubmissionIngestionService', () => {
       const service = new SubmissionIngestionService();
       setupTarballContext();
 
-      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
+        .resolves();
       sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
       sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(mockContributor);
       sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({

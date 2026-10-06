@@ -5,18 +5,18 @@ import { LogicalOperator } from './logical-operator';
 export type ExpressionTreePredicate = {
   type: 'predicate';
   feature_property_id: number;
-  feature_type_property_id: number | null;
+  blueprint_feature_type_property_id: number | null;
   operator: PredicateOperator;
   value?: unknown;
 };
 
-export type ExpressionTreeExpression = {
+export type ExpressionTree = {
   type: 'expression';
   operator: LogicalOperator;
   clauses: ExpressionTreeClause[];
 };
 
-export type ExpressionTreeClause = ExpressionTreeExpression | ExpressionTreePredicate;
+export type ExpressionTreeClause = ExpressionTree | ExpressionTreePredicate;
 
 /**
  * Expression-tree leaf node that binds a property to an operator and scalar value.
@@ -28,7 +28,7 @@ export const ExpressionTreePredicate: z.ZodType<ExpressionTreePredicate> = z
   .object({
     type: z.literal('predicate'),
     feature_property_id: z.number().int().positive(),
-    feature_type_property_id: z.number().int().positive().nullable(),
+    blueprint_feature_type_property_id: z.number().int().positive().nullable(),
     operator: PredicateOperator,
     value: z.unknown().optional()
   })
@@ -38,13 +38,13 @@ export const ExpressionTreePredicate: z.ZodType<ExpressionTreePredicate> = z
  * Recursive clause node used for nested expression composition.
  */
 export const ExpressionTreeClause: z.ZodType<ExpressionTreeClause> = z.lazy(() =>
-  z.union([ExpressionTreeExpression, ExpressionTreePredicate])
+  z.union([ExpressionTree, ExpressionTreePredicate])
 );
 
 /**
- * Recursive expression node composed of one or more expression-tree clauses.
+ * Recursive expression tree composed of one or more clauses.
  */
-export const ExpressionTreeExpression: z.ZodType<ExpressionTreeExpression> = z.lazy(() =>
+export const ExpressionTree: z.ZodType<ExpressionTree> = z.lazy(() =>
   z
     .object({
       type: z.literal('expression'),
@@ -53,9 +53,3 @@ export const ExpressionTreeExpression: z.ZodType<ExpressionTreeExpression> = z.l
     })
     .strict()
 );
-
-/**
- * Canonical root alias for expression trees.
- */
-export const ExpressionTree = ExpressionTreeExpression;
-export type ExpressionTree = z.infer<typeof ExpressionTree>;

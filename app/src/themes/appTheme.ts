@@ -30,6 +30,9 @@ const appTheme = createTheme({
     }
   },
   palette: {
+    action: {
+      selectedOpacity: 0.06
+    },
     background: {
       default: '#f5f5f5'
     },
@@ -175,6 +178,10 @@ const appTheme = createTheme({
           }
         }),
         contained: ({ theme, ownerState }) => {
+          if (ownerState.color === 'inherit') {
+            return {};
+          }
+
           const { main, dark, contrastText } = {
             ...theme.palette.primary,
             ...(theme.palette[ownerState.color as keyof typeof theme.palette] as
@@ -392,6 +399,13 @@ const appTheme = createTheme({
       styleOverrides: {
         paper: {
           padding: '8px'
+        }
+      }
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          borderRadius: '4px'
         }
       }
     },
@@ -635,6 +649,9 @@ const appTheme = createTheme({
             padding: '0 4px',
             overflow: 'hidden',
             textOverflow: 'ellipsis'
+          },
+          '& .MuiChip-icon': {
+            marginRight: theme.spacing(0.2)
           },
           '& .MuiChip-deleteIcon': {
             margin: '0 0 0 4px',

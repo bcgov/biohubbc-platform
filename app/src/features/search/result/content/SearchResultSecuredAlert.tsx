@@ -14,7 +14,7 @@ interface SearchResultSecuredAlertProps {
  * matched secured features the caller cannot access (and were therefore hidden).
  *
  * Rendered when the search response reports hidden secured matches
- * (`has_more_secured_features`), not merely when visible rows are secured.
+ * (`has_inaccessible_secured_features`), not merely when visible rows are secured.
  * Navigation stays in the parent and is passed in as the access-request callback.
  *
  * @param {SearchResultSecuredAlertProps} props - Callback for the "Request Access" action.
@@ -22,7 +22,7 @@ interface SearchResultSecuredAlertProps {
  */
 export const SearchResultSecuredAlert = ({ onRequestAccess }: SearchResultSecuredAlertProps) => {
   return (
-    <Container maxWidth="md" sx={{ pt: 2 }}>
+    <Container maxWidth="lg" sx={{ pt: 2 }}>
       <AlertBanner
         variant="standard"
         icon={<Icon path={mdiLock} size={0.75} style={{ marginTop: '1px' }} />}

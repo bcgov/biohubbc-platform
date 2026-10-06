@@ -1,61 +1,180 @@
 import { Knex } from 'knex';
+import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security';
 import { getKnex } from '../database/db';
-import { NormalizedExpressionTreeExpression } from '../models/expression-tree-internal';
-import { FeatureTypeProperty } from '../models/feature-type-property';
+import { ApiValidationError } from '../errors/api-error';
+import { CountResult } from '../models/count';
+import { NormalizedExpressionTree } from '../models/expression-tree-internal';
+import { SearchFeatureProperty } from '../models/feature-property';
+import {
+  NormalizedSubmissionUploadFeatureSearchFilters,
+  SearchFeatureFilters,
+  SearchFeatureSecurityContext
+} from '../models/search';
+import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
-import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import {
-  buildSecurityFilter,
   codePropertyValueJson,
   featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
-  isSubmissionFeatureActive,
+  isSubmissionFeatureCurrent,
   taxonPropertyValueJson
 } from './sql-fragments';
+import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-feature-search';
 
 /**
  * Repository for searching submission features by expression-tree criteria.
  */
 export class SearchFeatureRepository extends BaseRepository {
-  private readonly typedPropertyTableNames = [
-    'submission_feature_property_string',
-    'submission_feature_property_number',
-    'submission_feature_property_boolean',
-    'submission_feature_property_timestamp',
-    'submission_feature_property_geometry',
-    'submission_feature_property_code',
-    'submission_feature_property_taxon',
-    'submission_feature_property_feature'
-  ];
+  /**
+   * Search review-upload features and resolve security through upload-local parent ancestry.
+   * Published closure is neither required nor consulted; properties are not hydrated.
+   *
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {NormalizedSubmissionUploadFeatureSearchFilters} filters Normalized criteria; omitted or null expression matches all upload features.
+   * @param {ApiCursorPaginationOptions} [cursorPagination] Cursor ordering and page limit.
+   * @returns {Promise<SearchFeatureResultWithRelevancy[]>} Matching features with review-time security state.
+   */
+  async searchSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    filters: NormalizedSubmissionUploadFeatureSearchFilters,
+    cursorPagination?: ApiCursorPaginationOptions
+  ): Promise<SearchFeatureResultWithRelevancy[]> {
+    const knex = getKnex();
+    const options = this.getExpressionSearchQueryOptions(cursorPagination);
+    const featureIds = buildSubmissionUploadFeatureIdsSubquery(
+      submissionId,
+      submissionUploadId,
+      filters.expression ?? undefined,
+      options
+    );
+    const query = knex
+      .from(featureIds.as('matches'))
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .join('submission as s', 's.submission_id', 'sf.submission_id')
+      .select(
+        'sf.submission_feature_id',
+        'sf.parent_submission_feature_id',
+        'sf.submission_id',
+        knex.raw('sf.uuid::text as uuid'),
+        'sf.feature_type_id',
+        'ft.name as feature_type_name',
+        'sf.create_date',
+        's.name as submission_name',
+        knex.raw('1.0 AS relevancy_score'),
+        knex.raw("'{}'::jsonb AS properties"),
+        'security.provenance',
+        knex.raw('security.provenance IS NOT NULL AS is_secured')
+      )
+      // Security is resolved per result row. Each ancestor step and each assignment lookup is keyed inside an
+      // OFFSET 0 fence, with the upload boundary applied to the step's result, so a row costs a few index probes
+      // however large the upload and however stale its statistics.
+      .joinRaw(
+        `LEFT JOIN LATERAL (
+        WITH RECURSIVE ancestors AS (
+          SELECT sf.submission_feature_id AS target_id
+          UNION
+          SELECT parent.submission_feature_id
+          FROM ancestors
+          CROSS JOIN LATERAL (
+            SELECT parent.submission_feature_id, parent.submission_upload_id, parent.record_end_date
+            FROM submission_feature child
+            JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
+            WHERE child.submission_feature_id = ancestors.target_id
+            OFFSET 0
+          ) parent
+          WHERE parent.submission_upload_id = ?::uuid AND parent.record_end_date IS NULL
+        )
+        SELECT CASE WHEN bool_or(assignment.submission_feature_id = sf.submission_feature_id)
+          THEN 'direct' ELSE 'inherited' END AS provenance
+        FROM ancestors
+        CROSS JOIN LATERAL (
+          SELECT sfs.submission_feature_id
+          FROM submission_feature_security sfs
+          JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id AND sr.record_end_date IS NULL
+          JOIN security_category sc ON sc.security_category_id = sr.security_category_id AND sc.record_end_date IS NULL
+          WHERE sfs.submission_feature_id = ancestors.target_id
+            AND sfs.record_effective_date <= now() AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+          OFFSET 0
+        ) assignment
+        HAVING count(*) > 0
+      ) security ON true`,
+        [submissionUploadId]
+      );
+    this.applyExpressionSearchOrder(query, 'sf', options);
+    const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
+    return response.rows;
+  }
+
+  /**
+   * Count review-upload matches without depending on published closure or public visibility.
+   * @param {number} submissionId Submission boundary.
+   * @param {string} submissionUploadId Upload boundary.
+   * @param {NormalizedSubmissionUploadFeatureSearchFilters} filters Normalized criteria; omitted or null expression matches all upload features.
+   * @returns {Promise<number>} Matching upload feature count.
+   */
+  async countSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    filters: NormalizedSubmissionUploadFeatureSearchFilters
+  ): Promise<number> {
+    const knex = getKnex();
+    const featureIds = buildSubmissionUploadFeatureIdsSubquery(
+      submissionId,
+      submissionUploadId,
+      filters.expression ?? undefined
+    );
+    const query = knex.from(featureIds.as('matches')).select(knex.raw('count(*)::integer AS count'));
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
+  }
 
   /**
    * Searches for submission features matching the provided expression tree.
    *
-   * @param {ExpressionTree} expressionTree - Expression tree criteria
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
-   * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<SearchFeatureResultWithRelevancy[]>}
+   * @param {string | null} anchorFeatureType - Target feature type returned by the search
+   * @param {NormalizedExpressionTree | null} expression - Optional validated and optimized expression criteria
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Optional cursor-pagination options
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
+   * @return {Promise<SearchFeatureResultWithRelevancy[]>} Ordered, accessible feature rows
    */
   async searchFeaturesByExpressionTree(
-    anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
-    pagination?: ApiPaginationOptions,
-    systemUserId?: number | null
+    anchorFeatureType: string | null,
+    expression: NormalizedExpressionTree | null,
+    cursorPagination?: ApiCursorPaginationOptions,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     const knex = getKnex();
-    const expressionFeatureIds = expressionTree
+    const queryOptions = this.getExpressionSearchQueryOptions(cursorPagination);
+    let searchUserId: number | null | undefined = null;
+    if (securityContext.type === 'user') {
+      searchUserId = securityContext.systemUserId;
+    } else if (securityContext.type === 'unrestricted') {
+      searchUserId = undefined;
+    }
+    const featureIds = expression
       ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
           anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
+          expression,
+          searchUserId,
+          queryOptions
         )
-      : null;
+      : expressionEvaluation.buildBroadFeatureTypeSubquery(anchorFeatureType, searchUserId, queryOptions);
 
-    let query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, expressionFeatureIds, systemUserId);
-    query = this.applyExpressionSearchPagination(query, pagination);
+    this.applySearchFilters(
+      featureIds,
+      expression ? 'anchor_sf.submission_feature_id' : 'sf.submission_feature_id',
+      filters
+    );
+    const query = this.buildExpressionTreeSearchQuery(knex, anchorFeatureType, featureIds, queryOptions);
 
     const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
 
@@ -63,41 +182,43 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Gets the count of features matching the provided expression tree.
+   * Counts matching anchor features.
    *
-   * @param {ExpressionTree} expressionTree - Expression tree criteria
-   * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<number>} Promise resolving to the count of matching features
+   * @param {string} anchorFeatureType - Target feature type returned by the search.
+   * @param {NormalizedExpressionTree | null} expression - Validated criteria, or null for all features in scope.
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
+   * @return {Promise<number>} Matching feature count.
    */
-  async searchFeaturesByExpressionTreeCount(
+  async countFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
-    systemUserId?: number | null
+    expression: NormalizedExpressionTree | null,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<number> {
     const knex = getKnex();
-    const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
-      : null;
+    let featureIds: Knex.QueryBuilder;
+    if (securityContext.type === 'unrestricted') {
+      featureIds = expression
+        ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(anchorFeatureType, expression, undefined)
+        : expressionEvaluation.buildBroadFeatureTypeSubquery(anchorFeatureType, undefined);
+    } else {
+      const searchUserId = securityContext.type === 'user' ? securityContext.systemUserId : null;
+      featureIds = expression
+        ? expressionEvaluation.buildExpressionTreeCountFeatureIdsSubquery(anchorFeatureType, expression, searchUserId)
+        : expressionEvaluation.buildBroadFeatureTypeCountSubquery(anchorFeatureType, searchUserId);
+    }
+    const countQuery = knex.from(featureIds.as('matching_features')).select(knex.raw('count(*)::integer as count'));
+    this.applySearchFilters(countQuery, 'matching_features.submission_feature_id', filters);
+    const response = await this.connection.knex(countQuery, CountResult);
 
-    const query = this.buildExpressionTreeMatchingFeaturesQuery(
-      knex,
-      anchorFeatureType,
-      expressionFeatureIds,
-      systemUserId
-    );
-    const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
-    const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
   }
 
   /**
    * Checks whether the expression matched secured features that are not visible to the caller.
    *
-   * This is the source of the `has_more_secured_features` flag. It is a sibling of the visible search
+   * This is the source of the `has_inaccessible_secured_features` flag. It is a sibling of the visible search
    * query that reuses the same expression criteria and feature-type filter, but deliberately does NOT
    * apply the caller access filter before checking for inaccessible secured matches — otherwise the
    * very features we want to detect would already be removed.
@@ -113,37 +234,68 @@ export class SearchFeatureRepository extends BaseRepository {
    * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
-   * @param {number | null} [systemUserId] - Security context (null = anonymous)
+   * @param {NormalizedExpressionTree | null} expression - Validated criteria, or null for all features in scope
+   * @param {SearchFeatureSecurityContext} [securityContext] - Caller identity and access mode; defaults to anonymous.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
    * @return {Promise<boolean>} True if matching secured features exist that the caller cannot access
    */
   async hasInaccessibleSecuredFeaturesByExpressionTree(
     anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
-    systemUserId?: number | null
+    expression: NormalizedExpressionTree | null,
+    securityContext: SearchFeatureSecurityContext = ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT,
+    filters?: SearchFeatureFilters
   ): Promise<boolean> {
+    if (securityContext.type === 'unrestricted') {
+      return false;
+    }
     const knex = getKnex();
 
-    // Candidate anchor features matched by the expression, WITHOUT the caller access filter. The
-    // expression subquery already restricts to active anchor-type features, so it is used directly;
-    // only the no-expression case needs the feature-type filter from buildExpressionTreeMatchingFeaturesQuery.
-    const matchingFeatures = expressionTree
-      ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expressionTree)
-      : this.buildExpressionTreeMatchingFeaturesQuery(knex, anchorFeatureType, null);
+    const expressionFeatureIds = expression
+      ? expressionEvaluation.buildUnfilteredExpressionTreeFeatureIdsSubquery(anchorFeatureType, expression)
+      : null;
 
-    const existsQuery = knex
+    // Start from the tiny active-security set and project through closure to matching candidates. Broad
+    // searches commonly have millions of unsecured matches; scanning all of them just to prove the
+    // hidden-secured banner is false is the wrong direction.
+    const existsQuery = knex('submission_feature_security as sfs')
       .select(knex.raw('1'))
-      .from(matchingFeatures.as('mf'))
-      .whereRaw(isEffectivelySecured('mf.submission_feature_id'))
+      .join('submission_feature_closure as ancestry', (join) => {
+        join
+          .on('ancestry.target_submission_feature_id', '=', 'sfs.submission_feature_id')
+          .andOn('ancestry.is_ancestor', '=', knex.raw('true'));
+      })
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'ancestry.source_submission_feature_id')
+      .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('ft.name', anchorFeatureType)
+      .whereNull('ft.record_end_date')
+      .whereRaw(isSubmissionFeatureCurrent('sf'))
+      .whereRaw('sfs.record_effective_date <= now()')
+      .where((activeSecurity) => {
+        activeSecurity.whereNull('sfs.record_end_date').orWhereRaw('now() < sfs.record_end_date');
+      })
+      .whereExists(
+        knex('submission_feature_closure as sfc')
+          .select(knex.raw('1'))
+          .whereRaw('sfc.source_submission_feature_id = sf.submission_feature_id')
+          .whereRaw('sfc.target_submission_feature_id = sf.submission_feature_id')
+      )
       .limit(1);
+
+    this.applySearchFilters(existsQuery, 'sf.submission_feature_id', filters);
+
+    if (expressionFeatureIds) {
+      existsQuery.join(expressionFeatureIds.clone().as('expression_matches'), function () {
+        this.on('expression_matches.submission_feature_id', '=', 'sf.submission_feature_id');
+      });
+    }
 
     // Authenticated: a secured match is hidden when the caller cannot access it. Reuses the shared
     // isAccessibleToUser check (anchor-based, identical to the visible-results access filter) so the
     // banner stays consistent with which rows are actually shown. The candidate is already effectively
     // secured here, so isAccessibleToUser short-circuits to its team-scope-anchor branch.
-    // Anonymous (null/undefined): every secured match is hidden.
-    if (systemUserId) {
-      existsQuery.whereRaw(`NOT ${isAccessibleToUser('mf.submission_feature_id')}`, [systemUserId]);
+    // Anonymous context: every secured match is hidden.
+    if (securityContext.type === 'user') {
+      existsQuery.whereRaw(`NOT ${isAccessibleToUser('sf.submission_feature_id')}`, [securityContext.systemUserId]);
     }
 
     const response = await this.connection.knex(existsQuery);
@@ -152,139 +304,88 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Gets metadata for properties with at least one non-null typed value on the full filtered result set.
-   * Pagination is intentionally irrelevant. A typed row counts only when its property belongs to the
-   * matched feature's feature type, mirroring row-level property hydration.
-   *
-   * @param {string} anchorFeatureType - Target feature type returned by the search
-   * @param {NormalizedExpressionTreeExpression | undefined} expressionTree - Expression tree criteria
-   * @param {number | null} [systemUserId] - Security context
-   * @return {Promise<FeatureTypeProperty[]>} Active metadata for properties with at least one non-null value.
+   * Constrain shared search candidates before pagination.
+   * @param {Knex.QueryBuilder} query Candidate query.
+   * @param {string} featureIdColumn Qualified feature identifier.
+   * @param {SearchFeatureFilters} [filters] Submission/upload scope.
+   * @returns {void}
    */
-  async searchFeaturesByExpressionTreeProperties(
-    anchorFeatureType: string,
-    expressionTree: NormalizedExpressionTreeExpression | undefined,
-    systemUserId?: number | null
-  ): Promise<FeatureTypeProperty[]> {
+  private applySearchFilters(query: Knex.QueryBuilder, featureIdColumn: string, filters?: SearchFeatureFilters): void {
+    if (!filters) {
+      return;
+    }
     const knex = getKnex();
 
-    // Compile the normalized expression into an unexecuted feature-id subquery. When there is no
-    // expression, the matching-feature query below uses all active features of the anchor type.
-    const expressionFeatureIds = expressionTree
-      ? expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-          anchorFeatureType,
-          expressionTree,
-          systemUserId ?? null
-        )
-      : null;
+    const scopedFeatures = knex('submission_feature').select('submission_feature_id');
+    if (filters.submissionIds?.length) {
+      scopedFeatures
+        .whereIn('submission_id', filters.submissionIds)
+        .whereExists(
+          knex('submission_feature_closure as scope_closure')
+            .select(knex.raw('1'))
+            .whereRaw('scope_closure.source_submission_feature_id = submission_feature.submission_feature_id')
+            .whereRaw('scope_closure.target_submission_feature_id = submission_feature.submission_feature_id')
+        );
+    }
+    if (filters.submissionUploadIds?.length) {
+      scopedFeatures.whereIn('submission_upload_id', filters.submissionUploadIds).whereNull('record_end_date');
+    }
+    query.whereIn(featureIdColumn, scopedFeatures);
+  }
 
-    // Build the full, security-filtered result set as (submission_feature_id, feature_type_id).
-    // This intentionally has no LIMIT/OFFSET: top-level property metadata describes every feature
-    // matched by the expression, independently of the page returned in `features`.
-    const matchingFeaturesQuery = this.buildExpressionTreeMatchingFeaturesQuery(
-      knex,
-      anchorFeatureType,
-      expressionFeatureIds,
-      systemUserId
-    );
+  /**
+   * Gets the property columns of the anchor feature type.
+   *
+   * Property definitions are type metadata, not search-result data. Keeping this query independent
+   * of the expression prevents the full expression from being evaluated once per typed value table.
+   * One column is returned per property ever assigned to the feature type, under any Blueprint at
+   * any lifecycle, so every value hydrated below has a column whatever Blueprint it was stored
+   * under. `allow_multiple` is true when any assignment of the property allows several values;
+   * the order is the earliest assignment sort, then display name.
+   *
+   * @param {string} anchorFeatureType - Target feature type returned by the search
+   * @return {Promise<SearchFeatureProperty[]>} Property columns of the anchor feature type.
+   */
+  async getFeatureTypeProperties(anchorFeatureType: string): Promise<SearchFeatureProperty[]> {
+    const knex = getKnex();
 
-    // Normalize all indexed typed-property tables to the two columns needed for presence checks.
-    // Typed rows represent non-null values. Keeping the matching-feature join outside this
-    // UNION means PostgreSQL consumes `matching_features` once instead of once per property table.
-    const typedPropertyRowsQuery = knex.unionAll(
-      this.typedPropertyTableNames.map((tableName) =>
-        knex(`${tableName} as p`).select('p.submission_feature_id', 'p.feature_type_property_id')
-      ),
-      true
-    );
-
-    // Retain property ids that occur on at least one matched feature. The feature-type join mirrors
-    // row hydration and rejects stale or unrelated property rows attached to a feature id. Grouping
-    // here reduces an arbitrarily large value set to the small set of distinct property ids before
-    // descriptive metadata is joined.
-    const presentPropertyIdsQuery = knex('typed_property_rows as tpr')
-      .select('tpr.feature_type_property_id')
-      .join('matching_features as mf', 'tpr.submission_feature_id', 'mf.submission_feature_id')
-      .join('feature_type_property as matching_ftp', (join) => {
-        join
-          .on('tpr.feature_type_property_id', '=', 'matching_ftp.feature_type_property_id')
-          .andOn('mf.feature_type_id', '=', 'matching_ftp.feature_type_id');
-      })
-      .whereNull('matching_ftp.record_end_date')
-      .groupBy('tpr.feature_type_property_id');
-
-    // Assemble the three stages as single-use CTEs, then hydrate only the active metadata records
-    // for property ids proven to have a non-null value in the full expression result.
-    const query = knex
-      .with('matching_features', matchingFeaturesQuery)
-      .with('typed_property_rows', typedPropertyRowsQuery)
-      .with('present_property_ids', presentPropertyIdsQuery)
-      .from('present_property_ids as ppi')
+    const query = knex('feature_type as ft')
       .select(
-        'ftp.feature_type_property_id',
         'fp.feature_property_id',
         'fpt.feature_property_type_id',
         'fp.name',
         'fp.display_name',
         'fp.description',
         'fpt.name as type_name',
-        'ftp.required_value',
         'fp.calculated_value',
-        'ftp.allow_multiple'
+        knex.raw('BOOL_OR(bftp.allow_multiple) AS allow_multiple')
       )
-      .join('feature_type_property as ftp', 'ppi.feature_type_property_id', 'ftp.feature_type_property_id')
-      .join('feature_property as fp', 'ftp.feature_property_id', 'fp.feature_property_id')
-      .join('feature_property_type as fpt', 'fp.feature_property_type_id', 'fpt.feature_property_type_id')
-      .whereNull('ftp.record_end_date')
+      .join('blueprint_feature_type as bft', 'bft.feature_type_id', 'ft.feature_type_id')
+      .join(
+        'blueprint_feature_type_property as bftp',
+        'bftp.blueprint_feature_type_id',
+        'bft.blueprint_feature_type_id'
+      )
+      .join('feature_property as fp', 'fp.feature_property_id', 'bftp.feature_property_id')
+      .join('feature_property_type as fpt', 'fpt.feature_property_type_id', 'fp.feature_property_type_id')
+      .where('ft.name', anchorFeatureType)
+      .whereNull('ft.record_end_date')
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date')
-      .orderByRaw('ftp.sort ASC NULLS LAST')
+      .groupBy(
+        'fp.feature_property_id',
+        'fpt.feature_property_type_id',
+        'fp.name',
+        'fp.display_name',
+        'fp.description',
+        'fpt.name',
+        'fp.calculated_value'
+      )
+      .orderByRaw('MIN(bftp.sort) ASC NULLS LAST')
       .orderBy('fp.display_name', 'asc');
-
-    // Only the compact metadata result crosses the database/application boundary; matching feature
-    // ids and typed value rows remain inside PostgreSQL.
-    const response = await this.connection.knex(query, FeatureTypeProperty);
+    const response = await this.connection.knex(query, SearchFeatureProperty);
 
     return response.rows;
-  }
-
-  /**
-   * Builds the filtered set of matching submission features without result hydration.
-   *
-   * Used by count and property-metadata queries so they do not pay the cost of building
-   * row-level properties JSON that they never read.
-   *
-   * @param {Knex} knex - Knex instance
-   * @param {string} anchorFeatureType - Route anchor/result feature type
-   * @param {Knex.QueryBuilder | null} expressionFeatureIds - Optional expression-tree matches
-   * @param {number | null} [systemUserId] - Security context
-   * @return {Knex.QueryBuilder} Query returning submission_feature_id and feature_type_id rows
-   */
-  private buildExpressionTreeMatchingFeaturesQuery(
-    knex: Knex,
-    anchorFeatureType: string,
-    expressionFeatureIds: Knex.QueryBuilder | null,
-    systemUserId?: number | null
-  ): Knex.QueryBuilder {
-    const query = knex('submission_feature as sf')
-      .select('sf.submission_feature_id', 'sf.feature_type_id')
-      .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .where('ft.name', anchorFeatureType)
-      .whereRaw(isSubmissionFeatureActive('sf'));
-
-    if (expressionFeatureIds) {
-      query.whereIn('sf.submission_feature_id', expressionFeatureIds);
-    }
-
-    if (systemUserId !== undefined) {
-      const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id');
-
-      if (securityFilter) {
-        query.whereRaw(securityFilter);
-      }
-    }
-
-    return query;
   }
 
   /**
@@ -294,68 +395,71 @@ export class SearchFeatureRepository extends BaseRepository {
    * subquery from `expression-evaluation.buildExpressionTreeFeatureIdsSubquery`.
    * Feature properties are hydrated from typed property tables rather than
    * `submission_feature.data`, which remains ingestion source JSON only.
-   * Adds the `is_secured` projection and applies the security WHERE filter.
-   *
-   * Pagination is applied separately by `applyExpressionSearchPagination` so the count wrapper
-   * can wrap this query in `count(*)` without inheriting LIMIT/OFFSET.
+   * Applies expression/closure/security filters before pagination, then hydrates the typed property
+   * JSON only for the authorized page of features.
    *
    * @param {Knex} knex - Knex instance
-   * @param {string} anchorFeatureType - Route anchor/result feature type
-   * @param {Knex.QueryBuilder | null} expressionFeatureIds - Subquery returning submission_feature_id
-   *   matches for the expression tree, or null when no expression tree was provided.
-   * @param {number | null} [systemUserId] - Security context
+   * @param {string | null} anchorFeatureType - Route anchor/result feature type
+   * @param {Knex.QueryBuilder} featureIds - Paginated subquery returning matching submission_feature_id values.
+   * @param {SearchFeatureQueryOptions} queryOptions - Applied cursor pagination and sort options
    * @return {Knex.QueryBuilder} Knex query builder with security filter applied
    */
   private buildExpressionTreeSearchQuery(
     knex: Knex,
-    anchorFeatureType: string,
-    expressionFeatureIds: Knex.QueryBuilder | null,
-    systemUserId?: number | null
+    anchorFeatureType: string | null,
+    featureIds: Knex.QueryBuilder,
+    queryOptions: SearchFeatureQueryOptions
   ): Knex.QueryBuilder {
-    const expressionResults = knex('submission_feature as sf')
+    const authorizedFeatures = knex
+      .from(featureIds.clone().as('expression_matches'))
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'expression_matches.submission_feature_id');
+
+    authorizedFeatures
       .select(
         'sf.submission_feature_id',
+        'sf.parent_submission_feature_id',
         'sf.submission_id',
         knex.raw('sf.uuid::text as uuid'),
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw(`COALESCE(typed_properties.properties, '{}'::jsonb) as properties`),
-        's.name as submission_name',
         'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
-      .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .joinRaw(this.buildTypedPropertiesLateralJoinSql())
-      .where('ft.name', anchorFeatureType)
-      .whereRaw(isSubmissionFeatureActive('sf'));
-
-    if (expressionFeatureIds) {
-      expressionResults.whereIn('sf.submission_feature_id', expressionFeatureIds);
-    }
+      .modify((query) => {
+        if (anchorFeatureType !== null) {
+          query.where('ft.name', anchorFeatureType);
+        }
+      })
+      .whereNull('ft.record_end_date');
 
     const finalQuery = knex
-      .from(expressionResults.as('expression_results'))
+      .from(authorizedFeatures.as('authorized_features'))
       .select(
-        'submission_feature_id',
-        'submission_id',
-        'uuid',
-        'feature_type_id',
-        'feature_type_name',
-        'properties',
-        'submission_name',
-        knex.raw(`${isEffectivelySecured('expression_results.submission_feature_id')} AS is_secured`),
-        'relevancy_score',
-        'create_date'
-      );
+        'authorized_features.submission_feature_id',
+        'authorized_features.parent_submission_feature_id',
+        knex.raw(`(SELECT CASE WHEN bool_or(sfs.submission_feature_id = authorized_features.submission_feature_id)
+          THEN 'direct' ELSE 'inherited' END
+          FROM submission_feature_closure c JOIN submission_feature_security sfs
+            ON sfs.submission_feature_id = c.target_submission_feature_id
+          WHERE c.source_submission_feature_id = authorized_features.submission_feature_id AND c.is_ancestor
+            AND sfs.record_effective_date <= now()
+            AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+          HAVING count(*) > 0) AS provenance`),
+        'authorized_features.submission_id',
+        'authorized_features.uuid',
+        'authorized_features.feature_type_id',
+        'authorized_features.feature_type_name',
+        knex.raw(`COALESCE(typed_properties.properties, '{}'::jsonb) as properties`),
+        's.name as submission_name',
+        knex.raw(`${isEffectivelySecured('authorized_features.submission_feature_id')} AS is_secured`),
+        'authorized_features.relevancy_score',
+        'authorized_features.create_date'
+      )
+      .join('submission as s', 'authorized_features.submission_id', 's.submission_id')
+      .joinRaw(this.buildTypedPropertiesLateralJoinSql());
 
-    if (systemUserId !== undefined) {
-      const securityFilter = buildSecurityFilter(knex, systemUserId, 'expression_results.submission_feature_id');
-
-      if (securityFilter) {
-        finalQuery.whereRaw(securityFilter);
-      }
-    }
+    this.applyExpressionSearchOrder(finalQuery, 'authorized_features', queryOptions);
 
     return finalQuery;
   }
@@ -390,65 +494,59 @@ export class SearchFeatureRepository extends BaseRepository {
           FROM (
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_string_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_string p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
              AND fpt.name = 'number'
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_number_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_number p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_boolean_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_boolean p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_timestamp_id AS ordinal,
               to_jsonb(
                 CASE
@@ -460,53 +558,47 @@ export class SearchFeatureRepository extends BaseRepository {
                 END
               ) AS value
             FROM submission_feature_property_timestamp p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_code_id AS ordinal,
               ${codePropertyValueJson('ccc', 'cs')} AS value
             FROM submission_feature_property_code p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
              AND ccc.record_end_date IS NULL
             JOIN contributor_codeset cs
               ON cs.contributor_codeset_id = ccc.contributor_codeset_id
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_taxon_id AS ordinal,
               ${taxonPropertyValueJson('t')} AS value
             FROM submission_feature_property_taxon p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
@@ -514,46 +606,42 @@ export class SearchFeatureRepository extends BaseRepository {
             JOIN taxon t
               ON t.taxon_id = p.taxon_id
              AND t.record_end_date IS NULL
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_geometry_id AS ordinal,
               public.ST_AsGeoJSON(p.value)::jsonb AS value
             FROM submission_feature_property_geometry p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
-            WHERE p.submission_feature_id = sf.submission_feature_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
 
             SELECT
               fp.name,
-              ftp.sort,
-              ftp.allow_multiple,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_feature_id AS ordinal,
               ${featureReferencePropertyValueJson('referenced_sf')} AS value
             FROM submission_feature_property_feature p
-            JOIN feature_type_property ftp
-              ON ftp.feature_type_property_id = p.feature_type_property_id
-             AND ftp.feature_type_id = sf.feature_type_id
-             AND ftp.record_end_date IS NULL
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
-              ON fp.feature_property_id = ftp.feature_property_id
+              ON fp.feature_property_id = bftp.feature_property_id
              AND fp.record_end_date IS NULL
             JOIN submission_feature referenced_sf
               ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-             AND ${isSubmissionFeatureActive('referenced_sf')}
-            WHERE p.submission_feature_id = sf.submission_feature_id
+             AND ${isSubmissionFeatureCurrent('referenced_sf')}
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
           ) AS property_values
           GROUP BY property_values.name
         ) AS grouped_properties
@@ -562,35 +650,86 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Applies SQL-side pagination for expression search results.
+   * Applies stable SQL-side ordering for expression search results.
    *
-   * The current public pagination model is page/limit based, so deep pages still use OFFSET. Keep ordering stable by
-   * always adding submission_feature_id as the deterministic order key/tie-breaker. A future cursor API can replace
-   * this with `submission_feature_id > :cursor ORDER BY submission_feature_id LIMIT :limit` without changing the
-   * expression evaluator boundary.
+   * @example
+   * Sorting by `create_date DESC` adds `submission_feature_id DESC` as a deterministic tie-breaker. Sorting directly by
+   * `submission_feature_id` adds no second order column because the primary key is already unique.
    *
-   * @param {Knex.QueryBuilder} query - Final expression search query
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
-   * @return {Knex.QueryBuilder} Query with stable SQL-side pagination applied
+   * @param {Knex.QueryBuilder} query - Search query
+   * @param {string} tableAlias - Table alias used to qualify sortable columns.
+   * @param {SearchFeatureQueryOptions} options - Cursor pagination and sort options
+   * @return {Knex.QueryBuilder} Query with stable ordering applied
    */
-  private applyExpressionSearchPagination(
+  private applyExpressionSearchOrder(
     query: Knex.QueryBuilder,
-    pagination?: ApiPaginationOptions
+    tableAlias: string,
+    options: SearchFeatureQueryOptions
   ): Knex.QueryBuilder {
-    if (pagination?.sort && pagination.order) {
-      query.orderBy(pagination.sort, pagination.order);
-    }
+    query.orderBy(`${tableAlias}.${options.sort}`, options.order);
 
-    query.orderBy('submission_feature_id', 'asc');
-
-    if (pagination?.limit) {
-      query.limit(pagination.limit);
-    }
-
-    if (pagination?.page && pagination.limit) {
-      query.offset((pagination.page - 1) * pagination.limit);
+    if (options.sort !== 'submission_feature_id') {
+      query.orderBy(`${tableAlias}.submission_feature_id`, options.order);
     }
 
     return query;
+  }
+
+  /**
+   * Resolves the supported database sort and order for a feature search.
+   *
+   * Relevance currently has no variable score, so it uses stable feature-ID
+   * ordering. Explicit ID and creation-date sorts retain their requested order.
+   *
+   * @example
+   * An omitted sort or `relevancy_score` returns `{ sort: 'submission_feature_id', order: 'asc' }`.
+   * `{ sort: 'create_date', order: 'desc' }` remains unchanged after validation.
+   *
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Requested cursor pagination and sorting
+   * @return {{ sort: SearchFeatureSort; order: 'asc' | 'desc' }} Validated database sort definition
+   */
+  private getExpressionSearchSort(cursorPagination?: ApiCursorPaginationOptions): {
+    sort: SearchFeatureSort;
+    order: 'asc' | 'desc';
+  } {
+    if (!cursorPagination?.sort || cursorPagination.sort === 'relevancy_score') {
+      return { sort: 'submission_feature_id', order: 'asc' };
+    }
+
+    const sort = SearchFeatureSort.safeParse(cursorPagination.sort);
+    if (!sort.success) {
+      throw new ApiValidationError('Unsupported search result sort field');
+    }
+
+    return {
+      sort: sort.data,
+      order: cursorPagination.order
+    };
+  }
+
+  /**
+   * Builds the normalized query options used to page the feature-ID subquery before hydration.
+   *
+   * The request boundary is already decoded and validated at the HTTP boundary. Only positional
+   * values needed by the active sort are used to resume the query.
+   *
+   * @example
+   * Input: `{ limit: 25, sort: 'create_date', order: 'desc', boundary }`
+   * Output: `{ limit: 25, sort: 'create_date', order: 'desc', boundary }`
+   *
+   * Relevancy sorting is resolved earlier to stable feature-ID ordering because expression search currently has no
+   * variable relevance score.
+   *
+   * @param {ApiCursorPaginationOptions} [cursorPagination] - Requested cursor pagination and sorting
+   * @return {SearchFeatureQueryOptions} Database sort, boundary, and optional page limit
+   */
+  private getExpressionSearchQueryOptions(cursorPagination?: ApiCursorPaginationOptions): SearchFeatureQueryOptions {
+    const sort = this.getExpressionSearchSort(cursorPagination);
+
+    return {
+      ...sort,
+      ...(cursorPagination?.boundary && { boundary: cursorPagination.boundary }),
+      ...(cursorPagination?.limit && { limit: cursorPagination.limit })
+    };
   }
 }

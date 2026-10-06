@@ -3,7 +3,7 @@
 //
 // The `_code` and `_taxon` value tables hold no production rows today (no feature_property is
 // declared with type=code or type=taxon yet). The corpus widening is forward-looking — these
-// tests insert into those value tables using any available feature_type_property_id; the
+// tests insert into those value tables using any available blueprint_feature_type_property_id; the
 // FK only checks the referenced row exists, not that its declared type matches the value
 // table, so this exercises the SQL path the schema is built to support.
 //
@@ -129,7 +129,7 @@ describe('SearchRepository (integration)', function () {
       const keyword = `${TOKEN}_stringbase`;
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Survey alpha' });
-      await addStringProperty(connection, featureId, 'survey', 'description', `moose habitat near ${keyword}`);
+      await addStringProperty(connection, featureId, 'description', `moose habitat near ${keyword}`);
 
       const result = await findFeatures(keyword);
 
@@ -147,7 +147,7 @@ describe('SearchRepository (integration)', function () {
       );
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST alpha' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -165,7 +165,7 @@ describe('SearchRepository (integration)', function () {
       );
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST beta' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -178,7 +178,7 @@ describe('SearchRepository (integration)', function () {
       const codeId = await createCodesetCode(connection, keyword, 'Friendly label', 'Friendly description');
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST keyonly' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -191,8 +191,8 @@ describe('SearchRepository (integration)', function () {
       const keyword = `${TOKEN}_taxon`;
       const taxonId = await createTaxon(connection, `Alces ${keyword}`, 'Moose');
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Bear-1' });
-      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
+      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Bear-1' });
+      await addTaxonProperty(connection, featureId, 'associated_species', taxonId);
 
       const result = await findFeatures(keyword);
 
@@ -204,8 +204,8 @@ describe('SearchRepository (integration)', function () {
       const tsn = 9_876_543;
       const taxonId = await createTaxon(connection, `Ursus ${TOKEN}`, 'Bear', tsn);
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Bear-2' });
-      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
+      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Bear-2' });
+      await addTaxonProperty(connection, featureId, 'associated_species', taxonId);
 
       const result = await findFeatures(String(tsn));
 
@@ -219,7 +219,7 @@ describe('SearchRepository (integration)', function () {
       await tombstoneCodesetCode(codeId);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dead' });
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -231,8 +231,8 @@ describe('SearchRepository (integration)', function () {
       const taxonId = await createTaxon(connection, `Vulpes ${keyword}`);
       await tombstoneTaxon(taxonId);
       const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: 'Fox-1' });
-      await addTaxonProperty(connection, featureId, 'animal', 'animal_identifier', taxonId);
+      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Fox-1' });
+      await addTaxonProperty(connection, featureId, 'associated_species', taxonId);
 
       const result = await findFeatures(keyword);
 
@@ -246,7 +246,7 @@ describe('SearchRepository (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       // `animal` features carry no `sf.data->>'name'` — label must fall back to the matched fragment.
       const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: identifier });
-      await addStringProperty(connection, featureId, 'animal', 'animal_identifier', identifier);
+      await addStringProperty(connection, featureId, 'animal_identifier', identifier);
 
       const result = await findFeatures(identifier);
 
@@ -262,8 +262,8 @@ describe('SearchRepository (integration)', function () {
       // dropdown should show.
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'study_area', { name: 'Salmon River' });
-      await addStringProperty(connection, featureId, 'study_area', 'name', `Salmon ${TOKEN} River`);
-      await addStringProperty(connection, featureId, 'study_area', 'description', 'unrelated description text');
+      await addStringProperty(connection, featureId, 'name', `Salmon ${TOKEN} River`);
+      await addStringProperty(connection, featureId, 'description', 'unrelated description text');
 
       const result = await findFeatures(`Salmon ${TOKEN}`);
 
@@ -277,7 +277,7 @@ describe('SearchRepository (integration)', function () {
       const keyword = `${TOKEN}_excluded`;
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'measurement', { measurement_type: 'mass' });
-      await addStringProperty(connection, featureId, 'measurement', 'description', `payload ${keyword}`);
+      await addStringProperty(connection, featureId, 'description', `payload ${keyword}`);
 
       const result = await findFeatures(keyword);
 
@@ -293,8 +293,8 @@ describe('SearchRepository (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dedup' });
       // Feature matches the keyword via _string AND via _code.
-      await addStringProperty(connection, featureId, 'sample_technique', 'description', `also ${keyword} text`);
-      await addCodeProperty(connection, featureId, 'sample_technique', 'description', codeId);
+      await addStringProperty(connection, featureId, 'description', `also ${keyword} text`);
+      await addCodeProperty(connection, featureId, 'attractant', codeId);
 
       const result = await findFeatures(keyword);
 
@@ -322,7 +322,7 @@ describe('SearchRepository (integration)', function () {
       const codeId = await createCodesetCode(connection, 'summarycode', `${keyword} Agency`, null);
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
-      await addCodeProperty(connection, featureId, 'survey', 'description', codeId);
+      await addCodeProperty(connection, featureId, 'collected_data', codeId);
 
       const summary = await repo.findFeatureSummary({ keyword });
       const records = await findFeatures(keyword);
@@ -339,7 +339,7 @@ describe('SearchRepository (integration)', function () {
       const featureId = await createTestFeature(connection, submissionId, 'measurement', {
         measurement_type: 'mass'
       });
-      await addStringProperty(connection, featureId, 'measurement', 'description', `${keyword} payload`);
+      await addStringProperty(connection, featureId, 'description', `${keyword} payload`);
 
       const summary = await repo.findFeatureSummary({ keyword });
 

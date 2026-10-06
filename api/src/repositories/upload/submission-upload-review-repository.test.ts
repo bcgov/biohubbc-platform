@@ -21,8 +21,10 @@ describe('SubmissionUploadReviewRepository', () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+      const result = await repository.insertSubmissionUploadReview(17, {
         submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        name: 'Access rules',
+        description: 'Review access rules',
         scope: SubmissionUploadReviewScope.SECURITY,
         status: SubmissionUploadReviewStatus.REQUESTED,
         requested_by: 7
@@ -39,8 +41,10 @@ describe('SubmissionUploadReviewRepository', () => {
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
       try {
-        await repository.insertSubmissionUploadReview('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+        await repository.insertSubmissionUploadReview(17, {
           submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+          name: 'Access rules',
+          description: 'Review access rules',
           scope: SubmissionUploadReviewScope.SECURITY,
           status: SubmissionUploadReviewStatus.REQUESTED,
           requested_by: 7
@@ -55,81 +59,23 @@ describe('SubmissionUploadReviewRepository', () => {
       expect(sqlStub.calledOnce).to.equal(true);
     });
 
-    it('soft deletes active review rows for a scope before a replacement insert', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [] } as QueryResult<SubmissionUploadReview>);
+    it('uses an append-only insert with no conflict or update clause', async () => {
+      const review = buildReview({ submission_upload_review_id: '11111111-1111-4111-8111-111111111111' });
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.softDeleteActiveSubmissionUploadReviewsByScope(
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        '550e8400-e29b-41d4-a716-446655440000',
-        SubmissionUploadReviewScope.SECURITY
-      );
+      await repository.insertSubmissionUploadReview(17, {
+        submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+        name: 'Access rules',
+        description: 'Review access rules',
+        scope: SubmissionUploadReviewScope.SECURITY,
+        status: SubmissionUploadReviewStatus.IN_PROGRESS,
+        requested_by: 7
+      });
 
-      expect(result).to.equal(1);
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('UPDATE submission_upload_review sur');
-      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date = now()');
-      expect(sqlStub.firstCall.args[0].text).to.contain('sur.scope =');
-      expect(sqlStub.firstCall.args[0].text).to.contain('sur.record_end_date IS NULL');
-    });
-  });
-
-  describe('insertDefaultSubmissionUploadReviews', () => {
-    it('inserts pending default review rows when a submission upload is created', async () => {
-      const reviews = [
-        buildReview({
-          submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
-          scope: SubmissionUploadReviewScope.VALIDATION,
-          status: SubmissionUploadReviewStatus.PENDING
-        }),
-        buildReview({
-          submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
-          scope: SubmissionUploadReviewScope.SECURITY,
-          status: SubmissionUploadReviewStatus.PENDING
-        })
-      ];
-      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: reviews } as QueryResult<SubmissionUploadReview>);
-      const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
-
-      const result = await repository.insertDefaultSubmissionUploadReviews(
-        99,
-        '550e8400-e29b-41d4-a716-446655440000',
-        7
-      );
-
-      expect(result).to.eql(reviews);
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain("'pending'::submission_upload_review_status");
       expect(sqlStub.firstCall.args[0].text).not.to.contain('ON CONFLICT');
-    });
-  });
-
-  describe('requestDefaultSubmissionUploadReviews', () => {
-    it('updates default review rows to requested when indexing succeeds', async () => {
-      const reviews = [
-        buildReview({
-          submission_upload_review_id: '11111111-1111-4111-8111-111111111111',
-          scope: SubmissionUploadReviewScope.VALIDATION
-        }),
-        buildReview({
-          submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
-          scope: SubmissionUploadReviewScope.SECURITY
-        })
-      ];
-      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: reviews } as QueryResult<SubmissionUploadReview>);
-      const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
-
-      const result = await repository.requestDefaultSubmissionUploadReviews(
-        99,
-        '550e8400-e29b-41d4-a716-446655440000',
-        7
-      );
-
-      expect(result).to.eql(reviews);
-      expect(sqlStub.calledOnce).to.equal(true);
-      expect(sqlStub.firstCall.args[0].text).to.contain('UPDATE submission_upload_review');
-      expect(sqlStub.firstCall.args[0].text).to.contain("AND sur.status = 'pending'");
-      expect(sqlStub.firstCall.args[0].text).to.contain("'requested'::submission_upload_review_status");
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('UPDATE submission_upload_review');
+      expect(sqlStub.firstCall.args[0].text).not.to.contain('SET record_end_date');
     });
   });
 
@@ -143,7 +89,7 @@ describe('SubmissionUploadReviewRepository', () => {
 
       try {
         await repository.updateSubmissionUploadReview(
-          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          17,
           '550e8400-e29b-41d4-a716-446655440000',
           '11111111-1111-4111-8111-111111111111',
           { status: SubmissionUploadReviewStatus.COMPLETED }
@@ -167,7 +113,7 @@ describe('SubmissionUploadReviewRepository', () => {
 
       try {
         await repository.deleteSubmissionUploadReview(
-          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          17,
           '550e8400-e29b-41d4-a716-446655440000',
           '11111111-1111-4111-8111-111111111111'
         );
@@ -188,6 +134,8 @@ const buildReview = (params: {
 }): SubmissionUploadReview => ({
   submission_upload_review_id: params.submission_upload_review_id,
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+  name: 'Access rules',
+  description: 'Review access rules',
   scope: params.scope ?? SubmissionUploadReviewScope.SECURITY,
   status: params.status ?? SubmissionUploadReviewStatus.REQUESTED,
   requested_by: 7

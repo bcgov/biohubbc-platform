@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { buildUrl } from 'utils/Utils';
-import { useQuery } from './useQuery';
+import { useUrlQueryParams } from './useUrlQueryParams';
 
 interface Redirect {
   redirectUri: string | undefined;
@@ -20,7 +20,7 @@ export default function useRedirect(fallbackUri: string): Redirect {
 }
 
 export function useRedirectUri(fallbackUri: string) {
-  const queryParams = useQuery();
+  const queryParams = useUrlQueryParams();
 
   const redirectUri = useMemo(
     () =>

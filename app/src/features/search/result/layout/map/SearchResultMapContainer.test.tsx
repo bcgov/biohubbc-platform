@@ -1,5 +1,7 @@
+import { BC_BASEMAP_LAYER_ID, BC_BASEMAP_SOURCE_ID } from 'components/map/bc-basemap-layers';
 import { MAP_FIT_MAX_ZOOM, MAP_FIT_PADDING, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import type { IMartinSession } from 'interfaces/useMartinApi.interface';
+import { useMemo } from 'react';
 import { act, cleanup, render, screen, waitFor } from 'test-helpers/test-utils';
 import { SearchResultMapContainer } from './SearchResultMapContainer';
 import { SEARCH_RESULTS_SOURCE_ID } from './map-layers';
@@ -12,7 +14,19 @@ const mocks = vi.hoisted(() => ({
   // so the recovery tests assert on when a remount happens, which render counts cannot show.
   slippyMapMounts: { count: 0 },
   easeTo: vi.fn(),
-  getZoom: vi.fn(() => 7)
+  getZoom: vi.fn(() => 7),
+  bcBasemap: {
+    mode: 'bc',
+    tileSources: {
+      'bc-basemap': { type: 'raster', tiles: ['bc-basemap://{z}/{x}/{y}?template=x'], tileSize: 256 }
+    },
+    layers: [
+      {
+        specification: { id: 'bc-basemap', type: 'raster', source: 'bc-basemap', paint: { 'raster-opacity': 1 } }
+      }
+    ],
+    onViewportChange: vi.fn()
+  } as Record<string, any>
 }));
 
 vi.mock('hooks/useApi', () => ({
@@ -22,9 +36,14 @@ vi.mock('hooks/useApi', () => ({
 vi.mock('hooks/useContext', () => ({
   useDialogContext: () => ({ setSnackbar: mocks.setSnackbar }),
   useConfigContext: () => ({
-    BASEMAP_URL: 'https://basemap.test/{z}/{y}/{x}',
-    BASEMAP_ATTRIBUTION: '© Province of British Columbia'
+    BASEMAP_URL: 'https://basemap.test/tile/{z}/{y}/{x}',
+    BASEMAP_ATTRIBUTION: '© Province of British Columbia',
+    BASEMAP_FALLBACK_STYLE_URL: 'https://style.test/bright'
   })
+}));
+
+vi.mock('components/map/useBcBasemap', () => ({
+  useBcBasemap: () => mocks.bcBasemap
 }));
 
 // SlippyMap is exercised by its own suite; here we only care what the search page hands it. The stub stands in for
@@ -59,6 +78,8 @@ vi.mock('components/map/SlippyMap', async () => {
   };
 });
 
+const DEFAULT_BC_BASEMAP = { ...mocks.bcBasemap };
+
 const buildSession = (overrides: Partial<IMartinSession> = {}): IMartinSession => ({
   token: 'token-1',
   token_type: 'Bearer',
@@ -67,7 +88,7 @@ const buildSession = (overrides: Partial<IMartinSession> = {}): IMartinSession =
   source: 'search',
   martin_context_id: 'ctx-1',
   martin_url_template: '/martin/search/{z}/{x}/{y}',
-  has_more_secured_features: false,
+  has_inaccessible_secured_features: false,
   ...overrides
 });
 
@@ -92,6 +113,7 @@ describe('SearchResultMapContainer', () => {
     mocks.slippyMapProps.length = 0;
     mocks.slippyMapMounts.count = 0;
     mocks.createMartinSession.mockReset();
+    mocks.bcBasemap = { ...DEFAULT_BC_BASEMAP, onViewportChange: mocks.bcBasemap.onViewportChange };
     mocks.setSnackbar.mockReset();
     vi.stubGlobal('location', { origin: 'https://biohub.test' });
   });
@@ -116,6 +138,49 @@ describe('SearchResultMapContainer', () => {
         'species_observation',
         expressionTree,
         expect.objectContaining({ signal: expect.anything() })
+      );
+    });
+
+    it('passes the submission scope when requesting a Martin session', async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+
+      renderContainer({ submissionIds: [42] });
+
+      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalled());
+      expect(mocks.createMartinSession).toHaveBeenCalledWith(
+        'species_observation',
+        null,
+        expect.objectContaining({ submissionIds: [42], signal: expect.anything() })
+      );
+    });
+
+    it('keeps a memoized submission session across renders and replaces it when its ID changes', async () => {
+      const ScopedMap = ({ submissionId }: { submissionId: number }) => {
+        const submissionIds = useMemo(() => [submissionId], [submissionId]);
+        return (
+          <SearchResultMapContainer
+            featureTypeName="species_observation"
+            expressionTree={null}
+            isActive
+            submissionIds={submissionIds}
+          />
+        );
+      };
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+      const { rerender } = render(<ScopedMap submissionId={42} />);
+      await screen.findByTestId('slippy-map-stub');
+
+      rerender(<ScopedMap submissionId={42} />);
+      await act(async () => {});
+      expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);
+      expect(mocks.slippyMapMounts.count).toBe(1);
+
+      rerender(<ScopedMap submissionId={44} />);
+      await waitFor(() => expect(mocks.createMartinSession).toHaveBeenCalledTimes(2));
+      expect(mocks.createMartinSession).toHaveBeenLastCalledWith(
+        'species_observation',
+        null,
+        expect.objectContaining({ submissionIds: [44] })
       );
     });
 
@@ -222,8 +287,51 @@ describe('SearchResultMapContainer', () => {
     });
   });
 
+  describe('basemaps', () => {
+    /** Render with a session and wait for the map. */
+    const renderReadyMap = async () => {
+      mocks.createMartinSession.mockResolvedValue(buildSession());
+
+      renderContainer();
+      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+    };
+
+    it('passes the fallback style url to the map', async () => {
+      await renderReadyMap();
+
+      expect(latestMapProps().mapStyle).toBe('https://style.test/bright');
+    });
+
+    it('draws the BC basemap beneath the search-result layers', async () => {
+      await renderReadyMap();
+
+      const { tileSources, layers } = latestMapProps();
+
+      expect(Object.keys(tileSources)).toEqual([BC_BASEMAP_SOURCE_ID, SEARCH_RESULTS_SOURCE_ID]);
+      expect(layers[0].specification.id).toBe(BC_BASEMAP_LAYER_ID);
+      expect(layers.slice(1).every((layer: any) => layer.specification.source === SEARCH_RESULTS_SOURCE_ID)).toBe(true);
+    });
+
+    it("hands the map's viewport to the basemap mode", async () => {
+      await renderReadyMap();
+
+      expect(latestMapProps().onViewportChange).toBe(mocks.bcBasemap.onViewportChange);
+    });
+
+    it('shows only the fallback style when no BC basemap is configured', async () => {
+      mocks.bcBasemap = { ...mocks.bcBasemap, tileSources: {}, layers: [] };
+
+      await renderReadyMap();
+
+      const { tileSources, layers } = latestMapProps();
+
+      expect(Object.keys(tileSources)).toEqual([SEARCH_RESULTS_SOURCE_ID]);
+      expect(layers.every((layer: any) => layer.specification.source === SEARCH_RESULTS_SOURCE_ID)).toBe(true);
+    });
+  });
+
   describe('token transport', () => {
-    it('attaches the token as an Authorization header once a session exists', async () => {
+    it('attaches the token only to Martin tile requests', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession({ token: 'token-abc' }));
 
       renderContainer();
@@ -231,14 +339,17 @@ describe('SearchResultMapContainer', () => {
 
       const { transformRequest } = latestMapProps();
 
-      expect(transformRequest('https://biohub.test/martin/search/5/5/11')).toEqual({
-        url: 'https://biohub.test/martin/search/5/5/11',
+      expect(transformRequest('https://biohub.test/martin/search/5/5/11?ctx=ctx-1')).toEqual({
+        url: 'https://biohub.test/martin/search/5/5/11?ctx=ctx-1',
         headers: { Authorization: 'Bearer token-abc' }
       });
 
-      expect(transformRequest('https://basemap.test/5/11/5')).toEqual({
-        url: 'https://basemap.test/5/11/5',
-        headers: { Authorization: 'Bearer token-abc' }
+      // The basemap providers get their requests as MapLibre built them: a credential for our origin never leaves it.
+      expect(transformRequest('https://style.test/planet/5/5/11.pbf')).toEqual({
+        url: 'https://style.test/planet/5/5/11.pbf'
+      });
+      expect(transformRequest('bc-basemap://11/323/700?template=x')).toEqual({
+        url: 'bc-basemap://11/323/700?template=x'
       });
     });
   });
@@ -465,7 +576,9 @@ describe('SearchResultMapContainer', () => {
       mocks.createMartinSession.mockResolvedValueOnce(buildSession({ token: 'token-1' }));
 
       renderContainer();
-      await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
+      // The stub counts a mount in a passive effect, which can run after the map is in the document; waiting on the
+      // count itself makes the baseline below the mount the assertions compare against.
+      await waitFor(() => expect(mocks.slippyMapMounts.count).toBe(1));
 
       let resolveMint: (session: IMartinSession) => void = () => undefined;
       mocks.createMartinSession.mockImplementationOnce(
@@ -506,14 +619,15 @@ describe('SearchResultMapContainer', () => {
       });
     });
 
-    it('ignores failures from the basemap source', async () => {
+    it('recovers only from the search-result source', async () => {
       mocks.createMartinSession.mockResolvedValue(buildSession());
 
       renderContainer();
       await waitFor(() => expect(screen.getByTestId('search-result-map')).toBeInTheDocument());
 
       await act(async () => {
-        latestMapProps().onSourceError('basemap');
+        latestMapProps().onSourceError('openmaptiles');
+        latestMapProps().onSourceError(BC_BASEMAP_SOURCE_ID);
       });
 
       expect(mocks.createMartinSession).toHaveBeenCalledTimes(1);

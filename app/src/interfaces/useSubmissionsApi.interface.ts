@@ -19,8 +19,24 @@ export type SubmissionRecord = {
   revision_count: number;
 };
 
-export type SubmissionRecordWithSecurity = SubmissionRecord & {
+export type SubmissionRecordWithSecurity = {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string | null;
+  publish_timestamp: string | null;
+  submitted_timestamp: string;
+  contributor_id: number;
+  name: string;
+  description: string;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
   security: SECURITY_APPLIED_STATUS;
+  contributor_name: string;
+  last_approved_upload_date: string | null;
+  feature_types: string[];
 };
 
 export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
@@ -90,13 +106,11 @@ export type SubmissionFeatureRecordWithTypeAndSecurity = {
   update_user: number | null;
   revision_count: number;
   feature_type_name: string;
-  feature_type_display_name: string;
   submission_feature_security_ids: number[];
 };
 
 export interface IGetSubmissionGroupedFeatureResponse {
   feature_type_name: string;
-  feature_type_display_name: string;
   features: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
 
@@ -141,6 +155,7 @@ export interface PresignedUploadUrlResponse {
 }
 
 export interface ICreateSubmission {
+  client_id?: string;
   bytes: number;
   name: string;
   description: string;

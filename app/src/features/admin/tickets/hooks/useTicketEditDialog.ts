@@ -1,9 +1,6 @@
-import { APIError } from 'hooks/api/useAxios';
-import { useApi } from 'hooks/useApi';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketExtended, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
-import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
+import { useUpdateTicketMutation } from './useUpdateTicketMutation';
 
 interface IUseTicketEditDialogProps {
   ticket: ITicketExtended;
@@ -12,66 +9,53 @@ interface IUseTicketEditDialogProps {
 /**
  * Edit ticket dialog state and save behavior.
  *
- * @param {IUseTicketEditDialogProps} props Hook props.
- * @return {*}
+ * @param {IUseTicketEditDialogProps} props The ticket as cached.
+ * @return {*} Dialog state, whether a save is running, and the dialog handlers.
  */
 export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
   const { ticket } = props;
-  const api = useApi();
-  const dialogContext = useDialogContext();
-  const { ticketId } = useTicketContext();
-  const { handleOptimisticTicketUpdate } = useOptimisticTicketHandlers({ ticket });
-
-  const [isSavingTicket, setIsSavingTicket] = useState(false);
+  const updateTicketMutation = useUpdateTicketMutation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
+  /**
+   * Opens the edit dialog.
+   *
+   * @return {void}
+   */
   const openEditDialog = () => setIsEditDialogOpen(true);
 
+  /**
+   * Closes the edit dialog.
+   *
+   * @return {void}
+   */
   const closeEditDialog = () => {
     setIsEditDialogOpen(false);
   };
 
-  const handleEditTicket = async (payload: IUpdateTicketRequest) => {
-    try {
-      setIsSavingTicket(true);
+  /**
+   * Saves the edit, sending the subject, description and priority, and the status only when it was edited. The dialog
+   * closes on success and stays open on failure, which the mutation reports.
+   *
+   * @param {IUpdateTicketRequest} payload The edited fields.
+   * @return {void}
+   */
+  const handleEditTicket = (payload: IUpdateTicketRequest) => {
+    const updatePayload: IUpdateTicketRequest = {
+      subject: payload.subject ?? ticket.subject,
+      description: payload.description === undefined ? ticket.description : payload.description,
+      priority: payload.priority ?? ticket.priority
+    };
 
-      const nextTicket = {
-        ...ticket,
-        subject: payload.subject ?? ticket.subject,
-        description: payload.description === undefined ? ticket.description : payload.description,
-        priority: payload.priority ?? ticket.priority,
-        status: payload.status ?? ticket.status
-      };
-
-      const updatePayload: IUpdateTicketRequest = {
-        subject: nextTicket.subject,
-        description: nextTicket.description,
-        priority: nextTicket.priority
-      };
-
-      if (payload.status !== undefined) {
-        updatePayload.status = nextTicket.status;
-      }
-
-      await handleOptimisticTicketUpdate({
-        buildOptimisticTicket: () => nextTicket,
-        handleUpdate: () => api.tickets.updateTicket(ticketId, updatePayload)
-      });
-
-      setIsEditDialogOpen(false);
-    } catch (caughtError) {
-      const apiError = caughtError as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsSavingTicket(false);
+    if (payload.status !== undefined) {
+      updatePayload.status = payload.status;
     }
+
+    updateTicketMutation.mutate(updatePayload, { onSuccess: () => setIsEditDialogOpen(false) });
   };
 
   return {
-    isSavingTicket,
+    isSavingTicket: updateTicketMutation.isPending,
     isEditDialogOpen,
     openEditDialog,
     closeEditDialog,

@@ -1,9 +1,14 @@
 import chai, { expect } from 'chai';
+import { RequestHandler } from 'express';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
+import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
+import { HTTP403 } from '../../errors/http-error';
+import { SystemUserExtended } from '../../models/system-user';
+import { authorizationDependencies } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/old-artifact-service';
 import * as path from './delete';
 
@@ -52,4 +57,30 @@ describe('delete artifact', () => {
       expect(dbConnectionObj.rollback).to.have.not.been.calledOnce;
     });
   });
+});
+
+describe('artifact deletion authorization', () => {
+  afterEach(() => sinon.restore());
+
+  for (const roleNames of [[], [SYSTEM_ROLE.SYSTEM_ADMIN], [SYSTEM_ROLE.DATA_ADMINISTRATOR]]) {
+    it(`restricts artifact deletion to administrator roles (${roleNames.join(',') || 'ordinary user'})`, async () => {
+      sinon.stub(authorizationDependencies, 'getAPIUserDBConnection').returns(getMockDBConnection());
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.keycloak_token = { sub: 'user' };
+      mockReq.system_user = { system_user_id: 5, role_names: roleNames } as SystemUserExtended;
+      let failure: unknown;
+      try {
+        await (path.POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      } catch (error_) {
+        failure = error_;
+      }
+      if (roleNames.length) {
+        expect(failure).to.be.undefined;
+        expect(mockNext).to.have.been.calledOnce;
+      } else {
+        expect(failure).to.be.instanceOf(HTTP403);
+        expect(mockNext).not.to.have.been.called;
+      }
+    });
+  }
 });

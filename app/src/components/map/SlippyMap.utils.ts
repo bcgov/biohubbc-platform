@@ -1,9 +1,9 @@
 import type { Feature } from 'geojson';
 import { isEqual, omit } from 'lodash-es';
-import type { StyleSpecification } from 'maplibre-gl';
+import type { Map as MapLibreMap, SourceSpecification, StyleSpecification } from 'maplibre-gl';
 import type { GeoJSONStoreFeatures } from 'terra-draw';
 import { v4, validate, version } from 'uuid';
-import type { ISlippyMapDrawControls, SlippyMapDrawMode } from './SlippyMap.interface';
+import type { ISlippyMapDrawControls, ISlippyMapTile, SlippyMapDrawMode } from './SlippyMap.interface';
 
 /**
  * Default `SlippyMap` style: a blank neutral background that makes no external network requests.
@@ -216,4 +216,97 @@ export const isDrawModeEnabled = (mode: string, drawControls?: ISlippyMapDrawCon
   }
 
   return Boolean(drawControls?.[DRAW_MODE_CONTROL_KEYS[mode as SlippyMapDrawMode]]);
+};
+
+/**
+ * Web Mercator X of a longitude, as a fraction of the world's width.
+ *
+ * @param {number} longitude
+ * @return {*}  {number}
+ */
+const mercatorXFromLongitude = (longitude: number): number => (180 + longitude) / 360;
+
+/**
+ * Web Mercator Y of a latitude, as a fraction of the world's height measured from the north.
+ *
+ * @param {number} latitude
+ * @return {*}  {number}
+ */
+const mercatorYFromLatitude = (latitude: number): number =>
+  (180 - (180 / Math.PI) * Math.log(Math.tan(Math.PI / 4 + (latitude * Math.PI) / 360))) / 360;
+
+/**
+ * Whether a tile intersects a source's `bounds`, by MapLibre's own rule: the bounds are clamped to the world and a
+ * tile that merely touches them counts. Matching that rule is what makes this agree with the tiles MapLibre actually
+ * requests from a bounded source.
+ *
+ * @param {{ z: number; x: number; y: number }} tile
+ * @param {[number, number, number, number]} [bounds] - `[west, south, east, north]`. Without bounds every tile counts.
+ * @return {*}  {boolean}
+ */
+export const isTileWithinBounds = (
+  tile: { z: number; x: number; y: number },
+  bounds?: [number, number, number, number]
+): boolean => {
+  if (!bounds) {
+    return true;
+  }
+
+  const west = Math.max(-180, bounds[0]);
+  const south = Math.max(-90, bounds[1]);
+  const east = Math.min(180, bounds[2]);
+  const north = Math.min(90, bounds[3]);
+  const worldSize = 2 ** tile.z;
+
+  const minX = Math.floor(mercatorXFromLongitude(west) * worldSize);
+  const maxX = Math.ceil(mercatorXFromLongitude(east) * worldSize);
+  const minY = Math.floor(mercatorYFromLatitude(north) * worldSize);
+  const maxY = Math.ceil(mercatorYFromLatitude(south) * worldSize);
+
+  return tile.x >= minX && tile.x < maxX && tile.y >= minY && tile.y < maxY;
+};
+
+/**
+ * The tiles a source needs at the map's current viewport, as MapLibre itself computes them.
+ *
+ * Raster sources round the tile zoom while vector sources floor it, and the tile size and zoom range are read from
+ * the specification rather than the live source: a source only learns its bounds once its own load completes, which
+ * need not have happened when the map reports its first viewport.
+ *
+ * @param {Pick<MapLibreMap, 'coveringTiles'>} map
+ * @param {SourceSpecification} [source] - The applied source's specification.
+ * @return {*}  {ISlippyMapTile[]} Empty for a source that is not tiled.
+ */
+export const coveringTilesForSource = (
+  map: Pick<MapLibreMap, 'coveringTiles'>,
+  source: SourceSpecification | undefined
+): ISlippyMapTile[] => {
+  if (!source || (source.type !== 'raster' && source.type !== 'raster-dem' && source.type !== 'vector')) {
+    return [];
+  }
+
+  const tileIds = map.coveringTiles({
+    tileSize: 'tileSize' in source && source.tileSize ? source.tileSize : 512,
+    minzoom: source.minzoom ?? 0,
+    maxzoom: source.maxzoom ?? 22,
+    roundZoom: source.type !== 'vector'
+  });
+
+  // Keyed by canonical tile: a world that repeats across the antimeridian yields the same tile more than once.
+  const tiles = new Map<string, ISlippyMapTile>();
+
+  for (const { canonical } of tileIds) {
+    const key = `${canonical.z}/${canonical.x}/${canonical.y}`;
+
+    if (!tiles.has(key)) {
+      tiles.set(key, {
+        z: canonical.z,
+        x: canonical.x,
+        y: canonical.y,
+        withinBounds: isTileWithinBounds(canonical, source.bounds)
+      });
+    }
+  }
+
+  return [...tiles.values()];
 };

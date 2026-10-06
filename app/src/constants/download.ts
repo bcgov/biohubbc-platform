@@ -1,5 +1,5 @@
 import { ChipProps } from '@mui/material';
-import { type DownloadRecord } from 'interfaces/useDownloadApi.interface';
+import { type DownloadRecord, type DownloadStatus } from 'interfaces/useDownloadApi.interface';
 import { type DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 
 type DownloadStatusChipProps = { color: ChipProps['color']; label: string };
@@ -14,7 +14,7 @@ export const DOWNLOAD_STATUS_CHIP_PROPS: Record<DownloadRecord['download_status'
 
 /**
  * Status-to-body-copy mapping shown beside the download status chip on the
- * public download page. `pending` and `processing` share copy because the
+ * download page. `pending` and `processing` share copy because the
  * distinction is internal to the worker; `ready` and `downloaded` share copy
  * because both mean the parquet is available.
  */
@@ -35,3 +35,17 @@ export const EXPORT_STATUS_CHIP_PROPS: Record<DownloadExportStatus, DownloadStat
   ready: { color: 'success', label: 'Ready' },
   failed: { color: 'error', label: 'Failed' }
 };
+
+export const DOWNLOAD_TABLE_STATUS_CHIP_COLORS: Record<
+  DownloadStatus | DownloadExportStatus,
+  DownloadStatusChipProps['color']
+> = {
+  pending: 'warning',
+  processing: 'info',
+  ready: 'success',
+  downloaded: 'default',
+  failed: 'error'
+};
+
+/** Downloads per page in the search results' Downloads sidebar. */
+export const DOWNLOAD_SIDEBAR_PAGE_SIZE = 10;

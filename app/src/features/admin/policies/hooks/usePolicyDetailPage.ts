@@ -1,39 +1,49 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { IPolicyExpressionFormValues } from 'features/admin/policies/components/PolicyExpressionForm';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, usePolicyContext } from 'hooks/useContext';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import {
   ICreatePolicyStatementRequest,
   IPolicyExpression,
-  IPolicyExpressionsResponse,
   IPolicyStatement,
   PolicyStatus
 } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
+import { keepPreviousDataWithin, refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
+import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
 import { PolicyDetailTab } from '../detail/header/PolicyHeader';
+import { usePolicyQuery } from './usePolicyQuery';
 
 /**
  * State and actions for the policy detail page.
+ *
+ * Saved changes refresh the policy from the server and invalidate its copies on other pages. Expression changes
+ * also refresh the paginated expressions table; no mutation reconstructs the policy in the cache.
  *
  * @returns Policy detail page state and handlers.
  */
 export const usePolicyDetailPage = () => {
   const api = useApi();
+  const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
-  const { policyId, policyDataLoader } = usePolicyContext();
+  const { policyId } = usePolicyContext();
+  const policyQuery = usePolicyQuery();
   const [activeTab, setActiveTab] = useState<PolicyDetailTab>('expressions');
   const [isCreateExpressionDialogOpen, setIsCreateExpressionDialogOpen] = useState(false);
   const [isCreateStatementDialogOpen, setIsCreateStatementDialogOpen] = useState(false);
   const [editingExpression, setEditingExpression] = useState<IPolicyExpression | null>(null);
   const [editingStatement, setEditingStatement] = useState<IPolicyStatement | null>(null);
-  const [isSavingExpression, setIsSavingExpression] = useState(false);
-  const [isSavingStatement, setIsSavingStatement] = useState(false);
-  const [isSavingPolicyStatus, setIsSavingPolicyStatus] = useState(false);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
-  const [isSavingPolicyDetails, setIsSavingPolicyDetails] = useState(false);
-  const policy = policyDataLoader.data;
+  const policy = policyQuery.data;
 
+  /**
+   * Shows a message in the shared snackbar.
+   *
+   * @param {string} snackbarMessage The message.
+   */
   const setSnackbar = (snackbarMessage: string) => {
     dialogContext.setSnackbar({
       open: true,
@@ -41,16 +51,163 @@ export const usePolicyDetailPage = () => {
     });
   };
 
+  /**
+   * Reports a failed change in the shared snackbar.
+   *
+   * @param {Error} error The failure.
+   */
   const setErrorSnackbar = (error: Error) => {
     setSnackbar(error.message);
   };
 
-  const expressions = useServerPaginatedDataGrid<IPolicyExpression, IPolicyExpressionsResponse>({
-    fetcher: (_search, pagination) => api.policies.getPolicyExpressions(policyId, pagination),
-    extractData: (response) => response.expressions,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'name', sort: 'asc' }
+  /**
+   * Refreshes the changed policy and the lists and timelines that show it.
+   *
+   * @param {string} changedPolicyId The policy captured when the mutation started.
+   * @returns {Promise<void>} Resolves after the visible policy has refreshed.
+   */
+  const refreshPolicy = (changedPolicyId: string): Promise<void> => {
+    void refreshChangedQueries(queryClient, changedQueryKeys.policyListings());
+    return queryClient.invalidateQueries({ queryKey: policyQueryKeys.detail(changedPolicyId) });
+  };
+
+  /**
+   * Refreshes all pages of a policy's expressions after an expression change.
+   *
+   * @param {string} changedPolicyId The policy captured when the mutation started.
+   * @returns {Promise<void>} Resolves after visible expression pages have refreshed.
+   */
+  const refreshExpressions = (changedPolicyId: string): Promise<void> =>
+    queryClient.invalidateQueries({ queryKey: policyQueryKeys.expressionsAll(changedPolicyId) });
+
+  const expressionsGrid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
+  const expressionsQuery = useQuery({
+    queryKey: policyQueryKeys.expressions(policyId, expressionsGrid.apiPagination),
+    queryFn: ({ signal }) => api.policies.getPolicyExpressions(policyId, expressionsGrid.apiPagination, { signal }),
+    placeholderData: keepPreviousDataWithin(policyQueryKeys.expressionsAll(policyId))
   });
+  const expressions = {
+    grid: expressionsGrid,
+    rows: expressionsQuery.data?.expressions ?? [],
+    rowCount: expressionsQuery.data?.pagination.total ?? 0
+  };
+
+  const createStatementMutation = useMutation({
+    mutationFn: (values: ICreatePolicyStatementRequest) => api.policies.createPolicyStatement(policyId, values),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      setIsCreateStatementDialogOpen(false);
+      setSnackbar('Created statement');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const editStatementMutation = useMutation({
+    mutationFn: ({ statementId, values }: { statementId: string; values: ICreatePolicyStatementRequest }) =>
+      api.policies.updatePolicyStatement(policyId, statementId, values),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      setEditingStatement(null);
+      setSnackbar('Updated statement');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const deleteStatementMutation = useMutation({
+    mutationFn: (statementId: string) => api.policies.deletePolicyStatement(policyId, statementId),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      setSnackbar('Deleted statement');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const createExpressionMutation = useMutation({
+    mutationFn: (values: IPolicyExpressionFormValues & { expression: IPolicyExpression['expression'] }) =>
+      api.policies.createPolicyExpression(policyId, {
+        name: values.name,
+        description: values.description || undefined,
+        expression: values.expression
+      }),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      await refreshExpressions(changedPolicyId);
+      setIsCreateExpressionDialogOpen(false);
+      setSnackbar('Created expression');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const editExpressionMutation = useMutation({
+    mutationFn: ({
+      expressionId,
+      values
+    }: {
+      expressionId: string;
+      values: IPolicyExpressionFormValues & { expression: IPolicyExpression['expression'] };
+    }) =>
+      api.policies.updatePolicyExpression(policyId, expressionId, {
+        name: values.name,
+        description: values.description || undefined,
+        expression: values.expression
+      }),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      await refreshExpressions(changedPolicyId);
+      setEditingExpression(null);
+      setSnackbar('Updated expression');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const deleteExpressionMutation = useMutation({
+    mutationFn: (expressionId: string) => api.policies.deletePolicyExpression(policyId, expressionId),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      await refreshExpressions(changedPolicyId);
+      setSnackbar('Deleted expression');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: (status: PolicyStatus) => api.policies.updatePolicyStatus(policyId, { status }),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      setSnackbar('Updated policy status');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const updateDetailsMutation = useMutation({
+    mutationFn: (values: IPolicyFormValues) =>
+      api.policies.updatePolicy(policyId, {
+        name: values.name,
+        description: values.description || undefined,
+        status: values.status
+      }),
+    onMutate: () => policyId,
+    onSuccess: async (_data, _variables, changedPolicyId) => {
+      await refreshPolicy(changedPolicyId);
+      setIsEditPolicyDialogOpen(false);
+      setSnackbar('Updated policy');
+    },
+    onError: setErrorSnackbar
+  });
+
+  const isSavingExpression =
+    createExpressionMutation.isPending || editExpressionMutation.isPending || deleteExpressionMutation.isPending;
+  const isSavingStatement =
+    createStatementMutation.isPending || editStatementMutation.isPending || deleteStatementMutation.isPending;
+  const isSavingPolicyStatus = updateStatusMutation.isPending;
+  const isSavingPolicyDetails = updateDetailsMutation.isPending;
 
   /**
    * Opens the create expression dialog from the expressions tab toolbar.
@@ -120,27 +277,12 @@ export const usePolicyDetailPage = () => {
    *
    * @param values - Statement request submitted by the statement dialog.
    */
-  const handleCreateStatement = async (values: ICreatePolicyStatementRequest) => {
+  const handleCreateStatement = (values: ICreatePolicyStatementRequest) => {
     if (!policy) {
       return;
     }
 
-    try {
-      setIsSavingStatement(true);
-
-      const createdStatement = await api.policies.createPolicyStatement(policy.policy_id, values);
-
-      policyDataLoader.setData({
-        ...policy,
-        statements: [...policy.statements, createdStatement]
-      });
-      setIsCreateStatementDialogOpen(false);
-      setSnackbar('Created statement');
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingStatement(false);
-    }
+    createStatementMutation.mutate(values);
   };
 
   /**
@@ -148,32 +290,12 @@ export const usePolicyDetailPage = () => {
    *
    * @param values - Expression form values submitted by the expression dialog.
    */
-  const handleCreateExpression = async (values: IPolicyExpressionFormValues) => {
+  const handleCreateExpression = (values: IPolicyExpressionFormValues) => {
     if (!policy || !values.expression) {
       return;
     }
 
-    try {
-      setIsSavingExpression(true);
-
-      const createdExpression = await api.policies.createPolicyExpression(policy.policy_id, {
-        name: values.name,
-        description: values.description || undefined,
-        expression: values.expression
-      });
-
-      policyDataLoader.setData({
-        ...policy,
-        expressions: [...policy.expressions, createdExpression]
-      });
-      expressions.refresh();
-      setIsCreateExpressionDialogOpen(false);
-      setSnackbar('Created expression');
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingExpression(false);
-    }
+    createExpressionMutation.mutate({ ...values, expression: values.expression });
   };
 
   /**
@@ -181,38 +303,15 @@ export const usePolicyDetailPage = () => {
    *
    * @param values - Updated expression form values submitted by the expression dialog.
    */
-  const handleEditExpression = async (values: IPolicyExpressionFormValues) => {
+  const handleEditExpression = (values: IPolicyExpressionFormValues) => {
     if (!policy || !editingExpression || !values.expression) {
       return;
     }
 
-    try {
-      setIsSavingExpression(true);
-
-      const updatedExpression = await api.policies.updatePolicyExpression(
-        policy.policy_id,
-        editingExpression.policy_expression_id,
-        {
-          name: values.name,
-          description: values.description || undefined,
-          expression: values.expression
-        }
-      );
-
-      policyDataLoader.setData({
-        ...policy,
-        expressions: policy.expressions.map((expression) =>
-          expression.policy_expression_id === updatedExpression.policy_expression_id ? updatedExpression : expression
-        )
-      });
-      expressions.refresh();
-      setEditingExpression(null);
-      setSnackbar('Updated expression');
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingExpression(false);
-    }
+    editExpressionMutation.mutate({
+      expressionId: editingExpression.policy_expression_id,
+      values: { ...values, expression: values.expression }
+    });
   };
 
   /**
@@ -237,26 +336,9 @@ export const usePolicyDetailPage = () => {
       onClose: () => {
         dialogContext.setYesNoDialog({ open: false });
       },
-      onYes: async () => {
+      onYes: () => {
         dialogContext.setYesNoDialog({ open: false });
-
-        try {
-          setIsSavingExpression(true);
-
-          await api.policies.deletePolicyExpression(policy.policy_id, expression.policy_expression_id);
-          policyDataLoader.setData({
-            ...policy,
-            expressions: policy.expressions.filter(
-              (policyExpression) => policyExpression.policy_expression_id !== expression.policy_expression_id
-            )
-          });
-          expressions.refresh();
-          setSnackbar('Deleted expression');
-        } catch (error) {
-          setErrorSnackbar(error as Error);
-        } finally {
-          setIsSavingExpression(false);
-        }
+        deleteExpressionMutation.mutate(expression.policy_expression_id);
       }
     });
   };
@@ -266,33 +348,12 @@ export const usePolicyDetailPage = () => {
    *
    * @param values - Statement request submitted by the statement dialog.
    */
-  const handleEditStatement = async (values: ICreatePolicyStatementRequest) => {
+  const handleEditStatement = (values: ICreatePolicyStatementRequest) => {
     if (!policy || !editingStatement) {
       return;
     }
 
-    try {
-      setIsSavingStatement(true);
-
-      const updatedStatement = await api.policies.updatePolicyStatement(
-        policy.policy_id,
-        editingStatement.policy_statement_id,
-        values
-      );
-
-      policyDataLoader.setData({
-        ...policy,
-        statements: policy.statements.map((statement) =>
-          statement.policy_statement_id === updatedStatement.policy_statement_id ? updatedStatement : statement
-        )
-      });
-      setEditingStatement(null);
-      setSnackbar('Updated statement');
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingStatement(false);
-    }
+    editStatementMutation.mutate({ statementId: editingStatement.policy_statement_id, values });
   };
 
   /**
@@ -317,25 +378,9 @@ export const usePolicyDetailPage = () => {
       onClose: () => {
         dialogContext.setYesNoDialog({ open: false });
       },
-      onYes: async () => {
+      onYes: () => {
         dialogContext.setYesNoDialog({ open: false });
-
-        try {
-          setIsSavingStatement(true);
-
-          await api.policies.deletePolicyStatement(policy.policy_id, statement.policy_statement_id);
-          policyDataLoader.setData({
-            ...policy,
-            statements: policy.statements.filter(
-              (policyStatement) => policyStatement.policy_statement_id !== statement.policy_statement_id
-            )
-          });
-          setSnackbar('Deleted statement');
-        } catch (error) {
-          setErrorSnackbar(error as Error);
-        } finally {
-          setIsSavingStatement(false);
-        }
+        deleteStatementMutation.mutate(statement.policy_statement_id);
       }
     });
   };
@@ -345,29 +390,12 @@ export const usePolicyDetailPage = () => {
    *
    * @param nextStatus - Selected status value from the dropdown.
    */
-  const handlePolicyStatusChange = async (nextStatus: string) => {
+  const handlePolicyStatusChange = (nextStatus: string) => {
     if (!policy || nextStatus === policy.status) {
       return;
     }
 
-    try {
-      setIsSavingPolicyStatus(true);
-
-      const updatedPolicy = await api.policies.updatePolicyStatus(policy.policy_id, {
-        status: nextStatus as PolicyStatus
-      });
-
-      policyDataLoader.setData({
-        ...policy,
-        status: updatedPolicy.status
-      });
-
-      setSnackbar('Updated policy status');
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingPolicyStatus(false);
-    }
+    updateStatusMutation.mutate(nextStatus as PolicyStatus);
   };
 
   /**
@@ -386,31 +414,12 @@ export const usePolicyDetailPage = () => {
    *
    * @param values - Policy metadata submitted by the edit policy dialog.
    */
-  const handleSavePolicyDetails = async (values: IPolicyFormValues) => {
+  const handleSavePolicyDetails = (values: IPolicyFormValues) => {
     if (!policy) {
       return;
     }
 
-    try {
-      setIsSavingPolicyDetails(true);
-
-      const updatedPolicy = await api.policies.updatePolicy(policy.policy_id, {
-        name: values.name,
-        description: values.description || undefined,
-        status: values.status
-      });
-
-      policyDataLoader.setData({
-        ...policy,
-        ...updatedPolicy
-      });
-      setIsEditPolicyDialogOpen(false);
-      setSnackbar('Updated policy');
-    } catch (error) {
-      setErrorSnackbar(error as Error);
-    } finally {
-      setIsSavingPolicyDetails(false);
-    }
+    updateDetailsMutation.mutate(values);
   };
 
   return {
@@ -426,7 +435,7 @@ export const usePolicyDetailPage = () => {
     isSavingPolicyStatus,
     isSavingStatement,
     policy,
-    policyDataLoader,
+    isLoadingPolicy: policyQuery.isLoading,
     handleCloseExpressionDialog,
     handleClosePolicyDialog,
     handleCloseStatementDialog,

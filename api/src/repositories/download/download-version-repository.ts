@@ -1,8 +1,10 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -142,7 +144,7 @@ export class DownloadVersionRepository extends BaseRepository {
    * @return {Promise<DownloadArtifactInfo[]>}
    * @memberof DownloadVersionRepository
    */
-  async listDownloadVersionArtifactsByDownloadVersionId(downloadVersionId: string): Promise<DownloadArtifactInfo[]> {
+  async listDownloadVersionArtifacts(downloadVersionId: string): Promise<DownloadArtifactInfo[]> {
     const sql = SQL`
       SELECT
         a.artifact_id,
@@ -158,76 +160,27 @@ export class DownloadVersionRepository extends BaseRepository {
   }
 
   /**
-   * Get a download version record by ID.
+   * Find a download version by ID.
    *
-   * `find*` returns null on missing (codebase convention — companion to
-   * `getDownloadVersionById`).
-   *
-   * @param {string} downloadVersionId - The download version ID.
-   * @return {Promise<DownloadVersionRecord | null>}
-   * @memberof DownloadVersionRepository
-   */
-  async findDownloadVersionById(downloadVersionId: string): Promise<DownloadVersionRecord | null> {
-    const sql = SQL`
-      SELECT
-        download_version_id,
-        download_id
-      FROM download_version
-      WHERE download_version_id = ${downloadVersionId}
-        AND record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql, DownloadVersionRecord);
-
-    return response.rows[0] ?? null;
-  }
-
-  /**
-   * Get a download version record by ID, throwing if not found.
-   *
-   * Used by the worker to resolve the owning `download_id` from a version.
+   * Returns the complete lifecycle record so all repository consumers share one canonical version
+   * representation. Following the repository `find*` convention, a missing active row returns null.
    *
    * @param {string} downloadVersionId - The download version ID.
-   * @return {Promise<DownloadVersionRecord>}
-   * @throws {ApiNotFoundError} when no version matches the given ID.
+   * @return {Promise<DownloadVersionStatusRecord | null>} The matching version, or null when absent.
    * @memberof DownloadVersionRepository
    */
-  async getDownloadVersionById(downloadVersionId: string): Promise<DownloadVersionRecord> {
-    const record = await this.findDownloadVersionById(downloadVersionId);
-
-    if (!record) {
-      throw new ApiNotFoundError('Download version not found', [
-        'DownloadVersionRepository->getDownloadVersionById',
-        `no download_version with id ${downloadVersionId}`
-      ]);
-    }
-
-    return record;
-  }
-
-  /**
-   * Get a download version's full materialization-lifecycle status row by ID, throwing if not found.
-   *
-   * Wider SELECT than `getDownloadVersionById` — surfaces status/timing/error so callers (the worker's
-   * status guards, the export ready-gate, the publisher's duplicate gate) judge a version's lifecycle
-   * directly off the version row that owns it, with no `download`-side indirection. The not-found throw is
-   * the codebase get* convention; all status/ownership/duplicate decisions stay in the calling services.
-   *
-   * @param {string} downloadVersionId - The download version ID.
-   * @return {Promise<DownloadVersionStatusRecord>}
-   * @throws {ApiNotFoundError} when no version matches the given ID.
-   * @memberof DownloadVersionRepository
-   */
-  async getDownloadVersionStatusById(downloadVersionId: string): Promise<DownloadVersionStatusRecord> {
+  async findDownloadVersion(downloadVersionId: string): Promise<DownloadVersionStatusRecord | null> {
     const sql = SQL`
       SELECT
         download_version_id,
         download_id,
         status,
+        feature_count,
         started_at,
         completed_at,
         materialized_at,
-        error_message
+        error_message,
+        create_date
       FROM download_version
       WHERE download_version_id = ${downloadVersionId}
         AND record_end_date IS NULL;
@@ -235,15 +188,91 @@ export class DownloadVersionRepository extends BaseRepository {
 
     const response = await this.connection.sql(sql, DownloadVersionStatusRecord);
 
-    const record = response.rows[0] ?? null;
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get a download version record by ID, throwing if not found.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionStatusRecord>} The complete download version lifecycle record.
+   * @throws {ApiNotFoundError} when no version matches the given ID.
+   * @memberof DownloadVersionRepository
+   */
+  async getDownloadVersion(downloadVersionId: string): Promise<DownloadVersionStatusRecord> {
+    const record = await this.findDownloadVersion(downloadVersionId);
 
     if (!record) {
       throw new ApiNotFoundError('Download version not found', [
-        'DownloadVersionRepository->getDownloadVersionStatusById',
+        'DownloadVersionRepository->getDownloadVersion',
         `no download_version with id ${downloadVersionId}`
       ]);
     }
 
     return record;
+  }
+
+  /**
+   * List download versions for a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
+   * @return {Promise<DownloadVersionStatusRecord[]>}
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersions(
+    downloadId: string,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadVersionStatusRecord[]> {
+    const knex = getKnex();
+
+    const query = knex
+      .select([
+        'download_version_id',
+        'download_id',
+        'status',
+        'feature_count',
+        'started_at',
+        'completed_at',
+        'materialized_at',
+        'error_message',
+        'create_date'
+      ])
+      .from('download_version')
+      .where('download_id', downloadId)
+      .whereNull('record_end_date');
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    if (!pagination?.sort) {
+      query.orderBy('create_date', 'desc').orderBy('download_version_id', 'desc');
+    }
+
+    const response = await this.connection.knex(query, DownloadVersionStatusRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Count download versions for a download.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @return {Promise<number>}
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersionsCount(downloadId: string): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex
+      .table('download_version')
+      .where('download_id', downloadId)
+      .whereNull('record_end_date')
+      .select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
   }
 }

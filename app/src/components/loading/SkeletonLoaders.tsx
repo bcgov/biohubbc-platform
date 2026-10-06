@@ -91,7 +91,7 @@ const SkeletonRow = (skeletonProps: ISingleSkeletonProps) => (
       height: '56px',
       overflow: 'hidden',
       borderBottom: '1px solid ' + grey[300],
-      '& .MuiSkeleton-root:not(:first-of-type)': {
+      '& .MuiSkeleton-root': {
         flex: '1 1 auto'
       },
       '& *': {
