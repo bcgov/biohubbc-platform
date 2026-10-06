@@ -47,7 +47,7 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
             <Typography component="h3" fontWeight={700} sx={{ overflowWrap: 'anywhere' }}>
               <Link
                 component={RouterLink}
-                to={`/admin/submissions/${upload.submission_id}`}
+                to={`/admin/submissions/${upload.submission_id}/uploads/${upload.submission_upload_id}`}
                 underline="always"
                 sx={{
                   display: 'inline-flex',
