@@ -3,6 +3,7 @@ import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import {
+  AdminSubmissionUploadsResponse,
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
@@ -20,6 +21,7 @@ import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { getLogger } from '../../utils/logger';
+import { makePaginationResponse } from '../../utils/pagination';
 import { getSupersededProcessingStatuses } from '../../utils/submission-upload-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
@@ -73,6 +75,23 @@ export class SubmissionUploadService extends DBService {
     this.teamService = new TeamService(connection);
     this.submissionService = new SubmissionService(connection);
     this.submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
+  }
+
+  /**
+   * Retrieve a bounded page of active uploads for the administrative submission view.
+   *
+   * @param {number} submissionId Submission whose uploads are listed.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<AdminSubmissionUploadsResponse>} Uploads and pagination totals, including empty pages.
+   */
+  async listAdminSubmissionUploads(
+    submissionId: number,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUploadsResponse> {
+    const uploads = await this.submissionUploadRepository.listAdminSubmissionUploads(submissionId, pagination);
+    const total = await this.submissionUploadRepository.countAdminSubmissionUploads(submissionId);
+
+    return { uploads, pagination: makePaginationResponse(total, pagination) };
   }
 
   /**
