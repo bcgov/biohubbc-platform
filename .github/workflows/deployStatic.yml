@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  OC_VERSION: "4.16.60"
+  OC_VERSION: '4.16.60'
   OC_CACHE_DIR: ~/.cache/oc
 
 jobs:
@@ -77,7 +77,7 @@ jobs:
     env:
       IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
       BRANCH: ${{ github.base_ref || github.ref_name }}
-      APP_NAME: "biohub-platform-app"
+      APP_NAME: 'biohub-platform-app'
     needs:
       - checkoutRepo
     steps:
@@ -128,7 +128,7 @@ jobs:
     env:
       IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
       BRANCH: ${{ github.base_ref || github.ref_name }}
-      APP_NAME: "biohub-platform-db"
+      APP_NAME: 'biohub-platform-db'
     needs:
       - checkoutRepo
     steps:
@@ -179,7 +179,7 @@ jobs:
     env:
       IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
       BRANCH: ${{ github.base_ref || github.ref_name }}
-      APP_NAME: "biohub-platform-db-setup"
+      APP_NAME: 'biohub-platform-db-setup'
     needs:
       - checkoutRepo
     steps:
@@ -230,7 +230,7 @@ jobs:
     env:
       IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
       BRANCH: ${{ github.base_ref || github.ref_name }}
-      APP_NAME: "biohub-platform-api"
+      APP_NAME: 'biohub-platform-api'
     needs:
       - checkoutRepo
     steps:
@@ -280,7 +280,7 @@ jobs:
     env:
       IMAGE_TAG: build-1.0.0-${{ needs.checkoutRepo.outputs.timestamp }}-${{ github.base_ref || github.ref_name }}
       BRANCH: ${{ github.base_ref || github.ref_name }}
-      APP_NAME: "biohub-platform-martin-gateway"
+      APP_NAME: 'biohub-platform-martin-gateway'
     needs:
       - checkoutRepo
     steps:
@@ -357,17 +357,17 @@ jobs:
         with:
           oc-version: ${{ env.OC_VERSION }}
           cache-dir: ${{ env.OC_CACHE_DIR }}
-          login: "true"
+          login: 'true'
           namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-${{ env.BRANCH }}
 
       # Deploy the Helm chart
       - name: Deploy Helm Chart
         run: |
           echo "Deploying Helm chart for branch $BRANCH"
-          
+
           # Generate a timestamp (unix seconds) for env.ts
           TS=$(date +%s)
-          
+
           # Update Helm dependencies
           echo "Updating Helm dependencies..."
           helm dependency update ./infrastructure/biohub-platform
@@ -396,6 +396,7 @@ jobs:
             --set-string biohub-platform-db.app.postgresDb=${{ secrets.DATABASE_NAME }} \
             --set-string biohub-platform-db-setup.environment.ts=$TS \
             --set-string biohub-platform-db-setup.environment.changeId=$BUILD_TAG \
+            --set-string biohub-platform-cronjobs.image.tag="build-1.0.0-${BUILD_TAG}-${BRANCH}" \
             --set-string biohub-platform-api.environment.ts=$TS \
             --set-string biohub-platform-api.environment.changeId=$BUILD_TAG \
             --set-string biohub-platform-queue.environment.ts=$TS \
@@ -403,7 +404,7 @@ jobs:
             --set-string biohub-platform-martin.environment.ts=$TS \
             --set-string biohub-platform-martin.environment.changeId=$BUILD_TAG \
             --wait --timeout=600s
-          
+
           echo "Helm chart deployment completed for branch $BRANCH"
 
   # Prune old image tags for this environment (keep 3 most recent by date)
@@ -429,7 +430,7 @@ jobs:
         with:
           oc-version: ${{ env.OC_VERSION }}
           cache-dir: ${{ env.OC_CACHE_DIR }}
-          login: "true"
+          login: 'true'
 
       - name: Prune old environment image tags
         run: |

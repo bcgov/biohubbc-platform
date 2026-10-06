@@ -28,45 +28,48 @@ spec:
           restartPolicy: Never
           containers:
             - name: refresh-materialized-views
-              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              image: "{{ .Values.image.repository }}:{{ required "Set image.tag to the database setup build tag" .Values.image.tag }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               env:
-                - name: PGHOST
-                  value: {{ .Values.database.host | quote }}
-                - name: PGPORT
+                - name: DB_HOST
+                  value: {{ required "Set database.host in the environment values" .Values.database.host | quote }}
+                - name: DB_PORT
                   value: {{ .Values.database.port | quote }}
-                - name: PGDATABASE
+                - name: DB_DATABASE
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.database.secretName }}
+                      name: {{ required "Set database.dbNameSecretName" .Values.database.dbNameSecretName }}
                       key: {{ .Values.database.secretKeys.database }}
-                - name: PGUSER
+                - name: DB_ADMIN
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.database.secretName }}
+                      name: {{ required "Set database.adminSecretName" .Values.database.adminSecretName }}
                       key: {{ .Values.database.secretKeys.username }}
-                - name: PGPASSWORD
+                - name: DB_ADMIN_PASS
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.database.secretName }}
+                      name: {{ required "Set database.adminSecretName" .Values.database.adminSecretName }}
                       key: {{ .Values.database.secretKeys.password }}
-              command:
-                - /bin/sh
-                - -ec
-              args:
-                - |
-                  echo "Starting materialized-view refresh at $(date -Iseconds)"
-
-                  psql \
-                    --no-psqlrc \
-                    --set=ON_ERROR_STOP=1 \
-                    --command='
-                  {{- range .Values.materializedViews }}
-                    REFRESH MATERIALIZED VIEW{{ if .concurrently }} CONCURRENTLY{{ end }} "{{ .schema }}"."{{ .name }}";
-                  {{- end }}
-                  '
-
-                  echo "Materialized-view refresh completed at $(date -Iseconds)"
+                {{- if .Values.database.tls.enabled }}
+                - name: PG_SSL_CA_PATH
+                  value: "/etc/pg-ssl/{{ .Values.database.tls.caSecretKey }}"
+                {{- end }}
+              command: ["npm", "run", "refresh-materialized-views"]
+              {{- if .Values.database.tls.enabled }}
+              volumeMounts:
+                - name: pg-root-ca
+                  mountPath: /etc/pg-ssl
+                  readOnly: true
+              {{- end }}
               resources:
                 {{- toYaml .Values.resources | nindent 16 }}
+          {{- if .Values.database.tls.enabled }}
+          volumes:
+            - name: pg-root-ca
+              secret:
+                secretName: {{ .Values.database.tls.caSecretName }}
+                items:
+                  - key: {{ .Values.database.tls.caSecretKey }}
+                    path: {{ .Values.database.tls.caSecretKey }}
+          {{- end }}
 {{- end }}

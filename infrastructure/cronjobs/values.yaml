@@ -1,128 +1,44 @@
-# Default values for database chart
-environment:
-  licensePlate: "a0ec71" # License plate of the project
-  name: "" # Environment name (dev, test, prod)
-  id: "" # Environment id (PR, deploy)
-  changeId: "" # Change id (PR number)
-  ts: "" # Timestamp of the deployment
+# Shared settings for the TypeScript materialized-view refresh job.
+# Supply an environment values file and the database setup image tag at deployment.
+nameOverride: ''
+fullnameOverride: ''
 
 image:
-  registry: "image-registry.openshift-image-registry.svc:5000" # The base image registry URL
-  image: af2668-tools/biohubbc-api # Always pull from tools namespace
+  repository: image-registry.openshift-image-registry.svc:5000/a0ec71-tools/biohub-platform-db-setup
+  tag: '' # Required when enabled: use the tag produced by the database setup build.
+  pullPolicy: Always
 
-# API configuration
-app:
-  name: biohubbc-api
-  nodeEnv: "" # NODE_ENV specification variable
-  nodeOptions: "" # NODE_OPTIONS specification variable
-  appHost: "" # APP host for application frontend
-  timezone: America/Vancouver # Application timezone
+cronjob:
+  enabled: true
+  schedule: '0 23 * * 0' # Sunday at 11 p.m.
+  timeZone: America/Vancouver
+  suspend: true # Enable only after the view migrations have been deployed.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  backoffLimit: 1
+  activeDeadlineSeconds: 7500 # Allows two sequential statements with one-hour timeouts.
 
-  # Clamav
-  clamav:
+database:
+  host: '' # Set by values-dev/test/prod.yaml.
+  port: 5432
+  adminSecretName: ''
+  dbNameSecretName: ''
+  secretKeys:
+    username: user
+    password: password
+    database: dbname
+  tls:
     enabled: true
-    host: clamav
-    port: 3310
-    
-  # BioHub Platform (aka: Backbone)
-  backboneInternalApiHost: "" # API host for BioHub Platform Backbone. Example "https://platform.com".
-  backbonePublicApiHost: ""
-  backboneSubmissionUploadPath: /api/submission # Base path: first-time = {path}/upload/archive, re-publish = {path}/{submission_uuid}/upload.
-  backboneUploadCompletePath: /api/upload # The multipart upload completion endpoint path for BioHub Platform submissions. Example "/api/path/to/upload".
-  biohubTaxonPath: /api/taxonomy/taxon # API path for BioHub Platform Backbone taxon endpoint. Example "/api/path/to/taxon"
-  biohubTaxonTsnPath: /api/taxonomy/taxon/tsn # API path for BioHub Platform Backbone taxon TSN endpoint. Example "/api/path/to/taxon/tsn"
-  
-  # Critterbase
-  critterbaseApiHost: "" # API host for the Critterbase service, SIMS API will hit this to retrieve critter metadata. Example "https://critterbase.com".
+    caSecretName: pgo-root-cacert
+    caSecretKey: root.crt
 
-  # Database
-  database:
-    secretName: biohubbc-db # Unused: legacy path uses hardcoded dbHost helper (biohubbc-db + app.suffix) for secret name
-    serviceName: "" # Unused: reserved for future use
-    port: 5432 # Database port
-    # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments (legacy dbHost secret).
-    useCrunchy: true
-    host: "" # e.g. "<release>-primary" (biohubbc-db-dev-primary for DEV); use primary not pgbouncer (biohub_api not in PgBouncer config)
-    appSecretName: "" # e.g. "<release>-pguser-biohub-api" (biohubbc-db-dev-pguser-biohub-api for DEV)
-    dbNameSecretName: "" # e.g. "<release>-pguser-<cluster-name>" (biohubbc-db-dev-pguser-biohubbc-db-dev for DEV)
-    adminSecretName: "" # e.g. "<release>-pguser-postgres" (biohubbc-db-dev-pguser-postgres for DEV)
-    # Secret keys default in templates: user/password/dbname (override in parent values if needed)
-    # PGO root CA for TLS verification (same secret name in all envs)
-    caSecretName: "pgo-root-cacert"
-    caSecretKey: "root.crt"
-
-  # Request limits
-  requestLimits:
-    bodySize: "52428800" # Maximum request body size in bytes
-    uploadNumFiles: "10" # Maximum number of files uploaded in a single request
-    uploadFileSize: "52428800" # Maximum upload file size in bytes
-    submissionUploadMaxSize: "1073741824" # Maximum file size for BioHub submission TAR files in bytes (1 GB)
-  
-  # Logging
-  logging:
-    level: "" # Log level for logs written to the console (console transport)
-    levelFile: "" # Log level for logs written to log files (file transport)
-    fileDir: data/logs # Directory where log files are stored
-    fileName: sims-api.log # Name of the log file
-    fileDatePattern: YYYY-MM-DD # Date pattern for log the files
-    fileMaxSize: 45m # Maximum size an individual log file can reach before a new file is created
-    fileMaxFiles: "" # Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
-  
-  # API Validation
-  apiResponseValidationEnabled: ""
-  databaseResponseValidationEnabled: ""
-  
-  # Feature flags
-  featureFlags: "" # Used to identify features that should be temporarily disabled/hidden. Must be a comma delimited list of keywords.
-
-  # GCNotify
-  gcnotify:
-    apiSecret: gcnotify-api-key # Secret for gcnotify api key
-    adminEmail: biohub@gov.bc.ca # admin email for gcnotify api
-    onboardingRequestEmailTemplate: 7779a104-b863-40ac-902f-1aa607d2071a # gcnotify email template id
-    onboardingRequestSmsTemplate: af2f1e40-bd72-4612-9c5a-567ee5b26ca5 # gcnotify sms template id
-    requestResubmitTemplate: c973da33-1f2b-435a-9429-d8ab4fd273c5 # gcnotify email resubmit template id
-    emailUrl: "https://api.notification.canada.ca/v2/notifications/email"
-    smsUrl: "https://api.notification.canada.ca/v2/notifications/sms" 
-
-  # Telemetry
-  telemetry:
-    schedule: 0 0 * * * # The schedule for the telemetry cronjob
-    disabled: "" # Boolean flag to disable the cronjob, only static deployments should run on schedule.
-    deviceLimit: "" # Limit the number of devices to process in the telemetry cronjob. Used for PR cronjob deployments.
-    secretKey: biohubbc-telemetry # The name of the Openshift Biohubbc telemetry secret
-
-  # Lotek
-  lotekApiHost: "https://webservice.lotek.com" # The host URL for Lotek webservice API
-
-  # Vectronic
-  vectronicApiHost: "https://api.vectronic-wildlife.com/v2" # The host URL for Vectronic webservice API
-
-# Openshift Resources
-replicas: ""
+# Initial resources for the Node client; PostgreSQL performs the refresh work.
 resources:
   requests:
-    cpu: ""
-    memory: ""
+    cpu: 50m
+    memory: 100Mi
   limits:
-    cpu: ""
-    memory: ""
-
-# Volume for logs and persistent data
-persistence:
-  enabled: true
-  size: "" # Volume space available for data, e.g. 512Mi, 2Gi.
-  storageClass: ""
-  accessMode: ReadWriteMany
-  mountPath: /opt/app-root/app/data
-
-# Service configuration
-service:
-  type: ClusterIP
-  name: 6100-tcp
-  port: 6100
-  targetPort: 6100
-
-# Route configuration (OpenShift)
-route:
-  host: ""
+    cpu: 1000m
+    memory: 1792Mi
