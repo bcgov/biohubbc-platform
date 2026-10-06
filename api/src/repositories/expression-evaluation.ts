@@ -102,8 +102,7 @@ export function buildBroadFeatureTypeSubquery(
         if (featureTypeName !== null) {
           query.where('ft.name', featureTypeName);
         }
-      })
-      .whereNull('ft.record_end_date');
+      });
 
     query = query.where('sf.feature_type_id', featureTypeName === null ? 'in' : '=', featureTypeId).whereRaw(
       `(
@@ -117,7 +116,6 @@ export function buildBroadFeatureTypeSubquery(
   } else {
     query = query
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .whereNull('ft.record_end_date')
       .modify((query) => {
         if (featureTypeName !== null) {
           query.where('ft.name', featureTypeName);
@@ -166,7 +164,6 @@ export function buildBroadFeatureTypeCountSubquery(
     .select('sf.submission_feature_id')
     .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
     .where('ft.name', featureTypeName)
-    .whereNull('ft.record_end_date')
     .whereRaw(isSubmissionFeatureCurrent('sf'))
     .whereNotExists(
       knex('denied').select(knex.raw('1')).whereRaw('denied.submission_feature_id = sf.submission_feature_id')
@@ -307,10 +304,7 @@ function buildPredicateAnchorIdsQuery(
   const operator = evidence.type === 'expression' ? evidence.operator : 'AND';
   const { tableName } = getPredicateTableConfig(property.internal_predicate);
   const anchorFeatureTypeId = () =>
-    knex('feature_type as count_ft')
-      .select('count_ft.feature_type_id')
-      .where('count_ft.name', anchorFeatureType)
-      .whereNull('count_ft.record_end_date');
+    knex('feature_type as count_ft').select('count_ft.feature_type_id').where('count_ft.name', anchorFeatureType);
   const closureSelfIsAvailable = (closureAlias: string, submissionFeatureId: string) =>
     knex.raw(`(
       SELECT true
@@ -455,8 +449,7 @@ function buildAndEqualityAnchorIdsQuery(
   const anchorFeatureTypeId = () =>
     knex('feature_type as grouped_count_ft')
       .select('grouped_count_ft.feature_type_id')
-      .where('grouped_count_ft.name', anchorFeatureType)
-      .whereNull('grouped_count_ft.record_end_date');
+      .where('grouped_count_ft.name', anchorFeatureType);
 
   const directRows = applyPropertyReferenceLifecycleFilters(
     knex(`${tableName} as p`)
@@ -653,7 +646,6 @@ function buildExpressionTargetIdsQuery(
             query.where('anchor_ft.name', anchorFeatureType);
           }
         })
-        .whereNull('anchor_ft.record_end_date')
     ).whereRaw(`(
       SELECT true
       FROM submission_feature_closure anchor_self

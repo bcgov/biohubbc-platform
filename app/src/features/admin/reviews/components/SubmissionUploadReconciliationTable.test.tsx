@@ -1,15 +1,36 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { render } from 'test-helpers/test-utils';
 import { SubmissionUploadReconciliationTable } from './SubmissionUploadReconciliationTable';
 
 describe('SubmissionUploadReconciliationTable', () => {
-  it('renders each reconciliation outcome count', () => {
-    render(<SubmissionUploadReconciliationTable counts={{ new: 4, unmodified: 7, modified: 2 }} />);
-
+  it('renders each outcome and navigates even when its count is zero', () => {
+    const onOutcomeClick = vi.fn();
+    render(
+      <SubmissionUploadReconciliationTable
+        counts={{ new: 0, unmodified: 7, modified: 2 }}
+        onOutcomeClick={onOutcomeClick}
+      />
+    );
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeVisible();
-    expect(screen.getByRole('grid')).toBeVisible();
-    expect(screen.getByRole('row', { name: 'New 4' })).toBeVisible();
-    expect(screen.getByRole('row', { name: 'Unmodified 7' })).toBeVisible();
-    expect(screen.getByRole('row', { name: 'Modified 2' })).toBeVisible();
+    for (const [label, route] of [
+      ['New 0', 'new'],
+      ['Unchanged 7', 'unchanged'],
+      ['Changed 2', 'changed']
+    ]) {
+      fireEvent.click(screen.getByRole('row', { name: label }));
+      expect(onOutcomeClick).toHaveBeenLastCalledWith(route);
+    }
+  });
+
+  it.each(['Enter', ' '])('opens an outcome using the %s key', (key) => {
+    const onOutcomeClick = vi.fn();
+    render(
+      <SubmissionUploadReconciliationTable
+        counts={{ new: 0, unmodified: 7, modified: 2 }}
+        onOutcomeClick={onOutcomeClick}
+      />
+    );
+    fireEvent.keyDown(screen.getByRole('gridcell', { name: 'Unchanged' }), { key });
+    expect(onOutcomeClick).toHaveBeenCalledWith('unchanged');
   });
 });

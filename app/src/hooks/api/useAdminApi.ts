@@ -1,7 +1,11 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
+  ReconciliationFeatureScope,
+  ReconciliationFeatureCounts,
+  ReconciliationFeaturePage,
   ISubmissionUploadFeatureGeometryExtent,
+  ISubmissionUploadFeatureTypePropertiesResponse,
   IgcNotifyGenericMessage,
   IgcNotifyRecipient,
   ISubmissionUploadReconciliationCounts,
@@ -24,6 +28,66 @@ import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from '
  * @return {*} object whose properties are supported api methods.
  */
 const useAdminApi = (axios: AxiosInstance) => {
+  /**
+   * Get unique property definitions present for a feature type across the whole upload.
+   * @param {number} submissionId Owning submission.
+   * @param {string} submissionUploadId Reviewed upload.
+   * @param {string} featureType Canonical feature type name.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<ISubmissionUploadFeatureTypePropertiesResponse>} Upload-scoped property definitions.
+   */
+  const getSubmissionUploadFeatureTypeProperties = async (
+    submissionId: number,
+    submissionUploadId: string,
+    featureType: string,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionUploadFeatureTypePropertiesResponse> => {
+    const { data } = await axios.get(
+      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/feature-types/${encodeURIComponent(featureType)}/properties`,
+      options
+    );
+    return data;
+  };
+
+  /**
+   * Load feature-type counts for all rows with a stored reconciliation outcome.
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<ReconciliationFeatureCounts>} Outcome total and feature-type sidebar counts.
+   */
+  const countReconciliationFeatures = async (
+    scope: ReconciliationFeatureScope,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ReconciliationFeatureCounts> => {
+    const { data } = await axios.get(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/reconciliation/${scope.reconciliation}/features/count`,
+      options
+    );
+    return data;
+  };
+
+  /**
+   * Load a bounded, hydrated page of reconciliation features.
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {string} featureType Selected feature type.
+   * @param {ApiCursorPaginationRequestOptions} pagination Cursor and sorting options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<ReconciliationFeaturePage>} Features, property columns, and adjacent-page cursors.
+   */
+  const getReconciliationFeatures = async (
+    scope: ReconciliationFeatureScope,
+    featureType: string,
+    pagination: ApiCursorPaginationRequestOptions,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ReconciliationFeaturePage> => {
+    const { data } = await axios.post(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/reconciliation/${scope.reconciliation}/features`,
+      { featureType, pagination },
+      options
+    );
+    return data;
+  };
+
   /**
    * Get the spatial extent of one current upload feature, including unpublished geometry.
    *
@@ -446,6 +510,9 @@ const useAdminApi = (axios: AxiosInstance) => {
   };
 
   return {
+    getSubmissionUploadFeatureTypeProperties,
+    countReconciliationFeatures,
+    getReconciliationFeatures,
     getSubmissionUploadReconciliationCounts,
     getSubmissionUploadFeatureGeometryExtent,
     getSubmissionUploadReview,

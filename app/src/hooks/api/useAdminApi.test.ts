@@ -14,6 +14,44 @@ describe('useAdminApi', () => {
     mock.restore();
   });
 
+  it('loads feature-type property definitions for the upload without feature IDs or outcome filters', async () => {
+    const signal = new AbortController().signal;
+    const response = { properties: [] };
+    mock
+      .onGet('/api/administrative/submission/16/upload/upload-id/feature-types/animal/properties')
+      .reply(200, response);
+    expect(
+      await useAdminApi(axios).getSubmissionUploadFeatureTypeProperties(16, 'upload-id', 'animal', { signal })
+    ).toEqual(response);
+    expect(mock.history.get[0].signal).toBe(signal);
+    expect(mock.history.get[0].params).toBeUndefined();
+  });
+
+  it('loads reconciliation counts and a cursor page with cancellation', async () => {
+    const scope = { submissionId: 7, submissionUploadId: 'upload-1', reconciliation: 'unmodified' as const };
+    const signal = new AbortController().signal;
+    const path = '/api/administrative/submission/7/upload/upload-1/reconciliation/unmodified/features';
+    const counts = { total: 0, feature_types: [] };
+    const page = { features: [], properties: [], pagination: { next_cursor: null, previous_cursor: null } };
+    mock.onGet(`${path}/count`).reply(200, counts);
+    mock.onPost(path).reply(200, page);
+    expect(await useAdminApi(axios).countReconciliationFeatures(scope, { signal })).toEqual(counts);
+    expect(
+      await useAdminApi(axios).getReconciliationFeatures(
+        scope,
+        'animal',
+        { limit: 25, cursor: 'NextCursor' },
+        { signal }
+      )
+    ).toEqual(page);
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({
+      featureType: 'animal',
+      pagination: { limit: 25, cursor: 'NextCursor' }
+    });
+    expect(mock.history.get[0].signal).toBe(signal);
+    expect(mock.history.post[0].signal).toBe(signal);
+  });
+
   it('requests the upload-feature extent without creating a tile session', async () => {
     const response = { bbox: null, geometry_count: 0 };
     const signal = new AbortController().signal;

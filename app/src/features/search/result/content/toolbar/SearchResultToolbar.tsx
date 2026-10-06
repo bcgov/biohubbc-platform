@@ -29,7 +29,7 @@ interface SearchResultToolbarProps {
   view: SEARCH_RESULT_VIEW;
   /** Switches between available result presentation modes. */
   onViewChange: (view: SEARCH_RESULT_VIEW) => void;
-  /** View toggle definitions shown at the end of the result toolbar. */
+  /** View options; the toggle is shown only when multiple views are available. */
   viewOptions: ToggleButtonView<SEARCH_RESULT_VIEW>[];
 }
 
@@ -70,7 +70,9 @@ export const SearchResultToolbar = ({
         })}
       </Box>
 
-      <ToggleButtons views={viewOptions} activeView={view} onViewChange={onViewChange} orientation="horizontal" />
+      {viewOptions.length > 1 && (
+        <ToggleButtons views={viewOptions} activeView={view} onViewChange={onViewChange} orientation="horizontal" />
+      )}
     </Stack>
   );
 };

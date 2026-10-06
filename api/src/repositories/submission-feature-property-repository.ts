@@ -279,10 +279,9 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
         JOIN feature_property_type fpt
           ON fpt.feature_property_type_id = fp.feature_property_type_id
-         AND fpt.name = 'number'
+         AND fpt.name IN ('string', 'number')
 
         UNION ALL
 
@@ -297,7 +296,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
 
         UNION ALL
 
@@ -312,7 +310,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
 
         UNION ALL
 
@@ -337,7 +334,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
 
         UNION ALL
 
@@ -352,7 +348,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
         JOIN contributor_codeset_code ccc
           ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
          AND ccc.record_end_date IS NULL
@@ -372,7 +367,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
         JOIN feature_property_type fpt
           ON fpt.feature_property_type_id = fp.feature_property_type_id
          AND fpt.name = 'taxon'
@@ -393,7 +387,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
 
         UNION ALL
 
@@ -408,7 +401,6 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
           ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
         JOIN feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
-         AND fp.record_end_date IS NULL
         JOIN submission_feature referenced_sf
           ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
          AND ${referencedFeatureStatusPredicate}

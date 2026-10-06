@@ -4,6 +4,11 @@ import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { SubmissionFeatureTableProps } from './SubmissionFeatureTable.interface';
 
+/**
+ * Render paginated submission features.
+ * @param props Feature rows, navigation, and server pagination controls.
+ * @returns Feature table within its standard Features section.
+ */
 export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
   const {
     rows,

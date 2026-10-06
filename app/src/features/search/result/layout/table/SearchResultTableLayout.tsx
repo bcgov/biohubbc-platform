@@ -1,3 +1,5 @@
+import Link from '@mui/material/Link';
+import { Link as RouterLink } from 'react-router-dom';
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Typography } from '@mui/material';
@@ -12,6 +14,8 @@ import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   featureTypeProperties: SearchFeatureProperty[];
+  /** Optional destination for property headings when the owning workflow exposes type-level definitions. */
+  featureTypePropertiesPath?: string;
   pathResolvers: SubmissionPropertyValuePathResolvers;
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
 }
@@ -30,6 +34,7 @@ interface SearchResultTableLayoutProps {
 export const SearchResultTableLayout = ({
   results,
   featureTypeProperties,
+  featureTypePropertiesPath,
   pathResolvers,
   onClick
 }: SearchResultTableLayoutProps) => {
@@ -38,6 +43,13 @@ export const SearchResultTableLayout = ({
       (property, index) => ({
         field: String(property.feature_property_id),
         headerName: property.display_name,
+        renderHeader: featureTypePropertiesPath
+          ? () => (
+              <Link component={RouterLink} to={featureTypePropertiesPath} color="inherit" underline="hover">
+                {property.display_name}
+              </Link>
+            )
+          : undefined,
         minWidth: 160,
         flex: 1,
         sortable: false,
@@ -84,7 +96,7 @@ export const SearchResultTableLayout = ({
       },
       ...propertyColumns
     ];
-  }, [featureTypeProperties, pathResolvers]);
+  }, [featureTypeProperties, featureTypePropertiesPath, pathResolvers]);
 
   return (
     <CustomDataGrid

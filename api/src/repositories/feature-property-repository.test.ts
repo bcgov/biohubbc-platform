@@ -25,6 +25,51 @@ describe('FeaturePropertyRepository', () => {
     sinon.restore();
   });
 
+  describe('getSubmissionUploadFeatureTypeProperties', () => {
+    it('reads unique definitions using submission, upload, and type boundaries in one query', async () => {
+      const execute = sinon.stub().resolves({ rows: [mockFeatureProperty] });
+      const repository = new FeaturePropertyRepository(getMockDBConnection({ sql: execute }));
+      const result = await repository.getSubmissionUploadFeatureTypeProperties(16, 'upload-id', 'animal');
+      expect(result).to.deep.equal([mockFeatureProperty]);
+      expect(execute).to.have.been.calledOnce;
+      const query = execute.firstCall.args[0];
+      expect(query.values).to.deep.equal([16, 'upload-id', 'animal']);
+      expect(query.text).to.include('SELECT DISTINCT fp.feature_property_id');
+      expect(query.text).to.include('sf.submission_id =');
+      expect(query.text).to.include('sf.submission_upload_id =');
+      expect(query.text).to.include('ft.name =');
+      expect(query.text).not.to.include('reconciliation');
+      expect(query.text).not.to.include('record_end_date');
+      expect(query.text).not.to.include('submission_feature_closure');
+      expect(query.text).to.include('submission_feature_property_artifact');
+      expect(query.text).to.include('submission_feature_property_feature');
+    });
+
+    it('returns an empty set when the upload has no properties for that type', async () => {
+      const repository = new FeaturePropertyRepository(
+        getMockDBConnection({ sql: sinon.stub().resolves({ rows: [] }) })
+      );
+      expect(await repository.getSubmissionUploadFeatureTypeProperties(16, 'upload-id', 'animal')).to.deep.equal([]);
+    });
+  });
+
+  describe('getExpressionPredicatePropertyMetadata', () => {
+    for (const assignmentId of [null, 12]) {
+      it(`retains retired definitions when resolving assignment ${assignmentId}`, async () => {
+        const execute = sinon.stub().resolves({ rowCount: 1, rows: [{ feature_property_id: 7 }] });
+        const repository = new FeaturePropertyRepository(getMockDBConnection({ sql: execute }));
+        await repository.getExpressionPredicatePropertyMetadata(7, assignmentId);
+        expect(execute).to.have.been.calledOnce;
+        const query = execute.firstCall.args[0];
+        expect(query.text).not.to.include('record_end_date');
+        expect(query.values).to.include(7);
+        if (assignmentId !== null) {
+          expect(query.values).to.include(assignmentId);
+        }
+      });
+    }
+  });
+
   describe('getFeaturePropertyTypeById', () => {
     it('returns the feature property type record when found', async () => {
       const mockResponse = {
