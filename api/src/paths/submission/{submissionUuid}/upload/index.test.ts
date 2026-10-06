@@ -77,13 +77,14 @@ describe('append submission upload handler', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.params = { submissionUuid };
-    mockReq.body = { bytes: 12345, submitters: mockSubmitters, blueprint_id: 7 };
+    mockReq.body = { bytes: 12345, archiveFormat: 'tar.gz', submitters: mockSubmitters, blueprint_id: 7 };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(startAppendStub).to.have.been.calledOnceWith({
       bytes: 12345,
+      archiveFormat: mockReq.body.archiveFormat,
       submissionUuid,
       submitters: mockSubmitters,
       blueprintId: 7
@@ -118,6 +119,7 @@ describe('append submission upload handler', () => {
 
     expect(startAppendStub).to.have.been.calledOnceWith({
       bytes: 12345,
+      archiveFormat: mockReq.body.archiveFormat,
       submissionUuid,
       submitters: [],
       blueprintId: undefined
@@ -141,7 +143,7 @@ describe('append submission upload handler', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.params = { submissionUuid };
-    mockReq.body = { bytes: 12345, submitters: mockSubmitters, blueprint_id: 7 };
+    mockReq.body = { bytes: 12345, archiveFormat: 'tar.gz', submitters: mockSubmitters, blueprint_id: 7 };
     mockReq.keycloak_token = { clientId: 'sims-service-client' };
 
     try {
