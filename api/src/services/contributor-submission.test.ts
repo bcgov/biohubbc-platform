@@ -72,6 +72,7 @@ describe('Explicit submission contributor selection', () => {
     await uploadIngestionService.createSubmissionArchiveUpload({
       contributorId: 2,
       bytes: 100,
+      archiveFormat: 'tar.gz',
       name: 'Test',
       description: 'Description',
       comment: 'Comment',
@@ -85,6 +86,7 @@ describe('Explicit submission contributor selection', () => {
     expect(start.firstCall.args[1]).include({ contributor_id: 2, system_user_id: 5 });
     expect(start.firstCall.args[2]).eql([12]);
     expect(start.firstCall.args[3]).equals(7);
+    expect(start.firstCall.args[4]).equals('tar.gz');
   });
 
   it('waits for all submitters before propagating a failure to the transaction boundary', async () => {

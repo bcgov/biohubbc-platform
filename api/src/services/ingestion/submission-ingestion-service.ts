@@ -6,7 +6,7 @@ import {
 import { UPLOAD_ARCHIVE_MEDIA_CONCURRENCY, UPLOAD_FEATURE_BATCH_MAX_BYTES } from '../../constants/upload';
 import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
-import { SubmissionUpload } from '../../models/submission-upload';
+import { SubmissionArchiveFormat, SubmissionUpload } from '../../models/submission-upload';
 import { withConnection } from '../../queue/with-connection';
 import { streamSubmissionArchive } from '../../utils/biohub-tar-parser';
 import { getLogger } from '../../utils/logger';
@@ -85,7 +85,7 @@ export class SubmissionIngestionService {
       submissionId,
       uploadId
     });
-    const { objectKey, uploadArchiveId } = await withConnection((connection) =>
+    const { objectKey, uploadArchiveId, archiveFormat } = await withConnection((connection) =>
       this.getTarballUploadContext(connection, uploadId)
     );
     defaultLog.debug({
@@ -168,6 +168,7 @@ export class SubmissionIngestionService {
 
     const { featureCount, uploadedCount, codesetFileCount } =
       await submissionIngestionDependencies.streamSubmissionArchive(tarStream, {
+        archiveFormat,
         objectStorageService: this.objectStorageService,
         s3KeyPrefix: `submissions/${submissionId}/uploads/${submissionUploadId}/media`,
         featureBatchSize: INGESTION_FEATURE_BATCH_SIZE,
@@ -312,13 +313,13 @@ export class SubmissionIngestionService {
    * @private
    * @param {IDBConnection} connection
    * @param {string} uploadId - The upload ID
-   * @returns {Promise<{ objectKey: string; uploadArchiveId: string }>}
+   * @returns {Promise<{ objectKey: string; uploadArchiveId: string; archiveFormat: SubmissionArchiveFormat }>}
    * @memberof SubmissionIngestionService
    */
   private async getTarballUploadContext(
     connection: IDBConnection,
     uploadId: string
-  ): Promise<{ objectKey: string; uploadArchiveId: string }> {
+  ): Promise<{ objectKey: string; uploadArchiveId: string; archiveFormat: SubmissionArchiveFormat }> {
     const uploadArchiveService = new UploadArchiveService(connection);
     const artifactService = new ArtifactService(connection);
     const uploadArchives = await uploadArchiveService.getUploadArchivesByUploadId(uploadId);
@@ -328,6 +329,7 @@ export class SubmissionIngestionService {
 
     const artifact = await artifactService.getArtifact(uploadArchives[0].artifact_id);
     return {
+      archiveFormat: artifact.format === 'tar.gz' ? 'tar.gz' : 'tar',
       objectKey: artifact.object_key,
       uploadArchiveId: uploadArchives[0].upload_archive_id
     };

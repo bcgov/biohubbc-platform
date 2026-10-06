@@ -32,6 +32,7 @@ describe('Submission upload request contributor selection', () => {
       mockReq.body = {
         client_id: selection.body,
         bytes: 100,
+        archiveFormat: 'tar.gz',
         name: 'Name',
         description: 'Description',
         comment: 'Comment',
@@ -55,6 +56,7 @@ describe('Submission upload request contributor selection', () => {
       expect(uploadOperation.firstCall.args[0]).eql({
         contributorId: 77,
         bytes: 100,
+        archiveFormat: 'tar.gz',
         name: 'Name',
         description: 'Description',
         comment: 'Comment',

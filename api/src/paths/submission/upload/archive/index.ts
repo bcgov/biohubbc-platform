@@ -64,6 +64,7 @@ export function startUpload(): RequestHandler {
       const result = await uploadIngestionService.createSubmissionArchiveUpload({
         contributorId: req.contributor_id!,
         bytes: req.body.bytes,
+        archiveFormat: req.body.archiveFormat,
         name: req.body.name,
         description: req.body.description,
         comment: req.body.comment,

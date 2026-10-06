@@ -28,10 +28,10 @@ export const CreateSubmissionForm = () => {
       return;
     }
 
-    const isTar = file.name.toLowerCase().endsWith('.tar');
+    const isTar = /\.tar(?:\.gz)?$/i.test(file.name);
 
     if (!isTar) {
-      setFieldError('file', 'Only .tar files are supported');
+      setFieldError('file', 'Only .tar and .tar.gz files are supported');
       return;
     }
 
@@ -68,7 +68,7 @@ export const CreateSubmissionForm = () => {
         uploadHandler={uploadHandler}
         dropZoneProps={{
           maxFileSize: config.MAX_UPLOAD_TARBALL_SIZE,
-          acceptedFileExtensions: [AttachmentValidExtensions.TAR]
+          acceptedFileExtensions: [AttachmentValidExtensions.TAR, AttachmentValidExtensions.GZ]
         }}
       />
     </Box>

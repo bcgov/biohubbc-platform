@@ -157,6 +157,7 @@ export interface PresignedUploadUrlResponse {
 export interface ICreateSubmission {
   client_id?: string;
   bytes: number;
+  archiveFormat?: 'tar' | 'tar.gz';
   name: string;
   description: string;
   comment: string;

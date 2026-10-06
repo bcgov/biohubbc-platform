@@ -54,75 +54,98 @@ describe('UploadIngestionService', () => {
   });
 
   describe('startArchiveUpload', () => {
-    it('should create submission, upload, artifact, and generate presigned URLs on success', async () => {
-      const mockSubmissionId = 123;
-      const mockUploadId = 'upload-456';
-      const mockArtifactId = 'artifact-789';
-      const mockUploadArchiveId = 'upload-archive-999';
-      const mockS3UploadId = 's3-upload-111';
-      const mockBytes = 5_000_000;
+    for (const archiveFormat of [undefined, 'tar', 'tar.gz'] as const) {
+      it(`creates upload metadata and presigned URLs for ${archiveFormat ?? 'default tar'}`, async () => {
+        const mockSubmissionId = 123;
+        const mockUploadId = 'upload-456';
+        const mockArtifactId = 'artifact-789';
+        const mockUploadArchiveId = 'upload-archive-999';
+        const mockS3UploadId = 's3-upload-111';
+        const mockBytes = 5_000_000;
 
-      const insertSubmissionStub = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionRecord')
-        .resolves({ submission_id: mockSubmissionId });
-      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
-        uuid: mockSubmission.uuid
-      } as ISubmissionModel);
-      sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
-      const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
-        ticket_id: '11111111-1111-1111-1111-111111111111',
-        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-      } as any);
-      const insertSubmissionUploadStub = sinon
-        .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
-        .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
-      sinon
-        .stub(UploadArchiveService.prototype, 'insertUploadArchive')
-        .resolves({ upload_archive_id: mockUploadArchiveId });
-
-      const mockPresigned = {
-        uploadId: mockS3UploadId,
-        presignedUrls: [
-          { partNumber: 1, url: 'https://s3-url-1', partSizeBytes: 5_000_000 },
-          { partNumber: 2, url: 'https://s3-url-2', partSizeBytes: 100_000 }
-        ],
-        partCount: 2
-      };
-      sinon.stub(UploadIngestionService.dependencies, 'generateMultipartUploadPresignedUrls').resolves(mockPresigned);
-
-      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
-
-      const result = await service.startArchiveUpload(mockBytes, mockSubmission, [mockHumanSubmitterSystemUserId, 43]);
-      expect(insertSubmissionStub).to.have.been.calledWith(mockSubmission, [mockHumanSubmitterSystemUserId, 43]);
-      expect(createTicketStub).to.have.been.calledWith(
-        sinon.match({
-          subject: 'New Submission',
-          priority: 'medium',
-          description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`,
-          systemUserIds: [mockSubmission.system_user_id]
-        })
-      );
-      expect(insertSubmissionUploadStub).to.have.been.calledWith(
-        sinon.match({
-          submission_id: mockSubmissionId,
-          upload_id: mockUploadId,
+        const insertSubmissionStub = sinon
+          .stub(SubmissionService.prototype, 'insertSubmissionRecord')
+          .resolves({ submission_id: mockSubmissionId });
+        sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+          uuid: mockSubmission.uuid
+        } as ISubmissionModel);
+        sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
+        const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
           ticket_id: '11111111-1111-1111-1111-111111111111',
-          status: 'uploaded',
-          blueprint_id: mockBlueprintId,
-          comment: mockSubmission.comment
-        }),
-        mockSubmission.system_user_id,
-        [mockHumanSubmitterSystemUserId, 43]
-      );
-      expect(result.submissionUuid).to.equal(mockSubmission.uuid);
-      expect(result.uploadId).to.equal(mockUploadId);
-      expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);
-      expect(result.s3UploadId).to.equal(mockS3UploadId);
-      expect(result.partCount).to.equal(mockPresigned.partCount);
-      expect(result.presignedUrls).to.deep.equal(mockPresigned.presignedUrls);
-      expect(result.presignedUrls[0].partSizeBytes).to.equal(mockPresigned.presignedUrls[0].partSizeBytes);
-    });
+          team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+        } as any);
+        const insertSubmissionUploadStub = sinon
+          .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
+          .resolves({ submission_upload_id: 'submission-upload-id-1' });
+        sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
+        sinon
+          .stub(UploadArchiveService.prototype, 'insertUploadArchive')
+          .resolves({ upload_archive_id: mockUploadArchiveId });
+
+        const mockPresigned = {
+          uploadId: mockS3UploadId,
+          presignedUrls: [
+            { partNumber: 1, url: 'https://s3-url-1', partSizeBytes: 5_000_000 },
+            { partNumber: 2, url: 'https://s3-url-2', partSizeBytes: 100_000 }
+          ],
+          partCount: 2
+        };
+        sinon.stub(UploadIngestionService.dependencies, 'generateMultipartUploadPresignedUrls').resolves(mockPresigned);
+
+        sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
+
+        const result = await service.startArchiveUpload(
+          mockBytes,
+          mockSubmission,
+          [mockHumanSubmitterSystemUserId, 43],
+          null,
+          archiveFormat
+        );
+        expect(result.key).to.equal(
+          `submissions/${mockSubmissionId}/uploads/${mockUploadId}.${archiveFormat ?? 'tar'}`
+        );
+        expect(ArtifactService.prototype.insertArtifact).to.have.been.calledWith(
+          sinon.match({
+            format: archiveFormat ?? 'tar',
+            byte_size: mockBytes,
+            object_key: result.key
+          })
+        );
+        expect(UploadIngestionService.dependencies.generateMultipartUploadPresignedUrls).to.have.been.calledWith({
+          key: result.key,
+          bytes: mockBytes,
+          contentType: archiveFormat === 'tar.gz' ? 'application/gzip' : 'application/x-tar'
+        });
+        expect(insertSubmissionStub).to.have.been.calledWith(mockSubmission, [mockHumanSubmitterSystemUserId, 43]);
+        expect(createTicketStub).to.have.been.calledWith(
+          sinon.match({
+            subject: 'New Submission',
+            priority: 'medium',
+            description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`,
+            systemUserIds: [mockSubmission.system_user_id]
+          })
+        );
+        expect(insertSubmissionUploadStub).to.have.been.calledWith(
+          sinon.match({
+            submission_id: mockSubmissionId,
+            upload_id: mockUploadId,
+            ticket_id: '11111111-1111-1111-1111-111111111111',
+            status: 'uploaded',
+            blueprint_id: mockBlueprintId,
+            comment: mockSubmission.comment
+          }),
+          mockSubmission.system_user_id,
+          [mockHumanSubmitterSystemUserId, 43]
+        );
+        expect(result.submissionUuid).to.equal(mockSubmission.uuid);
+        expect(result.uploadId).to.equal(mockUploadId);
+        expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);
+        expect(result.s3UploadId).to.equal(mockS3UploadId);
+        expect(result.partCount).to.equal(mockPresigned.partCount);
+        expect(result.presignedUrls).to.deep.equal(mockPresigned.presignedUrls);
+        expect(result.presignedUrls[0].partSizeBytes).to.equal(mockPresigned.presignedUrls[0].partSizeBytes);
+      });
+    }
 
     it('should grant upload access to only the authenticated user when no submitter is provided', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
@@ -134,15 +157,16 @@ describe('UploadIngestionService', () => {
       await service.startArchiveUpload(5_000_000, mockSubmission);
 
       expect(SubmissionService.prototype.insertSubmissionRecord).to.have.been.calledWith(mockSubmission, []);
-      expect(startForSubmissionStub).to.have.been.calledWith(
-        5_000_000,
-        123,
-        mockSubmission.uuid,
-        [mockSubmission.system_user_id],
-        [],
-        mockSubmission.comment,
-        undefined
-      );
+      expect(startForSubmissionStub).to.have.been.calledOnceWithExactly({
+        bytes: 5_000_000,
+        submissionId: 123,
+        submissionUuid: mockSubmission.uuid,
+        systemUserIds: [mockSubmission.system_user_id],
+        submitterSystemUserIds: [],
+        comment: mockSubmission.comment,
+        requestedBlueprintId: undefined,
+        archiveFormat: 'tar'
+      });
     });
 
     it('should throw if submission creation fails', async () => {
@@ -286,6 +310,7 @@ describe('UploadIngestionService', () => {
 
       const result = await service.startArchiveUploadForExistingSubmissionByUuid({
         bytes: mockBytes,
+        archiveFormat: 'tar.gz',
         submissionUuid,
         submitters
       });
@@ -316,6 +341,13 @@ describe('UploadIngestionService', () => {
       );
       expect(result.submissionUuid).to.equal(submissionUuid);
       expect(result.uploadId).to.equal(mockUploadId);
+      expect(result.key).to.equal(`submissions/${existingSubmissionId}/uploads/${mockUploadId}.tar.gz`);
+      expect(ArtifactService.prototype.insertArtifact).to.have.been.calledWith(sinon.match({ format: 'tar.gz' }));
+      expect(UploadIngestionService.dependencies.generateMultipartUploadPresignedUrls).to.have.been.calledWith({
+        key: result.key,
+        bytes: mockBytes,
+        contentType: 'application/gzip'
+      });
     });
 
     it('grants append-upload access to only the authenticated user when no submitter is provided', async () => {
@@ -336,15 +368,16 @@ describe('UploadIngestionService', () => {
       await service.startArchiveUploadForExistingSubmissionByUuid({ bytes: 3_000_000, submissionUuid });
 
       expect(SubmissionService.prototype.addSubmissionTeamMembers).to.have.been.calledWith(mockSubmissionTeamId, [1]);
-      expect(startForSubmissionStub).to.have.been.calledWith(
-        3_000_000,
-        existingSubmissionId,
+      expect(startForSubmissionStub).to.have.been.calledOnceWithExactly({
+        bytes: 3_000_000,
+        submissionId: existingSubmissionId,
         submissionUuid,
-        [1],
-        [],
-        null,
-        undefined
-      );
+        systemUserIds: [1],
+        submitterSystemUserIds: [],
+        comment: null,
+        requestedBlueprintId: undefined,
+        archiveFormat: undefined
+      });
     });
 
     it('resolves duplicate submitter GUIDs once and forwards the requested Blueprint', async () => {
@@ -368,7 +401,16 @@ describe('UploadIngestionService', () => {
         mockSubmissionTeamId,
         [1, 42]
       );
-      expect(startForSubmissionStub).to.have.been.calledWith(3_000_000, 456, mockSubmission.uuid, [1], [42], null, 7);
+      expect(startForSubmissionStub).to.have.been.calledOnceWithExactly({
+        bytes: 3_000_000,
+        submissionId: 456,
+        submissionUuid: mockSubmission.uuid,
+        systemUserIds: [1],
+        submitterSystemUserIds: [42],
+        comment: null,
+        requestedBlueprintId: 7,
+        archiveFormat: undefined
+      });
     });
 
     it('does not add team members or start an upload when submitter resolution fails', async () => {

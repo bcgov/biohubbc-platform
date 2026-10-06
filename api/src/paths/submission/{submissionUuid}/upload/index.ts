@@ -80,6 +80,7 @@ export function createSubmissionUpload(): RequestHandler {
       const uploadIngestionService = new UploadIngestionService(connection);
       const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid({
         bytes: req.body.bytes,
+        archiveFormat: req.body.archiveFormat,
         submissionUuid: req.params.submissionUuid,
         submitters: req.body.submitters,
         blueprintId: req.body.blueprint_id

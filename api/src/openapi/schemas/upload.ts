@@ -43,6 +43,12 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
       description:
         "Contributor client ID that owns the new submission. When omitted, defaults to the token's clientId or azp. Active membership in the selected contributor is required; supply client_id when submitting for a different contributor."
     },
+    archiveFormat: {
+      type: 'string',
+      enum: ['tar', 'tar.gz'],
+      default: 'tar',
+      description: 'Archive format. Upload gzip-compressed bytes unchanged for tar.gz; bytes is the compressed size.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -157,6 +163,12 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes'],
   properties: {
+    archiveFormat: {
+      type: 'string',
+      enum: ['tar', 'tar.gz'],
+      default: 'tar',
+      description: 'Archive format. Upload gzip-compressed bytes unchanged for tar.gz; bytes is the compressed size.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
