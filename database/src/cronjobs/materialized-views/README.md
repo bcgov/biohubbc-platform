@@ -1,6 +1,6 @@
 # Materialized view refresh
 
-`../index.ts` runs the job in `cronjob.ts`, which refreshes `bcgw.wld_telemetry_all` followed by `bcgw.wld_telemetry_public` in one transaction. Errors roll back the transaction and the process exits with a nonzero status. These regular refreshes can block readers while running.
+`../index.ts` runs the job in `cronjob.ts`, which refreshes all six BCGW materialized views in one transaction: `wld_telemetry_all`, `wld_telemetry_public`, `wld_observations_all`, `wld_observations_public`, `wld_incidental_all`, and `wld_incidental_public`. Errors roll back the transaction and the process exits with a nonzero status. These regular refreshes can block readers while running.
 
 The Kubernetes CronJob is defined in `infrastructure/cronjobs/templates/cronjob-mv.yaml`. It uses the database setup image, administrator credentials, and a mounted Crunchy TLS CA. See `infrastructure/cronjobs/README.md` for values and deployment requirements. Umbrella dev/test/prod values enable the dependency with the job suspended; static CI supplies its image tag. PR values disable the dependency. Set `biohub-platform-cronjobs.cronjob.suspend: false` in the umbrella environment values after verifying the migrations to start scheduled runs.
 

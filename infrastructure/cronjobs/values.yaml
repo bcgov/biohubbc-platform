@@ -18,7 +18,7 @@ cronjob:
   failedJobsHistoryLimit: 3
   startingDeadlineSeconds: 3600
   backoffLimit: 1
-  activeDeadlineSeconds: 7500 # Allows two sequential statements with one-hour timeouts.
+  activeDeadlineSeconds: 21900 # Allows six sequential statements with one-hour timeouts.
 
 database:
   host: '' # Set by values-dev/test/prod.yaml.

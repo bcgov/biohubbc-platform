@@ -22,19 +22,31 @@ function mockClient(failOn?: string) {
   return { statements, end };
 }
 
-test('refreshes both views in dependency order and commits', async () => {
+test('refreshes all six BCGW views and commits', async () => {
   const { statements, end } = mockClient();
-  await refreshMaterializedViews();
+  const result = await refreshMaterializedViews();
   assert.deepEqual(statements, [
     'BEGIN',
     'REFRESH MATERIALIZED VIEW bcgw.wld_telemetry_all',
     'REFRESH MATERIALIZED VIEW bcgw.wld_telemetry_public',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_observations_all',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_observations_public',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_incidental_all',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_incidental_public',
     'COMMIT'
+  ]);
+  assert.deepEqual(result.refreshedViews, [
+    'bcgw.wld_telemetry_all',
+    'bcgw.wld_telemetry_public',
+    'bcgw.wld_observations_all',
+    'bcgw.wld_observations_public',
+    'bcgw.wld_incidental_all',
+    'bcgw.wld_incidental_public'
   ]);
   assert.equal(end.mock.callCount(), 1);
 });
 
-test('rolls back both refreshes if the second view fails and propagates the error', async () => {
+test('rolls back when the second view fails and skips the remaining views', async () => {
   const { statements, end } = mockClient('REFRESH MATERIALIZED VIEW bcgw.wld_telemetry_public');
   await assert.rejects(refreshMaterializedViews(), /Refresh failed/);
   assert.deepEqual(statements, [
@@ -57,5 +69,21 @@ test('cleans up and propagates connection failures', async () => {
   const { statements, end } = mockClient('connect');
   await assert.rejects(refreshMaterializedViews(), /Connection failed/);
   assert.deepEqual(statements, []);
+  assert.equal(end.mock.callCount(), 1);
+});
+
+test('rolls back the whole batch when the final incidental view fails', async () => {
+  const { statements, end } = mockClient('REFRESH MATERIALIZED VIEW bcgw.wld_incidental_public');
+  await assert.rejects(refreshMaterializedViews(), /Refresh failed/);
+  assert.deepEqual(statements, [
+    'BEGIN',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_telemetry_all',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_telemetry_public',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_observations_all',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_observations_public',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_incidental_all',
+    'REFRESH MATERIALIZED VIEW bcgw.wld_incidental_public',
+    'ROLLBACK'
+  ]);
   assert.equal(end.mock.callCount(), 1);
 });
