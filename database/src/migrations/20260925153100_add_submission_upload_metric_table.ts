@@ -1,7 +1,7 @@
 import type { Knex } from 'knex';
 
 /**
- * 
+ * Create submission_upload_metric table with audit and journal triggers
  *
  * @export
  * @param {Knex} knex
