@@ -109,10 +109,13 @@ export interface SubmissionUploadSubmitter {
   identitySource: string;
 }
 
+export type SubmissionArchiveFormat = 'tar' | 'tar.gz';
+
 /** Request fields for creating a submission and its first archive upload. */
 export interface CreateSubmissionArchiveUploadInput {
   contributorId: number;
   bytes: number;
+  archiveFormat?: SubmissionArchiveFormat;
   name: string;
   description: string;
   comment: string;
@@ -123,7 +126,20 @@ export interface CreateSubmissionArchiveUploadInput {
 /** Request fields for appending an archive to an existing submission. */
 export interface CreateExistingSubmissionArchiveUploadInput {
   bytes: number;
+  archiveFormat?: SubmissionArchiveFormat;
   submissionUuid: string;
   submitters?: SubmissionUploadSubmitter[];
   blueprintId?: number | null;
+}
+
+/** Resolved submission context for starting an archive upload. */
+export interface StartSubmissionArchiveUploadInput {
+  bytes: number;
+  submissionId: number;
+  submissionUuid: string;
+  systemUserIds: number[];
+  submitterSystemUserIds: number[];
+  comment: string | null;
+  requestedBlueprintId?: number | null;
+  archiveFormat?: SubmissionArchiveFormat;
 }
