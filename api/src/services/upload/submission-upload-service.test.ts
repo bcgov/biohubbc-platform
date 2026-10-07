@@ -33,6 +33,39 @@ describe('SubmissionUploadService', () => {
     sinon.restore();
   });
 
+  describe('listAdminSubmissionUploads', () => {
+    it('preserves totals for a requested page beyond the last upload', async () => {
+      const list = sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([]);
+      const count = sinon.stub(SubmissionUploadRepository.prototype, 'countAdminSubmissionUploads').resolves(11);
+      const pagination = { page: 3, limit: 10, sort: 'create_date', order: 'desc' as const };
+
+      const result = await service.listAdminSubmissionUploads(17, pagination);
+
+      expect(list).to.have.been.calledOnceWithExactly(17, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(17);
+      expect(result).to.eql({
+        uploads: [],
+        pagination: {
+          total: 11,
+          per_page: 10,
+          current_page: 3,
+          last_page: 2,
+          sort: 'create_date',
+          order: 'desc'
+        }
+      });
+    });
+
+    it('returns a valid empty first page for a submission without uploads', async () => {
+      sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([]);
+      sinon.stub(SubmissionUploadRepository.prototype, 'countAdminSubmissionUploads').resolves(0);
+      const result = await service.listAdminSubmissionUploads(17, { page: 1, limit: 10 });
+      expect(result.uploads).to.eql([]);
+      expect(result.pagination.total).to.equal(0);
+      expect(result.pagination.last_page).to.equal(1);
+    });
+  });
+
   describe('getSubmissionUpload', () => {
     it('should return a single submission_upload record', async () => {
       const fakeSubmissionUpload: SubmissionUpload = {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ApiPaginationResults } from '../zod-schema/pagination';
 import { SubmissionUploadReview } from './submission-upload-review';
 import { TicketSubmissionValidation } from './submission-validation';
 import { UploadArtifactRoleEnum } from './upload-artifact';
@@ -40,6 +41,26 @@ export const SubmissionUpload = z.object({
   record_end_date: z.coerce.date().nullable().optional()
 });
 export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
+
+/** Active upload fields shown in the administrative submission list. */
+export const AdminSubmissionUpload = SubmissionUpload.pick({
+  submission_upload_id: true,
+  upload_id: true,
+  status: true,
+  decision: true,
+  ticket_id: true
+}).extend({
+  comment: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  submitted_by_identifier: z.string().nullable()
+});
+export type AdminSubmissionUpload = z.infer<typeof AdminSubmissionUpload>;
+
+export interface AdminSubmissionUploadsResponse {
+  uploads: AdminSubmissionUpload[];
+  pagination: ApiPaginationResults;
+}
 
 /**
  * Payload for creating a new SubmissionUpload

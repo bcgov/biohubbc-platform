@@ -1,6 +1,24 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { JsonValue } from 'types/json';
 import { SECURITY_APPLIED_STATUS } from './useArtifactApi.interface';
+import { SubmissionUploadDecision, SubmissionUploadJobStatus } from './useTicketsApi.interface';
+
+export interface AdminSubmissionUpload {
+  submission_upload_id: string;
+  upload_id: string;
+  status: SubmissionUploadJobStatus;
+  decision: SubmissionUploadDecision;
+  ticket_id: string;
+  comment: string | null;
+  create_date: string;
+  create_user: number;
+  submitted_by_identifier: string | null;
+}
+
+export interface AdminSubmissionUploadsResponse {
+  uploads: AdminSubmissionUpload[];
+  pagination: ApiPaginationResponseParams;
+}
 
 export type SubmissionRecord = {
   submission_id: number;

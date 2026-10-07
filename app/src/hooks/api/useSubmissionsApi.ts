@@ -1,6 +1,7 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICreateSubmission,
+  AdminSubmissionUploadsResponse,
   IGetSubmissionsForUserResponse,
   ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
@@ -20,6 +21,26 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
  * @return {*} object whose properties are supported api methods.
  */
 const useSubmissionsApi = (axios: AxiosInstance) => {
+  /**
+   * Fetch one page of active uploads for the administrative submission view.
+   *
+   * @param {number} submissionId Submission whose uploads are listed.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @returns {Promise<AdminSubmissionUploadsResponse>} Uploads with server pagination totals.
+   */
+  const listAdminSubmissionUploads = async (
+    submissionId: number,
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<AdminSubmissionUploadsResponse> => {
+    const { data } = await axios.get<AdminSubmissionUploadsResponse>(
+      `api/administrative/submission/${submissionId}/upload`,
+      { params: pagination, ...options }
+    );
+    return data;
+  };
+
   /**
    * Fetch the paginated submission features visible to the requesting user.
    *
@@ -170,6 +191,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   return {
+    listAdminSubmissionUploads,
     getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
     getUnreviewedSubmissionsForAdmins,
