@@ -1,3 +1,4 @@
+import { DialogContextProvider } from 'contexts/dialogContext';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { IApiKeyView, ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
@@ -31,7 +32,7 @@ const mockCreateApiKey = vi.fn();
 const mockRevokeApiKey = vi.fn();
 const mockDeleteApiKey = vi.fn();
 
-const renderPage = () => render(<PortalApiKeysPage />);
+const renderPage = () => render(<PortalApiKeysPage />, { wrapper: DialogContextProvider });
 
 const clickMenuButton = async () => {
   await waitFor(() => screen.getByTestId('custom-menu-icon-Actions'));
@@ -146,6 +147,32 @@ describe('PortalApiKeysPage', () => {
       });
     });
   });
+
+  it.each(['revoke', 'delete'] as const)(
+    'keeps a failed %s confirmation open, reports the error and allows retry',
+    async (action) => {
+      mockListApiKeys.mockResolvedValue([makeKeyView()]);
+      const mutation = action === 'revoke' ? mockRevokeApiKey : mockDeleteApiKey;
+      mutation.mockResolvedValue(undefined).mockRejectedValueOnce(new Error('Permission denied'));
+      renderPage();
+      if (action === 'revoke') {
+        await clickRevokeFromMenu();
+      } else {
+        await clickDeleteFromMenu();
+      }
+      fireEvent.click(screen.getByTestId('yes-button'));
+      expect(await screen.findByTestId('ok-dialog')).toHaveTextContent('Permission denied');
+      fireEvent.click(screen.getByTestId('ok-button'));
+      expect(screen.getByTestId('yes-no-dialog')).toBeVisible();
+      expect(screen.getByTestId('yes-button')).toBeEnabled();
+      expect(mockListApiKeys).toHaveBeenCalledOnce();
+
+      fireEvent.click(screen.getByTestId('yes-button'));
+      await waitFor(() => expect(screen.queryByTestId('yes-no-dialog')).not.toBeInTheDocument());
+      expect(mutation).toHaveBeenCalledTimes(2);
+      expect(mockListApiKeys).toHaveBeenCalledTimes(2);
+    }
+  );
 
   describe('create flow', () => {
     it('opens create dialog when New API Key button is clicked', async () => {

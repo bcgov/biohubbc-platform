@@ -40,15 +40,18 @@ export const TicketSidebarSystemUserCard = (props: ITicketSidebarSystemUserCardP
     []
   );
 
+  const isCreating = ticketSystemUser.ticket_system_user_id.startsWith('optimistic-');
   const displayLabel = getUserLabel(ticketSystemUser.system_user);
   const statusContextMenuItems: IContextMenuItem[] = statusOptions.map((statusOption) => ({
     label: statusOption.label,
+    disabled: isCreating,
     icon: <Icon path={statusOption.icon} size={0.7} />,
     onClick: () => onUpdateTicketSystemUserStatus(ticketSystemUser.ticket_system_user_id, statusOption.value)
   }));
   const deleteContextMenuItems: IContextMenuItem[] = [
     {
       label: 'Delete',
+      disabled: isCreating,
       icon: <Icon path={mdiTrashCanOutline} size={0.7} />,
       onClick: () => onRemoveTicketSystemUser(ticketSystemUser.ticket_system_user_id)
     }

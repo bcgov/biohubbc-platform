@@ -1,9 +1,12 @@
 import { IDBConnection } from '../database/db';
-import { SubmissionFeatureProperty } from '../models/feature-property';
+import { ApiNotFoundError } from '../errors/api-error';
+import { FeatureProperty, SubmissionFeatureProperty } from '../models/feature-property';
 import { SubmissionFeaturePropertyFilters } from '../models/submission-feature';
+import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { SubmissionFeaturePropertyRepository } from '../repositories/submission-feature-property-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
+import { SubmissionUploadService } from './upload/submission-upload-service';
 
 /**
  * Service for reading canonical indexed properties attached to submission features.
@@ -14,10 +17,38 @@ import { DBService } from './db-service';
  */
 export class SubmissionFeaturePropertyService extends DBService {
   submissionFeaturePropertyRepository: SubmissionFeaturePropertyRepository;
+  featurePropertyRepository: FeaturePropertyRepository;
+  submissionUploadService: SubmissionUploadService;
 
   constructor(connection: IDBConnection) {
     super(connection);
+    this.featurePropertyRepository = new FeaturePropertyRepository(connection);
+    this.submissionUploadService = new SubmissionUploadService(connection);
     this.submissionFeaturePropertyRepository = new SubmissionFeaturePropertyRepository(connection);
+  }
+
+  /**
+   * Read unique property definitions for a feature type across a reviewed upload.
+   * @param {number} submissionId Owning submission from the request path.
+   * @param {string} submissionUploadId Reviewed upload.
+   * @param {string} featureType Canonical feature type name.
+   * @returns {Promise<FeatureProperty[]>} Definitions present in the upload's stored values.
+   * @throws {ApiNotFoundError} When the upload belongs to another submission.
+   */
+  async getSubmissionUploadFeatureTypeProperties(
+    submissionId: number,
+    submissionUploadId: string,
+    featureType: string
+  ): Promise<FeatureProperty[]> {
+    const upload = await this.submissionUploadService.getSubmissionUpload(submissionUploadId);
+    if (upload.submission_id !== submissionId) {
+      throw new ApiNotFoundError('Submission upload not found');
+    }
+    return this.featurePropertyRepository.getSubmissionUploadFeatureTypeProperties(
+      submissionId,
+      submissionUploadId,
+      featureType
+    );
   }
 
   /**

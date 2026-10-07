@@ -183,7 +183,7 @@ describe('TeamMemberSelect', () => {
 
     // Wait for initial load
     await waitFor(() => {
-      expect(mockGetAvailableUsers).toHaveBeenCalledWith(undefined);
+      expect(mockGetAvailableUsers).toHaveBeenCalledWith('', { signal: expect.any(AbortSignal) });
     });
 
     // Clear initial call count
@@ -196,7 +196,7 @@ describe('TeamMemberSelect', () => {
     // Wait for debounced search to trigger (300ms debounce)
     await waitFor(
       () => {
-        expect(mockGetAvailableUsers).toHaveBeenCalledWith('ali');
+        expect(mockGetAvailableUsers).toHaveBeenCalledWith('ali', { signal: expect.any(AbortSignal) });
       },
       { timeout: 500 }
     );
@@ -234,7 +234,7 @@ describe('TeamMemberSelect', () => {
     // Wait for search to complete
     await waitFor(
       () => {
-        expect(mockGetAvailableUsers).toHaveBeenCalledWith('dav');
+        expect(mockGetAvailableUsers).toHaveBeenCalledWith('dav', { signal: expect.any(AbortSignal) });
       },
       { timeout: 500 }
     );

@@ -23,7 +23,7 @@ describe('useSearchApi', () => {
       {
         type: 'predicate' as const,
         feature_property_id: 1,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'Contains' as const,
         value: 'moose'
       }
@@ -150,6 +150,15 @@ describe('useSearchApi', () => {
           pagination: { limit: 25 }
         })
       );
+    });
+
+    it('includes submission IDs in both result and count requests', async () => {
+      mock.onPost('/api/search/feature/survey').reply(200, {});
+      mock.onPost('/api/search/feature/survey/count').reply(200, { total: 0 });
+      await api.searchFeatures('survey', null, { limit: 10 }, { submissionIds: [42] });
+      await api.countFeatures('survey', null, { signal: new AbortController().signal, submissionIds: [42] });
+      expect(JSON.parse(mock.history.post[0].data)).toEqual({ pagination: { limit: 10 }, submissionIds: [42] });
+      expect(JSON.parse(mock.history.post[1].data)).toEqual({ submissionIds: [42] });
     });
 
     it('should return empty array when no results', async () => {

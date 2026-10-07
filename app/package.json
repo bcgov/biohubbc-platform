@@ -39,6 +39,7 @@
     "@mui/system": "^7.3.2",
     "@mui/x-data-grid": "^8.11.2",
     "@react-keycloak/web": "^3.4.0",
+    "@tanstack/react-query": "^5.104.0",
     "@tmcw/togeojson": "^7.1.2",
     "@turf/bbox": "^7.2.0",
     "@turf/boolean-equal": "^7.2.0",

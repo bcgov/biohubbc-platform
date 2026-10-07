@@ -1,3 +1,4 @@
+import { DownloadVersionExportTable } from './components/table/DownloadVersionExportTable';
 import { cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { DownloadDetail, DownloadVersion } from 'interfaces/useDownloadApi.interface';
 import { DownloadExportDetail, DownloadExportListResponse } from 'interfaces/useDownloadExportApi.interface';
@@ -110,6 +111,16 @@ describe('DownloadVersionPage', () => {
 
   afterEach(cleanup);
 
+  it('clears the previous version exports while another version loads', async () => {
+    const { findByRole, queryByRole, rerender } = render(
+      <DownloadVersionExportTable downloadId={DOWNLOAD_ID} downloadVersionId={VERSION_ID} />
+    );
+    await findByRole('button', { name: 'Download' });
+    mockListDownloadVersionExports.mockReturnValue(new Promise(() => undefined));
+    rerender(<DownloadVersionExportTable downloadId={DOWNLOAD_ID} downloadVersionId="other-version" />);
+    expect(queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
+  });
+
   it('renders the download header with Features and Exports tabs', async () => {
     const { findByRole, getByRole, getByText } = renderPage();
 
@@ -125,7 +136,7 @@ describe('DownloadVersionPage', () => {
     expect(getByText('Failed to load rows')).toBeVisible();
     expect(getByRole('tab', { name: 'Features' })).toBeVisible();
     expect(getByRole('tab', { name: 'Exports' })).toBeVisible();
-    expect(mockGetDownloadVersion).toHaveBeenCalledWith(DOWNLOAD_ID, VERSION_ID);
+    expect(mockGetDownloadVersion).toHaveBeenCalledWith(DOWNLOAD_ID, VERSION_ID, { signal: expect.any(AbortSignal) });
   });
 
   it('lists only this version exports on the Exports tab', async () => {
@@ -139,7 +150,8 @@ describe('DownloadVersionPage', () => {
     expect(mockListDownloadVersionExports).toHaveBeenCalledWith(
       DOWNLOAD_ID,
       VERSION_ID,
-      expect.objectContaining({ page: 1, limit: 10, sort: 'started_at', order: 'desc' })
+      expect.objectContaining({ page: 1, limit: 10, sort: 'started_at', order: 'desc' }),
+      { signal: expect.any(AbortSignal) }
     );
   });
 
@@ -170,5 +182,16 @@ describe('DownloadVersionPage', () => {
         expect.objectContaining({ feature_types: ['observation'] })
       );
     });
+  });
+
+  it("reloads this version's exports after an export starts, leaving the download and version records alone", async () => {
+    const { findByRole, findByText } = renderPage();
+    fireEvent.click(await findByRole('tab', { name: 'Exports' }));
+    await findByText('33333333-4444-5555-6666-777777777777');
+
+    fireEvent.click(await findByRole('button', { name: 'Export' }));
+
+    await waitFor(() => expect(mockListDownloadVersionExports).toHaveBeenCalledTimes(2));
+    expect([mockGetDownload, mockGetDownloadVersion].map((load) => load.mock.calls.length)).toEqual([1, 1]);
   });
 });

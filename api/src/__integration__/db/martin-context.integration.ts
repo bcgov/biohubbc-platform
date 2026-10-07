@@ -21,7 +21,7 @@ const FEATURE_TYPE = 'species_observation';
 /** Identifiers of a feature property, as an expression predicate has to name both. */
 interface PropertyIds {
   feature_property_id: number;
-  feature_type_property_id: number;
+  blueprint_feature_type_property_id: number;
 }
 
 /**
@@ -36,13 +36,20 @@ interface PropertyIds {
 const resolveNumericProperty = async (connection: IDBConnection): Promise<PropertyIds> => {
   const result = await connection.sql(
     SQL`
-      SELECT fp.feature_property_id, ftp.feature_type_property_id
+      SELECT fp.feature_property_id, bftp.blueprint_feature_type_property_id
       FROM feature_type ft
-      JOIN feature_type_property ftp
-        ON ftp.feature_type_id = ft.feature_type_id
-        AND ftp.record_end_date IS NULL
+      JOIN blueprint_feature_type bft
+        ON bft.feature_type_id = ft.feature_type_id
+        AND bft.record_end_date IS NULL
+      JOIN blueprint b
+        ON b.blueprint_id = bft.blueprint_id
+        AND b.is_default = true
+        AND b.record_end_date IS NULL
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
+        AND bftp.record_end_date IS NULL
       JOIN feature_property fp
-        ON fp.feature_property_id = ftp.feature_property_id
+        ON fp.feature_property_id = bftp.feature_property_id
         AND fp.record_end_date IS NULL
       JOIN feature_property_type fpt
         ON fpt.feature_property_type_id = fp.feature_property_type_id
@@ -51,7 +58,7 @@ const resolveNumericProperty = async (connection: IDBConnection): Promise<Proper
       ORDER BY fp.feature_property_id
       LIMIT 1;
     `,
-    z.object({ feature_property_id: z.number(), feature_type_property_id: z.number() })
+    z.object({ feature_property_id: z.number(), blueprint_feature_type_property_id: z.number() })
   );
 
   if (!result.rows.length) {
@@ -148,7 +155,7 @@ describe('Tile context (integration)', function () {
       {
         type: 'predicate',
         feature_property_id: countProperty.feature_property_id,
-        feature_type_property_id: countProperty.feature_type_property_id,
+        blueprint_feature_type_property_id: countProperty.blueprint_feature_type_property_id,
         operator: 'GreaterThanOrEqual',
         value
       }

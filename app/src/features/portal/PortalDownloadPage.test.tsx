@@ -56,7 +56,8 @@ describe('PortalDownloadPage', () => {
     expect(getByText('Ready')).toBeVisible();
     expect(getByText(getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, download.create_date))).toBeVisible();
     expect(mockGetDownloads).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' })
+      expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' }),
+      { signal: expect.any(AbortSignal) }
     );
   });
 

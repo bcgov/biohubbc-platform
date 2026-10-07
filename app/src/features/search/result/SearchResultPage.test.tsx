@@ -1,7 +1,8 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useCodesQuery } from 'hooks/useCodesQuery';
+import { useDialogContext } from 'hooks/useContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { SearchResultPage } from './SearchResultPage';
@@ -34,6 +35,7 @@ vi.mock('react-router-dom', async () => {
 vi.mock('hooks/useApi');
 vi.mock('hooks/useAuthStateContext');
 vi.mock('hooks/useContext');
+vi.mock('hooks/useCodesQuery');
 vi.mock('./hooks/useSearchResults');
 // The map container owns its own Martin session and renders MapLibre; the page test only cares that it is handed the
 // current search, so it is replaced with a marker.
@@ -59,7 +61,7 @@ vi.mock('./header/SearchResultSearch', () => ({
               {
                 type: 'predicate',
                 feature_property_id: 10,
-                feature_type_property_id: null,
+                blueprint_feature_type_property_id: null,
                 operator: 'ILike',
                 value: 'salmon'
               }
@@ -79,7 +81,8 @@ import { useSearchResults } from './hooks/useSearchResults';
 
 const mockUseApi = useApi as Mock;
 const mockUseAuthStateContext = useAuthStateContext as Mock;
-const mockUseCodesContext = useCodesContext as Mock;
+const mockUseCodesQuery = useCodesQuery as Mock;
+const mockReload = vi.fn();
 const mockUseDialogContext = useDialogContext as Mock;
 const mockUseSearchResults = useSearchResults as Mock;
 
@@ -131,9 +134,7 @@ describe('SearchResultPage', () => {
       dataRequest: { createDataRequest: mockCreateDataRequest },
       teams: { getAvailableUsers: mockGetAvailableUsers }
     });
-    mockUseCodesContext.mockReturnValue({
-      codesDataLoader: { isReady: true, data: codesPayload }
-    });
+    mockUseCodesQuery.mockReturnValue({ isFetched: true, data: codesPayload });
     mockUseDialogContext.mockReturnValue({
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
@@ -146,7 +147,8 @@ describe('SearchResultPage', () => {
       searchParams: new URLSearchParams(),
       setSearchParams: mockSetResultSearchParams,
       totalCount: 5,
-      cursor: defaultCursor
+      cursor: defaultCursor,
+      reload: mockReload
     });
   });
 
@@ -327,8 +329,7 @@ describe('SearchResultPage', () => {
         expect.objectContaining({
           type: 'expression',
           operator: 'AND'
-        }),
-        expect.any(Number)
+        })
       );
     });
 
@@ -342,23 +343,18 @@ describe('SearchResultPage', () => {
         expect.objectContaining({
           type: 'expression',
           operator: 'AND'
-        }),
-        expect.any(Number)
+        })
       );
     });
   });
 
-  it('refreshes with a null expression when applying no expression filters', async () => {
-    const { getByRole, rerender } = renderPage();
-    const callCountBeforeApply = mockUseSearchResults.mock.calls.length;
+  it('searches again when the filters already applied are applied again', () => {
+    const { getByRole } = renderPage();
 
     fireEvent.click(getByRole('button', { name: /apply empty expression/i }));
-    rerender(<SearchResultPage />);
 
-    await waitFor(() => {
-      expect(mockUseSearchResults.mock.calls.length).toBeGreaterThan(callCountBeforeApply);
-      expect(mockUseSearchResults).toHaveBeenLastCalledWith('survey', true, null, expect.any(Number));
-    });
+    expect(mockReload).toHaveBeenCalledOnce();
+    expect(mockUseSearchResults).toHaveBeenLastCalledWith('survey', true, null);
   });
 
   it('surfaces the API error message in a snackbar when submit fails', async () => {

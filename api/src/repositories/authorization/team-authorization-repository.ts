@@ -264,8 +264,7 @@ export class TeamAuthorizationRepository extends BaseRepository {
       WHERE NOT parent.submission_feature_id = ANY(child.path)
     )`;
 
-    const enforcingSecurity = `(sfs.status = 'active'
-      AND sfs.record_effective_date <= now()
+    const enforcingSecurity = `( sfs.record_effective_date <= now()
       AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date))`;
 
     const historicallyUnsecured = `NOT EXISTS (

@@ -1,11 +1,17 @@
+import { SubmissionUploadReviewValidationFeatureTypePage } from 'features/admin/reviews/SubmissionUploadReviewValidationFeatureTypePage';
+import { SubmissionUploadReviewValidationReconciliationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationReconciliationPage';
+import { BlueprintFeatureTypePage } from 'features/admin/configuration/blueprint/feature/BlueprintFeatureTypePage';
+import { BlueprintPage } from 'features/admin/configuration/blueprint/BlueprintPage';
+import { ConfigurationPage } from 'features/admin/configuration/ConfigurationPage';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
 import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
 import { PolicyDetailPage } from 'features/admin/policies/PolicyDetailPage';
-import { SubmissionUploadReviewValidationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationPage';
+import { SubmissionUploadReviewPage } from 'features/admin/reviews/SubmissionUploadReviewPage';
 import { SubmissionReviewFeaturePage } from 'features/admin/reviews/SubmissionReviewFeaturePage';
 import { ManageSecurityPage } from 'features/admin/security/ManageSecurityPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
+import { ContributorDetailPage } from 'features/admin/users/contributors/ContributorDetailPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -17,7 +23,7 @@ import { TicketsRouter } from './ticket/TicketsRouter';
 /**
  * Returns routes for system administrators
  *
- * @returns
+ * @returns {JSX.Element} Authorized administrative routes.
  */
 export const AdminRouter = () => {
   return (
@@ -44,7 +50,40 @@ export const AdminRouter = () => {
 
       {/* Submission upload review routes */}
       <Route
-        path="submission/:submissionId/upload/:submissionUploadId/review/:reviewId/feature/:submissionFeatureId"
+        path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/:reconciliation?/feature-type/:featureType"
+        element={
+          <BaseLayout>
+            <PageTitle
+              title="Feature Type Properties"
+              description="Review property definitions within a submission upload"
+            />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <SubmissionUploadReviewValidationFeatureTypePage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/:reconciliation"
+        element={
+          <BaseLayout>
+            <PageTitle title="Reconciliation Features" description="Review features by reconciliation outcome" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <SubmissionUploadReviewValidationReconciliationPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/feature/:submissionFeatureId"
         element={
           <BaseLayout>
             <PageTitle title="Review Feature" description="Review submission feature details" />
@@ -59,21 +98,36 @@ export const AdminRouter = () => {
         }
       />
       <Route
-        path="submission/:submissionId/upload/:submissionUploadId/review/:reviewId"
+        path="submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
         element={
           <BaseLayout>
-            <PageTitle title="Validation Review" description="Review submission upload features" />
+            <PageTitle title="Upload Review" description="Review submission upload features" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
-                <SubmissionUploadReviewValidationPage />
+                <SubmissionUploadReviewPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>
         }
       />
 
+      <Route
+        path="users/contributor/:contributorId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Contributor" description="Manage contributor and associated users" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <ContributorDetailPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
       {/* Manage Users route */}
       <Route
         path="users"
@@ -82,7 +136,7 @@ export const AdminRouter = () => {
             <PageTitle title="Manage Users" description="Manage users and their roles" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
-                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <ManageUsersPage />
               </SystemRoleGuard>
@@ -155,6 +209,54 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <TicketsRouter />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="configuration"
+        element={
+          <BaseLayout>
+            <PageTitle title="Configuration" description="Manage platform schema configuration" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <ConfigurationPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="configuration/blueprints/:blueprintId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Blueprint" description="Manage platform schema configuration" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <BlueprintPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="configuration/blueprints/:blueprintId/feature_type/:blueprintFeatureTypeId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Blueprint" description="Manage platform schema configuration" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <BlueprintFeatureTypePage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

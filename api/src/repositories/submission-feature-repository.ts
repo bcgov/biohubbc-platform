@@ -196,7 +196,6 @@ export class SubmissionFeatureRepository extends BaseRepository {
             JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id
             WHERE c.source_submission_feature_id = ${terminalFeatureId}
               AND c.is_ancestor = true
-              AND sfs.status = 'active'
               AND sfs.record_effective_date <= now()
               AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
           ), ARRAY[]::varchar[])
@@ -242,8 +241,7 @@ export class SubmissionFeatureRepository extends BaseRepository {
           JOIN submission_feature_security sfs
             ON sfs.submission_feature_id = ancestry.submission_feature_id
           JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id
-          WHERE sfs.status = 'active'
-            AND sfs.record_effective_date <= now()
+          WHERE sfs.record_effective_date <= now()
             AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
         )
         SELECT

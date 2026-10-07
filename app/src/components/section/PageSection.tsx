@@ -1,8 +1,8 @@
 import { mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
-import Button from '@mui/material/Button';
+import Button, { ButtonProps } from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
-import Paper from '@mui/material/Paper';
+import Paper, { PaperProps } from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -13,7 +13,12 @@ export interface IPageSectionProps extends PropsWithChildren {
   label: ReactNode;
   onAdd?: () => void;
   addLabel?: string;
+  /**
+   * Optional size for this section's add button.
+   */
+  addButtonSize?: ButtonProps['size'];
   headerContent?: ReactNode;
+  sx?: PaperProps['sx'];
 }
 
 /**
@@ -26,10 +31,10 @@ export interface IPageSectionProps extends PropsWithChildren {
  * @returns {JSX.Element}
  */
 export const PageSection = (props: IPageSectionProps) => {
-  const { id, label, onAdd, addLabel = 'Add', headerContent, children } = props;
+  const { id, label, onAdd, addLabel = 'Add', addButtonSize, headerContent, children, sx } = props;
 
   return (
-    <Paper>
+    <Paper sx={sx}>
       <Toolbar disableGutters sx={{ px: 2 }}>
         <Typography variant="h5" component="h2" flexGrow={1}>
           {label}
@@ -38,6 +43,7 @@ export const PageSection = (props: IPageSectionProps) => {
           {headerContent}
           {onAdd && (
             <Button
+              size={addButtonSize}
               variant="contained"
               color="primary"
               startIcon={<Icon path={mdiPlus} size={0.8} />}

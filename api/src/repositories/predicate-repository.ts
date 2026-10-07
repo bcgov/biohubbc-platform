@@ -30,7 +30,7 @@ export class PredicateRepository extends BaseRepository {
       .returning([
         'predicate_id',
         'feature_property_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'feature_property_type_id',
         'predicate_hash',
         knex.raw('true AS inserted')
@@ -67,7 +67,7 @@ export class PredicateRepository extends BaseRepository {
       .select([
         'predicate_id',
         'feature_property_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'feature_property_type_id',
         'predicate_hash'
       ])
@@ -106,7 +106,7 @@ export class PredicateRepository extends BaseRepository {
       .select([
         'predicate_id',
         'feature_property_id',
-        'feature_type_property_id',
+        'blueprint_feature_type_property_id',
         'feature_property_type_id',
         'predicate_hash'
       ])
@@ -168,7 +168,7 @@ export class PredicateRepository extends BaseRepository {
         jsonb_build_object(
           'operator', px.operator::text
         ) || CASE
-          WHEN px.operator::text <> 'Exists' THEN jsonb_build_object('value', px.taxon_id)
+          WHEN px.operator::text <> 'Exists' THEN jsonb_build_object('value', t.itis_tsn)
           ELSE '{}'::jsonb
         END
       WHEN pg.predicate_id IS NOT NULL THEN
@@ -204,6 +204,8 @@ export class PredicateRepository extends BaseRepository {
    *
    * This keeps payload-count logic computed once and avoids sparse-row mapper
    * branches in TypeScript.
+   * Taxon values are projected back to ITIS TSNs, matching public write inputs.
+   * The taxon join stays optional because `Exists` has no taxon reference.
    *
    * @param {string[]} predicateIds - Predicate identifiers to fetch.
    * @return {Knex.QueryBuilder} Knex query builder returning `ReadPredicateNodeRow`-shaped rows.
@@ -215,7 +217,7 @@ export class PredicateRepository extends BaseRepository {
       .select([
         'p.predicate_id',
         'p.feature_property_id',
-        'p.feature_type_property_id',
+        'p.blueprint_feature_type_property_id',
         knex.raw(`${this.readPayloadCountExpression} AS payload_count`),
         knex.raw(`${this.readTypedPredicateExpression} AS typed_predicate_json`)
       ])
@@ -234,6 +236,7 @@ export class PredicateRepository extends BaseRepository {
       .leftJoin('predicate_taxon as px', function () {
         this.on('px.predicate_id', '=', 'p.predicate_id').onNull('px.record_end_date');
       })
+      .leftJoin('taxon as t', 't.taxon_id', 'px.taxon_id')
       .leftJoin('predicate_geometry as pg', function () {
         this.on('pg.predicate_id', '=', 'p.predicate_id').onNull('pg.record_end_date');
       })
@@ -253,7 +256,7 @@ export class PredicateRepository extends BaseRepository {
                 jsonb_build_object(
                   'type', 'predicate',
                   'feature_property_id', base.feature_property_id,
-                  'feature_type_property_id', base.feature_type_property_id,
+                  'blueprint_feature_type_property_id', base.blueprint_feature_type_property_id,
                   'operator', base.typed_predicate_json->>'operator'
                 ) || (base.typed_predicate_json - 'operator')
               ELSE NULL

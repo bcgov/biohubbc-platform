@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   CreateExportPayload,
   DownloadExport,
@@ -61,16 +61,18 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    * @param {string} downloadId - The parent download ID.
    * @param {string} downloadVersionId - The selected download version ID.
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination and sorting parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<DownloadExportListResponse>} The selected version's paginated exports.
    */
   const listDownloadVersionExports = async (
     downloadId: string,
     downloadVersionId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<DownloadExportListResponse> => {
     const { data } = await axios.get<DownloadExportListResponse>(
       `/api/download/${downloadId}/version/${downloadVersionId}/export`,
-      { params: pagination }
+      { params: pagination, ...options }
     );
     return data;
   };
@@ -80,10 +82,14 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
    * which drive the export config picker.
    *
    * @param {string} downloadId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<DownloadFeatureType[]>}
    */
-  const getDownloadFeatureTypes = async (downloadId: string): Promise<DownloadFeatureType[]> => {
-    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`);
+  const getDownloadFeatureTypes = async (
+    downloadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadFeatureType[]> => {
+    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`, options);
     return data;
   };
 

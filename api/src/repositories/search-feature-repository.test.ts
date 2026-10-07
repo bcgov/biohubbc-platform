@@ -11,12 +11,12 @@ import { codePropertyValueJson, featureReferencePropertyValueJson, taxonProperty
 
 const normalizedPredicate = (
   feature_property_id: number,
-  feature_type_property_id: number | null,
+  blueprint_feature_type_property_id: number | null,
   internal_predicate: any
 ) => ({
   type: 'predicate' as const,
   feature_property_id,
-  feature_type_property_id,
+  blueprint_feature_type_property_id,
   operator: internal_predicate.operator,
   ...(internal_predicate.value !== undefined ? { value: internal_predicate.value } : {}),
   feature_property_type_id: internal_predicate.type === 'number' ? 2 : 1,
@@ -27,6 +27,52 @@ const normalizedPredicate = (
 describe('SearchFeatureRepository', () => {
   afterEach(() => {
     Sinon.restore();
+  });
+
+  describe('reconciliation browsing', () => {
+    const scope = { submissionId: 7, submissionUploadId: 'upload', reconciliation: 'unmodified' as const };
+
+    it('scopes and limits historical candidates before hydrating properties without requiring closure', async () => {
+      const execute = Sinon.stub().resolves({ rows: [] });
+      const repository = new SearchFeatureRepository(getMockDBConnection({ knex: execute }));
+      await repository.getReconciliationFeatures(scope, 'animal', {
+        limit: 3,
+        sort: 'create_date',
+        order: 'desc',
+        boundary: { direction: 'next', submission_feature_id: 30, create_date: '2026-01-01T00:00:00Z' }
+      });
+      expect(execute).to.have.been.calledOnce;
+      const sql = execute.firstCall.args[0].toString();
+      expect(sql).to.include('"sf"."submission_id" = 7');
+      expect(sql).to.include('"sf"."submission_upload_id" = \'upload\'');
+      expect(sql).to.include('"sf"."reconciliation" = \'unmodified\'');
+      expect(sql).to.include('"ft"."name" = \'animal\'');
+      expect(sql).to.include('limit 3');
+      expect(sql).not.to.include('sf.record_end_date');
+      expect(sql).not.to.include('submission_feature_closure');
+      expect(sql).to.include("fpt.name IN ('string', 'number')");
+      expect(sql).to.include("referenced_sf.submission_upload_id = 'upload'::uuid");
+      expect(sql).not.to.include('referenced_sf.record_end_date');
+      expect(sql).not.to.include('fp.record_end_date');
+      expect(sql).to.include('FROM submission_feature_property_artifact p');
+      expect(sql).to.include('to_jsonb(a.object_key::text)');
+      expect(sql.indexOf('limit 3')).to.be.lessThan(sql.indexOf('LEFT JOIN LATERAL'));
+    });
+
+    it('groups counts without pagination or current-row predicates', async () => {
+      const execute = Sinon.stub().resolves({ rows: [{ feature_type_name: 'animal', count: 2 }] });
+      const repository = new SearchFeatureRepository(getMockDBConnection({ knex: execute }));
+      expect(await repository.countReconciliationFeatures(scope)).to.deep.equal([
+        { feature_type_name: 'animal', count: 2 }
+      ]);
+      expect(execute).to.have.been.calledOnce;
+      const sql = execute.firstCall.args[0].toString();
+      expect(sql).to.include('"sf"."submission_id" = 7');
+      expect(sql).to.include('"sf"."reconciliation" = \'unmodified\'');
+      expect(sql).to.include('group by "ft"."name"');
+      expect(sql).not.to.include('record_end_date');
+      expect(sql).not.to.include('limit');
+    });
   });
 
   describe('searchFeaturesByExpressionTree (wrapper relay)', () => {
@@ -53,7 +99,10 @@ describe('SearchFeatureRepository', () => {
         ]
       };
 
-      await repository.searchFeaturesByExpressionTree('survey', expressionTree, undefined, 42);
+      await repository.searchFeaturesByExpressionTree('survey', expressionTree, undefined, {
+        type: 'user',
+        systemUserId: 42
+      });
 
       expect(subqueryStub.calledOnce).to.equal(true);
       expect(subqueryStub.getCall(0).args).to.deep.equal([
@@ -70,7 +119,7 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.not.include('security_scope_anchor');
     });
 
-    it('should default systemUserId to null when omitted', async () => {
+    it('should default to anonymous access when securityContext is omitted', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
@@ -105,7 +154,7 @@ describe('SearchFeatureRepository', () => {
 
       const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
 
-      await repository.searchFeaturesByExpressionTree('telemetry', undefined, { limit: 25 }, null);
+      await repository.searchFeaturesByExpressionTree('telemetry', null, { limit: 25 }, { type: 'anonymous' });
 
       expect(subqueryStub.notCalled).to.equal(true);
 
@@ -133,9 +182,9 @@ describe('SearchFeatureRepository', () => {
 
       await repository.searchFeaturesByExpressionTree(
         'telemetry',
-        undefined,
+        null,
         { limit: 25, sort: 'create_date', order: 'desc' },
-        null
+        { type: 'anonymous' }
       );
 
       const sortedSql = knexSpy.getCall(0).args[0].toString();
@@ -170,7 +219,7 @@ describe('SearchFeatureRepository', () => {
             create_date: '2026-09-01T12:00:00Z'
           }
         },
-        null
+        { type: 'anonymous' }
       );
 
       expect(subqueryStub.getCall(0).args[3]).to.deep.equal({
@@ -191,9 +240,9 @@ describe('SearchFeatureRepository', () => {
 
       await repository.searchFeaturesByExpressionTree(
         'telemetry',
-        undefined,
+        null,
         { limit: 25, sort: 'relevancy_score', order: 'desc' },
-        null
+        { type: 'anonymous' }
       );
 
       const sql = knexSpy.getCall(0).args[0].toString();
@@ -210,9 +259,9 @@ describe('SearchFeatureRepository', () => {
       try {
         await repository.searchFeaturesByExpressionTree(
           'telemetry',
-          undefined,
+          null,
           { limit: 25, sort: 'unsupported_field', order: 'desc' },
-          null
+          { type: 'anonymous' }
         );
         expect.fail('Expected searchFeaturesByExpressionTree to reject');
       } catch (error) {
@@ -230,9 +279,9 @@ describe('SearchFeatureRepository', () => {
       try {
         await repository.searchFeaturesByExpressionTree(
           'telemetry',
-          undefined,
+          null,
           { limit: 25, sort: 'submission_name', order: 'asc' },
-          null
+          { type: 'anonymous' }
         );
         expect.fail('Expected searchFeaturesByExpressionTree to reject');
       } catch (error) {
@@ -247,7 +296,7 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+      await repository.searchFeaturesByExpressionTree('survey', null, undefined, { type: 'anonymous' });
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.not.include('sf.data');
@@ -260,7 +309,7 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_property_code');
       expect(sql).to.include('submission_feature_property_taxon');
       expect(sql).to.include('submission_feature_property_feature');
-      expect(sql).to.include("fpt.name = 'number'");
+      expect(sql).to.include("fpt.name IN ('string', 'number')");
       expect(sql).to.include("fpt.name = 'taxon'");
       expect(sql).to.include(`${taxonPropertyValueJson('t')} AS value`);
       expect(sql).to.include('contributor_codeset_code');
@@ -273,7 +322,7 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+      await repository.searchFeaturesByExpressionTree('survey', null, undefined, { type: 'anonymous' });
 
       const sql = knexSpy.getCall(0).args[0].toString();
       // The taxon branch emits the same object as the feature-detail properties read path
@@ -288,7 +337,7 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+      await repository.searchFeaturesByExpressionTree('survey', null, undefined, { type: 'anonymous' });
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include(codePropertyValueJson('ccc', 'cs'));
@@ -304,11 +353,56 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      await repository.searchFeaturesByExpressionTree('survey', undefined, undefined, null);
+      await repository.searchFeaturesByExpressionTree('survey', null, undefined, { type: 'anonymous' });
 
       const sql = knexSpy.getCall(0).args[0].toString();
       expect(sql).to.include(featureReferencePropertyValueJson('referenced_sf'));
       expect(sql).to.not.include('to_jsonb(referenced_sf.urn)');
+    });
+  });
+
+  describe('unrestricted security context', () => {
+    it('passes unrestricted visibility to the feature query builder', async () => {
+      const query = getKnex()('submission_feature').select('submission_feature_id');
+      const broad = Sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(query);
+      const repository = new SearchFeatureRepository(
+        getMockDBConnection({
+          knex: Sinon.stub().resolves({ rows: [], rowCount: 0 })
+        })
+      );
+
+      await repository.searchFeaturesByExpressionTree('survey', null, undefined, { type: 'unrestricted' });
+
+      expect(broad.firstCall.args[1]).to.be.undefined;
+    });
+
+    it('uses the unrestricted builder for counts rather than the public count path', async () => {
+      const query = getKnex()('submission_feature').select('submission_feature_id');
+      const broad = Sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(query);
+      const publicCount = Sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeCountSubquery');
+      const repository = new SearchFeatureRepository(
+        getMockDBConnection({
+          knex: Sinon.stub().resolves({ rows: [{ count: 3 }], rowCount: 1 })
+        })
+      );
+
+      const count = await repository.countFeaturesByExpressionTree('survey', null, { type: 'unrestricted' });
+
+      expect(count).to.equal(3);
+      expect(broad.firstCall.args).to.deep.equal(['survey', undefined]);
+      expect(publicCount.called).to.equal(false);
+    });
+
+    it('reports no inaccessible features without querying for unrestricted callers', async () => {
+      const query = Sinon.stub();
+      const repository = new SearchFeatureRepository(getMockDBConnection({ knex: query }));
+
+      const hidden = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('survey', null, {
+        type: 'unrestricted'
+      });
+
+      expect(hidden).to.equal(false);
+      expect(query.called).to.equal(false);
     });
   });
 
@@ -336,7 +430,10 @@ describe('SearchFeatureRepository', () => {
         getKnex()('any_table').select('submission_feature_id').where('value', 'moose')
       );
 
-      const total = await repository.countFeaturesByExpressionTree('survey', expressionTree, 42);
+      const total = await repository.countFeaturesByExpressionTree('survey', expressionTree, {
+        type: 'user',
+        systemUserId: 42
+      });
 
       expect(total).to.equal(42_000);
       expect(subqueryStub.firstCall.args).to.deep.equal(['survey', expressionTree, 42]);
@@ -360,7 +457,7 @@ describe('SearchFeatureRepository', () => {
         getKnex()('any_table').select('submission_feature_id')
       );
 
-      const total = await repository.countFeaturesByExpressionTree('survey', undefined);
+      const total = await repository.countFeaturesByExpressionTree('survey', null);
 
       expect(total).to.equal(5_000_000);
       expect(broadStub.firstCall.args).to.deep.equal(['survey', null]);
@@ -394,7 +491,10 @@ describe('SearchFeatureRepository', () => {
       ).returns(getKnex()('unfiltered_table').select('submission_feature_id'));
       const filteredStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
 
-      await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', expressionTree, 42);
+      await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', expressionTree, {
+        type: 'user',
+        systemUserId: 42
+      });
 
       // The hidden-secured check must use the unfiltered candidate set, never the access-filtered one.
       expect(unfilteredStub.calledOnce).to.equal(true);
@@ -417,7 +517,10 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      const result = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, 42);
+      const result = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', null, {
+        type: 'user',
+        systemUserId: 42
+      });
 
       expect(result).to.equal(true);
 
@@ -443,7 +546,9 @@ describe('SearchFeatureRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
 
-      const result = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, null);
+      const result = await repository.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', null, {
+        type: 'anonymous'
+      });
 
       expect(result).to.equal(false);
 
@@ -457,18 +562,26 @@ describe('SearchFeatureRepository', () => {
     it('should return true when the EXISTS probe yields a row and false otherwise', async () => {
       const truthyKnex = Sinon.stub().resolves({ rowCount: 1, rows: [{ '?column?': 1 }] });
       const trueRepo = new SearchFeatureRepository(getMockDBConnection({ knex: truthyKnex }));
-      expect(await trueRepo.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, 42)).to.equal(true);
+      expect(
+        await trueRepo.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', null, {
+          type: 'user',
+          systemUserId: 42
+        })
+      ).to.equal(true);
 
       const emptyKnex = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const falseRepo = new SearchFeatureRepository(getMockDBConnection({ knex: emptyKnex }));
-      expect(await falseRepo.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', undefined, 42)).to.equal(
-        false
-      );
+      expect(
+        await falseRepo.hasInaccessibleSecuredFeaturesByExpressionTree('telemetry', null, {
+          type: 'user',
+          systemUserId: 42
+        })
+      ).to.equal(false);
     });
   });
 
   describe('getFeatureTypeProperties', () => {
-    it('should return active anchor-type metadata', async () => {
+    it('lists one column per property assigned to the anchor type under any Blueprint', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
@@ -476,10 +589,16 @@ describe('SearchFeatureRepository', () => {
       await repository.getFeatureTypeProperties('survey');
 
       const sql = knexSpy.getCall(0).args[0].toString();
-      expect(sql).to.include('from "feature_type_property" as "ftp"');
+      expect(sql).to.include('from "feature_type" as "ft"');
+      expect(sql).to.not.include('"blueprint" as "b"');
+      expect(sql).to.not.include('is_default');
+      expect(sql).to.not.include('"bftp"."record_end_date"');
+      expect(sql).to.not.include('"bft"."record_end_date"');
       expect(sql).to.include('"ft"."name" = \'survey\'');
       expect(sql).to.include('"fpt"."name" as "type_name"');
-      expect(sql).to.include('order by ftp.sort ASC NULLS LAST');
+      expect(sql).to.include('BOOL_OR(bftp.allow_multiple) AS allow_multiple');
+      expect(sql).to.include('group by "fp"."feature_property_id"');
+      expect(sql).to.include('order by MIN(bftp.sort) ASC NULLS LAST');
       expect(sql).to.not.include('submission_feature_property_');
       expect(sql).to.not.include('expression_match');
       expect(sql).to.not.include('exists');

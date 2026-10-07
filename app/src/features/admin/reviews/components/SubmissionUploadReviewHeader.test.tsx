@@ -49,20 +49,13 @@ describe('SubmissionUploadReviewHeader', () => {
     render(
       <MemoryRouter>
         <DialogContext.Provider value={dialogContext}>
-          <SubmissionUploadReviewHeader
-            submissionId={16}
-            review={review}
-            isSavingStatus={false}
-            onStatusActionClick={vi.fn()}
-            activeTab="features"
-            onTabChange={vi.fn()}
-          />
+          <SubmissionUploadReviewHeader submissionId={16} review={review} onStatusActionClick={vi.fn()} />
         </DialogContext.Provider>
       </MemoryRouter>
     );
 
     const breadcrumbs = screen.getByLabelText('review breadcrumb');
-    expect(breadcrumbs).toHaveTextContent(`Submission>Review>${review.name}`);
+    expect(breadcrumbs).toHaveTextContent(`Submission/Review/${review.name}`);
     expect(within(breadcrumbs).getByRole('link', { name: 'Submission' })).toHaveAttribute(
       'href',
       '/admin/submissions/16'
@@ -80,16 +73,14 @@ describe('SubmissionUploadReviewHeader', () => {
           <SubmissionUploadReviewHeader
             submissionId={16}
             review={{ ...review, scope: 'security', name: 'Access rules review' }}
-            isSavingStatus={false}
             onStatusActionClick={vi.fn()}
-            activeTab="features"
-            onTabChange={vi.fn()}
           />
         </DialogContext.Provider>
       </MemoryRouter>
     );
 
-    expect(screen.getByLabelText('review breadcrumb')).toHaveTextContent('Submission>Review>Access rules review');
+    expect(screen.getByLabelText('review breadcrumb')).toHaveTextContent('Submission/Review/Access rules review');
+    expect(screen.queryByRole('tab', { name: 'Security' })).not.toBeInTheDocument();
   });
 
   it('shows Reopen Review when the review is completed', () => {
@@ -99,10 +90,7 @@ describe('SubmissionUploadReviewHeader', () => {
           <SubmissionUploadReviewHeader
             submissionId={16}
             review={{ ...review, status: 'completed' }}
-            isSavingStatus={false}
             onStatusActionClick={vi.fn()}
-            activeTab="features"
-            onTabChange={vi.fn()}
           />
         </DialogContext.Provider>
       </MemoryRouter>

@@ -11,6 +11,7 @@ const searchSpeciesMock = vi.hoisted(() => vi.fn());
 const setSnackbarMock = vi.hoisted(() => vi.fn());
 let user: ReturnType<typeof userEvent.setup>;
 const expressionBuilderInteractionTimeout = 20000;
+const expectSignal = { signal: expect.any(AbortSignal) };
 
 vi.setConfig({ testTimeout: expressionBuilderInteractionTimeout });
 
@@ -177,7 +178,7 @@ describe('ExpressionBuilder', () => {
             {
               type: 'predicate',
               feature_property_id: 1,
-              feature_type_property_id: null,
+              blueprint_feature_type_property_id: null,
               operator: 'Equals',
               value: 'sensitive'
             }
@@ -215,7 +216,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'ILike',
           value: 'wolf'
         }
@@ -276,7 +277,7 @@ describe('ExpressionBuilder', () => {
     expect(searchTaxonMock).not.toHaveBeenCalled();
     expect(searchSpeciesMock).not.toHaveBeenCalled();
     await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
-    expect(searchTaxonMock).toHaveBeenLastCalledWith({ keyword: '180701' }, { page: 1, limit: 25 });
+    expect(searchTaxonMock).toHaveBeenLastCalledWith({ keyword: '180701' }, { page: 1, limit: 25 }, expectSignal);
     expect(searchSpeciesMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Taxon')).toHaveValue('180701');
     fireEvent.click(await screen.findByRole('option', { name: 'Ovis canadensis' }));
@@ -290,7 +291,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180701
         }
@@ -363,7 +364,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'DescendsFrom',
           value: 180701
         }
@@ -434,7 +435,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 15,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: '179913'
         }
@@ -484,7 +485,7 @@ describe('ExpressionBuilder', () => {
     fireEvent.change(screen.getByLabelText('Taxon'), { target: { value: '999999' } });
 
     await waitFor(() => expect(searchTaxonMock).toHaveBeenCalledTimes(1));
-    expect(searchTaxonMock).toHaveBeenLastCalledWith({ keyword: '999999' }, { page: 1, limit: 25 });
+    expect(searchTaxonMock).toHaveBeenLastCalledWith({ keyword: '999999' }, { page: 1, limit: 25 }, expectSignal);
     await user.click(screen.getByRole('button', { name: /apply/i }));
 
     expect(onApply).toHaveBeenCalledWith({
@@ -494,7 +495,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 999999
         }
@@ -647,8 +648,8 @@ describe('ExpressionBuilder', () => {
 
     render(<ExpressionBuilder recommendedSearchTerm="Moose" onApply={onApply} />);
 
-    await waitFor(() => expect(searchSpeciesMock).toHaveBeenLastCalledWith('Moose'));
-    expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 });
+    await waitFor(() => expect(searchSpeciesMock).toHaveBeenLastCalledWith('Moose', undefined, expectSignal));
+    expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 }, expectSignal);
 
     await user.click(await screen.findByText('Alces alces'));
     await user.click(screen.getByRole('button', { name: /apply/i }));
@@ -660,7 +661,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 3,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         }
@@ -707,7 +708,7 @@ describe('ExpressionBuilder', () => {
 
     await screen.findByText('Alces alces');
     expect(searchPropertiesMock).toHaveBeenCalledTimes(2);
-    expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 });
+    expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 }, expectSignal);
 
     await user.click(await screen.findByText('Alces alces'));
 
@@ -722,7 +723,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         }
@@ -771,11 +772,15 @@ describe('ExpressionBuilder', () => {
 
     await screen.findByText('Alces alces');
     expect(searchPropertiesMock).toHaveBeenCalledTimes(2);
-    expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 });
+    expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 }, expectSignal);
 
     await user.click(screen.getByText('Alces alces'));
     await waitFor(() =>
-      expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'taxon_id' }, { page: 1, limit: 25 })
+      expect(searchPropertiesMock).toHaveBeenLastCalledWith(
+        { keyword: 'taxon_id' },
+        { page: 1, limit: 25 },
+        expectSignal
+      )
     );
     expect(searchPropertiesMock).toHaveBeenCalledTimes(3);
 
@@ -791,14 +796,14 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         },
         {
           type: 'predicate',
           feature_property_id: 7,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals',
           value: 180703
         }
@@ -816,12 +821,16 @@ describe('ExpressionBuilder', () => {
 
     await screen.findByText('Alces alces');
     expect(searchPropertiesMock).toHaveBeenCalledTimes(2);
-    expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 });
+    expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 }, expectSignal);
 
     await user.click(screen.getByText('Alces alces'));
 
     await waitFor(() =>
-      expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'taxon_id' }, { page: 1, limit: 25 })
+      expect(searchPropertiesMock).toHaveBeenLastCalledWith(
+        { keyword: 'taxon_id' },
+        { page: 1, limit: 25 },
+        expectSignal
+      )
     );
     expect(setSnackbarMock).toHaveBeenCalledWith({
       open: true,
@@ -862,7 +871,7 @@ describe('ExpressionBuilder', () => {
     render(<ExpressionBuilder recommendedSearchTerm="species" onApply={vi.fn()} />);
 
     await waitFor(() =>
-      expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'species' }, { page: 1, limit: 25 })
+      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'species' }, { page: 1, limit: 25 }, expectSignal)
     );
 
     await user.click(await screen.findByText('Species'));
@@ -907,7 +916,7 @@ describe('ExpressionBuilder', () => {
     render(<ExpressionBuilder recommendedSearchTerm="species" onApply={vi.fn()} />);
 
     await waitFor(() =>
-      expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'species' }, { page: 1, limit: 25 })
+      expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'species' }, { page: 1, limit: 25 }, expectSignal)
     );
 
     await user.click(await screen.findByText('Species name'));
@@ -926,13 +935,13 @@ describe('ExpressionBuilder', () => {
     rerender(<ExpressionBuilder recommendedSearchTerm="Mo" onApply={vi.fn()} />);
     rerender(<ExpressionBuilder recommendedSearchTerm="Moose" onApply={vi.fn()} />);
 
-    await waitFor(() => expect(searchSpeciesMock).toHaveBeenLastCalledWith('Moose'));
+    await waitFor(() => expect(searchSpeciesMock).toHaveBeenLastCalledWith('Moose', undefined, expectSignal));
 
-    expect(searchSpeciesMock).toHaveBeenCalledWith('M');
-    expect(searchSpeciesMock).toHaveBeenCalledWith('Mo');
-    expect(searchSpeciesMock).toHaveBeenCalledWith('Moose');
-    expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 });
-    expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 });
+    expect(searchSpeciesMock).toHaveBeenCalledWith('M', undefined, expectSignal);
+    expect(searchSpeciesMock).toHaveBeenCalledWith('Mo', undefined, expectSignal);
+    expect(searchSpeciesMock).toHaveBeenCalledWith('Moose', undefined, expectSignal);
+    expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 }, expectSignal);
+    expect(searchPropertiesMock).toHaveBeenCalledWith({ keyword: 'Moose' }, { page: 1, limit: 25 }, expectSignal);
   });
 
   it('keeps latest suggested property chips when an older recommendation response finishes later', async () => {
@@ -1078,7 +1087,11 @@ describe('ExpressionBuilder', () => {
         await Promise.resolve();
       });
 
-      expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'habitat' }, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenLastCalledWith(
+        { keyword: 'habitat' },
+        { page: 1, limit: 25 },
+        expectSignal
+      );
       expect(searchPropertiesMock.mock.calls.filter(([filters]) => filters.keyword === 'habitat')).toHaveLength(1);
 
       vi.useRealTimers();
@@ -1091,7 +1104,7 @@ describe('ExpressionBuilder', () => {
     }
   });
 
-  it('cancels pending property searches and loads default property options once when search is cleared', async () => {
+  it('cancels pending property searches and keeps the default property options when search is cleared', async () => {
     vi.useFakeTimers();
     searchPropertiesMock.mockResolvedValue(defaultSearchPropertyResponse);
 
@@ -1100,8 +1113,12 @@ describe('ExpressionBuilder', () => {
 
       await flushAsyncUpdates();
 
-      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 });
+      expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 }, expectSignal);
       expect(searchPropertiesMock).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(result.current.propertyOptions).toHaveLength(2);
 
       act(() => {
         result.current.refreshPropertyOptions('habitat');
@@ -1116,9 +1133,9 @@ describe('ExpressionBuilder', () => {
         await Promise.resolve();
       });
 
-      expect(searchPropertiesMock).toHaveBeenCalledTimes(2);
-      expect(searchPropertiesMock.mock.calls.filter(([filters]) => Object.keys(filters).length === 0)).toHaveLength(2);
+      expect(searchPropertiesMock).toHaveBeenCalledTimes(1);
       expect(searchPropertiesMock.mock.calls.filter(([filters]) => filters.keyword)).toHaveLength(0);
+      expect(result.current.propertyOptions).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }
@@ -1196,7 +1213,7 @@ describe('ExpressionBuilder', () => {
 
       render(<ExpressionBuilder onApply={vi.fn()} />);
 
-      await waitFor(() => expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 }));
+      await waitFor(() => expect(searchPropertiesMock).toHaveBeenCalledWith({}, { page: 1, limit: 25 }, expectSignal));
 
       let propertyInputs = screen.getAllByRole('combobox', { name: 'Property' });
       let listbox = await openCombobox(propertyInputs[0]);
@@ -1213,7 +1230,11 @@ describe('ExpressionBuilder', () => {
 
       fireEvent.change(propertyInputs[1], { target: { value: 'habitat' } });
       await waitFor(() =>
-        expect(searchPropertiesMock).toHaveBeenLastCalledWith({ keyword: 'habitat' }, { page: 1, limit: 25 })
+        expect(searchPropertiesMock).toHaveBeenLastCalledWith(
+          { keyword: 'habitat' },
+          { page: 1, limit: 25 },
+          expectSignal
+        )
       );
       await waitFor(() => expect(propertyInputs[0]).toHaveValue('Description'));
       listbox = await openCombobox(propertyInputs[1]);
@@ -1245,7 +1266,7 @@ describe('ExpressionBuilder', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Exists'
         }
       ]

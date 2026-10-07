@@ -62,7 +62,7 @@ immediately rather than on the first tile request.
 | `MARTIN_TOKEN_AUD` | `biohub-tiles` | Expected `aud` claim. |
 | `MARTIN_TOKEN_ISS` | `biohub-api` | Expected `iss` claim. |
 | `MARTIN_TOKEN_SCOPE` | `tiles:read` | Scope the token must carry. |
-| `MARTIN_ALLOWED_SOURCES` | `search` | Comma separated sources this gateway will serve. |
+| `MARTIN_ALLOWED_SOURCES` | `search` | Comma separated sources this gateway will serve. The stack publishes `search`, `feature` and `upload`. |
 | `MARTIN_MIN_ZOOM` / `MARTIN_MAX_ZOOM` | `0` / `15` | Inclusive zoom bounds. |
 | `MARTIN_MAX_TILE_BYTES` | `52428800` | Per-tile response size cap accepted from Martin. |
 | `MARTIN_SOURCE_VERSION` | `1` | Appended to every upstream tile URL (`v=`). Martin's cache keys include the query string, so bumping this invalidates every tile Martin has cached. |

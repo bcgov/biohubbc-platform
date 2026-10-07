@@ -7,17 +7,18 @@ import { authorizeRequestHandler } from '../../../request-handlers/security/auth
 import { UploadIngestionService } from '../../../services/upload/upload-ingestion-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/upload/{uploadId}/archive/{uploadArchiveId}/index');
+const defaultLog = getLogger('paths/upload/{uploadId}/index');
 
 export const PUT: Operation = [
-  authorizeRequestHandler(() => ({
-    or: [{ discriminator: 'Contributor' }]
+  authorizeRequestHandler((req) => ({
+    or: [{ discriminator: 'Upload', uploadId: req.params.uploadId }]
   })),
   completeUpload()
 ];
 
 PUT.apiDoc = {
-  description: 'Complete a multipart file upload and create a submission.',
+  description:
+    'Complete a pending multipart upload. Requires the upload creator and access to the owning submission contributor.',
   tags: ['submission'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -63,7 +64,9 @@ export function completeUpload(): RequestHandler {
 
       await uploadIngestionService.completeArchiveUpload({
         uploadId,
-        ...req.body
+        s3UploadId: req.body.s3UploadId,
+        key: req.body.key,
+        parts: req.body.parts
       });
 
       await connection.commit();

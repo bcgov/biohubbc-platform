@@ -1,13 +1,38 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTicketContext } from 'hooks/useContext';
-import { ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
+import { ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
- * Cached ticket comment mutations shared by ticket comment flows.
+ * Writes to the cached ticket's comments, shared by ticket comment flows.
+ *
+ * Each write applies to the ticket as cached when it runs, and leaves the cache unchanged while the ticket
+ * has not loaded. A load of the ticket that was already in flight is repeated, since it predates the saved comment, and
+ * the ticket's other cached details are refreshed.
  *
  * @returns Comment cache mutation helpers.
  */
 export const useTicketCommentCache = () => {
-  const { ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketId, ticketQueryKey } = useTicketContext();
+
+  /**
+   * Writes a saved comment change into the cached ticket and refreshes the ticket's other copies.
+   *
+   * @param {(ticket: ITicketExtended) => ITicketExtended} update Builds the ticket with the change.
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
+   */
+  const writeSavedComment = async (update: (ticket: ITicketExtended) => ITicketExtended) => {
+    const hadPendingRead = queryClient.isFetching({ queryKey: ticketQueryKey, exact: true }) > 0;
+    await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+    queryClient.setQueryData<ITicketExtended>(ticketQueryKey, (ticket) => ticket && update(ticket));
+    if (hadPendingRead) {
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+    }
+    await refreshChangedQueries(queryClient, changedQueryKeys.ticketDetail(ticketId), ticketQueryKey);
+  };
 
   /**
    * Append a comment to the cached ticket details.
@@ -15,19 +40,16 @@ export const useTicketCommentCache = () => {
    * Used after the API returns a created comment. If ticket details are not loaded, the cache is left unchanged.
    *
    * @param {ITicketCommentLog} newComment Comment to append.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
   const appendCachedComment = (newComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: [...latestTicket.comments, newComment]
-    });
+    return writeSavedComment((ticket) => ({
+      ...ticket,
+      comments: [
+        ...ticket.comments.filter((comment) => comment.ticket_comment_id !== newComment.ticket_comment_id),
+        newComment
+      ]
+    }));
   };
 
   /**
@@ -36,19 +58,13 @@ export const useTicketCommentCache = () => {
    * Used by persisted deletes. If ticket details are not loaded, the cache is left unchanged.
    *
    * @param {string} ticketCommentId Comment identifier to remove.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
   const removeCachedComment = (ticketCommentId: string) => {
-    const latestTicket = ticketDataLoader.data;
-
-    if (!latestTicket) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
-    });
+    return writeSavedComment((ticket) => ({
+      ...ticket,
+      comments: ticket.comments.filter((comment) => comment.ticket_comment_id !== ticketCommentId)
+    }));
   };
 
   /**
@@ -58,26 +74,20 @@ export const useTicketCommentCache = () => {
    *
    * @param {string} ticketCommentId Comment identifier to replace.
    * @param {ITicketCommentLog} replacementComment Comment to write into the cache.
-   * @returns {void}
+   * @returns {Promise<void>} Resolves after the cache write and any immediate refresh.
    */
   const replaceCachedComment = (ticketCommentId: string, replacementComment: ITicketCommentLog) => {
-    const latestTicket = ticketDataLoader.data;
+    return writeSavedComment((ticket) => {
+      if (!ticket.comments.some((comment) => comment.ticket_comment_id === ticketCommentId)) {
+        return ticket;
+      }
 
-    if (!latestTicket) {
-      return;
-    }
-
-    const hasCachedComment = latestTicket.comments.some((comment) => comment.ticket_comment_id === ticketCommentId);
-
-    if (!hasCachedComment) {
-      return;
-    }
-
-    ticketDataLoader.setData({
-      ...latestTicket,
-      comments: latestTicket.comments.map((comment) =>
-        comment.ticket_comment_id === ticketCommentId ? replacementComment : comment
-      )
+      return {
+        ...ticket,
+        comments: ticket.comments.map((comment) =>
+          comment.ticket_comment_id === ticketCommentId ? replacementComment : comment
+        )
+      };
     });
   };
 

@@ -1,4 +1,3 @@
-import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
 export interface ISecureDataAccessRequestForm {
@@ -30,46 +29,6 @@ export interface IPersecutionHarmRule {
   wldtaxonomic_units_id: number;
   name: string;
   description: string | null;
-}
-
-/**
- * Represents a patch request made to apply security;
- *
- * @export
- * @interface IPatchFeatureSecurityRules
- */
-export interface IPatchFeatureSecurityRules {
-  /**
-   * The array of submission feature IDs whose security rules will be mutated
-   *
-   * @type {number[]}
-   * @memberof IPatchFeatureSecurityRules
-   */
-  submissionFeatureIds: number[];
-  /**
-   * The array of the security rules that will be applied to all of the given features.
-   * Note that it is possible that a particular rule ID may also belong to `stagedForRemove`.
-   *
-   * @type {number[]}
-   * @memberof IPatchFeatureSecurityRules
-   */
-  stagedForApply: ISecurityRuleAndCategory[];
-  /**
-   * The array of the security rules that will be removed from all of the given features.
-   * Note that it is possible that a particular rule ID may also belong to `stagedForApply`.
-   *
-   * @type {number[]}
-   * @memberof IPatchFeatureSecurityRules
-   */
-  stagedForRemove: ISecurityRuleAndCategory[];
-}
-
-export interface ISubmissionFeatureSecurityRulesSummary {
-  security_rule_id: number;
-  count: number;
-}
-export interface ISubmissionFeatureSecurityRulesSummaryResponse {
-  rules: ISubmissionFeatureSecurityRulesSummary[];
 }
 
 export interface ISecurityCategoryWithRuleCount {

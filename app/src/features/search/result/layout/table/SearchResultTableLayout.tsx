@@ -1,18 +1,21 @@
+import Link from '@mui/material/Link';
+import { Link as RouterLink } from 'react-router-dom';
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Typography } from '@mui/material';
 import { GridCellParams, GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PropertyValueDisplay } from 'components/property/PropertyValueDisplay';
-import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
-import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 import { type SubmissionPropertyValuePathResolvers } from 'utils/routes.interface';
 import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 
 interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
-  featureTypeProperties: FeatureTypeProperty[];
+  featureTypeProperties: SearchFeatureProperty[];
+  /** Optional destination for property headings when the owning workflow exposes type-level definitions. */
+  featureTypePropertiesPath?: string;
   pathResolvers: SubmissionPropertyValuePathResolvers;
   onClick?: (result: SearchFeatureResultWithRelevancy) => void;
 }
@@ -31,31 +34,43 @@ interface SearchResultTableLayoutProps {
 export const SearchResultTableLayout = ({
   results,
   featureTypeProperties,
+  featureTypePropertiesPath,
   pathResolvers,
   onClick
 }: SearchResultTableLayoutProps) => {
   const columns = useMemo<GridColDef<SearchFeatureResultWithRelevancy>[]>(() => {
-    const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map((property) => ({
-      field: String(property.feature_type_property_id),
-      headerName: property.display_name,
-      minWidth: 160,
-      flex: 1,
-      sortable: false,
-      valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
-      renderCell: (params) => (
-        <Typography
-          variant="body2"
-          noWrap
-          title={typeof params.value === 'string' ? params.value : ''}
-          sx={{ width: '100%' }}>
-          <PropertyValueDisplay
-            value={params.row.properties?.[property.name]}
-            submissionId={params.row.submission_id}
-            pathResolvers={pathResolvers}
-          />
-        </Typography>
-      )
-    }));
+    const propertyColumns: GridColDef<SearchFeatureResultWithRelevancy>[] = featureTypeProperties.map(
+      (property, index) => ({
+        field: String(property.feature_property_id),
+        headerName: property.display_name,
+        renderHeader: featureTypePropertiesPath
+          ? () => (
+              <Link component={RouterLink} to={featureTypePropertiesPath} color="inherit" underline="hover">
+                {property.display_name}
+              </Link>
+            )
+          : undefined,
+        minWidth: 160,
+        flex: 1,
+        sortable: false,
+        cellClassName: index === featureTypeProperties.length - 1 ? 'last-column-cell' : undefined,
+        headerClassName: index === featureTypeProperties.length - 1 ? 'last-column-header' : undefined,
+        valueGetter: (_value, row) => formatSubmissionPropertyValue(row.properties?.[property.name]),
+        renderCell: (params) => (
+          <Typography
+            variant="body2"
+            noWrap
+            title={typeof params.value === 'string' ? params.value : ''}
+            sx={{ width: '100%' }}>
+            <PropertyValueDisplay
+              value={params.row.properties?.[property.name]}
+              submissionId={params.row.submission_id}
+              pathResolvers={pathResolvers}
+            />
+          </Typography>
+        )
+      })
+    );
 
     return [
       {
@@ -81,7 +96,7 @@ export const SearchResultTableLayout = ({
       },
       ...propertyColumns
     ];
-  }, [featureTypeProperties, pathResolvers]);
+  }, [featureTypeProperties, featureTypePropertiesPath, pathResolvers]);
 
   return (
     <CustomDataGrid
@@ -101,7 +116,8 @@ export const SearchResultTableLayout = ({
         '& .MuiDataGrid-root': {
           border: 'none'
         },
-        '& .secured-column-cell, & .secured-column-header': { pl: '30px', justifyContent: 'center' }
+        '& .secured-column-cell, & .secured-column-header': { pl: 1, justifyContent: 'center' },
+        '& .last-column-cell, & .last-column-header': { pr: 1 }
       }}
     />
   );

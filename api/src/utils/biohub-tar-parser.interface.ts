@@ -1,4 +1,5 @@
 import { IFlattenedBlock } from '../models/submission-feature';
+import { SubmissionArchiveFormat } from '../models/submission-upload';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { ObjectStorageService } from '../services/object-storage/object-storage-service';
 
@@ -41,6 +42,8 @@ export interface UploadMediaEntryOptions {
 }
 
 export interface StreamSubmissionArchiveOptions {
+  /** Archive encoding; existing callers default to uncompressed TAR. */
+  archiveFormat?: SubmissionArchiveFormat;
   objectStorageService: ObjectStorageService;
   s3KeyPrefix: string;
   featureBatchSize: number;

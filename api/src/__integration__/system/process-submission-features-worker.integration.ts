@@ -5,8 +5,10 @@
 import { expect } from 'chai';
 import { Knex } from 'knex';
 import { randomUUID } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import * as tar from 'tar-stream';
 import { defaultPoolConfig, getAPIUserDBConnection, initDBPool } from '../../database/db';
+import { SubmissionArchiveFormat } from '../../models/submission-upload';
 import { JobQueues } from '../../queue/jobs';
 import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
@@ -496,7 +498,10 @@ describe('SubmissionIngestionService pipeline (system)', function () {
    * block's setupSubmissionWithTar, using Knex (auto-committed) so the service's
    * own short-lived transactions can see the rows.
    */
-  async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{
+  async function setupSubmissionWithTar(
+    tarBuffer: Buffer,
+    archiveFormat: SubmissionArchiveFormat = 'tar'
+  ): Promise<{
     submissionId: number;
     uploadId: string;
     submissionUploadId: string;
@@ -504,10 +509,16 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     teamId: string;
     blueprintId: number;
   }> {
-    const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
+    const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.${archiveFormat}`;
 
-    await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
+    const contentType = archiveFormat === 'tar.gz' ? 'application/gzip' : 'application/x-tar';
+    await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, contentType, objectKey);
     createdObjectKeys.push(objectKey);
+
+    const [submissionTeam] = await db('biohub.team')
+      .insert({ name: `${TEST_PREFIX} submission team ${randomUUID()}`, description: 'Submission access team.' })
+      .returning('team_id');
+    createdTeamIds.push(submissionTeam.team_id);
 
     // 1. submission
     const [submission] = await db('biohub.submission')
@@ -515,6 +526,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
         uuid: randomUUID(),
         system_user_id: SYSTEM_USER_ID,
         contributor_id: 1,
+        team_id: submissionTeam.team_id,
         name: TEST_PREFIX,
         description: TEST_PREFIX,
         comment: TEST_PREFIX
@@ -539,7 +551,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
         byte_size: tarBuffer.length,
         artifact_status: 'uploaded',
         uploaded_at: new Date().toISOString(),
-        format: 'tar'
+        format: archiveFormat
       })
       .returning('artifact_id');
     createdArtifactIds.push(artifact.artifact_id);
@@ -598,13 +610,16 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   /**
    * Run ingestSubmissionUpload with the output from setupSubmissionWithTar.
    */
-  async function ingestTar(tarBuffer: Buffer): Promise<{
+  async function ingestTar(
+    tarBuffer: Buffer,
+    archiveFormat: SubmissionArchiveFormat = 'tar'
+  ): Promise<{
     result: { valid: boolean; errors: unknown[] };
     submissionId: number;
     uploadId: string;
     submissionUploadId: string;
   }> {
-    const setup = await setupSubmissionWithTar(tarBuffer);
+    const setup = await setupSubmissionWithTar(tarBuffer, archiveFormat);
     const result = await service.ingestSubmissionUpload({
       submission_upload_id: setup.submissionUploadId,
       submission_id: setup.submissionId,
@@ -711,80 +726,90 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(String(count)).to.equal('0');
   });
 
-  it('should process media files and create artifact records', async () => {
-    const surveyId = randomUUID();
-    const surveyFeatureId = randomUUID();
-    const fileFeatureId = randomUUID();
+  for (const archiveFormat of ['tar', 'tar.gz'] as const) {
+    it(`processes ${archiveFormat} media and creates feature and artifact records`, async () => {
+      const surveyId = randomUUID();
+      const surveyFeatureId = randomUUID();
+      const fileFeatureId = randomUUID();
 
-    const tarBuffer = await createTarBuffer([
-      { name: '.survey-id', content: surveyId },
-      {
-        name: 'features/survey.json',
-        content: JSON.stringify([
-          {
-            id: surveyFeatureId,
-            type: 'survey',
-            properties: {
-              name: 'Media Test Survey',
-              focal_species: [12345],
-              start_date: '2024-01-01'
-            },
-            content: [fileFeatureId],
-            parent: null
-          }
-        ])
-      },
-      {
-        name: 'features/file.json',
-        content: JSON.stringify([
-          {
-            id: fileFeatureId,
-            type: 'file',
-            properties: { filename: 'photo.jpg', file_size: 1024, file_type: 'image/jpeg' },
-            content: [],
-            parent: surveyFeatureId
-          }
-        ])
-      },
-      { name: 'files/photo.jpg', content: 'fake-image-bytes' }
-    ]);
+      const tarBuffer = await createTarBuffer([
+        { name: '.survey-id', content: surveyId },
+        {
+          name: 'features/survey.json',
+          content: JSON.stringify([
+            {
+              id: surveyFeatureId,
+              type: 'survey',
+              properties: {
+                name: 'Media Test Survey',
+                focal_species: [12345],
+                start_date: '2024-01-01'
+              },
+              content: [fileFeatureId],
+              parent: null
+            }
+          ])
+        },
+        {
+          name: 'features/file.json',
+          content: JSON.stringify([
+            {
+              id: fileFeatureId,
+              type: 'file',
+              properties: { filename: 'photo.jpg', file_size: 1024, file_type: 'image/jpeg' },
+              content: [],
+              parent: surveyFeatureId
+            }
+          ])
+        },
+        { name: 'files/photo.jpg', content: 'fake-image-bytes' }
+      ]);
 
-    const { result, submissionId, uploadId, submissionUploadId } = await ingestTar(tarBuffer);
-
-    // Track S3 media upload for cleanup
-    createdObjectKeys.push(`submissions/${submissionId}/uploads/${submissionUploadId}/media/photo.jpg`);
-
-    expect(result.valid).to.be.true;
-    expect(result.errors).to.have.lengthOf(0);
-
-    // Verify features were inserted (survey + file)
-    const features = await db('biohub.submission_feature as sf')
-      .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .where('sf.submission_id', submissionId)
-      .orderBy('ft.name')
-      .select<Array<{ feature_type_name: string; data: Record<string, unknown> }>>(
-        db.raw('ft.name as feature_type_name'),
-        'sf.data'
+      const { result, submissionId, uploadId, submissionUploadId } = await ingestTar(
+        archiveFormat === 'tar.gz' ? gzipSync(tarBuffer) : tarBuffer,
+        archiveFormat
       );
 
-    const typeNames = features.map((r) => r.feature_type_name);
-    expect(typeNames).to.include('survey');
-    expect(typeNames).to.include('file');
+      expect(result.valid).to.be.true;
+      expect(result.errors).to.have.lengthOf(0);
 
-    // Raw ingest keeps original feature payload shape.
-    const fileFeature = features.find((r) => r.feature_type_name === 'file');
-    expect(fileFeature?.data).to.have.property('properties');
-    expect((fileFeature?.data.properties as Record<string, unknown>)['filename']).to.equal('photo.jpg');
+      // Verify features were inserted (survey + file)
+      const features = await db('biohub.submission_feature as sf')
+        .join('biohub.feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+        .where('sf.submission_id', submissionId)
+        .orderBy('ft.name')
+        .select<Array<{ feature_type_name: string; data: Record<string, unknown> }>>(
+          db.raw('ft.name as feature_type_name'),
+          'sf.data'
+        );
 
-    // Verify media upload_artifact rows were created with persisted path values.
-    const mediaUploadArtifacts = await db('biohub.upload_artifact as ua')
-      .join('biohub.artifact as a', 'ua.artifact_id', 'a.artifact_id')
-      .where('ua.upload_id', uploadId)
-      .where('a.object_key', 'like', `submissions/${submissionId}/uploads/${submissionUploadId}/media/%`)
-      .select<Array<{ path: string | null }>>('ua.path');
-    expect(mediaUploadArtifacts).to.have.lengthOf(1);
-    expect(mediaUploadArtifacts[0].path).to.equal('files/photo.jpg');
-  });
+      const typeNames = features.map((r) => r.feature_type_name);
+      expect(typeNames).to.include('survey');
+      expect(typeNames).to.include('file');
+
+      // Raw ingest keeps original feature payload shape.
+      const fileFeature = features.find((r) => r.feature_type_name === 'file');
+      expect(fileFeature?.data).to.have.property('properties');
+      expect((fileFeature?.data.properties as Record<string, unknown>)['filename']).to.equal('photo.jpg');
+
+      // Verify media upload_artifact rows were created with persisted path values.
+      const mediaUploadArtifacts = await db('biohub.upload_artifact as ua')
+        .join('biohub.artifact as a', 'ua.artifact_id', 'a.artifact_id')
+        .where('ua.upload_id', uploadId)
+        .where('a.object_key', 'like', `submissions/${submissionId}/uploads/${submissionUploadId}/media/%`)
+        .select<Array<{ path: string | null; artifact_id: string; object_key: string }>>(
+          'ua.path',
+          'a.artifact_id',
+          'a.object_key'
+        );
+      for (const artifact of mediaUploadArtifacts) {
+        createdArtifactIds.push(artifact.artifact_id);
+        createdObjectKeys.push(artifact.object_key);
+      }
+      expect(mediaUploadArtifacts).to.have.lengthOf(1);
+      expect(mediaUploadArtifacts[0].path).to.equal('files/photo.jpg');
+    });
+  }
 
   it('should ingest successfully when referenced media file is missing from tar', async () => {
     const surveyId = randomUUID();

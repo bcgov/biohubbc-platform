@@ -8,7 +8,6 @@ import { ITicketCommentEditFormValues } from './comment/edit/TicketCommentEditFo
 import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEditFormYupSchema';
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
-import { useSubmissionUploadStatusHistory } from './hooks/upload/useSubmissionUploadStatusHistory';
 import { useTicketTimelineUploadActions } from './hooks/upload/useTicketTimelineUploadActions';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
@@ -24,7 +23,7 @@ import { ITicketTimelineProps } from './TicketTimeline.interface';
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { ticket, isLoading } = props;
+  const { ticket } = props;
   const {
     selectedComment,
     isEditCommentDialogOpen,
@@ -56,7 +55,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleConfirmSubmissionUploadDecisionUpdate,
     handleConfirmSubmissionUploadDecisionReset
   } = useTicketTimelineUploadActions();
-  const { statusHistoryByUploadId, loadStatusHistory } = useSubmissionUploadStatusHistory();
   const authStateContext = useAuthStateContext();
   const canViewSubmissionUploadStatusHistory = hasAtLeastOneValidValue(
     [SYSTEM_ROLE.SYSTEM_ADMIN],
@@ -67,7 +65,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     <>
       <TicketTimelineItems
         ticket={ticket}
-        isLoading={isLoading}
         updatingDataRequestId={updatingDataRequestId}
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}
@@ -77,8 +74,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
         canViewSubmissionUploadStatusHistory={canViewSubmissionUploadStatusHistory}
-        submissionUploadStatusHistoryByUploadId={statusHistoryByUploadId}
-        onLoadSubmissionUploadStatusHistory={loadStatusHistory}
         onCreateSubmissionUploadReview={handleCreateSubmissionUploadReview}
         onOpenSubmissionUploadReview={handleOpenSubmissionUploadReview}
         onConfirmSubmissionUploadDecisionUpdate={handleConfirmSubmissionUploadDecisionUpdate}

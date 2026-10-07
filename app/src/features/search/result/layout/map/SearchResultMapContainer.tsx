@@ -1,9 +1,6 @@
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import { SkeletonMap } from 'components/loading/SkeletonLoaders';
 import { buildMartinRequestTransform } from 'components/map/martin-request';
 import { SlippyMap } from 'components/map/SlippyMap';
+import { TileSessionFrame } from 'components/map/TileSessionFrame';
 import type { ISlippyMapLayer, ISlippyMapPopupContext } from 'components/map/SlippyMap.interface';
 import { useBcBasemap } from 'components/map/useBcBasemap';
 import {
@@ -18,7 +15,7 @@ import {
 import { useConfigContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import type { SourceSpecification } from 'maplibre-gl';
-import { PropsWithChildren, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { buildSearchResultLayers, buildSearchResultsSource, SEARCH_RESULTS_SOURCE_ID } from './map-layers';
 import { resolveMapSelection } from './map-selection';
 import { SearchResultMapPopper } from './SearchResultMapPopper';
@@ -37,25 +34,9 @@ export interface ISearchResultMapContainerProps {
    * has and stops talking to the server, and re-mints on the way back.
    */
   isActive: boolean;
+  /** Optional submission scope. Memoize derived arrays at the caller to preserve the map session. */
+  submissionIds?: number[];
 }
-
-/**
- * Fixed frame every state of the map view renders inside.
- *
- * The panel slot this view fills is a row flex container, so an unsized child collapses to its content — swapping the
- * map for a loading or error state would then change the panel's height and make the surrounding search UI jump. One
- * shared frame keeps the footprint identical across states; only the content inside it swaps.
- *
- * @param {PropsWithChildren<{ testId: string }>} props
- * @return {*}
- */
-const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
-  <Box
-    data-testid={props.testId}
-    sx={{ position: 'relative', display: 'flex', flex: '1 1 auto', width: '100%', minHeight: MAP_VIEW_MIN_HEIGHT }}>
-    {props.children}
-  </Box>
-);
 
 /**
  * Map view of the search results.
@@ -63,18 +44,19 @@ const MapFrame = (props: PropsWithChildren<{ testId: string }>) => (
  * Owns everything search-specific: creating the Martin session, attaching the tile token, replacing the tile source
  * when the search changes, and interpreting cluster selections. `SlippyMap` receives only generic map configuration.
  *
- * @param {ISearchResultMapContainerProps} props
- * @return {*}
+ * @param {ISearchResultMapContainerProps} props - Search state, visibility, and optional submission scope.
+ * @returns {JSX.Element} The search results map or its current loading or error state.
  */
 export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) => {
-  const { featureTypeName, expressionTree, isActive } = props;
+  const { featureTypeName, expressionTree, isActive, submissionIds } = props;
 
   const config = useConfigContext();
 
   const { status, session, tokenRef, reloadNonce, retry, onTileError } = useMartinSession(
     featureTypeName,
     expressionTree,
-    isActive
+    isActive,
+    submissionIds
   );
 
   const bcBasemap = useBcBasemap(config?.BASEMAP_URL, config?.BASEMAP_ATTRIBUTION);
@@ -147,67 +129,45 @@ export const SearchResultMapContainer = (props: ISearchResultMapContainerProps) 
     [onTileError]
   );
 
-  if (status === 'loading' && !session) {
-    return (
-      <MapFrame testId="search-result-map-loading">
-        <SkeletonMap />
-      </MapFrame>
-    );
-  }
-
-  if (status === 'error' || !session) {
-    return (
-      <MapFrame testId="search-result-map-error">
-        <Box
-          sx={{
-            flex: '1 1 auto',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            p: 4
-          }}>
-          <Typography variant="body2" color="text.secondary">
-            The map could not be loaded.
-          </Typography>
-          <Button onClick={retry}>Try again</Button>
-        </Box>
-      </MapFrame>
-    );
-  }
-
   return (
-    <MapFrame testId="search-result-map">
-      <SlippyMap
-        // A new context means a different session, so the map is rebuilt for it. A recovery or manual retry bumps
-        // reloadNonce to force a remount that re-requests the tiles; a token-only refresh before expiry changes
-        // neither the context id nor the nonce and therefore never remounts.
-        key={`${session.martin_context_id}:${reloadNonce}`}
-        readOnly
-        mapStyle={config?.BASEMAP_FALLBACK_STYLE_URL || undefined}
-        mapOptions={{
-          minZoom: MAP_MIN_ZOOM,
-          maxZoom: MAP_MAX_ZOOM,
-          // `bounds` rather than a center and a computed zoom: solving the fit by hand means
-          // reimplementing Web Mercator badly. Degrees of latitude and longitude do not cover the
-          // same distance on screen — at BC's latitudes a degree of latitude is nearly twice as
-          // tall — and the panel's aspect ratio decides which of the two dimensions actually
-          // limits the fit. MapLibre already accounts for both. The whole province is the frame:
-          // the session carries no extent of its own.
-          bounds: [
-            [ALL_OF_BC_BBOX[0], ALL_OF_BC_BBOX[1]],
-            [ALL_OF_BC_BBOX[2], ALL_OF_BC_BBOX[3]]
-          ],
-          fitBoundsOptions: { maxZoom: MAP_FIT_MAX_ZOOM, padding: MAP_FIT_PADDING }
-        }}
-        tileSources={tileSources}
-        layers={layers}
-        transformRequest={transformRequest}
-        onSourceError={handleSourceError}
-        onViewportChange={bcBasemap.onViewportChange}
-        sx={{ flex: '1 1 auto', minHeight: MAP_VIEW_MIN_HEIGHT }}
-      />
-    </MapFrame>
+    <TileSessionFrame
+      testId="search-result-map"
+      // The panel slot this view fills is a row flex container, so the frame sizes itself rather than its content.
+      minHeight={MAP_VIEW_MIN_HEIGHT}
+      status={status}
+      session={session}
+      onRetry={retry}>
+      {(current) => (
+        <SlippyMap
+          // A new context means a different session, so the map is rebuilt for it. A recovery or manual retry bumps
+          // reloadNonce to force a remount that re-requests the tiles; a token-only refresh before expiry changes
+          // neither the context id nor the nonce and therefore never remounts.
+          key={`${current.martin_context_id}:${reloadNonce}`}
+          readOnly
+          mapStyle={config?.BASEMAP_FALLBACK_STYLE_URL || undefined}
+          mapOptions={{
+            minZoom: MAP_MIN_ZOOM,
+            maxZoom: MAP_MAX_ZOOM,
+            // `bounds` rather than a center and a computed zoom: solving the fit by hand means
+            // reimplementing Web Mercator badly. Degrees of latitude and longitude do not cover the
+            // same distance on screen — at BC's latitudes a degree of latitude is nearly twice as
+            // tall — and the panel's aspect ratio decides which of the two dimensions actually
+            // limits the fit. MapLibre already accounts for both. The whole province is the frame:
+            // the session carries no extent of its own.
+            bounds: [
+              [ALL_OF_BC_BBOX[0], ALL_OF_BC_BBOX[1]],
+              [ALL_OF_BC_BBOX[2], ALL_OF_BC_BBOX[3]]
+            ],
+            fitBoundsOptions: { maxZoom: MAP_FIT_MAX_ZOOM, padding: MAP_FIT_PADDING }
+          }}
+          tileSources={tileSources}
+          layers={layers}
+          transformRequest={transformRequest}
+          onSourceError={handleSourceError}
+          onViewportChange={bcBasemap.onViewportChange}
+          sx={{ flex: '1 1 auto', minHeight: MAP_VIEW_MIN_HEIGHT }}
+        />
+      )}
+    </TileSessionFrame>
   );
 };

@@ -1,7 +1,12 @@
+import { mdiArrowTopRight } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { SubmissionUploadReviewScope } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { TicketTimelineItem } from './layout/TicketTimelineItem';
 import { TicketUploadDecisionRow } from './upload/decision/TicketUploadDecisionRow';
 import { CreateReviewDialog } from './upload/review/CreateReviewDialog';
@@ -17,22 +22,10 @@ import { ITicketUploadTimelineItemProps } from './upload/TicketUploadTimelineIte
  * @returns {JSX.Element} Ticket timeline item for a submission upload.
  */
 export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) => {
-  const {
-    upload,
-    dateLabel,
-    canViewStatusHistory,
-    statusHistory,
-    onLoadStatusHistory,
-    onCreateReview,
-    onOpenReview,
-    onAccept,
-    onReject,
-    onResetDecision
-  } = props;
-  const bodyText =
-    upload.submission_comment ||
-    upload.submission_description ||
-    `Submission upload ${upload.submission_upload_id.slice(0, 8)}`;
+  const { upload, dateLabel, canViewStatusHistory, onCreateReview, onOpenReview, onAccept, onReject, onResetDecision } =
+    props;
+  const submissionName = upload.submission_name || `Submission upload ${upload.submission_upload_id.slice(0, 8)}`;
+  const comment = upload.submission_comment || 'No comment provided.';
   const [createReviewScope, setCreateReviewScope] = useState<SubmissionUploadReviewScope | null>(null);
 
   const handleCreateReview = (values: ICreateReviewFormValues) => {
@@ -50,16 +43,31 @@ export const TicketUploadTimelineItem = (props: ITicketUploadTimelineItemProps) 
     <>
       <TicketTimelineItem title="New Submission" dateLabel={dateLabel}>
         <Box sx={{ mx: -2, my: -2 }}>
-          <Box sx={{ px: 2, py: 2.5 }}>
-            <Typography variant="body2">{bodyText}</Typography>
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Typography component="h3" fontWeight={700} sx={{ overflowWrap: 'anywhere' }}>
+              <Link
+                component={RouterLink}
+                to={`/admin/submissions/${upload.submission_id}/uploads/${upload.submission_upload_id}`}
+                underline="always"
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  textDecoration: 'underline dashed',
+                  textUnderlineOffset: '5px',
+                  '&:hover': { textDecoration: 'underline dashed' }
+                }}>
+                {submissionName}
+                <Icon path={mdiArrowTopRight} size={0.7} style={{ flexShrink: 0 }} />
+              </Link>
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Typography color="textSecondary" variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {comment}
+            </Typography>
           </Box>
 
-          <TicketUploadStatusRow
-            upload={upload}
-            canViewStatusHistory={canViewStatusHistory}
-            statusHistory={statusHistory}
-            onLoadStatusHistory={onLoadStatusHistory}
-          />
+          <TicketUploadStatusRow upload={upload} canViewStatusHistory={canViewStatusHistory} />
 
           <TicketUploadReviewRow
             label="Validation"

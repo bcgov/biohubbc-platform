@@ -1,10 +1,11 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from 'test-helpers/test-utils';
 import { URL_PARAMS } from 'constants/query-params';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
+import { useMemo } from 'react';
 import { Mock, vi } from 'vitest';
 import { useSearchResults } from './useSearchResults';
 
@@ -16,6 +17,13 @@ vi.mock('hooks/useSearchQuery', () => ({
 }));
 
 const mockSearchFeatures = vi.fn();
+
+/**
+ * Lets settled requests reach the hook: the query client delivers updates on a zero-delay timer.
+ *
+ * @returns {Promise<void>} Resolves once pending query notifications have run.
+ */
+const flushQueryUpdates = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const mockCountFeatures = vi.fn();
 
 describe('useSearchResults', () => {
@@ -39,7 +47,7 @@ describe('useSearchResults', () => {
       {
         type: 'predicate',
         feature_property_id: 10,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'ILike',
         value: 'salmon'
       }
@@ -78,10 +86,7 @@ describe('useSearchResults', () => {
       pagination: { ...defaultSearchFeatureResponse.pagination, next_cursor: 'next', previous_cursor: 'previous' }
     });
     const { result } = renderHook(() => useSearchResults('survey'));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(result.current.isLoading).toBe(false);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.totalCount).toBeUndefined();
     expect(result.current.cursor.next).toBe('next');
     expect(result.current.cursor.previous).toBe('previous');
@@ -94,9 +99,7 @@ describe('useSearchResults', () => {
       setSearchParams
     });
     const { result } = renderHook(() => useSearchResults('survey'));
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(mockSearchFeatures.mock.lastCall?.[2]).toEqual(
       expect.objectContaining({ limit: 50, cursor: 'CaseSensitive_Cursor' })
     );
@@ -112,7 +115,7 @@ describe('useSearchResults', () => {
     });
     const { result } = renderHook(() => useSearchResults('survey'));
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
     act(() => result.current.setSearchParams({ cursor: 'Next_Cursor' }));
@@ -169,14 +172,14 @@ describe('useSearchResults', () => {
 
     await act(async () => {
       resolveCount!({ total: 50_000_000 });
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(result.current.totalCount).toBe(50_000_000);
 
     await act(async () => {
       resolveResults!(defaultSearchFeatureResponse);
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(result.current.isLoading).toBe(false);
@@ -195,7 +198,7 @@ describe('useSearchResults', () => {
     });
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(result.current.totalCount).toBe(50_000_000);
@@ -208,7 +211,7 @@ describe('useSearchResults', () => {
     expect(result.current.cursor.next).toBeNull();
     expect(result.current.cursor.previous).toBeNull();
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
   });
 
@@ -269,7 +272,7 @@ describe('useSearchResults', () => {
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -282,7 +285,7 @@ describe('useSearchResults', () => {
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
@@ -314,7 +317,7 @@ describe('useSearchResults', () => {
     const { result, rerender } = renderHook(() => useSearchResults('species_observation', true, null));
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -328,7 +331,7 @@ describe('useSearchResults', () => {
     expect(setSearchParams.mock.calls[0][0].toString()).toBe('limit=50');
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -362,7 +365,7 @@ describe('useSearchResults', () => {
     expect(result.current.isLoading).toBe(true);
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(result.current.isLoading).toBe(false);
@@ -377,7 +380,7 @@ describe('useSearchResults', () => {
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -388,17 +391,12 @@ describe('useSearchResults', () => {
       .mockRejectedValueOnce(new Error('Search failed'))
       .mockResolvedValueOnce(defaultSearchFeatureResponse);
 
-    const { result, rerender } = renderHook(
-      ({ refreshKey }) => useSearchResults('species_observation', true, null, refreshKey),
-      {
-        initialProps: { refreshKey: 0 }
-      }
-    );
+    const { result } = renderHook(() => useSearchResults('species_observation', true, null));
 
     expect(result.current.isLoading).toBe(true);
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -409,13 +407,10 @@ describe('useSearchResults', () => {
     });
     expect(result.current.totalCount).toBe(0);
 
-    await act(async () => {
-      rerender({ refreshKey: 1 });
-      await Promise.resolve();
-    });
+    act(() => result.current.reload());
 
-    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
-    expect(result.current.isLoading).toBe(false);
+    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.totalCount).toBe(0);
   });
 
@@ -427,7 +422,7 @@ describe('useSearchResults', () => {
         {
           type: 'predicate',
           feature_property_id: 11,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'ILike',
           value: 'trout'
         }
@@ -442,7 +437,7 @@ describe('useSearchResults', () => {
     );
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -450,7 +445,7 @@ describe('useSearchResults', () => {
 
     await act(async () => {
       rerender({ appliedExpression: updatedExpressionTree });
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -483,7 +478,7 @@ describe('useSearchResults', () => {
     });
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -491,14 +486,14 @@ describe('useSearchResults', () => {
 
     await act(async () => {
       rerender({ featureTypeName: 'telemetry' });
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(result.current.isLoading).toBe(true);
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
@@ -514,26 +509,55 @@ describe('useSearchResults', () => {
     );
   });
 
-  it('refreshes with a null expression when the explicit refresh key changes', async () => {
-    const { rerender } = renderHook(
-      ({ refreshKey }) => useSearchResults('species_observation', true, null, refreshKey),
-      {
-        initialProps: { refreshKey: 0 }
-      }
+  it('reuses a memoized submission scope across renders and refreshes when its ID changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ submissionId }) => {
+        const submissionIds = useMemo(() => [submissionId], [submissionId]);
+        return useSearchResults('species_observation', true, null, submissionIds);
+      },
+      { initialProps: { submissionId: 42 } }
     );
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
+    });
+    rerender({ submissionId: 42 });
+    await act(async () => {
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
+    expect(result.current.isLoading).toBe(false);
+    expect(mockCountFeatures).toHaveBeenCalledTimes(1);
 
+    rerender({ submissionId: 43 });
     await act(async () => {
-      rerender({ refreshKey: 1 });
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
-
     expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
+    expect(mockCountFeatures).toHaveBeenCalledTimes(2);
+    expect(mockCountFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      expect.objectContaining({ submissionIds: [43] })
+    );
+    expect(mockSearchFeatures).toHaveBeenLastCalledWith(
+      'species_observation',
+      null,
+      expect.any(Object),
+      expect.objectContaining({ submissionIds: [43] })
+    );
+  });
+
+  it('searches again with every input unchanged when reloaded', async () => {
+    const { result } = renderHook(() => useSearchResults('species_observation', true, null));
+
+    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalledTimes(2));
+    expect(mockCountFeatures).toHaveBeenCalledTimes(2);
     expect(mockSearchFeatures).toHaveBeenLastCalledWith(
       'species_observation',
       null,
@@ -546,38 +570,37 @@ describe('useSearchResults', () => {
     );
   });
 
-  it('aborts an active request and immediately starts the next request when apply refreshes again', async () => {
-    mockSearchFeatures.mockImplementation(
-      () =>
-        new Promise(() => {
-          // Keep the request active until the hook aborts it.
-        })
-    );
+  it('aborts a reload in flight and immediately starts the next one when reloaded again', async () => {
+    mockSearchFeatures
+      .mockResolvedValueOnce(defaultSearchFeatureResponse)
+      .mockImplementation(() => new Promise(() => undefined));
 
-    const { rerender } = renderHook(
-      ({ refreshKey }) => useSearchResults('species_observation', true, expressionTree, refreshKey),
-      {
-        initialProps: { refreshKey: 0 }
-      }
-    );
+    const { result } = renderHook(() => useSearchResults('species_observation', true, expressionTree));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
 
+    act(() => result.current.reload());
+    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalledTimes(2));
+    const reloadSignal = mockSearchFeatures.mock.calls[1][3].signal as AbortSignal;
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalledTimes(3));
+    expect(reloadSignal.aborted).toBe(true);
+    expect((mockSearchFeatures.mock.calls[2][3].signal as AbortSignal).aborted).toBe(false);
+  });
+
+  it('joins the first load rather than restarting it when reloaded before any results arrive', async () => {
+    mockSearchFeatures.mockImplementation(() => new Promise(() => undefined));
+
+    const { result } = renderHook(() => useSearchResults('species_observation', true, expressionTree));
+    await waitFor(() => expect(mockSearchFeatures).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.reload());
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
-    const firstSignal = mockSearchFeatures.mock.calls[0][3].signal as AbortSignal;
-    expect(firstSignal.aborted).toBe(false);
-
-    await act(async () => {
-      rerender({ refreshKey: 1 });
-      await Promise.resolve();
-    });
-
-    expect(firstSignal.aborted).toBe(true);
-    expect(mockSearchFeatures).toHaveBeenCalledTimes(2);
-    const secondSignal = mockSearchFeatures.mock.calls[1][3].signal as AbortSignal;
-    expect(secondSignal.aborted).toBe(false);
+    expect((mockSearchFeatures.mock.calls[0][3].signal as AbortSignal).aborted).toBe(false);
   });
 
   it('aborts an active request and immediately starts the next request when sort changes', async () => {
@@ -599,7 +622,7 @@ describe('useSearchResults', () => {
     const { rerender } = renderHook(() => useSearchResults('species_observation', true, expressionTree));
 
     await act(async () => {
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
@@ -613,7 +636,7 @@ describe('useSearchResults', () => {
 
     await act(async () => {
       rerender();
-      await Promise.resolve();
+      await flushQueryUpdates();
     });
 
     expect(firstSignal.aborted).toBe(true);
@@ -629,12 +652,13 @@ describe('useSearchResults', () => {
       expectAbortOptions
     );
   });
-  it.each(['resolve', 'reject'])('ignores stale requests that %s after cancellation', async (completion) => {
+  it.each(['resolve', 'reject'])('ignores a reload that %ss after it was superseded', async (completion) => {
     let resolveResults!: (response: SearchFeatureResponse) => void;
     let rejectResults!: (error: Error) => void;
     let resolveCount!: (response: { total: number }) => void;
     let rejectCount!: (error: Error) => void;
     mockSearchFeatures
+      .mockResolvedValueOnce(defaultSearchFeatureResponse)
       .mockImplementationOnce(
         () =>
           new Promise((resolve, reject) => {
@@ -644,6 +668,7 @@ describe('useSearchResults', () => {
       )
       .mockImplementationOnce(() => new Promise(() => {}));
     mockCountFeatures
+      .mockResolvedValueOnce({ total: 10 })
       .mockImplementationOnce(
         () =>
           new Promise((resolve, reject) => {
@@ -652,17 +677,18 @@ describe('useSearchResults', () => {
           })
       )
       .mockResolvedValueOnce({ total: 50 });
-    const { result, rerender, unmount } = renderHook(
-      ({ refreshKey }) => useSearchResults('survey', true, null, refreshKey),
-      { initialProps: { refreshKey: 0 } }
-    );
-    const oldResultsSignal = mockSearchFeatures.mock.calls[0][3].signal;
-    const oldCountSignal = mockCountFeatures.mock.calls[0][2].signal;
-    await act(async () => {
-      rerender({ refreshKey: 1 });
-    });
-    expect(oldResultsSignal.aborted).toBe(true);
-    expect(oldCountSignal.aborted).toBe(true);
+    const { result, unmount } = renderHook(() => useSearchResults('survey', true, null));
+    await waitFor(() => expect(result.current.totalCount).toBe(10));
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(mockCountFeatures).toHaveBeenCalledTimes(2));
+    const staleResultsSignal = mockSearchFeatures.mock.calls[1][3].signal;
+    const staleCountSignal = mockCountFeatures.mock.calls[1][2].signal;
+    act(() => result.current.reload());
+    await waitFor(() => expect(mockCountFeatures).toHaveBeenCalledTimes(3));
+
+    expect(staleResultsSignal.aborted).toBe(true);
+    expect(staleCountSignal.aborted).toBe(true);
     await act(async () => {
       if (completion === 'resolve') {
         resolveResults({
@@ -674,26 +700,25 @@ describe('useSearchResults', () => {
         rejectResults(new Error('Old search failed'));
         rejectCount(new Error('Old count failed'));
       }
+      await flushQueryUpdates();
     });
+    await waitFor(() => expect(result.current.totalCount).toBe(50));
     expect(result.current.rows).toEqual([]);
-    expect(result.current.totalCount).toBe(50);
     expect(result.current.isLoading).toBe(true);
     expect((useDialogContext as Mock).mock.results[0].value.setSnackbar).not.toHaveBeenCalled();
     unmount();
-    expect(mockSearchFeatures.mock.calls[1][3].signal.aborted).toBe(true);
-    expect(mockCountFeatures.mock.calls[1][2].signal.aborted).toBe(true);
+    expect(mockSearchFeatures.mock.calls[2][3].signal.aborted).toBe(true);
   });
 
-  it('aborts both requests when search is disabled', async () => {
-    mockSearchFeatures.mockImplementation(() => new Promise(() => {}));
-    mockCountFeatures.mockImplementation(() => new Promise(() => {}));
-    const { rerender } = renderHook(({ enabled }) => useSearchResults('survey', enabled), {
-      initialProps: { enabled: true }
+  it('issues no requests while search is disabled', async () => {
+    const { result } = renderHook(() => useSearchResults('survey', false));
+
+    await act(async () => {
+      await flushQueryUpdates();
     });
-    rerender({ enabled: false });
-    expect(mockSearchFeatures.mock.calls[0][3].signal.aborted).toBe(true);
-    expect(mockCountFeatures.mock.calls[0][2].signal.aborted).toBe(true);
-    expect(mockSearchFeatures).toHaveBeenCalledTimes(1);
-    expect(mockCountFeatures).toHaveBeenCalledTimes(1);
+
+    expect(mockSearchFeatures).not.toHaveBeenCalled();
+    expect(mockCountFeatures).not.toHaveBeenCalled();
+    expect(result.current.isLoading).toBe(true);
   });
 });

@@ -2,7 +2,9 @@ import { SQL } from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import {
+  AdminSubmissionUpload,
   CreateSubmissionUploadWithTeam,
   SubmissionUpload,
   SubmissionUploadDecision,
@@ -19,6 +21,59 @@ import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 export class SubmissionUploadRepository extends BaseRepository {
+  /**
+   * List active uploads for one submission without multiplying rows by attached artifacts.
+   *
+   * @param {number} submissionId Submission whose uploads are listed.
+   * @param {ApiPaginationOptions} pagination Page size, offset and validated sort.
+   * @returns {Promise<AdminSubmissionUpload[]>} One page of upload records, with stable ordering.
+   */
+  async listAdminSubmissionUploads(
+    submissionId: number,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUpload[]> {
+    const knex = getKnex();
+    const query = knex('submission_upload as su')
+      .select(
+        'su.submission_upload_id',
+        'su.upload_id',
+        'su.status',
+        'su.decision',
+        'su.ticket_id',
+        'su.comment',
+        'su.create_date',
+        'su.create_user',
+        'u.user_identifier as submitted_by_identifier'
+      )
+      .leftJoin('system_user as u', 'u.system_user_id', 'su.create_user')
+      .where('su.submission_id', submissionId)
+      .whereNull('su.record_end_date')
+      .orderBy(`su.${pagination.sort ?? 'create_date'}`, pagination.order ?? 'desc')
+      .orderBy('su.submission_upload_id', 'desc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, AdminSubmissionUpload);
+    return response.rows;
+  }
+
+  /**
+   * Count active uploads belonging to one submission.
+   *
+   * @param {number} submissionId Submission whose uploads are counted.
+   * @returns {Promise<number>} Number of active uploads.
+   */
+  async countAdminSubmissionUploads(submissionId: number): Promise<number> {
+    const knex = getKnex();
+    const query = knex('submission_upload')
+      .select(knex.raw('count(*)::integer as count'))
+      .where('submission_id', submissionId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
+  }
+
   /**
    * Get a single active submission_upload record by ID.
    *
@@ -187,6 +242,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.upload_id,
         su.team_id,
         su.status,
+        su.decision,
         su.ticket_id,
         su.blueprint_id,
         su.comment,

@@ -1,6 +1,7 @@
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { cleanup, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter } from 'react-router-dom';
+import { render } from 'test-helpers/test-utils';
 import { Mock, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 

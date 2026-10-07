@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings';
-import { FeatureType, FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureType } from '../../models/feature-type';
 import { BaseRepository } from '../base-repository';
 import { isSubmissionFeatureCurrent } from '../sql-fragments';
 
@@ -213,79 +213,5 @@ export class FeatureIngestionRepository extends BaseRepository {
         AND child.record_end_date IS NULL;`);
 
     await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Get feature type with its associated properties.
-   * Returns null if the feature type does not exist.
-   *
-   * @param {string} name Feature type name.
-   * @returns {Promise<FeatureTypeWithProperties | null>}
-   * @memberof FeatureIngestionRepository
-   */
-  async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
-    const sqlStatement = SQL`
-      WITH feature_type_cte AS (
-        SELECT
-          ft.feature_type_id,
-          ft.name,
-          ft.display_name
-        FROM feature_type ft
-        WHERE
-          ft.name = ${name}
-          AND ft.record_end_date IS NULL
-      ),
-      properties_cte AS (
-        SELECT
-          ftp.feature_type_id,
-          ftp.feature_type_property_id,
-          fp.name,
-          fp.display_name,
-          fp.description,
-          fpt.name AS type_name,
-          ftp.required_value,
-          fp.calculated_value
-        FROM feature_type_property ftp
-        JOIN feature_property fp
-          ON ftp.feature_property_id = fp.feature_property_id
-          AND fp.record_end_date IS NULL
-        JOIN feature_property_type fpt
-          ON fp.feature_property_type_id = fpt.feature_property_type_id
-          AND fpt.record_end_date IS NULL
-        WHERE
-          ftp.record_end_date IS NULL
-      )
-      SELECT
-        JSON_BUILD_OBJECT(
-          'feature_type_id', ft.feature_type_id,
-          'name', ft.name,
-          'display_name', ft.display_name
-        ) AS "feature_type",
-        COALESCE(
-          JSON_AGG(
-            JSON_BUILD_OBJECT(
-              'feature_type_property_id', p.feature_type_property_id,
-              'name', p.name,
-              'display_name', p.display_name,
-              'description', p.description,
-              'type_name', p.type_name,
-              'required_value', p.required_value,
-              'calculated_value', p.calculated_value
-            )
-          ) FILTER (WHERE p.name IS NOT NULL),
-          '[]'
-        ) AS properties
-      FROM feature_type_cte ft
-      LEFT JOIN properties_cte p
-        ON ft.feature_type_id = p.feature_type_id
-      GROUP BY
-        ft.feature_type_id,
-        ft.name,
-        ft.display_name;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, FeatureTypeWithProperties);
-
-    return response.rows[0] ?? null;
   }
 }

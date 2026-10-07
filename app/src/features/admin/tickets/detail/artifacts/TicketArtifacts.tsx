@@ -1,13 +1,16 @@
+import { keepPreviousDataWithin } from 'utils/query-client';
 import { mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import Stack from '@mui/material/Stack';
+import { useQuery } from '@tanstack/react-query';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
-import { IGetTicketArtifactsResponse, ITicketArtifact } from 'interfaces/useTicketsApi.interface';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { ITicketArtifact } from 'interfaces/useTicketsApi.interface';
 import { useCallback } from 'react';
+import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { useTicketAttachmentUpload } from '../../hooks/useTicketAttachmentUpload';
 import { downloadTicketArtifact } from '../../utils/ticketArtifactDownload';
 import { getTicketArtifactMarkdown } from '../../utils/ticketArtifactMarkdown';
@@ -23,12 +26,13 @@ export const TicketArtifacts = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketId } = useTicketContext();
-  const { isUploadingAttachment, uploadTicketAttachment } = useTicketAttachmentUpload();
-  const ticketArtifactsGrid = useServerPaginatedDataGrid<ITicketArtifact, IGetTicketArtifactsResponse>({
-    fetcher: (search, pagination) => api.tickets.getTicketArtifacts(ticketId, { search, ...pagination }),
-    extractData: (response) => response.artifacts,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'create_date', sort: 'desc' }
+  const { isUploadingAttachment, uploadTicketAttachments } = useTicketAttachmentUpload();
+  const artifactsGrid = useServerPaginatedGridState({ defaultSort: { field: 'create_date', sort: 'desc' } });
+  const artifactsParams = { search: artifactsGrid.debouncedSearchTerm, ...artifactsGrid.apiPagination };
+  const artifactsQuery = useQuery({
+    queryKey: ticketQueryKeys.artifacts(ticketId, artifactsParams),
+    queryFn: ({ signal }) => api.tickets.getTicketArtifacts(ticketId, artifactsParams, { signal }),
+    placeholderData: keepPreviousDataWithin(ticketQueryKeys.artifactsAll(ticketId))
   });
 
   /**
@@ -75,23 +79,14 @@ export const TicketArtifacts = () => {
   /**
    * Uploads artifacts selected from the hidden file input triggered by the PageSection Upload button.
    *
-   * Delegates each selected file to the shared ticket attachment uploader, then refreshes the paginated artifacts grid
-   * when at least one upload succeeds.
+   * Uploads the selected files together through the shared ticket attachment uploader, which reloads the artifacts
+   * grid once they have all settled.
+   *
+   * @param {File[]} artifacts Files selected by the user.
+   * @returns {Promise<void>} Resolves once every upload has settled.
    */
   const handleUploadSelection = async (artifacts: File[]) => {
-    let didUpload = false;
-
-    for (const artifact of artifacts) {
-      const ticketArtifact = await uploadTicketAttachment(artifact);
-
-      if (ticketArtifact) {
-        didUpload = true;
-      }
-    }
-
-    if (didUpload) {
-      ticketArtifactsGrid.refresh();
-    }
+    await uploadTicketAttachments(artifacts);
   };
 
   return (
@@ -103,8 +98,8 @@ export const TicketArtifacts = () => {
           <SearchTextField
             size="small"
             placeholder="Search files"
-            value={ticketArtifactsGrid.searchTerm}
-            onChange={(event) => ticketArtifactsGrid.handleSearch(event.target.value)}
+            value={artifactsGrid.searchTerm}
+            onChange={(event) => artifactsGrid.handleSearch(event.target.value)}
           />
           <TicketArtifactUpload
             label="Upload"
@@ -117,13 +112,13 @@ export const TicketArtifacts = () => {
         </Stack>
       }>
       <TicketArtifactsTable
-        rows={ticketArtifactsGrid.rows}
-        rowCount={ticketArtifactsGrid.rowCount}
-        paginationModel={ticketArtifactsGrid.paginationModel}
-        setPaginationModel={ticketArtifactsGrid.handlePaginationChange}
-        sortModel={ticketArtifactsGrid.sortModel}
-        setSortModel={ticketArtifactsGrid.handleSortChange}
-        isLoading={ticketArtifactsGrid.isLoading || isUploadingAttachment}
+        rows={artifactsQuery.data?.artifacts ?? []}
+        rowCount={artifactsQuery.data?.pagination.total ?? 0}
+        paginationModel={artifactsGrid.paginationModel}
+        setPaginationModel={artifactsGrid.handlePaginationChange}
+        sortModel={artifactsGrid.sortModel}
+        setSortModel={artifactsGrid.handleSortChange}
+        isLoading={artifactsQuery.isFetching || isUploadingAttachment}
         onDownload={handleDownloadArtifact}
         onCopy={handleCopyArtifactMarkdown}
       />

@@ -36,6 +36,19 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes', 'name', 'description', 'comment'],
   properties: {
+    client_id: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Contributor client ID that owns the new submission. When omitted, defaults to the token's clientId or azp. Active membership in the selected contributor is required; supply client_id when submitting for a different contributor."
+    },
+    archiveFormat: {
+      type: 'string',
+      enum: ['tar', 'tar.gz'],
+      default: 'tar',
+      description: 'Archive format. Upload gzip-compressed bytes unchanged for tar.gz; bytes is the compressed size.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -56,7 +69,8 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     },
     submitters: {
       type: 'array',
-      description: 'Optional people to add to the submission and upload teams.',
+      description:
+        'Optional people the caller grants ongoing submission-list and history access, plus access to this upload team. Active existing users are reused and missing users are created. Recipients need not belong to the contributor; adding them does not grant contributor membership.',
       maxItems: 100,
       items: SubmitterSchema
     },
@@ -149,6 +163,12 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes'],
   properties: {
+    archiveFormat: {
+      type: 'string',
+      enum: ['tar', 'tar.gz'],
+      default: 'tar',
+      description: 'Archive format. Upload gzip-compressed bytes unchanged for tar.gz; bytes is the compressed size.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -169,7 +189,8 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     },
     submitters: {
       type: 'array',
-      description: 'Optional people to add to the submission and upload teams.',
+      description:
+        'Optional people the caller grants ongoing submission-list and history access, plus access to this upload team. Active existing users are reused and missing users are created. Recipients need not belong to the contributor; adding them does not grant contributor membership.',
       maxItems: 100,
       items: SubmitterSchema
     },

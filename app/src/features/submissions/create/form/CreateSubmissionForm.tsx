@@ -10,6 +10,11 @@ import { useFormikContext } from 'formik';
 import { useConfigContext } from 'hooks/useContext';
 import { ICreateSubmissionForm } from './CreateSubmissionForm.interface';
 
+/**
+ * Render the contributor selection, submission details, and archive input.
+ *
+ * @returns The submission form fields.
+ */
 export const CreateSubmissionForm = () => {
   const { errors, setFieldError, setFieldValue } = useFormikContext<ICreateSubmissionForm>();
   const config = useConfigContext();
@@ -23,10 +28,10 @@ export const CreateSubmissionForm = () => {
       return;
     }
 
-    const isTar = file.name.toLowerCase().endsWith('.tar');
+    const isTar = /\.tar(?:\.gz)?$/i.test(file.name);
 
     if (!isTar) {
-      setFieldError('file', 'Only .tar files are supported');
+      setFieldError('file', 'Only .tar and .tar.gz files are supported');
       return;
     }
 
@@ -37,6 +42,12 @@ export const CreateSubmissionForm = () => {
 
   return (
     <Box component="form" display="flex" flexDirection="column" gap={3}>
+      <CustomTextFieldFormik
+        name="clientId"
+        label="Contributor client ID"
+        placeholder="Defaults to your signed-in client"
+      />
+
       {/* Name Field */}
       <CustomTextFieldFormik name="name" label="Name" />
 
@@ -57,7 +68,7 @@ export const CreateSubmissionForm = () => {
         uploadHandler={uploadHandler}
         dropZoneProps={{
           maxFileSize: config.MAX_UPLOAD_TARBALL_SIZE,
-          acceptedFileExtensions: [AttachmentValidExtensions.TAR]
+          acceptedFileExtensions: [AttachmentValidExtensions.TAR, AttachmentValidExtensions.GZ]
         }}
       />
     </Box>

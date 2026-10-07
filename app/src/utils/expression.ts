@@ -22,26 +22,26 @@ import { SearchPropertyResult } from 'interfaces/useSearchApi.interface';
  *
  * Use this when matching API predicates to builder properties because a
  * property identity is the pair of `feature_property_id` and nullable
- * `feature_type_property_id`.
+ * `blueprint_feature_type_property_id`.
  *
  * @param {number} featurePropertyId - Feature property identifier from the API.
- * @param {number | null} featureTypePropertyId - Feature type property identifier, or null for global properties.
- * @returns {string} Stable property key in `feature_property_id:feature_type_property_id` form.
+ * @param {number | null} blueprintFeatureTypePropertyId - Blueprint assignment identifier, or null for a property across all assignments.
+ * @returns {string} Stable property key in `feature_property_id:blueprint_feature_type_property_id` form.
  */
 export const getExpressionBuilderPropertyKey = (
   featurePropertyId: number,
-  featureTypePropertyId: number | null
-): string => `${featurePropertyId}:${featureTypePropertyId ?? ''}`;
+  blueprintFeatureTypePropertyId: number | null
+): string => `${featurePropertyId}:${blueprintFeatureTypePropertyId ?? ''}`;
 
 /**
  * Builds the canonical key for expression-builder property metadata.
  *
- * @param {Pick<ExpressionBuilderProperty, 'feature_property_id' | 'feature_type_property_id'>} property - Property metadata to identify.
- * @returns {string} Stable property key in `feature_property_id:feature_type_property_id` form.
+ * @param {Pick<ExpressionBuilderProperty, 'feature_property_id' | 'blueprint_feature_type_property_id'>} property - Property metadata to identify.
+ * @returns {string} Stable property key in `feature_property_id:blueprint_feature_type_property_id` form.
  */
 export const getExpressionBuilderPropertyKeyFromProperty = (
-  property: Pick<ExpressionBuilderProperty, 'feature_property_id' | 'feature_type_property_id'>
-): string => getExpressionBuilderPropertyKey(property.feature_property_id, property.feature_type_property_id);
+  property: Pick<ExpressionBuilderProperty, 'feature_property_id' | 'blueprint_feature_type_property_id'>
+): string => getExpressionBuilderPropertyKey(property.feature_property_id, property.blueprint_feature_type_property_id);
 
 /**
  * Indexes builder property metadata by canonical API identity.
@@ -58,7 +58,7 @@ const getPropertyTypeById = (properties: ExpressionBuilderProperty[]): Map<strin
 
   for (const property of properties) {
     propertyTypes.set(
-      getExpressionBuilderPropertyKey(property.feature_property_id, property.feature_type_property_id),
+      getExpressionBuilderPropertyKey(property.feature_property_id, property.blueprint_feature_type_property_id),
       property.predicate_type
     );
   }
@@ -134,7 +134,7 @@ const datetimeStringToObject = (value: unknown): { date_value?: string; time_val
  * Use this at every boundary where `/api/search/property` results enter the
  * builder, including property autocomplete results and recommended property
  * suggestions. It preserves the API identifiers and allowed operator list, and
- * sets `feature_type_property_id` to `null` because property search results are
+ * sets `blueprint_feature_type_property_id` to `null` because property search results are
  * global feature-property matches.
  *
  * @param {SearchPropertyResult} property - One property result from the search-property API.
@@ -144,7 +144,7 @@ export const mapSearchPropertyToExpressionBuilderProperty = (
   property: SearchPropertyResult
 ): ExpressionBuilderProperty => ({
   feature_property_id: property.feature_property_id,
-  feature_type_property_id: null,
+  blueprint_feature_type_property_id: null,
   label: property.property_display_name,
   property_name: property.property_name,
   property_display_name: property.property_display_name,
@@ -276,7 +276,7 @@ const hydrateBuilderExpressionNodeWithPropertyTypes = (
     }
 
     const predicateType = propertyTypesById.get(
-      getExpressionBuilderPropertyKey(clause.feature_property_id, clause.feature_type_property_id)
+      getExpressionBuilderPropertyKey(clause.feature_property_id, clause.blueprint_feature_type_property_id)
     );
     const fallbackPredicateType = inferPredicateTypeFromHydratedClause(clause);
 
@@ -284,7 +284,7 @@ const hydrateBuilderExpressionNodeWithPropertyTypes = (
       ui_id: crypto.randomUUID(),
       type: 'predicate',
       feature_property_id: clause.feature_property_id,
-      feature_type_property_id: clause.feature_type_property_id,
+      blueprint_feature_type_property_id: clause.blueprint_feature_type_property_id,
       predicate:
         predicateType || fallbackPredicateType
           ? {
@@ -358,7 +358,7 @@ export const createBuilderPredicateNode = (): BuilderPredicateNode => ({
   ui_id: crypto.randomUUID(),
   type: 'predicate',
   feature_property_id: null,
-  feature_type_property_id: null,
+  blueprint_feature_type_property_id: null,
   predicate: null
 });
 
@@ -381,7 +381,7 @@ export const getUsedExpressionBuilderPropertyKeys = (expression: BuilderExpressi
     }
 
     if (clause.feature_property_id !== null) {
-      keys.add(getExpressionBuilderPropertyKey(clause.feature_property_id, clause.feature_type_property_id));
+      keys.add(getExpressionBuilderPropertyKey(clause.feature_property_id, clause.blueprint_feature_type_property_id));
     }
   };
 
@@ -1269,7 +1269,7 @@ export const serializeExpressionTree = (node: BuilderExpressionNode): Expression
       return {
         type: 'predicate',
         feature_property_id: clause.feature_property_id,
-        feature_type_property_id: clause.feature_type_property_id,
+        blueprint_feature_type_property_id: clause.blueprint_feature_type_property_id,
         operator: clause.predicate.operator,
         value
       };

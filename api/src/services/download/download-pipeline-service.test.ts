@@ -12,7 +12,7 @@ import { DownloadStatusEnum } from '../../models/download-status';
 import { ExpressionTree } from '../../models/expression-tree';
 import { NormalizedExpressionTree } from '../../models/expression-tree-internal';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
-import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeWithPropertyDefinitions } from '../../models/feature-type';
 import { PolicyEffect } from '../../models/policy-statement';
 import {
   ActivePolicyStatementWithExpression,
@@ -22,6 +22,7 @@ import { DownloadRepository } from '../../repositories/download/download-reposit
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { dependencies as expressionEvaluation } from '../../repositories/expression-evaluation';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
+import { PARQUET_PROPERTIES_METADATA_KEY } from '../../utils/parquet-utils';
 import { CodeService } from '../code-service';
 import { ExpressionTreeNormalizationService } from '../expression-tree-normalization-service';
 import { ExpressionTreeService } from '../expression-tree-service';
@@ -279,19 +280,17 @@ describe('DownloadPipelineService', () => {
   });
 
   describe('resolveParquetSchema', () => {
-    const mockCodes: FeatureTypeWithProperties[] = [
+    const mockCodes: FeatureTypeWithPropertyDefinitions[] = [
       {
         feature_type: { feature_type_id: 1, name: 'survey', display_name: 'Survey', description: null },
         properties: [
           {
-            feature_type_property_id: 1,
+            feature_property_id: 1,
             name: 'title',
             display_name: 'Title',
             description: 'Title',
             type_name: FEATURE_PROPERTY_TYPE.STRING,
-            required_value: true,
-            calculated_value: false,
-            allow_multiple: false
+            calculated_value: false
           }
         ]
       },
@@ -304,14 +303,12 @@ describe('DownloadPipelineService', () => {
         },
         properties: [
           {
-            feature_type_property_id: 2,
+            feature_property_id: 2,
             name: 'species',
             display_name: 'Species',
             description: 'Species',
             type_name: FEATURE_PROPERTY_TYPE.STRING,
-            required_value: false,
-            calculated_value: false,
-            allow_multiple: false
+            calculated_value: false
           }
         ]
       }
@@ -321,7 +318,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
       const statements = [stmt('survey'), stmt('observation', '33333333-3333-3333-3333-333333333333')];
       sinon
         .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
@@ -340,7 +337,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
       // Repo returns rows in urn_feature_type ASC; service must not reorder them.
       const statements = [stmt('a'), stmt('b'), stmt('c')];
       sinon
@@ -356,7 +353,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([...mockCodes].reverse());
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves([...mockCodes].reverse());
       const wildcardStatement = stmt('*', '33333333-3333-3333-3333-333333333333');
       sinon
         .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
@@ -375,7 +372,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
       const wildcardStatement = stmt('*', null);
       const concreteStatement = stmt('survey', '33333333-3333-3333-3333-333333333333');
       sinon
@@ -395,7 +392,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
       const wildcardStatement = stmt('*', '33333333-3333-3333-3333-333333333333');
       const observationStatement = stmt('observation', '44444444-4444-4444-4444-444444444444');
       sinon
@@ -419,7 +416,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
       const surveyAllow = stmt('survey');
       const repeatedSurveyAllow = stmt('survey', '33333333-3333-3333-3333-333333333333');
       sinon
@@ -436,7 +433,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
       sinon.stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId').resolves([]);
 
       const result = await service.resolveParquetSchema(TEST_SOURCE);
@@ -676,12 +673,13 @@ describe('DownloadPipelineService', () => {
         statement: stmt('observation', null)
       });
 
-      expect(mockWriter.setMetadata).to.have.been.calledOnce;
+      expect(mockWriter.setMetadata).to.have.been.calledTwice;
       expect(mockWriter.setMetadata.firstCall.args[0]).to.equal('geo');
       expect(mockWriter.setMetadata.firstCall.args[1]).to.be.a('string');
+      expect(mockWriter.setMetadata.secondCall.args[0]).to.equal(PARQUET_PROPERTIES_METADATA_KEY);
     });
 
-    it('does not set GeoParquet metadata when feature type has no spatial properties', async () => {
+    it('stores the property list the file was built with, and no GeoParquet entry, when there are no spatial properties', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
@@ -698,7 +696,9 @@ describe('DownloadPipelineService', () => {
         statement: stmt('observation', null)
       });
 
-      expect(mockWriter.setMetadata).to.not.have.been.called;
+      expect(mockWriter.setMetadata).to.have.been.calledOnce;
+      expect(mockWriter.setMetadata.firstCall.args[0]).to.equal(PARQUET_PROPERTIES_METADATA_KEY);
+      expect(JSON.parse(mockWriter.setMetadata.firstCall.args[1])).to.deep.equal(mockProperties);
     });
 
     it('inserts artifact with uploaded status, parquet format, and the deterministic S3 key', async () => {

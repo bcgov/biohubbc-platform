@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ISubmissionFeaturePropertiesResponse,
   ISubmissionFeatureResponse,
@@ -19,13 +19,15 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId
    * @param {number} submissionFeatureId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISubmissionFeatureResponse>}
    */
   const getSubmissionFeatureById = async (
     submissionId: number,
-    submissionFeatureId: number
+    submissionFeatureId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureResponse> => {
-    const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}`);
+    const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}`, options);
 
     return data;
   };
@@ -36,16 +38,19 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
    * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters} params
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISubmissionFeaturePropertiesResponse>}
    */
   const getSubmissionFeatureProperties = async (
     submissionId: number,
     submissionFeatureId: number,
-    params: ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters
+    params: ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeaturePropertiesResponse> => {
     const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}/properties`, {
       params,
-      paramsSerializer: (queryParams) => qs.stringify(queryParams)
+      paramsSerializer: (queryParams) => qs.stringify(queryParams),
+      ...options
     });
 
     return data;

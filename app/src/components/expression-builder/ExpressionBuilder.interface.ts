@@ -33,13 +33,13 @@ export interface BuilderPredicateNode {
   ui_id: string;
   type: 'predicate';
   feature_property_id: ExpressionTreePredicate['feature_property_id'] | null;
-  feature_type_property_id: ExpressionTreePredicate['feature_type_property_id'];
+  blueprint_feature_type_property_id: ExpressionTreePredicate['blueprint_feature_type_property_id'];
   predicate: BuilderPredicateDraft | null;
 }
 
 export interface ExpressionBuilderProperty {
   feature_property_id: number;
-  feature_type_property_id: ExpressionTreePredicate['feature_type_property_id'];
+  blueprint_feature_type_property_id: ExpressionTreePredicate['blueprint_feature_type_property_id'];
   label: string;
   property_name: string;
   property_display_name: string;

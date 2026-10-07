@@ -1,5 +1,7 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
+import { Readable } from 'node:stream';
+import { gzipSync } from 'node:zlib';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -9,9 +11,11 @@ import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { IValidationError, ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
+import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadArchiveService } from '../../services/upload/upload-archive-service';
+import { streamSubmissionArchive } from '../../utils/biohub-tar-parser';
 import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobDependencies,
@@ -143,6 +147,43 @@ describe('process-submission-features-job', () => {
       const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
       expect(toInvalidStub.calledWith('test-sub-upload-id')).to.be.true;
     });
+
+    for (const corruption of ['checksum', 'truncated'] as const) {
+      it(`marks gzip ${corruption} failures invalid without retrying`, async () => {
+        let compressed = gzipSync(Buffer.alloc(1024));
+        if (corruption === 'checksum') {
+          compressed[compressed.length - 8] ^= 0xff;
+        } else {
+          compressed = compressed.subarray(0, compressed.length - 8);
+        }
+        sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').callsFake(async () => {
+          await streamSubmissionArchive(Readable.from(compressed), {
+            archiveFormat: 'tar.gz',
+            objectStorageService: new ObjectStorageService(),
+            s3KeyPrefix: 'submissions/123/media',
+            featureBatchSize: 1,
+            featureMaxBatchBytes: 1024,
+            mediaBatchSize: 1,
+            mediaMaxBatchBytes: 1024,
+            mediaConcurrency: 1,
+            ingestFeatureBatch: async () => undefined,
+            ingestCodesets: async () => undefined,
+            ingestMediaBatch: async () => undefined
+          });
+          return { valid: true, errors: [] };
+        });
+        const publishStub = sinon.stub(
+          processSubmissionFeaturesJobDependencies,
+          'publishReconcileSubmissionFeaturesJob'
+        );
+
+        await processSubmissionFeaturesJobHandler([createMockJob()]);
+
+        const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
+        expect(toInvalidStub.calledOnceWithExactly('test-sub-upload-id')).to.be.true;
+        expect(publishStub.called).to.be.false;
+      });
+    }
 
     it('rethrows on ingestion system exceptions without prematurely marking upload failed', async () => {
       const testError = new Error('S3 unavailable');

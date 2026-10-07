@@ -19,7 +19,7 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
   const mockRow: SubmissionFeaturePropertyGeometry = {
     submission_feature_property_geometry_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: {
       type: 'Point',
       coordinates: [-123.1, 49.2]
@@ -28,7 +28,7 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
 
   const createPayload: CreateSubmissionFeaturePropertyGeometry = {
     submission_feature_id: 10,
-    feature_type_property_id: 20,
+    blueprint_feature_type_property_id: 20,
     value: mockRow.value
   };
   it('delegates create', async () => {
@@ -63,18 +63,15 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
     expect(stub).to.have.been.calledOnceWith(10);
     expect(result).to.eql([mockRow]);
   });
-
-  it('delegates getByFeatureTypePropertyId', async () => {
+  it('delegates getSubmissionUploadGeometryExtent', async () => {
     const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());
+    const extent = { bbox: [-125.1, 49.1, -125.0, 49.2] as [number, number, number, number], geometry_count: 3 };
     const stub = sinon
-      .stub(
-        SubmissionFeaturePropertyGeometryRepository.prototype,
-        'getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId'
-      )
-      .resolves([mockRow]);
-    const result = await service.getSubmissionFeaturePropertyGeometryByFeatureTypePropertyId(20);
-    expect(stub).to.have.been.calledOnceWith(20);
-    expect(result).to.eql([mockRow]);
+      .stub(SubmissionFeaturePropertyGeometryRepository.prototype, 'getSubmissionUploadGeometryExtent')
+      .resolves(extent);
+    const result = await service.getSubmissionUploadGeometryExtent(12, '11111111-1111-4111-8111-111111111111');
+    expect(stub).to.have.been.calledOnceWith(12, '11111111-1111-4111-8111-111111111111');
+    expect(result).to.eql(extent);
   });
   it('propagates repository errors', async () => {
     const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());

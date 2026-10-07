@@ -11,7 +11,8 @@ const defaultLog = getLogger('paths/submission/{submissionId}');
 export const GET: Operation = [getSubmissionRecordWithSecurity()];
 
 GET.apiDoc = {
-  description: 'Retrieves a submission record metadata',
+  description:
+    'Public submission metadata is available by ID regardless of publication, upload decision, or end date. Returns identifiers, name, description, audit timestamps and user IDs, contributor identity, and feature/security summaries. Internal comments are excluded; feature content has separate access checks.',
   tags: ['meta'],
   security: [
     {
@@ -47,13 +48,15 @@ GET.apiDoc = {
               'contributor_id',
               'name',
               'description',
-              'comment',
               'create_date',
               'create_user',
               'update_date',
               'update_user',
               'revision_count',
-              'security'
+              'security',
+              'contributor_name',
+              'last_approved_upload_date',
+              'feature_types'
             ],
             properties: {
               submission_id: {
@@ -91,10 +94,6 @@ GET.apiDoc = {
                 type: 'string',
                 maxLength: 3000
               },
-              comment: {
-                type: 'string',
-                maxLength: 3000
-              },
               record_end_date: {
                 type: 'string',
                 nullable: true
@@ -127,6 +126,18 @@ GET.apiDoc = {
                   SECURITY_APPLIED_STATUS.SECURED,
                   SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
                 ]
+              },
+              contributor_name: {
+                type: 'string'
+              },
+              last_approved_upload_date: {
+                type: 'string',
+                format: 'date-time',
+                nullable: true
+              },
+              feature_types: {
+                type: 'array',
+                items: { type: 'string' }
               }
             },
             additionalProperties: false

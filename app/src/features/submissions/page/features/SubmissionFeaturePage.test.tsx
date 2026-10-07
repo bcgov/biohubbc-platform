@@ -73,7 +73,9 @@ describe('SubmissionFeaturePage', () => {
     expect(await findByText('Properties')).toBeVisible();
     expect(await findByText('Wolf')).toBeVisible();
     expect(await findByText('5')).toBeVisible();
-    expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object));
+    expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object), {
+      signal: expect.any(AbortSignal)
+    });
   });
 
   it('renders Details as the selected tab', async () => {
