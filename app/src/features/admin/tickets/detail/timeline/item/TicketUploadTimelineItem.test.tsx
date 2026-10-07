@@ -1,6 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
+import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { TicketUploadTimelineItem } from './TicketUploadTimelineItem';
 
@@ -69,7 +70,7 @@ describe('TicketUploadTimelineItem', () => {
 
   it('lists every existing scoped review under Continue and opens the selected review', async () => {
     const user = userEvent.setup();
-    render(<TicketUploadTimelineItem {...baseProps} />);
+    render(<TicketUploadTimelineItem {...baseProps} />, { wrapper: MemoryRouter });
 
     const completedButton = screen.getByRole('button', { name: 'Completed' });
     const continueButton = screen.getByRole('button', { name: 'Continue' });
@@ -88,7 +89,7 @@ describe('TicketUploadTimelineItem', () => {
 
   it('starts another independent review from an existing review scope menu', async () => {
     const user = userEvent.setup();
-    render(<TicketUploadTimelineItem {...baseProps} />);
+    render(<TicketUploadTimelineItem {...baseProps} />, { wrapper: MemoryRouter });
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('menuitem', { name: 'New Review' }));
@@ -114,7 +115,9 @@ describe('TicketUploadTimelineItem', () => {
         validation: []
       }
     };
-    render(<TicketUploadTimelineItem {...baseProps} upload={uploadWithoutValidationReview} />);
+    render(<TicketUploadTimelineItem {...baseProps} upload={uploadWithoutValidationReview} />, {
+      wrapper: MemoryRouter
+    });
 
     const reviewButton = screen.getByRole('button', { name: 'Review' });
     expect(reviewButton).toHaveClass('MuiButton-colorPrimary');
