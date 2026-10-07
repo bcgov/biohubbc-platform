@@ -1,0 +1,8 @@
+# Deploy into namespace a0ec71-prod; pass image.tag from the database setup build.
+cronjob:
+  suspend: true
+
+database:
+  host: biohub-platform-db-prod-primary
+  adminSecretName: biohub-platform-db-prod-pguser-postgres
+  dbNameSecretName: biohub-platform-db-prod-pguser-biohub-platform-db-prod

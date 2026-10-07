@@ -1,0 +1,44 @@
+# Shared settings for the TypeScript materialized-view refresh job.
+# Supply an environment values file and the database setup image tag at deployment.
+nameOverride: ''
+fullnameOverride: ''
+
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/a0ec71-tools/biohub-platform-db-setup
+  tag: '' # Required when enabled: use the tag produced by the database setup build.
+  pullPolicy: Always
+
+cronjob:
+  enabled: true
+  schedule: '0 23 * * 0' # Sunday at 11 p.m.
+  timeZone: America/Vancouver
+  suspend: true # Enable only after the view migrations have been deployed.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  backoffLimit: 1
+  activeDeadlineSeconds: 21900 # Allows six sequential statements with one-hour timeouts.
+
+database:
+  host: '' # Set by values-dev/test/prod.yaml.
+  port: 5432
+  adminSecretName: ''
+  dbNameSecretName: ''
+  secretKeys:
+    username: user
+    password: password
+    database: dbname
+  tls:
+    enabled: true
+    caSecretName: pgo-root-cacert
+    caSecretKey: root.crt
+
+# Initial resources for the Node client; PostgreSQL performs the refresh work.
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 1000m
+    memory: 1792Mi
