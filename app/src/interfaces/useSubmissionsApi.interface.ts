@@ -1,6 +1,24 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { JsonValue } from 'types/json';
 import { SECURITY_APPLIED_STATUS } from './useArtifactApi.interface';
+import { SubmissionUploadDecision, SubmissionUploadJobStatus } from './useTicketsApi.interface';
+
+export interface AdminSubmissionUpload {
+  submission_upload_id: string;
+  upload_id: string;
+  status: SubmissionUploadJobStatus;
+  decision: SubmissionUploadDecision;
+  ticket_id: string;
+  comment: string | null;
+  create_date: string;
+  create_user: number;
+  submitted_by_identifier: string | null;
+}
+
+export interface AdminSubmissionUploadsResponse {
+  uploads: AdminSubmissionUpload[];
+  pagination: ApiPaginationResponseParams;
+}
 
 export type SubmissionRecord = {
   submission_id: number;
@@ -19,8 +37,24 @@ export type SubmissionRecord = {
   revision_count: number;
 };
 
-export type SubmissionRecordWithSecurity = SubmissionRecord & {
+export type SubmissionRecordWithSecurity = {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string | null;
+  publish_timestamp: string | null;
+  submitted_timestamp: string;
+  contributor_id: number;
+  name: string;
+  description: string;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
   security: SECURITY_APPLIED_STATUS;
+  contributor_name: string;
+  last_approved_upload_date: string | null;
+  feature_types: string[];
 };
 
 export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
@@ -139,7 +173,9 @@ export interface PresignedUploadUrlResponse {
 }
 
 export interface ICreateSubmission {
+  client_id?: string;
   bytes: number;
+  archiveFormat?: 'tar' | 'tar.gz';
   name: string;
   description: string;
   comment: string;

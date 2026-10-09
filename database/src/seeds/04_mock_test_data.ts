@@ -8,7 +8,6 @@ import { computeSubmissionFeatureClosureForUpload } from '../seed-utils';
 const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
 const NUM_MOCK_FEATURE_SUBMISSIONS = Number(process.env.NUM_MOCK_FEATURE_SUBMISSIONS || 0);
 const CONTRIBUTOR_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
-let activeTaxonTsnsPromise: Promise<number[]> | null = null;
 
 /**
  * Expression search query shape for performance testing.
@@ -387,8 +386,6 @@ export const insertObservationRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
-  const taxonTsn = await getRandomActiveTaxonTsn(knex);
-
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -412,10 +409,6 @@ export const insertObservationRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  if (taxonTsn) {
-    await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxonTsn })}`);
-  }
-
   //   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
 
@@ -428,7 +421,6 @@ const insertAnimalRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
-  const taxonTsn = await getRandomActiveTaxonTsn(knex);
   const species = faker.animal.type();
 
   const response = await knex.raw(
@@ -453,10 +445,6 @@ const insertAnimalRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-
-  if (taxonTsn) {
-    await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxonTsn })}`);
-  }
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -519,6 +507,11 @@ export const insertSubmission = (
 `;
 };
 
+/**
+ * Build a mock feature insert with a random reconciliation outcome for validation review.
+ * @param options Owning submission and upload, feature type, parent, and source data.
+ * @returns SQL inserting one published mock feature and returning its identifier.
+ */
 export const insertSubmissionFeature = (options: {
   submission_id: number;
   submission_upload_id: string;
@@ -534,6 +527,7 @@ export const insertSubmissionFeature = (options: {
         feature_type_id,
         source_id,
         data,
+        reconciliation,
         record_effective_date
     )
     values
@@ -544,6 +538,7 @@ export const insertSubmissionFeature = (options: {
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
         public.gen_random_uuid(),
         ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
+        '${faker.helpers.arrayElement(['new', 'unmodified', 'modified'])}',
         now()
     )
     RETURNING submission_feature_id;
@@ -553,23 +548,20 @@ const insertSearchString = (options: { submission_feature_id: number; property_n
     INSERT INTO submission_feature_property_string
     (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
-        ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         LEFT($$${options.value}$$, 250),
         1
     FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
     JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id AND fpt.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
@@ -579,9 +571,9 @@ const insertSearchString = (options: { submission_feature_id: number; property_n
           SELECT 1
           FROM submission_feature_property_string existing
           WHERE existing.submission_feature_id = sf.submission_feature_id
-            AND existing.feature_type_property_id = ftp.feature_type_property_id
+            AND existing.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
       )
-    ORDER BY ftp.feature_type_property_id
+    ORDER BY bftp.blueprint_feature_type_property_id
     LIMIT 1;
 `;
 
@@ -589,56 +581,23 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     INSERT INTO submission_feature_property_number
     (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
-        ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         ${faker.number.int({ min: 0, max: 100 })},
         1
     FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
       AND fp.name = 'count'
-    LIMIT 1;
-`;
-
-const insertSearchStringTaxonomy = (options: { submission_feature_id: number; taxonTsn: number }) => `
-    INSERT INTO submission_feature_property_taxon
-    (
-        submission_feature_id,
-        feature_type_property_id,
-        blueprint_feature_type_property_id,
-        taxon_id,
-        create_user
-    )
-    SELECT
-        sf.submission_feature_id,
-        ftp.feature_type_property_id,
-        bftp.blueprint_feature_type_property_id,
-        t.taxon_id,
-        1
-    FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
-    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
-    JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
-    JOIN taxon t
-      ON t.itis_tsn = ${options.taxonTsn}
-     AND t.record_end_date IS NULL
-    WHERE sf.submission_feature_id = ${options.submission_feature_id}
-      AND sf.record_end_date IS NULL
-      AND fp.name = 'taxon_id'
     LIMIT 1;
 `;
 
@@ -649,7 +608,6 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
     INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         date_value,
         time_value,
@@ -657,17 +615,15 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
     )
     SELECT
         sf.submission_feature_id,
-        ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         $$${date}$$::date,
         NULL::time,
         1
     FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
       AND fp.name = 'start_date'
@@ -682,7 +638,6 @@ const insertSearchEndDatetime = (options: { submission_feature_id: number }) => 
     INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         date_value,
         time_value,
@@ -690,17 +645,15 @@ const insertSearchEndDatetime = (options: { submission_feature_id: number }) => 
     )
     SELECT
         sf.submission_feature_id,
-        ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         $$${date}$$::date,
         NULL::time,
         1
     FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
       AND fp.name = 'end_date'
@@ -713,14 +666,12 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
     INSERT INTO submission_feature_property_geometry
     (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
-        ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         public.ST_GeomFromGeoJSON(
             '${JSON.stringify(
@@ -734,11 +685,10 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
         ),
         1
     FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
       AND fp.name = 'geometry'
@@ -750,14 +700,12 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
     INSERT INTO submission_feature_property_geometry
     (
         submission_feature_id,
-        feature_type_property_id,
         blueprint_feature_type_property_id,
         value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
-        ftp.feature_type_property_id,
         bftp.blueprint_feature_type_property_id,
         public.ST_GeomFromGeoJSON(
             '${JSON.stringify(
@@ -769,11 +717,10 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
         ),
         1
     FROM submission_feature sf
-    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
     WHERE sf.submission_feature_id = ${options.submission_feature_id}
       AND sf.record_end_date IS NULL
       AND fp.name = 'geometry'
@@ -784,58 +731,11 @@ const randomIntFromInterval = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
-/**
- * Loads active ITIS TSNs for mock feature seeding.
- *
- * Use this helper before seeding any mock typed taxon property row. The seeded
- * value must be an existing public ITIS TSN so `insertSearchStringTaxonomy` can
- * resolve it to the internal `taxon.taxon_id` and write a valid
- * `submission_feature_property_taxon` row.
- *
- * The result is cached as a promise for the lifetime of this seed module. Mock
- * animal and observation inserts run concurrently, so caching the in-flight
- * lookup prevents repeated full-table taxonomy reads during a single seed run.
- *
- * @param {Knex} knex - Knex connection or transaction used by the seed.
- * @returns {Promise<number[]>} Active `taxon.itis_tsn` values available for mock taxonomy properties.
- */
-const getActiveTaxonTsns = async (knex: Knex): Promise<number[]> => {
-  activeTaxonTsnsPromise ??= knex('taxon')
-    .select<{ itis_tsn: number }[]>('itis_tsn')
-    .whereNull('record_end_date')
-    .then((taxa) => taxa.map((taxon) => taxon.itis_tsn).filter((itisTsn) => Number.isFinite(itisTsn)));
-
-  return activeTaxonTsnsPromise;
-};
-
-/**
- * Picks one active ITIS TSN for a mock feature.
- *
- * Use this when building mock feature `data` for feature types that include a
- * taxonomy property. It delegates loading and caching to `getActiveTaxonTsns`,
- * then chooses a random TSN in memory. This avoids database-side
- * `ORDER BY random()` work for every seeded feature while still distributing
- * mock records across available active taxa. If no active taxa are available,
- * return undefined so mock feature seeding can continue without taxonomy rows.
- *
- * @param {Knex} knex - Knex connection or transaction used by the seed.
- * @returns {Promise<number | undefined>} Random active `taxon.itis_tsn` value, or undefined when taxonomy is unavailable.
- */
-const getRandomActiveTaxonTsn = async (knex: Knex): Promise<number | undefined> => {
-  const activeTaxonTsns = await getActiveTaxonTsns(knex);
-
-  if (activeTaxonTsns.length === 0) {
-    return undefined;
-  }
-
-  return activeTaxonTsns[randomIntFromInterval(0, activeTaxonTsns.length - 1)];
-};
-
 export const insertTelemetryRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
-  // Match the `feature_type_property` schema for telemetry (dop, elevation,
+  // Match the Blueprint assignments for telemetry (dop, elevation,
   // timestamp, geometry). Property names MUST align with the declarations in
   // `20251001000000_insert_feature_types.ts`. Full FeatureCollection matches
   // the ingest contract.
@@ -866,40 +766,37 @@ export const insertTelemetryRecord = async (
   // are hardcoded to `name`/`count` property names, so we use inline SQL here
   // to target telemetry's specific property names.
   await knex.raw(
-    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, bftp.blueprint_feature_type_property_id, ?, 1
+    `INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?, 1
      FROM submission_feature sf
-     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
      JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+     JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'dop';`,
     [telemetryData.dop, submission_feature_id]
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_number (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, bftp.blueprint_feature_type_property_id, ?, 1
+    `INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?, 1
      FROM submission_feature sf
-     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
      JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+     JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'elevation';`,
     [telemetryData.elevation, submission_feature_id]
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
-     SELECT sf.submission_feature_id, ftp.feature_type_property_id, bftp.blueprint_feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time, 1
+    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
+     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time, 1
      FROM submission_feature sf
-     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
      JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
-     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.feature_type_property_id = ftp.feature_type_property_id AND bftp.record_end_date IS NULL
-     JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+     JOIN blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+     JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id AND fp.record_end_date IS NULL
      WHERE sf.submission_feature_id = ? AND sf.record_end_date IS NULL AND fp.name = 'timestamp';`,
     [telemetryData.timestamp, telemetryData.timestamp, submission_feature_id]
   );

@@ -17,7 +17,7 @@ describe('countFeatures', () => {
       {
         type: 'predicate',
         feature_property_id: 14,
-        feature_type_property_id: null,
+        blueprint_feature_type_property_id: null,
         operator: 'GreaterThan',
         value: 30
       }
@@ -39,7 +39,7 @@ describe('countFeatures', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { feature_type: '  SPECIES_OBSERVATION  ' };
-    mockReq.body = { expression: expressionTree };
+    mockReq.body = { expression: expressionTree, submissionIds: [42] };
 
     const countStub = sinon
       .stub(SearchFeatureService.prototype, 'countSearchFeaturesByExpressionTree')
@@ -47,7 +47,12 @@ describe('countFeatures', () => {
 
     await count.countFeatures()(mockReq, mockRes, mockNext);
 
-    expect(countStub.firstCall.args).to.deep.equal(['species_observation', expressionTree, null]);
+    expect(countStub.firstCall.args).to.deep.equal([
+      'species_observation',
+      expressionTree,
+      { type: 'anonymous' },
+      { submissionIds: [42] }
+    ]);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.deep.equal({ total: 3_400_000 });
     expect(dbConnectionObj.commit).to.have.been.calledOnce;
@@ -73,7 +78,12 @@ describe('countFeatures', () => {
 
     await count.countFeatures()(mockReq, mockRes, mockNext);
 
-    expect(countStub.firstCall.args).to.deep.equal(['species_observation', undefined, null]);
+    expect(countStub.firstCall.args).to.deep.equal([
+      'species_observation',
+      null,
+      { type: 'anonymous' },
+      { submissionIds: undefined }
+    ]);
     expect(mockRes.jsonValue).to.deep.equal({ total: 5_000_000 });
   });
 

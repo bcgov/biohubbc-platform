@@ -1,8 +1,12 @@
-import { cleanup, fireEvent, waitFor, within } from '@testing-library/react';
+import { DialogContextProvider } from 'contexts/dialogContext';
+import { QueryClient } from '@tanstack/react-query';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
+import { act, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import dayjs from 'dayjs';
 import { DownloadDetail, DownloadVersion, DownloadVersionListResponse } from 'interfaces/useDownloadApi.interface';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { Link, MemoryRouter, Route, Routes } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { DownloadPage } from './DownloadPage';
@@ -65,7 +69,7 @@ const makeApiError = (status: number) => {
   return err;
 };
 
-const renderAt = (path: string) =>
+const renderAt = (path: string, queryClient?: QueryClient) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -75,7 +79,8 @@ const renderAt = (path: string) =>
           element={<div>Version detail destination</div>}
         />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
+    { queryClient, wrapper: DialogContextProvider }
   );
 
 describe('DownloadPage', () => {
@@ -89,6 +94,61 @@ describe('DownloadPage', () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it('does not export a previous download version under the new download', async () => {
+    const queryClient = createTestQueryClient();
+    const otherDownloadId = 'aaaaaaaa-2222-3333-4444-555555555555';
+    queryClient.setQueryData(
+      downloadQueryKeys.detail(otherDownloadId),
+      makeDownload({ download_id: otherDownloadId, name: 'Other download' })
+    );
+    mockListDownloadVersions.mockImplementation((id: string) =>
+      id === DOWNLOAD_ID ? Promise.resolve(makeVersionsResponse()) : new Promise(() => undefined)
+    );
+    const view = render(
+      <MemoryRouter initialEntries={[`/download/${DOWNLOAD_ID}`]}>
+        <Link to={`/download/${otherDownloadId}`}>Open other download</Link>
+        <Routes>
+          <Route path="/download/:downloadId" element={<DownloadPage />} />
+        </Routes>
+      </MemoryRouter>,
+      { queryClient, wrapper: DialogContextProvider }
+    );
+    await view.findByRole('button', { name: 'Export' });
+    fireEvent.click(view.getByRole('link', { name: 'Open other download' }));
+    await view.findByRole('heading', { name: 'Other download' });
+    expect(view.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+    expect(view.queryByText(VERSION_ID)).not.toBeInTheDocument();
+  });
+
+  it('reports a failed versions load in a dismissible dialog', async () => {
+    mockListDownloadVersions.mockRejectedValueOnce(new Error('Versions unavailable'));
+    const { findByRole, getByRole, queryByRole } = renderAt(`/download/${DOWNLOAD_ID}`);
+    expect(await findByRole('dialog')).toHaveTextContent('Failed to load download versionsVersions unavailable');
+    fireEvent.click(getByRole('button', { name: 'Ok' }));
+    await waitFor(() => expect(queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockGetDownload).toHaveBeenCalledOnce();
+    expect(mockListDownloadVersions).toHaveBeenCalledOnce();
+  });
+
+  it('reports a failed background refresh while keeping the existing versions visible', async () => {
+    const queryClient = createTestQueryClient();
+    const { findByText, findByRole } = renderAt(`/download/${DOWNLOAD_ID}`, queryClient);
+    const version = await findByText(VERSION_ID);
+    mockListDownloadVersions.mockRejectedValueOnce(new Error('Refresh unavailable'));
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: downloadQueryKeys.versions(DOWNLOAD_ID, {
+          page: 1,
+          limit: 10,
+          sort: 'create_date',
+          order: 'desc'
+        })
+      });
+    });
+    expect(await findByRole('dialog')).toHaveTextContent('Refresh unavailable');
+    expect(version).toBeVisible();
   });
 
   it('renders the download header with only the Versions tab', async () => {
@@ -121,7 +181,8 @@ describe('DownloadPage', () => {
     expect(queryByText('Started')).not.toBeInTheDocument();
     expect(mockListDownloadVersions).toHaveBeenCalledWith(
       DOWNLOAD_ID,
-      expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' })
+      expect.objectContaining({ page: 1, limit: 10, sort: 'create_date', order: 'desc' }),
+      { signal: expect.any(AbortSignal) }
     );
   });
 

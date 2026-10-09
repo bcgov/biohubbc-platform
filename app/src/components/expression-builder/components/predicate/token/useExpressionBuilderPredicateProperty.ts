@@ -40,7 +40,7 @@ export const useExpressionBuilderPredicateProperty = ({
   const isSelectedProperty = (property: ExpressionBuilderProperty | null): property is ExpressionBuilderProperty =>
     node.feature_property_id !== null &&
     property?.feature_property_id === node.feature_property_id &&
-    property.feature_type_property_id === node.feature_type_property_id;
+    property.blueprint_feature_type_property_id === node.blueprint_feature_type_property_id;
 
   /**
    * Finds metadata for the property selected by this predicate row.

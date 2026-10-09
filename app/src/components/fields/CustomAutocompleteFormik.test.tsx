@@ -25,6 +25,32 @@ describe('CustomAutocompleteFormik', () => {
     expect(getByDisplayValue('Open')).toBeVisible();
   });
 
+  it('leaves Formik updates to the caller when an explicit null value is supplied', async () => {
+    const onChange = vi.fn();
+    const page = render(
+      <Formik initialValues={{ status: 'OPEN' }} onSubmit={async () => {}}>
+        <>
+          <CustomAutocompleteFormik
+            id="status"
+            name="status"
+            label="Status"
+            options={options}
+            value={null}
+            onChange={onChange}
+          />
+          <FormikValueProbe />
+        </>
+      </Formik>
+    );
+    const input = page.getByRole('combobox');
+    expect(input).toHaveValue('');
+    fireEvent.mouseDown(input);
+    fireEvent.click(page.getByText('Closed'));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.anything(), options[1]));
+    expect(page.getByTestId('formik-probe')).toHaveTextContent('OPEN');
+    expect(input).toHaveValue('');
+  });
+
   it('updates primitive form value on selection', async () => {
     const { getByRole, getByText, getByTestId } = render(
       <Formik initialValues={{ status: '' }} onSubmit={async () => {}}>

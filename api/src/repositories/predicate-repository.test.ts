@@ -8,7 +8,7 @@ import { PredicateRepository } from './predicate-repository';
 const predicateRow = {
   predicate_id: 'pred-1',
   feature_property_id: 11,
-  feature_type_property_id: 22,
+  blueprint_feature_type_property_id: 22,
   feature_property_type_id: 3,
   predicate_hash: 'hash-1'
 };
@@ -25,7 +25,7 @@ describe('PredicateRepository', () => {
 
       const result = await repository.insertPredicateAnchor({
         feature_property_id: 11,
-        feature_type_property_id: 22,
+        blueprint_feature_type_property_id: 22,
         feature_property_type_id: 3,
         predicate_hash: 'hash-1'
       });
@@ -46,7 +46,7 @@ describe('PredicateRepository', () => {
 
       const result = await repository.insertPredicateAnchor({
         feature_property_id: 11,
-        feature_type_property_id: 22,
+        blueprint_feature_type_property_id: 22,
         feature_property_type_id: 3,
         predicate_hash: 'hash-1'
       });
@@ -213,7 +213,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 11,
-                feature_type_property_id: 22,
+                blueprint_feature_type_property_id: 22,
                 operator: 'Equals',
                 value: 'elk'
               }
@@ -232,7 +232,7 @@ describe('PredicateRepository', () => {
         predicate_node: {
           type: 'predicate',
           feature_property_id: 11,
-          feature_type_property_id: 22,
+          blueprint_feature_type_property_id: 22,
           operator: 'Equals',
           value: 'elk'
         }
@@ -249,7 +249,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 11,
-                feature_type_property_id: 1,
+                blueprint_feature_type_property_id: 1,
                 operator: 'Contains',
                 value: 'elk'
               }
@@ -260,7 +260,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 12,
-                feature_type_property_id: 2,
+                blueprint_feature_type_property_id: 2,
                 operator: 'GreaterThan',
                 value: 12.5
               }
@@ -271,7 +271,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 13,
-                feature_type_property_id: 3,
+                blueprint_feature_type_property_id: 3,
                 operator: 'Equals',
                 value: true
               }
@@ -282,7 +282,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 14,
-                feature_type_property_id: 4,
+                blueprint_feature_type_property_id: 4,
                 operator: 'Before',
                 value: '2024-01-01'
               }
@@ -293,7 +293,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 15,
-                feature_type_property_id: 5,
+                blueprint_feature_type_property_id: 5,
                 operator: 'DescendsFrom',
                 value: 123
               }
@@ -304,7 +304,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 16,
-                feature_type_property_id: 6,
+                blueprint_feature_type_property_id: 6,
                 operator: 'Intersects',
                 value: {
                   type: 'FeatureCollection',
@@ -318,7 +318,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 17,
-                feature_type_property_id: 7,
+                blueprint_feature_type_property_id: 7,
                 operator: 'Equals',
                 value: 42
               }
@@ -329,7 +329,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 18,
-                feature_type_property_id: 8,
+                blueprint_feature_type_property_id: 8,
                 operator: 'Exists'
               }
             }
@@ -357,7 +357,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 11,
-            feature_type_property_id: 1,
+            blueprint_feature_type_property_id: 1,
             operator: 'Contains',
             value: 'elk'
           }
@@ -368,7 +368,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 12,
-            feature_type_property_id: 2,
+            blueprint_feature_type_property_id: 2,
             operator: 'GreaterThan',
             value: 12.5
           }
@@ -379,7 +379,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 13,
-            feature_type_property_id: 3,
+            blueprint_feature_type_property_id: 3,
             operator: 'Equals',
             value: true
           }
@@ -390,7 +390,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 14,
-            feature_type_property_id: 4,
+            blueprint_feature_type_property_id: 4,
             operator: 'Before',
             value: '2024-01-01'
           }
@@ -401,7 +401,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 15,
-            feature_type_property_id: 5,
+            blueprint_feature_type_property_id: 5,
             operator: 'DescendsFrom',
             value: 123
           }
@@ -412,7 +412,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 16,
-            feature_type_property_id: 6,
+            blueprint_feature_type_property_id: 6,
             operator: 'Intersects',
             value: { type: 'FeatureCollection', features: [] }
           }
@@ -423,7 +423,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 17,
-            feature_type_property_id: 7,
+            blueprint_feature_type_property_id: 7,
             operator: 'Equals',
             value: 42
           }
@@ -434,7 +434,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 18,
-            feature_type_property_id: 8,
+            blueprint_feature_type_property_id: 8,
             operator: 'Exists'
           }
         }
@@ -465,7 +465,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 12,
-                feature_type_property_id: 33,
+                blueprint_feature_type_property_id: 33,
                 operator: 'Equals',
                 value: 'wolf'
               }
@@ -476,7 +476,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 11,
-                feature_type_property_id: 22,
+                blueprint_feature_type_property_id: 22,
                 operator: 'Equals',
                 value: 'elk'
               }
@@ -496,7 +496,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 11,
-            feature_type_property_id: 22,
+            blueprint_feature_type_property_id: 22,
             operator: 'Equals',
             value: 'elk'
           }
@@ -507,7 +507,7 @@ describe('PredicateRepository', () => {
           predicate_node: {
             type: 'predicate',
             feature_property_id: 12,
-            feature_type_property_id: 33,
+            blueprint_feature_type_property_id: 33,
             operator: 'Equals',
             value: 'wolf'
           }
@@ -525,7 +525,7 @@ describe('PredicateRepository', () => {
               predicate_node: {
                 type: 'predicate',
                 feature_property_id: 11,
-                feature_type_property_id: 22,
+                blueprint_feature_type_property_id: 22,
                 operator: 'Equals',
                 value: 'elk'
               }

@@ -1,5 +1,7 @@
+import dayjs from 'dayjs';
 import { IDBConnection } from '../../database/db';
-import { CreateUpload, UpdateUpload, Upload } from '../../models/upload';
+import { HTTP401, HTTP403 } from '../../errors/http-error';
+import { CreateUpload, UpdateUpload, Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadRepository } from '../../repositories/upload/upload-repository';
 import { DBService } from '../db-service';
 
@@ -15,6 +17,49 @@ export class UploadService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.uploadRepository = new UploadRepository(connection);
+  }
+
+  /**
+   * Authorize upload completion by requiring the creator and checking membership in the owning submission contributor.
+   * A missing association or different creator throws so the middleware's administrator bypass
+   * cannot grant access to someone else's upload. Contributor membership follows the usual admin bypass.
+   * Team membership is not required: removing the creator from either team does not revoke completion.
+   *
+   * @param {string} uploadId Upload session identifier.
+   * @param {number} systemUserId Authenticated caller.
+   * @returns {Promise<boolean>} Whether the creator belongs to the active owning contributor.
+   * @throws {HTTP403} If no active submission association exists or the caller is not the creator.
+   */
+  async isUserAuthorizedForUploadCompletion(uploadId: string, systemUserId: number): Promise<boolean> {
+    const access = await this.uploadRepository.findUploadCompletionAccess(uploadId, systemUserId);
+    if (access?.create_user !== systemUserId) {
+      throw new HTTP403('Only the creator can complete this upload');
+    }
+    return access.is_contributor_member;
+  }
+
+  /**
+   * Validate multipart identity, expiry, and pending status before completing an authorized upload.
+   * Requires prior Upload middleware authorization for the creator and owning contributor.
+   *
+   * @param {string} uploadId - The unique identifier for the upload in the system
+   * @param {string} s3UploadId - The S3 multipart upload ID, used to verify client intent
+   * @returns {Promise<void>} Resolves when the multipart identity and upload state are valid.
+   * @throws {HTTP401} If the multipart ID differs or the upload is expired or no longer pending.
+   */
+  async validateUploadCompletion(uploadId: string, s3UploadId: string): Promise<void> {
+    const upload = await this.getUpload(uploadId);
+
+    const now = dayjs();
+
+    const isValid =
+      upload.s3_upload_id === s3UploadId &&
+      now.isBefore(upload.record_end_date) &&
+      upload.upload_status === UploadStatusEnum.PENDING;
+
+    if (!isValid) {
+      throw new HTTP401('Access Denied');
+    }
   }
 
   /**

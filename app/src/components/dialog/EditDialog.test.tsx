@@ -77,7 +77,7 @@ describe('EditDialog', () => {
     expect(getByText('This is an error')).toBeVisible();
   });
 
-  it('calls the onSave prop when `Save Changes` button is clicked', async () => {
+  it('calls the onSave prop when `Save` button is clicked', async () => {
     const { getByTestId, getByLabelText } = renderContainer({ testFieldValue: 'initial value', open: true });
 
     const textField = await getByLabelText('Test Field', { exact: false });
@@ -104,7 +104,7 @@ describe('EditDialog', () => {
     });
 
     expect(getByTestId('edit-dialog-save-button')).toBeVisible();
-    expect(queryByText('Save Changes', { exact: false })).toBeNull();
+    expect(queryByText('Save', { exact: false })).toBeNull();
   });
 
   it('calls the onCancel prop when `Cancel` button is clicked', async () => {

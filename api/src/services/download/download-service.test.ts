@@ -252,7 +252,7 @@ describe('DownloadService', () => {
         {
           type: 'predicate',
           feature_property_id: 1,
-          feature_type_property_id: 2,
+          blueprint_feature_type_property_id: 2,
           operator: 'Equals',
           value: 'moose'
         }

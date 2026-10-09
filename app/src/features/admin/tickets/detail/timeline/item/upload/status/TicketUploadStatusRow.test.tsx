@@ -1,5 +1,4 @@
 import { mdiCheck, mdiClose, mdiProgressClock } from '@mdi/js';
-import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   ISubmissionUploadProcessingStatusHistoryItem,
@@ -7,10 +6,15 @@ import {
   TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { render } from 'test-helpers/test-utils';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { render, screen, waitFor } from 'test-helpers/test-utils';
 import { getFormattedDate } from 'utils/Utils';
-import { SubmissionUploadStatusHistoryState } from '../../../hooks/upload/useSubmissionUploadStatusHistory';
 import { TicketUploadStatusRow } from './TicketUploadStatusRow';
+
+const mocks = vi.hoisted(() => ({ getHistory: vi.fn() }));
+vi.mock('hooks/useApi', () => ({
+  useApi: () => ({ tickets: { getSubmissionUploadProcessingStatusHistory: mocks.getHistory } })
+}));
 
 const makeUpload = (uploadStatus: SubmissionUploadJobStatus): TicketSubmissionUploadResponse => ({
   submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
@@ -38,39 +42,42 @@ const makeHistoryItem = (
   create_date: createDate
 });
 
-const renderRow = (
-  upload: TicketSubmissionUploadResponse,
-  statusHistory: SubmissionUploadStatusHistoryState | undefined,
-  onLoadStatusHistory = vi.fn(),
-  canViewStatusHistory = true
-) => {
-  const view = render(
-    <TicketUploadStatusRow
-      upload={upload}
-      canViewStatusHistory={canViewStatusHistory}
-      statusHistory={statusHistory}
-      onLoadStatusHistory={onLoadStatusHistory}
-    />
-  );
+/**
+ * Renders the row against a client of its own.
+ *
+ * @param {TicketSubmissionUploadResponse} upload The upload shown.
+ * @param {boolean} [canViewStatusHistory] Whether the viewer may expand the history.
+ * @returns The RTL render result and the query client.
+ */
+const renderRow = (upload: TicketSubmissionUploadResponse, canViewStatusHistory = true) => {
+  const queryClient = createTestQueryClient();
+  const view = render(<TicketUploadStatusRow upload={upload} canViewStatusHistory={canViewStatusHistory} />, {
+    queryClient
+  });
 
-  return { ...view, onLoadStatusHistory };
+  return { ...view, queryClient };
 };
 
 describe('TicketUploadStatusRow', () => {
+  beforeEach(() => {
+    mocks.getHistory.mockReset();
+    mocks.getHistory.mockResolvedValue([]);
+  });
+
   it('shows only the current status, collapsed, and requests no history on render', () => {
-    const { onLoadStatusHistory } = renderRow(makeUpload('ingested'), undefined);
+    renderRow(makeUpload('ingested'));
 
     const toggle = screen.getByRole('button', { name: 'Ingested' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     const region = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
     expect(region).not.toBeVisible();
     expect(region).toBeEmptyDOMElement();
-    expect(onLoadStatusHistory).not.toHaveBeenCalled();
+    expect(mocks.getHistory).not.toHaveBeenCalled();
   });
 
   it('renders a static status row with no toggle or request when the viewer cannot see the history', async () => {
     const user = userEvent.setup();
-    const { onLoadStatusHistory } = renderRow(makeUpload('ingested'), undefined, vi.fn(), false);
+    renderRow(makeUpload('ingested'), false);
 
     expect(screen.getByText('Ingested')).toBeVisible();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -78,80 +85,80 @@ describe('TicketUploadStatusRow', () => {
 
     await user.click(screen.getByText('Ingested'));
 
-    expect(onLoadStatusHistory).not.toHaveBeenCalled();
+    expect(mocks.getHistory).not.toHaveBeenCalled();
   });
 
-  it('expands on click, requests the history, and collapses on the next click', async () => {
+  it('expands on click, requests the history once, and reuses it after collapsing and expanding again', async () => {
     const user = userEvent.setup();
     const upload = makeUpload('ingested');
-    const { onLoadStatusHistory } = renderRow(upload, undefined);
+    renderRow(upload);
 
     const toggle = screen.getByRole('button', { name: 'Ingested' });
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAttribute('aria-controls', screen.getByRole('region', { name: 'Processing history' }).id);
-    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
-    expect(onLoadStatusHistory).toHaveBeenCalledWith(upload);
+    expect(await screen.findByText('No processing history')).toBeVisible();
+    expect(mocks.getHistory).toHaveBeenCalledWith(upload.submission_id, upload.submission_upload_id, {
+      signal: expect.any(AbortSignal)
+    });
 
     await user.click(toggle);
-
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
+    await user.click(toggle);
+
+    expect(mocks.getHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the history again once the upload has moved on to another status', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderRow(makeUpload('ingesting'));
+    await user.click(screen.getByRole('button', { name: 'Ingesting' }));
+    await waitFor(() => expect(mocks.getHistory).toHaveBeenCalledTimes(1));
+
+    rerender(<TicketUploadStatusRow upload={makeUpload('ingested')} canViewStatusHistory={true} />);
+
+    await waitFor(() => expect(mocks.getHistory).toHaveBeenCalledTimes(2));
   });
 
   it('toggles from the keyboard', async () => {
     const user = userEvent.setup();
-    const { onLoadStatusHistory } = renderRow(makeUpload('indexing'), undefined);
+    renderRow(makeUpload('indexing'));
 
     await user.tab();
     expect(screen.getByRole('button', { name: 'Indexing' })).toHaveFocus();
 
     await user.keyboard('{Enter}');
     expect(screen.getByRole('button', { name: 'Indexing' })).toHaveAttribute('aria-expanded', 'true');
-    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mocks.getHistory).toHaveBeenCalledTimes(1));
 
     await user.keyboard(' ');
     expect(screen.getByRole('button', { name: 'Indexing' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('asks for the history again on every expansion so a failed request is retried', async () => {
+  it('shows the error state with the current status still visible, and retries on the next expansion', async () => {
     const user = userEvent.setup();
-    const { onLoadStatusHistory } = renderRow(makeUpload('failed'), { status: 'error', message: 'Forbidden' });
+    mocks.getHistory.mockRejectedValueOnce(new Error('Forbidden'));
+    renderRow(makeUpload('failed'));
 
     const toggle = screen.getByRole('button', { name: 'Failed' });
     await user.click(toggle);
+
+    expect(await screen.findByText('Failed to load processing history')).toBeVisible();
+    expect(toggle).toBeVisible();
+    expect(mocks.getHistory).toHaveBeenCalledTimes(1);
+
     await user.click(toggle);
     await user.click(toggle);
 
-    expect(onLoadStatusHistory).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not request again when the parent re-renders after an error', async () => {
-    const user = userEvent.setup();
-    const upload = makeUpload('failed');
-    const onLoadStatusHistory = vi.fn();
-    const { rerender } = renderRow(upload, { status: 'error', message: 'Forbidden' }, onLoadStatusHistory);
-
-    await user.click(screen.getByRole('button', { name: 'Failed' }));
-    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <TicketUploadStatusRow
-        upload={upload}
-        canViewStatusHistory={true}
-        statusHistory={{ status: 'error', message: 'Forbidden' }}
-        onLoadStatusHistory={onLoadStatusHistory}
-      />
-    );
-
-    expect(screen.getByText('Failed to load processing history')).toBeVisible();
-    expect(onLoadStatusHistory).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('No processing history')).toBeVisible();
+    expect(mocks.getHistory).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the current status visible while the history loads', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('indexing'), { status: 'loading' });
+    mocks.getHistory.mockReturnValue(new Promise(() => undefined));
+    renderRow(makeUpload('indexing'));
 
     await user.click(screen.getByRole('button', { name: 'Indexing' }));
 
@@ -160,40 +167,18 @@ describe('TicketUploadStatusRow', () => {
     expect(screen.queryByText('No processing history')).not.toBeInTheDocument();
   });
 
-  it('shows the error state with the current status still visible', async () => {
-    const user = userEvent.setup();
-    renderRow(makeUpload('failed'), { status: 'error', message: 'Forbidden' });
-
-    await user.click(screen.getByRole('button', { name: 'Failed' }));
-
-    expect(screen.getByText('Failed to load processing history')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Failed' })).toBeVisible();
-  });
-
-  it('shows the empty state when the upload has no history', async () => {
-    const user = userEvent.setup();
-    renderRow(makeUpload('uploaded'), { status: 'loaded', uploadStatus: 'uploaded', history: [] });
-
-    await user.click(screen.getByRole('button', { name: 'Uploaded' }));
-
-    expect(screen.getByText('No processing history')).toBeVisible();
-  });
-
   it('renders the history in API order with shared labels and formatted timestamps', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('ingested'), {
-      status: 'loaded',
-      uploadStatus: 'ingested',
-      history: [
-        makeHistoryItem(3, 'ingested', '2026-09-03T18:45:00.000Z'),
-        makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
-        makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z')
-      ]
-    });
+    mocks.getHistory.mockResolvedValue([
+      makeHistoryItem(3, 'ingested', '2026-09-03T18:45:00.000Z'),
+      makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
+      makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z')
+    ]);
+    renderRow(makeUpload('ingested'));
 
     await user.click(screen.getByRole('button', { name: 'Ingested' }));
 
-    const items = screen.getAllByRole('listitem');
+    const items = await screen.findAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual([
       `Ingested${getFormattedDate(DATE_FORMAT.ShortMediumDateTimeFormat, '2026-09-03T18:45:00.000Z')}`,
       `Uploaded${getFormattedDate(DATE_FORMAT.ShortMediumDateTimeFormat, '2026-09-03T18:30:00.000Z')}`,
@@ -204,52 +189,55 @@ describe('TicketUploadStatusRow', () => {
 
   it('keeps the icon of a stage that ended in failure instead of marking it completed', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('failed'), {
-      status: 'loaded',
-      uploadStatus: 'failed',
-      history: [
-        makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
-        makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
-        makeHistoryItem(3, 'ingested', '2026-09-03T18:32:00.000Z'),
-        makeHistoryItem(4, 'indexing', '2026-09-03T18:45:00.000Z'),
-        makeHistoryItem(5, 'failed', '2026-09-03T18:46:00.000Z')
-      ]
-    });
+    mocks.getHistory.mockResolvedValue([
+      makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
+      makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
+      makeHistoryItem(3, 'ingested', '2026-09-03T18:32:00.000Z'),
+      makeHistoryItem(4, 'indexing', '2026-09-03T18:45:00.000Z'),
+      makeHistoryItem(5, 'failed', '2026-09-03T18:46:00.000Z')
+    ]);
+    renderRow(makeUpload('failed'));
 
     await user.click(screen.getByRole('button', { name: 'Failed' }));
 
-    const iconPaths = screen.getAllByRole('listitem').map((item) => item.querySelector('svg path')?.getAttribute('d'));
-    expect(iconPaths).toEqual([mdiCheck, mdiCheck, mdiCheck, mdiProgressClock, mdiClose]);
+    const items = await screen.findAllByRole('listitem');
+    expect(items.map((item) => item.querySelector('svg path')?.getAttribute('d'))).toEqual([
+      mdiCheck,
+      mdiCheck,
+      mdiCheck,
+      mdiProgressClock,
+      mdiClose
+    ]);
   });
 
   it('marks every stage the upload moved on from as completed and keeps the current stage icon', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('indexing'), {
-      status: 'loaded',
-      uploadStatus: 'ingested',
-      history: [
-        makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
-        makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
-        makeHistoryItem(3, 'indexing', '2026-09-03T18:45:00.000Z')
-      ]
-    });
+    mocks.getHistory.mockResolvedValue([
+      makeHistoryItem(1, 'uploaded', '2026-09-03T18:30:00.000Z'),
+      makeHistoryItem(2, 'ingesting', '2026-09-03T18:31:00.000Z'),
+      makeHistoryItem(3, 'indexing', '2026-09-03T18:45:00.000Z')
+    ]);
+    renderRow(makeUpload('indexing'));
 
     await user.click(screen.getByRole('button', { name: 'Indexing' }));
 
-    const iconPaths = screen.getAllByRole('listitem').map((item) => item.querySelector('svg path')?.getAttribute('d'));
-    expect(iconPaths).toEqual([mdiCheck, mdiCheck, mdiProgressClock]);
+    const items = await screen.findAllByRole('listitem');
+    expect(items.map((item) => item.querySelector('svg path')?.getAttribute('d'))).toEqual([
+      mdiCheck,
+      mdiCheck,
+      mdiProgressClock
+    ]);
   });
 
   it('renders a safe fallback for a status the frontend does not know', async () => {
     const user = userEvent.setup();
-    renderRow(makeUpload('archiving' as SubmissionUploadJobStatus), {
-      status: 'loaded',
-      uploadStatus: 'ingested',
-      history: [makeHistoryItem(1, 'archiving' as SubmissionUploadJobStatus, '2026-09-03T18:30:00.000Z')]
-    });
+    mocks.getHistory.mockResolvedValue([
+      makeHistoryItem(1, 'archiving' as SubmissionUploadJobStatus, '2026-09-03T18:30:00.000Z')
+    ]);
+    renderRow(makeUpload('archiving' as SubmissionUploadJobStatus));
 
     await user.click(screen.getByRole('button', { name: 'Unknown status' }));
 
-    expect(screen.getAllByText('Unknown status')).toHaveLength(2);
+    await waitFor(() => expect(screen.getAllByText('Unknown status')).toHaveLength(2));
   });
 });

@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ITeam,
   ITeamsResponse,
@@ -22,14 +22,16 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    *
    * @param {ApiSearchParams} [searchParams] - Optional search parameters.
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITeamsResponse>}
    */
   const getTeams = async (
     searchParams?: ApiSearchParams,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ITeamsResponse> => {
     const params = { ...searchParams, ...pagination };
-    const { data } = await axios.get('/api/administrative/teams', { params });
+    const { data } = await axios.get('/api/administrative/teams', { params, ...options });
 
     return data;
   };
@@ -85,11 +87,16 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    * Get available users for team membership.
    *
    * @param {string} [search] - Optional search term to filter users by user_identifier
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] - Request cancellation.
    * @return {*} {Promise<IAvailableUsersResponse>}
    */
-  const getAvailableUsers = async (search?: string): Promise<IAvailableUsersResponse> => {
+  const getAvailableUsers = async (
+    search?: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IAvailableUsersResponse> => {
     const { data } = await axios.get('/api/administrative/users', {
-      params: search ? { search } : undefined
+      params: search ? { search } : undefined,
+      ...options
     });
 
     return data;
@@ -99,11 +106,16 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    * Get members for a team.
    *
    * @param {string} teamId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {*} {Promise<ITeamMembersResponse>}
    */
-  const getTeamMembers = async (teamId: string): Promise<ITeamMembersResponse> => {
+  const getTeamMembers = async (
+    teamId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ITeamMembersResponse> => {
     const { data } = await axios.get(`/api/administrative/teams/${teamId}/member`, {
-      params: { page: 1, limit: 100 }
+      params: { page: 1, limit: 100 },
+      ...options
     });
 
     return data;

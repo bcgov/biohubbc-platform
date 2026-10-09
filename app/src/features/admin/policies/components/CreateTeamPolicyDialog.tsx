@@ -1,9 +1,11 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
-import useDebounce from 'hooks/useDebounce';
-import useDataLoader from 'hooks/useDataLoader';
+import { TEAM_POLICY_ASSIGNMENT_OPTIONS_PAGINATION } from 'constants/team-policy';
 import { useApi } from 'hooks/useApi';
-import { useCallback, useEffect, useMemo } from 'react';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import useDebounce from 'hooks/useDebounce';
+import { useEffect, useMemo, useState } from 'react';
+import { policyQueryKeys } from 'utils/query-keys/policy-query-keys';
+import { teamQueryKeys } from 'utils/query-keys/team-query-keys';
 import {
   ITeamPolicyFormValues,
   TeamPolicyForm,
@@ -19,13 +21,6 @@ export interface ICreateTeamPolicyDialogProps {
   onSave: (values: ITeamPolicyFormValues) => void;
 }
 
-const ASSIGNMENT_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
-  page: 1,
-  limit: 25,
-  sort: 'name',
-  order: 'asc'
-};
-
 /**
  * Dialog for creating a team-policy assignment.
  *
@@ -36,49 +31,48 @@ export const CreateTeamPolicyDialog = (props: ICreateTeamPolicyDialogProps) => {
   const { open, isLoading, onLoadError, onCancel, onSave } = props;
   const biohubApi = useApi();
 
-  const teamsDataLoader = useDataLoader(
-    (search?: string) => biohubApi.teams.getTeams({ search }, ASSIGNMENT_OPTIONS_PAGINATION),
-    (error) => onLoadError('Failed to Load Assignment Options', 'An error occurred while loading teams.', error)
-  );
+  const [teamSearch, setTeamSearch] = useState('');
+  const [policySearch, setPolicySearch] = useState('');
 
-  const policiesDataLoader = useDataLoader(
-    (search?: string) => biohubApi.policies.getPolicies({ search }, ASSIGNMENT_OPTIONS_PAGINATION),
-    (error) => onLoadError('Failed to Load Assignment Options', 'An error occurred while loading policies.', error)
-  );
+  const teamsQuery = useQuery({
+    queryKey: teamQueryKeys.list({ search: teamSearch || undefined }, TEAM_POLICY_ASSIGNMENT_OPTIONS_PAGINATION),
+    queryFn: ({ signal }) =>
+      biohubApi.teams.getTeams({ search: teamSearch || undefined }, TEAM_POLICY_ASSIGNMENT_OPTIONS_PAGINATION, {
+        signal
+      }),
+    enabled: open,
+    placeholderData: keepPreviousData
+  });
 
+  const policiesQuery = useQuery({
+    queryKey: policyQueryKeys.list({ search: policySearch || undefined }, TEAM_POLICY_ASSIGNMENT_OPTIONS_PAGINATION),
+    queryFn: ({ signal }) =>
+      biohubApi.policies.getPolicies({ search: policySearch || undefined }, TEAM_POLICY_ASSIGNMENT_OPTIONS_PAGINATION, {
+        signal
+      }),
+    enabled: open,
+    placeholderData: keepPreviousData
+  });
+
+  const { error: teamsError } = teamsQuery;
   useEffect(() => {
-    if (!open) {
-      return;
+    if (teamsError) {
+      onLoadError('Failed to Load Assignment Options', 'An error occurred while loading teams.', teamsError);
     }
-    teamsDataLoader.refresh();
-    policiesDataLoader.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [teamsError, onLoadError]);
 
-  const teams = useMemo(() => teamsDataLoader.data?.teams ?? [], [teamsDataLoader.data?.teams]);
-  const policies = useMemo(() => policiesDataLoader.data?.policies ?? [], [policiesDataLoader.data?.policies]);
+  const { error: policiesError } = policiesQuery;
+  useEffect(() => {
+    if (policiesError) {
+      onLoadError('Failed to Load Assignment Options', 'An error occurred while loading policies.', policiesError);
+    }
+  }, [policiesError, onLoadError]);
 
-  const debouncedTeamRefresh = useDebounce((search: string) => {
-    teamsDataLoader.refresh(search || undefined);
-  }, 300);
+  const teams = useMemo(() => teamsQuery.data?.teams ?? [], [teamsQuery.data?.teams]);
+  const policies = useMemo(() => policiesQuery.data?.policies ?? [], [policiesQuery.data?.policies]);
 
-  const debouncedPolicyRefresh = useDebounce((search: string) => {
-    policiesDataLoader.refresh(search || undefined);
-  }, 300);
-
-  const handleTeamSearch = useCallback(
-    (search: string) => {
-      debouncedTeamRefresh(search);
-    },
-    [debouncedTeamRefresh]
-  );
-
-  const handlePolicySearch = useCallback(
-    (search: string) => {
-      debouncedPolicyRefresh(search);
-    },
-    [debouncedPolicyRefresh]
-  );
+  const handleTeamSearch = useDebounce(setTeamSearch, 300);
+  const handlePolicySearch = useDebounce(setPolicySearch, 300);
 
   return (
     <EditDialog<ITeamPolicyFormValues>

@@ -16,8 +16,7 @@ describe('SubmissionFeaturePropertyArtifactRepository', () => {
   const mockRow: SubmissionFeaturePropertyArtifact = {
     submission_feature_property_artifact_id: 1,
     submission_feature_id: 10,
-    feature_type_property_id: 20,
-    blueprint_feature_type_property_id: 30,
+    blueprint_feature_type_property_id: 20,
     artifact_id: artifactId
   };
 
@@ -29,8 +28,7 @@ describe('SubmissionFeaturePropertyArtifactRepository', () => {
 
       const result = await repository.insertSubmissionFeaturePropertyArtifact({
         submission_feature_id: 10,
-        feature_type_property_id: 20,
-        blueprint_feature_type_property_id: 30,
+        blueprint_feature_type_property_id: 20,
         artifact_id: artifactId
       });
 
@@ -45,8 +43,7 @@ describe('SubmissionFeaturePropertyArtifactRepository', () => {
       try {
         await repository.insertSubmissionFeaturePropertyArtifact({
           submission_feature_id: 10,
-          feature_type_property_id: 20,
-          blueprint_feature_type_property_id: 30,
+          blueprint_feature_type_property_id: 20,
           artifact_id: artifactId
         });
         expect.fail();
@@ -100,15 +97,6 @@ describe('SubmissionFeaturePropertyArtifactRepository', () => {
       );
 
       const result = await repository.getSubmissionFeaturePropertyArtifactsBySubmissionFeatureId(10);
-      expect(result).to.eql([mockRow]);
-    });
-
-    it('lists by feature_type_property_id', async () => {
-      const repository = new SubmissionFeaturePropertyArtifactRepository(
-        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
-      );
-
-      const result = await repository.getSubmissionFeaturePropertyArtifactsByFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
 

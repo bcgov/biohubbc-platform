@@ -1,9 +1,9 @@
+import { useQuery } from '@tanstack/react-query';
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useEffect } from 'react';
 import { useAuth } from 'react-oidc-context';
 import { coerceIdentitySource } from 'utils/authUtils';
+import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 
 export interface IBiohubUserWrapper {
   /**
@@ -32,37 +32,47 @@ export interface IBiohubUserWrapper {
   identitySource: SYSTEM_IDENTITY_SOURCE | null;
 }
 
+/**
+ * The signed-in user's BioHub record, loaded once per session, with fallbacks from the token profile.
+ *
+ * The record comes from `getOrRegisterUser`, which registers a first-time user, so it is keyed on the token subject
+ * and never refetched within a session. It is a write, so the request is not cancelled once started.
+ *
+ * @returns {IBiohubUserWrapper} The user's identity and roles; `isLoading` stays true until the record has been
+ * requested and has settled, including while the viewer is signed out.
+ */
 function useBiohubUserWrapper(): IBiohubUserWrapper {
   const auth = useAuth();
 
   const biohubApi = useApi();
 
-  const biohubUserDataLoader = useDataLoader(() => biohubApi.user.getOrRegisterUser());
+  const biohubUserQuery = useQuery({
+    queryKey: userQueryKeys.self(auth.user?.profile?.sub ?? ''),
+    queryFn: () => biohubApi.user.getOrRegisterUser(),
+    enabled: auth.isAuthenticated,
+    staleTime: Infinity
+  });
 
-  useEffect(() => {
-    if (auth.isAuthenticated) {
-      biohubUserDataLoader.load();
-    }
-  }, [auth.isAuthenticated, biohubUserDataLoader]);
+  const biohubUser = biohubUserQuery.data;
 
-  const isLoading = !biohubUserDataLoader.isReady;
+  const isLoading = !biohubUserQuery.isFetched;
 
-  const systemUserId = biohubUserDataLoader.data?.system_user_id;
+  const systemUserId = biohubUser?.system_user_id;
 
   const userGuid =
-    biohubUserDataLoader.data?.user_guid ||
+    biohubUser?.user_guid ||
     (auth.user?.profile?.idir_user_guid as string)?.toLowerCase() ||
     (auth.user?.profile?.bceid_user_guid as string)?.toLowerCase();
 
   const userIdentifier =
-    biohubUserDataLoader.data?.user_identifier ||
+    biohubUser?.user_identifier ||
     (auth.user?.profile?.idir_username as string) ||
     (auth.user?.profile?.bceid_username as string);
 
-  const roleNames = biohubUserDataLoader.data?.role_names;
+  const roleNames = biohubUser?.role_names;
 
   const identitySource = coerceIdentitySource(
-    biohubUserDataLoader.data?.identity_source || (auth.user?.profile?.identity_provider as string)?.toUpperCase()
+    biohubUser?.identity_source || (auth.user?.profile?.identity_provider as string)?.toUpperCase()
   );
 
   return {

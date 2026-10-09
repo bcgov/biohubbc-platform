@@ -1,3 +1,5 @@
+import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
+import { useQueryClient } from '@tanstack/react-query';
 import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
@@ -6,6 +8,8 @@ import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
  * Data-request status and policy dialog handlers for the ticket timeline.
@@ -17,7 +21,8 @@ export const useTicketTimelineDataRequestActions = () => {
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
   const { openConfirmationDialog } = useTicketTimelineConfirmationDialog();
-  const { ticketDataLoader } = useTicketContext();
+  const queryClient = useQueryClient();
+  const { ticketId, ticketQueryKey } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
   const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
@@ -26,7 +31,7 @@ export const useTicketTimelineDataRequestActions = () => {
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
 
   /**
-   * Persist a data-request policy status transition and patch the cached ticket.
+   * Persist a data-request policy status transition and refresh the ticket.
    *
    * Confirmation handlers call this after the user approves the status change. The active data request id is stored so
    * the matching timeline item can disable its action buttons while the API call is running.
@@ -40,21 +45,13 @@ export const useTicketTimelineDataRequestActions = () => {
     try {
       setUpdatingDataRequestId(dataRequestId);
 
-      const updatedPolicy = await api.policies.updatePolicyStatus(policyId, {
+      await api.policies.updatePolicyStatus(policyId, {
         status: policyStatus
       });
 
-      const latestTicket = ticketDataLoader.data;
-      if (!latestTicket) {
-        return;
-      }
-
-      ticketDataLoader.setData({
-        ...latestTicket,
-        data_requests: latestTicket.data_requests.map((dataRequest) =>
-          dataRequest.data_request_id === dataRequestId ? { ...dataRequest, status: updatedPolicy.status } : dataRequest
-        )
-      });
+      await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
     } catch (error) {
       const apiError = error as APIError;
       dialogContext.setSnackbar({
@@ -211,7 +208,7 @@ export const useTicketTimelineDataRequestActions = () => {
    * Save edited policy details from the policy dialog.
    *
    * The edit dialog calls this with form values. The handler persists policy metadata, preserves existing statements,
-   * patches cached data-request status for the matching policy, and closes the dialog on success.
+   * refreshes the ticket and related policy queries, and closes the dialog on success.
    *
    * @param {IPolicyFormValues} values Current policy form values.
    * @returns {Promise<void>} Resolves after the save attempt has completed.
@@ -224,28 +221,15 @@ export const useTicketTimelineDataRequestActions = () => {
     try {
       setIsSavingPolicy(true);
 
-      const updatedPolicy = await api.policies.updatePolicy(selectedPolicy.policy_id, {
+      await api.policies.updatePolicy(selectedPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
         status: values.status
       });
 
-      setSelectedPolicy({
-        ...selectedPolicy,
-        ...updatedPolicy
-      });
-
-      const latestTicket = ticketDataLoader.data;
-      if (latestTicket) {
-        ticketDataLoader.setData({
-          ...latestTicket,
-          data_requests: latestTicket.data_requests.map((dataRequest) =>
-            dataRequest.policy_id === updatedPolicy.policy_id
-              ? { ...dataRequest, status: updatedPolicy.status }
-              : dataRequest
-          )
-        });
-      }
+      await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
+      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
 
       dialogContext.setSnackbar({
         open: true,

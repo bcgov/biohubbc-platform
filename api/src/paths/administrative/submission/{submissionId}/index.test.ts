@@ -1,95 +1,71 @@
 import chai, { expect } from 'chai';
-import { describe } from 'mocha';
+import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { patchSubmissionRecord } from '.';
+import { PATCH, updateSubmission } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { SYSTEM_ROLE } from '../../../../constants/roles';
 import * as db from '../../../../database/db';
-import { HTTPError } from '../../../../errors/http-error';
-import { SubmissionRecord } from '../../../../repositories/submission-repository';
+import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 
 chai.use(sinonChai);
 
-describe('patchSubmissionRecord', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
+describe('updateSubmission endpoint', () => {
+  afterEach(() => sinon.restore());
 
-  it('re-throws any error that is thrown', async () => {
-    const mockDBConnection = getMockDBConnection({
-      open: () => {
-        throw new Error('test error');
-      }
-    });
-
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    const requestHandler = patchSubmissionRecord();
-
+  it('restricts updating a submission to system administrators', async () => {
+    const authorize = sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
+    const { mockReq, mockRes } = getRequestHandlerMocks();
+    const next = sinon.stub();
     try {
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).message).to.equal('test error');
+      await (PATCH[0] as RequestHandler)(mockReq, mockRes, next);
+      expect.fail('Expected authorization rejection');
+    } catch (error) {
+      expect((error as Error).message).to.equal('Access Denied');
     }
+    expect(authorize).to.have.been.calledOnce;
+    expect(mockReq.authorization_scheme).to.deep.equal({
+      and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+    });
+    expect(next).not.to.have.been.called;
   });
 
-  it('should return the patched submission record', async () => {
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
+  it('sets the submission default blueprint and commits', async () => {
+    const connection = getMockDBConnection();
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
+    const commit = sinon.stub(connection, 'commit').resolves();
+    const release = sinon.stub(connection, 'release');
+    const operation = sinon.stub(SubmissionService.prototype, 'updateSubmissionDefaultBlueprint').resolves();
+    const { mockReq, mockRes } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: '7' };
+    mockReq.body = { default_blueprint_id: 4 };
+    await updateSubmission()(mockReq, mockRes, () => {});
+    expect(operation).to.have.been.calledOnceWithExactly(7, 4);
+    expect(mockRes.statusValue).to.equal(204);
+    expect(commit).to.have.been.calledOnce;
+    expect(release).to.have.been.calledOnce;
+  });
 
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
-
-    const submissionId = 1;
-
-    const mockSubmissionRecord: SubmissionRecord = {
-      submission_id: 3,
-      uuid: '999-456-123',
-      security_review_timestamp: '2023-12-12',
-      publish_timestamp: '2023-12-12',
-      submitted_timestamp: '2023-12-12',
-      system_user_id: 3,
-      contributor_id: 1,
-      name: 'name',
-      description: 'description',
-      comment: 'comment',
-      record_end_date: '2023-12-12',
-      create_date: '2023-12-12',
-      create_user: 1,
-      update_date: '2023-12-12',
-      update_user: 1,
-      revision_count: 1
-    };
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.params = {
-      submissionId: String(submissionId)
-    };
-    mockReq.body = {
-      security_reviewed: true,
-      published: true
-    };
-
-    const getReviewedSubmissionsStub = sinon
-      .stub(SubmissionService.prototype, 'patchSubmissionRecord')
-      .resolves(mockSubmissionRecord);
-
-    const requestHandler = patchSubmissionRecord();
-
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(getReviewedSubmissionsStub).to.have.been.calledOnceWith(submissionId, {
-      security_reviewed: true,
-      published: true
-    });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockSubmissionRecord);
+  it('rolls back and releases on failure without committing', async () => {
+    const connection = getMockDBConnection();
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
+    const commit = sinon.stub(connection, 'commit').resolves();
+    const rollback = sinon.stub(connection, 'rollback').resolves();
+    const release = sinon.stub(connection, 'release');
+    const error = new Error('Update failed');
+    sinon.stub(SubmissionService.prototype, 'updateSubmissionDefaultBlueprint').rejects(error);
+    const { mockReq, mockRes } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: '7' };
+    mockReq.body = { default_blueprint_id: 4 };
+    try {
+      await updateSubmission()(mockReq, mockRes, () => {});
+      expect.fail('Expected failure');
+    } catch (actual) {
+      expect(actual).to.equal(error);
+    }
+    expect(commit).not.to.have.been.called;
+    expect(rollback).to.have.been.calledOnce;
+    expect(release).to.have.been.calledOnce;
   });
 });

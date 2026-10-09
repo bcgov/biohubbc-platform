@@ -7,7 +7,12 @@ import {
 } from '../constants/database-lock-keys';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
+import {
+  SubmissionContributorMembership,
+  SubmissionFeatureForReview,
+  SubmissionFilters,
+  SubmissionSummary
+} from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
@@ -47,6 +52,8 @@ export interface ICreateSubmission {
   name: string;
   description: string;
   comment: string;
+  /** Blueprint for uploads that do not name one; null falls back to the system default blueprint. */
+  default_blueprint_id: number | null;
 }
 
 export interface ICreateSubmissionWithTeam extends ICreateSubmission {
@@ -136,6 +143,7 @@ export interface ISubmissionModel {
   system_user_id: number;
   team_id: string;
   comment?: string | null;
+  default_blueprint_id?: number | null;
   security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
@@ -242,8 +250,11 @@ export const SubmissionRecord = z.object({
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
-export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
-  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
+export const SubmissionRecordWithSecurity = SubmissionRecord.omit({ comment: true }).extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  contributor_name: z.string(),
+  last_approved_upload_date: z.string().nullable(),
+  feature_types: z.array(z.string())
 });
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
@@ -298,13 +309,6 @@ export const SubmissionMessageRecord = z.object({
 
 export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
 
-export const PatchSubmissionRecord = z.object({
-  security_reviewed: z.boolean().optional(),
-  published: z.boolean().optional()
-});
-
-export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
-
 /**
  * A repository class for accessing submission data.
  *
@@ -313,6 +317,33 @@ export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
+  /**
+   * Find the current submission's active contributor and the caller's membership in it.
+   *
+   * @param {string} submissionUuid Submission whose owner is checked.
+   * @param {number} systemUserId Authenticated caller.
+   * @return {Promise<SubmissionContributorMembership | undefined>} Membership in the active owner, if available.
+   * @memberof SubmissionRepository
+   */
+  async findSubmissionContributorMembership(
+    submissionUuid: string,
+    systemUserId: number
+  ): Promise<SubmissionContributorMembership | undefined> {
+    const sql = SQL`
+      SELECT EXISTS (
+        SELECT 1 FROM contributor_system_user csu
+        WHERE csu.contributor_id = c.contributor_id
+          AND csu.system_user_id = ${systemUserId} AND csu.record_end_date IS NULL
+      ) AS is_member
+      FROM submission s
+      JOIN contributor c ON c.contributor_id = s.contributor_id AND c.record_end_date IS NULL
+      WHERE s.uuid = ${submissionUuid}
+        AND (s.record_end_date IS NULL OR s.record_end_date > NOW());
+    `;
+    const response = await this.connection.sql(sql, SubmissionContributorMembership);
+    return response.rows[0];
+  }
+
   /**
    * Lock the submission's current feature state for the current transaction.
    *
@@ -347,7 +378,8 @@ export class SubmissionRepository extends BaseRepository {
         contributor_id,
         name,
         description,
-        comment
+        comment,
+        default_blueprint_id
       ) VALUES (
         ${submissionData.uuid},
         ${submissionData.system_user_id},
@@ -355,7 +387,8 @@ export class SubmissionRepository extends BaseRepository {
         ${submissionData.contributor_id},
         ${submissionData.name},
         ${submissionData.description},
-        ${submissionData.comment}
+        ${submissionData.comment},
+        ${submissionData.default_blueprint_id}
       )
       RETURNING
         submission_id;
@@ -371,6 +404,35 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Set the blueprint that new uploads of an active submission use when the upload request does not name one.
+   *
+   * @param {number} submissionId - The submission to update.
+   * @param {number} blueprintId - The submission's new default blueprint.
+   * @returns {Promise<void>} - Resolves after the submission's default blueprint has been updated.
+   * @throws {ApiNotFoundError} - If no active submission was updated.
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionDefaultBlueprint(submissionId: number, blueprintId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission
+      SET
+        default_blueprint_id = ${blueprintId}
+      WHERE
+        submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Submission not found', [
+        'SubmissionRepository->updateSubmissionDefaultBlueprint',
+        { submissionId }
+      ]);
+    }
   }
 
   /**
@@ -846,8 +908,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -952,8 +1012,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -1033,8 +1091,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -1087,8 +1143,6 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
-      AND
-        submission_feature_security.status = 'active'
       AND
         submission_feature_security.record_effective_date <= now()
       AND
@@ -1153,7 +1207,6 @@ export class SubmissionRepository extends BaseRepository {
       })
       .leftJoin('submission_feature_security as sfs', function () {
         this.on('sfs.submission_feature_id', '=', 'sf.submission_feature_id')
-          .andOnVal('sfs.status', '=', 'active')
           .andOn(knex.raw('sfs.record_effective_date <= now()'))
           .andOn(knex.raw('(sfs.record_end_date IS NULL OR now() < sfs.record_end_date)'));
       })
@@ -1286,7 +1339,6 @@ export class SubmissionRepository extends BaseRepository {
         submission.contributor_id,
         submission.name,
         submission.description,
-        submission.comment,
         submission.publish_timestamp,
         submission.record_end_date,
         submission.create_date,
@@ -1294,7 +1346,12 @@ export class SubmissionRepository extends BaseRepository {
         submission.update_date,
         submission.update_user,
         submission.revision_count,
+        contributor.client_id as contributor_name,
+        latest_approved_upload.create_date as last_approved_upload_date,
+        submission_feature_types.feature_types,
         CASE
+          WHEN COUNT(submission_feature.submission_feature_id) > 0
+            AND jsonb_array_length(submission_feature_types.feature_types) = 0 THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
@@ -1302,15 +1359,70 @@ export class SubmissionRepository extends BaseRepository {
       FROM
         submission
       INNER JOIN
+        contributor
+      ON
+        contributor.contributor_id = submission.contributor_id
+      LEFT JOIN LATERAL (
+        SELECT
+          submission_upload.create_date
+        FROM
+          submission_upload
+        WHERE
+          submission_upload.submission_id = submission.submission_id
+        AND
+          submission_upload.decision = 'approved'
+        AND
+          (submission_upload.record_end_date IS NULL OR now() < submission_upload.record_end_date)
+        ORDER BY
+          submission_upload.create_date DESC,
+          submission_upload.submission_upload_id DESC
+        LIMIT 1
+      ) latest_approved_upload ON TRUE
+      INNER JOIN LATERAL (
+        SELECT
+          COALESCE(jsonb_agg(feature_types.name ORDER BY feature_types.is_root DESC, feature_types.name), '[]'::jsonb) as feature_types
+        FROM (
+          SELECT
+            feature_type.name,
+            bool_or(tab_submission_feature.parent_submission_feature_id IS NULL) as is_root
+          FROM
+            submission_feature tab_submission_feature
+          INNER JOIN
+            feature_type
+          ON
+            feature_type.feature_type_id = tab_submission_feature.feature_type_id
+          INNER JOIN
+            submission_feature_closure searchable_tab_feature
+          ON
+            searchable_tab_feature.source_submission_feature_id = tab_submission_feature.submission_feature_id
+          AND
+            searchable_tab_feature.target_submission_feature_id = tab_submission_feature.submission_feature_id
+          WHERE
+            tab_submission_feature.submission_id = submission.submission_id
+          AND
+            tab_submission_feature.record_effective_date <= now()
+          AND
+            (tab_submission_feature.record_end_date IS NULL OR now() < tab_submission_feature.record_end_date)
+          AND
+            tab_submission_feature.successor_submission_feature_id IS NULL
+          GROUP BY
+            feature_type.name
+        ) feature_types
+      ) submission_feature_types ON TRUE
+      LEFT JOIN
         submission_feature
       ON
         submission_feature.submission_id = submission.submission_id
+      AND
+        submission_feature.record_effective_date <= now()
+      AND
+        (submission_feature.record_end_date IS NULL OR now() < submission_feature.record_end_date)
+      AND
+        submission_feature.successor_submission_feature_id IS NULL
       LEFT JOIN
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
-      AND
-        submission_feature_security.status = 'active'
       AND
         submission_feature_security.record_effective_date <= now()
       AND
@@ -1318,7 +1430,10 @@ export class SubmissionRepository extends BaseRepository {
       WHERE
         submission.submission_id = ${submissionId}
       GROUP BY
-        submission.submission_id;
+        submission.submission_id,
+        contributor.client_id,
+        latest_approved_upload.create_date,
+        submission_feature_types.feature_types;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);
@@ -1448,8 +1563,6 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       AND
-        submission_feature_security.status = 'active'
-      AND
         submission_feature_security.record_effective_date <= now()
       AND
         (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
@@ -1540,88 +1653,6 @@ export class SubmissionRepository extends BaseRepository {
         `rowCount was ${response.rowCount}, expected rowCount === ${messages.length}`
       ]);
     }
-  }
-
-  /**
-   * Patch a submission record.
-   *
-   * @param {number} submissionId
-   * @param {PatchSubmissionRecord} patch
-   * @returns {Promise<SubmissionRecord>}
-   * @memberof SubmissionRepository
-   */
-  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
-    const knex = getKnex();
-    const queryBuilder = knex.table('submission').where('submission_id', submissionId);
-
-    // Collect all update operations
-    let updateOperations: Record<string, Knex.Raw> = {};
-
-    if (patch.security_reviewed === true) {
-      updateOperations = {
-        ...updateOperations,
-        security_review_timestamp: knex.raw(
-          'CASE WHEN security_review_timestamp IS NULL THEN NOW() ELSE security_review_timestamp END'
-        )
-      };
-    } else if (patch.security_reviewed === false) {
-      updateOperations = {
-        ...updateOperations,
-        security_review_timestamp: knex.raw(
-          'CASE WHEN security_review_timestamp IS NOT NULL THEN NULL ELSE security_review_timestamp END'
-        )
-      };
-    }
-
-    if (patch.published === true) {
-      updateOperations = {
-        ...updateOperations,
-        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
-      };
-
-      // Publishing this submission, first unpublish all submissions with the same uuid as the target submission.
-      // Why? Because we only want one published submission per uuid.
-      await this.unpublishAllSubmissionsBySubmissionId(submissionId);
-    } else if (patch.published === false) {
-      updateOperations = {
-        ...updateOperations,
-        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NOT NULL THEN NULL ELSE publish_timestamp END')
-      };
-    }
-
-    // Register all update operations
-    queryBuilder
-      .update(updateOperations)
-      .returning([
-        'submission_id',
-        'uuid',
-        'security_review_timestamp',
-        'submitted_timestamp',
-        'system_user_id',
-        'contributor_id',
-        'name',
-        'description',
-        'comment',
-        'publish_timestamp',
-        'record_end_date',
-        'create_date',
-        'create_user',
-        'update_date',
-        'update_user',
-        'revision_count'
-      ]);
-
-    const response = await this.connection.knex(queryBuilder);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to patch submission record', [
-        'SubmissionRepository->patchSubmissionRecord',
-        `rowCount was ${response.rowCount}, expected rowCount === 1`
-      ]);
-    }
-
-    const submissionRecord = response.rows[0];
-    return submissionRecord as SubmissionRecord;
   }
 
   /**

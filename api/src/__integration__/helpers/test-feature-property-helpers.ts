@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { IDBConnection } from '../../database/db';
 import {
@@ -52,24 +52,28 @@ export async function featureTypeIdByName(connection: IDBConnection, name: strin
 }
 
 /**
- * Create a synthetic `feature`-typed feature_property and assign it to a source feature type via
- * feature_type_property, then declare its allowed target feature types in
- * `feature_type_property_feature`. Idempotently ensures the 'feature' feature_property_type exists,
- * so each suite is self-contained.
+ * Create a synthetic `feature`-typed feature_property, assign it to a source feature type in the active
+ * default Blueprint, then declare its allowed target feature types in `feature_type_property_feature`.
+ * Idempotently ensures the 'feature' feature_property_type exists, so each suite is self-contained.
  *
  * @param sourceFeatureTypeName Feature type the property is attached to (the referencing feature).
  * @param allowedTargetFeatureTypeNames Allowed target feature type name(s). Pass a single string,
  *   an array of names, or null for "no permitted target".
  * @param allowMultiple Whether the property may carry multiple references.
- * @returns The new feature_type_property_id, the resolved allowed feature_type_ids (empty when no
+ * @returns The new assignment id, the property id, the resolved allowed feature_type_ids (empty when no
  *   targets), and the feature_property.name to use as the data.properties key on source features.
  */
-export async function createFeatureTypeProperty(
+export async function createBlueprintFeatureTypeProperty(
   connection: IDBConnection,
   sourceFeatureTypeName: string,
   allowedTargetFeatureTypeNames: string | string[] | null,
   allowMultiple = false
-): Promise<{ featureTypePropertyId: number; allowedFeatureTypeIds: number[]; propertyName: string }> {
+): Promise<{
+  blueprintFeatureTypePropertyId: number;
+  featurePropertyId: number;
+  allowedFeatureTypeIds: number[];
+  propertyName: string;
+}> {
   const systemUserId = connection.systemUserId();
 
   await connection.sql(SQL`
@@ -90,26 +94,7 @@ export async function createFeatureTypeProperty(
     VALUES (${featurePropertyTypeId}, ${propertyName}, ${'Test Feature Ref ' + uniqueSuffix}, now(), ${systemUserId})
     RETURNING feature_property_id;
   `);
-  const featurePropertyId = fpResult.rows[0].feature_property_id;
-
-  const ftpResult = await connection.sql(SQL`
-    INSERT INTO feature_type_property (
-      feature_type_id,
-      feature_property_id,
-      allow_multiple,
-      record_effective_date,
-      create_user
-    )
-    VALUES (
-      (SELECT feature_type_id FROM feature_type WHERE name = ${sourceFeatureTypeName} LIMIT 1),
-      ${featurePropertyId},
-      ${allowMultiple},
-      now(),
-      ${systemUserId}
-    )
-    RETURNING feature_type_property_id;
-  `);
-  const featureTypePropertyId: number = ftpResult.rows[0].feature_type_property_id;
+  const featurePropertyId: number = fpResult.rows[0].feature_property_id;
 
   const bftResult = await connection.sql(SQL`
     WITH inserted AS (
@@ -142,25 +127,24 @@ export async function createFeatureTypeProperty(
   `);
   const blueprintFeatureTypeId: number = bftResult.rows[0].blueprint_feature_type_id;
 
-  await connection.sql(SQL`
+  const bftpResult = await connection.sql(SQL`
     INSERT INTO blueprint_feature_type_property (
       blueprint_feature_type_id,
-      feature_type_property_id,
+      feature_property_id,
       required_value,
       allow_multiple,
       create_user
     )
     VALUES (
       ${blueprintFeatureTypeId},
-      ${featureTypePropertyId},
+      ${featurePropertyId},
       false,
       ${allowMultiple},
       ${systemUserId}
     )
-    ON CONFLICT (blueprint_feature_type_id, feature_type_property_id)
-    WHERE record_end_date IS NULL
-    DO NOTHING;
+    RETURNING blueprint_feature_type_property_id;
   `);
+  const blueprintFeatureTypePropertyId: number = bftpResult.rows[0].blueprint_feature_type_property_id;
 
   const targetNames =
     allowedTargetFeatureTypeNames === null
@@ -175,15 +159,137 @@ export async function createFeatureTypeProperty(
     allowedFeatureTypeIds.push(targetId);
     await connection.sql(SQL`
       INSERT INTO feature_type_property_feature (
-        feature_type_property_id,
+        blueprint_feature_type_property_id,
         target_feature_type_id,
         create_user
       )
-      VALUES (${featureTypePropertyId}, ${targetId}, ${systemUserId});
+      VALUES (${blueprintFeatureTypePropertyId}, ${targetId}, ${systemUserId});
     `);
   }
 
-  return { featureTypePropertyId, allowedFeatureTypeIds, propertyName };
+  return { blueprintFeatureTypePropertyId, featurePropertyId, allowedFeatureTypeIds, propertyName };
+}
+
+/**
+ * Create a feature property of the given type and assign it to each named feature type in the active default
+ * Blueprint, which `createTestUpload` pins uploads to, so values can be stored under the returned assignments. Each
+ * assignment accepts several values per feature.
+ *
+ * @param {IDBConnection} connection Open connection.
+ * @param {string} propertyTypeName Name of the property's `feature_property_type`, such as 'string' or 'number'.
+ * @param {string[]} featureTypeNames Feature types to assign the property to.
+ * @returns {Promise<{ featurePropertyId: number; assignments: Record<string, number> }>} The property id, and the
+ *   blueprint_feature_type_property_id of each assignment by feature type name.
+ */
+export async function createAssignedFeatureProperty(
+  connection: IDBConnection,
+  propertyTypeName: string,
+  featureTypeNames: string[]
+): Promise<{ featurePropertyId: number; assignments: Record<string, number> }> {
+  const property = await connection.sql(SQL`
+    INSERT INTO feature_property (name, display_name, feature_property_type_id)
+    VALUES (
+      ${`test_property_${crypto.randomUUID()}`},
+      'Test property',
+      (SELECT feature_property_type_id FROM feature_property_type WHERE name = ${propertyTypeName})
+    )
+    RETURNING feature_property_id;
+  `);
+  const featurePropertyId: number = property.rows[0].feature_property_id;
+
+  const result = await connection.sql(SQL`
+    WITH target AS (
+      SELECT bft.blueprint_feature_type_id, ft.name AS feature_type_name
+      FROM blueprint_feature_type bft
+      JOIN blueprint b ON b.blueprint_id = bft.blueprint_id AND b.is_default = true AND b.record_end_date IS NULL
+      JOIN feature_type ft ON ft.feature_type_id = bft.feature_type_id
+      WHERE bft.record_end_date IS NULL
+        AND ft.name = ANY(${featureTypeNames}::text[])
+    ),
+    inserted AS (
+      INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_property_id, required_value, allow_multiple)
+      SELECT target.blueprint_feature_type_id, ${featurePropertyId}, false, true
+      FROM target
+      RETURNING blueprint_feature_type_id, blueprint_feature_type_property_id
+    )
+    SELECT target.feature_type_name, inserted.blueprint_feature_type_property_id
+    FROM inserted
+    JOIN target USING (blueprint_feature_type_id);
+  `);
+  const assignments: Record<string, number> = Object.fromEntries(
+    result.rows.map((row) => [row.feature_type_name, row.blueprint_feature_type_property_id])
+  );
+  const unassigned = featureTypeNames.filter((featureTypeName) => assignments[featureTypeName] === undefined);
+  if (unassigned.length > 0) {
+    throw new Error(`The active default Blueprint does not include feature types: ${unassigned.join(', ')}`);
+  }
+
+  return { featurePropertyId, assignments };
+}
+
+/** A `feature_property_type` name whose values are stored in one of the typed property tables. */
+export type TypedPropertyTypeName = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'code' | 'spatial';
+
+/**
+ * Insert a pending submission feature: it has no effective date, so it is absent from published closure until
+ * activated.
+ *
+ * @param {IDBConnection} connection Open connection.
+ * @param {number} submissionId Owning submission.
+ * @param {string} submissionUploadId Owning upload.
+ * @param {string} featureTypeName Seeded feature type.
+ * @param {number | null} [parentId] Parent feature, if any.
+ * @returns {Promise<number>} The new submission_feature_id.
+ */
+export async function insertPendingFeature(
+  connection: IDBConnection,
+  submissionId: number,
+  submissionUploadId: string,
+  featureTypeName: string,
+  parentId: number | null = null
+): Promise<number> {
+  const result = await connection.sql(SQL`
+    INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date)
+    VALUES (${submissionId}, ${submissionUploadId}::uuid, (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}), ${parentId}, '{}'::jsonb, 2, NULL)
+    RETURNING submission_feature_id;
+  `);
+  return result.rows[0].submission_feature_id;
+}
+
+/**
+ * Store a property value for a feature in the typed table of its property type.
+ *
+ * @param {IDBConnection} connection Open connection.
+ * @param {TypedPropertyTypeName} propertyType Property type, which selects the storage table.
+ * @param {number} featureId Feature carrying the value.
+ * @param {number} assignmentId Assignment the value is stored under.
+ * @param {unknown[]} value Value columns: `[value]`, `[date, time]` for datetime, `[taxon_id]` for taxon,
+ *   `[contributor_codeset_code_id]` for code, or `[geojson]` for spatial.
+ * @returns {Promise<void>}
+ */
+export async function addPropertyValue(
+  connection: IDBConnection,
+  propertyType: TypedPropertyTypeName,
+  featureId: number,
+  assignmentId: number,
+  ...value: unknown[]
+): Promise<void> {
+  const statements: Record<TypedPropertyTypeName, string> = {
+    string:
+      'INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    number:
+      'INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    boolean:
+      'INSERT INTO submission_feature_property_boolean (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    datetime:
+      'INSERT INTO submission_feature_property_timestamp (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value) VALUES ($1, $2, $3, $4)',
+    taxon:
+      'INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id) VALUES ($1, $2, $3)',
+    code: 'INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id) VALUES ($1, $2, $3)',
+    spatial:
+      'INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, ST_GeomFromGeoJSON($3))'
+  };
+  await connection.query(statements[propertyType], [featureId, assignmentId, ...value]);
 }
 
 /**
@@ -215,18 +321,18 @@ export async function getSubmissionFeatureErrors(
 
 /**
  * Insert a single link row into `submission_feature_property_feature`, tying a source
- * feature to one referenced feature via a `feature`-typed feature_type_property.
+ * feature to one referenced feature via a `feature`-typed Blueprint assignment.
  *
- * The link table has no `value` column — the "value" of a feature-typed property is
- * the set of referenced submission_feature_ids carried by these rows. FK semantics:
- * both `submission_feature_id` (source) and `referenced_submission_feature_id` point
- * at `biohub.submission_feature`, and `feature_type_property_id` must be a property
- * declared on the source feature's type.
+ * The link table has no `value` column: the "value" of a feature-typed property is
+ * the set of referenced submission_feature_ids carried by these rows. Both
+ * `submission_feature_id` (source) and `referenced_submission_feature_id` point at
+ * `biohub.submission_feature`, and the assignment must belong to the source feature's type
+ * and to the Blueprint its upload is pinned to.
  */
 export async function insertSubmissionFeaturePropertyFeature(
   connection: IDBConnection,
   sourceSubmissionFeatureId: number,
-  featureTypePropertyId: number,
+  blueprintFeatureTypePropertyId: number,
   referencedSubmissionFeatureId: number
 ): Promise<void> {
   const systemUserId = connection.systemUserId();
@@ -234,26 +340,16 @@ export async function insertSubmissionFeaturePropertyFeature(
   await connection.sql(SQL`
     INSERT INTO submission_feature_property_feature (
       submission_feature_id,
-      feature_type_property_id,
       blueprint_feature_type_property_id,
       referenced_submission_feature_id,
       create_user
     )
-    SELECT
+    VALUES (
       ${sourceSubmissionFeatureId},
-      ${featureTypePropertyId},
-      bftp.blueprint_feature_type_property_id,
+      ${blueprintFeatureTypePropertyId},
       ${referencedSubmissionFeatureId},
       ${systemUserId}
-    FROM submission_feature sf
-    JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
-    JOIN blueprint_feature_type bft
-      ON bft.blueprint_id = su.blueprint_id AND bft.record_end_date IS NULL
-    JOIN blueprint_feature_type_property bftp
-      ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-     AND bftp.feature_type_property_id = ${featureTypePropertyId}
-     AND bftp.record_end_date IS NULL
-    WHERE sf.submission_feature_id = ${sourceSubmissionFeatureId};
+    );
   `);
 }
 
@@ -261,9 +357,9 @@ export async function insertSubmissionFeaturePropertyFeature(
 export async function getPropertyFeatureRows(
   connection: IDBConnection,
   sourceFeatureId: number
-): Promise<{ referenced_submission_feature_id: number; feature_type_property_id: number }[]> {
+): Promise<{ referenced_submission_feature_id: number; blueprint_feature_type_property_id: number }[]> {
   const result = await connection.sql(SQL`
-    SELECT referenced_submission_feature_id, feature_type_property_id
+    SELECT referenced_submission_feature_id, blueprint_feature_type_property_id
     FROM submission_feature_property_feature
     WHERE submission_feature_id = ${sourceFeatureId}
     ORDER BY referenced_submission_feature_id;
@@ -273,37 +369,16 @@ export async function getPropertyFeatureRows(
 
 // Indexed-property fixtures shared by the read-path suites (search-repository, property-value-read-paths).
 // They write canonical rows straight into the typed property tables against seeded feature types, which is
-// enough for read paths that resolve values by storage table and feature_type_property.
+// enough for read paths that resolve values by storage table and Blueprint assignment.
 
-/** Resolve the active feature_type_property for a (feature type, property name) pair. */
-export async function getFeatureTypePropertyId(
-  connection: IDBConnection,
-  featureTypeName: string,
-  propertyName: string
-): Promise<number> {
-  const result = await connection.sql(SQL`
-    SELECT ftp.feature_type_property_id
-    FROM feature_type_property ftp
-    JOIN feature_type ft ON ft.feature_type_id = ftp.feature_type_id
-    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id
-    WHERE ft.name = ${featureTypeName}
-      AND fp.name = ${propertyName}
-      AND ftp.record_end_date IS NULL
-    LIMIT 1;
-  `);
-
-  if (!result.rows[0]) {
-    throw new Error(`No feature_type_property row for (${featureTypeName}, ${propertyName})`);
-  }
-
-  return result.rows[0].feature_type_property_id;
-}
-
-/** Resolve the Blueprint assignment for a feature's property via its pinned Blueprint (NOT NULL provenance). */
+/**
+ * Resolve the assignment a property is stored under for a feature: the active assignment of the
+ * named property, within the feature's type, in the Blueprint its upload is pinned to.
+ */
 export async function getBlueprintFeatureTypePropertyId(
   connection: IDBConnection,
   submissionFeatureId: number,
-  featureTypePropertyId: number
+  propertyName: string
 ): Promise<number> {
   const result = await connection.sql(SQL`
     SELECT bftp.blueprint_feature_type_property_id
@@ -312,73 +387,65 @@ export async function getBlueprintFeatureTypePropertyId(
     JOIN blueprint_feature_type bft
       ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
     JOIN blueprint_feature_type_property bftp
-      ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id
-     AND bftp.feature_type_property_id = ${featureTypePropertyId}
-     AND bftp.record_end_date IS NULL
+      ON bftp.blueprint_feature_type_id = bft.blueprint_feature_type_id AND bftp.record_end_date IS NULL
+    JOIN feature_property fp
+      ON fp.feature_property_id = bftp.feature_property_id AND fp.name = ${propertyName}
     WHERE sf.submission_feature_id = ${submissionFeatureId}
     LIMIT 1;
   `);
 
   if (!result.rows[0]) {
-    throw new Error(
-      `No blueprint_feature_type_property for feature ${submissionFeatureId}, ftp ${featureTypePropertyId}`
-    );
+    throw new Error(`No blueprint_feature_type_property for feature ${submissionFeatureId}, property ${propertyName}`);
   }
 
   return result.rows[0].blueprint_feature_type_property_id;
 }
 
-/** Index a string value for a feature under a seeded (feature type, property name). */
+/** Index a string value for a feature under the named property of its type in its Blueprint. */
 export async function addStringProperty(
   connection: IDBConnection,
   submissionFeatureId: number,
-  featureTypeName: string,
   propertyName: string,
   value: string
 ): Promise<void> {
   const systemUserId = connection.systemUserId();
-  const ftpId = await getFeatureTypePropertyId(connection, featureTypeName, propertyName);
-  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, ftpId);
+  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_string (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, value, create_user)
-    VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${value}, ${systemUserId});
+    INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${value}, ${systemUserId});
   `);
 }
 
-/** Index a code reference for a feature under a seeded (feature type, property name). */
+/** Index a code reference for a feature under the named property of its type in its Blueprint. */
 export async function addCodeProperty(
   connection: IDBConnection,
   submissionFeatureId: number,
-  featureTypeName: string,
   propertyName: string,
   contributorCodesetCodeId: number
 ): Promise<void> {
   const systemUserId = connection.systemUserId();
-  const ftpId = await getFeatureTypePropertyId(connection, featureTypeName, propertyName);
-  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, ftpId);
+  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_code (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
-    VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
+    INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
   `);
 }
 
-/** Index a taxon reference for a feature under a seeded (feature type, property name). */
+/** Index a taxon reference for a feature under the named property of its type in its Blueprint. */
 export async function addTaxonProperty(
   connection: IDBConnection,
   submissionFeatureId: number,
-  featureTypeName: string,
   propertyName: string,
   taxonId: number
 ): Promise<void> {
   const systemUserId = connection.systemUserId();
-  const ftpId = await getFeatureTypePropertyId(connection, featureTypeName, propertyName);
-  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, ftpId);
+  const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_taxon (submission_feature_id, feature_type_property_id, blueprint_feature_type_property_id, taxon_id, create_user)
-    VALUES (${submissionFeatureId}, ${ftpId}, ${bftpId}, ${taxonId}, ${systemUserId});
+    INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id, create_user)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${taxonId}, ${systemUserId});
   `);
 }
 

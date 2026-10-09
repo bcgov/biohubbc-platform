@@ -78,7 +78,7 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
       keycloakToken: req.keycloak_token
     });
 
-    // Execute both auth pathways because `authorizationService.executeAuthorizationScheme` has side effects that mutate the `req`, which may be required by endpoints
+    // Evaluate the scheme even for administrators so invalid contributor selections still fail.
     const isSystemAdministrator = await authorizationService.authorizeSystemAdministrator();
     const isSchemeAuthorized = await authorizationService.executeAuthorizationScheme(authorizationScheme);
     const isAuthorized = isSystemAdministrator || isSchemeAuthorized;

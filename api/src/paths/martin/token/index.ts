@@ -67,7 +67,12 @@ export function createMartinSession(): RequestHandler {
 
       const martinContextService = new MartinContextService(connection);
 
-      const context = await martinContextService.createOrReuseMartinContext(featureType, expressionTree, systemUserId);
+      const context = await martinContextService.createOrReuseMartinContext(
+        featureType,
+        expressionTree,
+        systemUserId,
+        req.body.submissionIds
+      );
 
       await connection.commit();
 

@@ -8,6 +8,8 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { HTTP409 } from '../../errors/http-error';
 import { SubmissionUploadJobStatus } from '../../models/submission-upload';
+import { ContributorService } from '../../services/contributor-service';
+import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { createTestSubmission, createTestUploadWithFeatures } from '../helpers/test-submission-helpers';
@@ -25,6 +27,10 @@ describe('submission upload decision (integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
+    const contributorService = new ContributorService(connection);
+    const contributorId = await contributorService.ensureContributor('SIMS');
+    const memberships = new ContributorSystemUserService(connection);
+    await memberships.ensureContributorSystemUser(contributorId, connection.systemUserId());
     service = new SubmissionUploadService(connection);
     // pg-boss is not running under test:db; the closure job publish is asserted, not executed.
     publishClosureStub = sinon
@@ -100,11 +106,17 @@ describe('submission upload decision (integration)', function () {
     const before = await readUpload(submissionUploadId);
     expect(before.decision).to.equal('pending');
 
+    // The status route checks upload ownership through this schema-validated lookup before recording a decision.
+    const upload = await service.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
+    expect(upload.decision).to.equal('pending');
+
     const result = await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
 
     expect(result).to.eql({ submission_upload_id: submissionUploadId, decision: 'approved' });
     const after = await readUpload(submissionUploadId);
     expect(after.decision).to.equal('approved');
+    const approvedUpload = await service.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
+    expect(approvedUpload.decision).to.equal('approved');
     expect(after.revision_count).to.be.greaterThan(before.revision_count);
     expect(publishClosureStub).to.have.been.calledOnce;
     expect(publishClosureStub.firstCall.args[1]).to.eql({ submissionUploadId });

@@ -1,8 +1,15 @@
 import { Knex } from 'knex';
+import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { BlueprintCompositionOption } from '../models/blueprint-composition';
 import { CountResult } from '../models/count';
-import { CreateFeatureProperty, FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
+import {
+  CreateFeatureProperty,
+  ExpressionPredicatePropertyMetadata,
+  FeatureProperty,
+  UpdateFeatureProperty
+} from '../models/feature-property';
 import { FeaturePropertyFilters } from '../services/feature-property-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -15,6 +22,78 @@ import { BaseRepository } from './base-repository';
  * @extends {BaseRepository}
  */
 export class FeaturePropertyRepository extends BaseRepository {
+  /**
+   * List distinct property definitions actually used by one feature type in an upload.
+   * Includes historical feature rows and all reconciliation outcomes. Values stay in SQL;
+   * the result is bounded by the feature type's property definitions.
+   * @param {number} submissionId Owning submission.
+   * @param {string} submissionUploadId Reviewed upload.
+   * @param {string} featureType Canonical feature type name.
+   * @returns {Promise<FeatureProperty[]>} Unique definitions ordered by display name.
+   */
+  async getSubmissionUploadFeatureTypeProperties(
+    submissionId: number,
+    submissionUploadId: string,
+    featureType: string
+  ): Promise<FeatureProperty[]> {
+    const query = SQL`
+      WITH upload_features AS (
+        SELECT sf.submission_feature_id
+        FROM submission_feature sf
+        JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+        WHERE sf.submission_id = ${submissionId}
+          AND sf.submission_upload_id = ${submissionUploadId}::uuid
+          AND ft.name = ${featureType}
+      ), property_assignments AS (
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_string p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_number p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_boolean p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_timestamp p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_code p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_taxon p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_geometry p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_feature p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_artifact p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+      )
+      SELECT DISTINCT fp.feature_property_id, fp.feature_property_type_id,
+        fp.name, fp.display_name, fp.description, fpt.name AS type_name, fp.calculated_value
+      FROM property_assignments used
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_property_id = used.blueprint_feature_type_property_id
+      JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
+      JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+      ORDER BY fp.display_name, fp.name, fp.feature_property_id;
+    `;
+    const response = await this.connection.sql(query, FeatureProperty);
+    return response.rows;
+  }
+
   /**
    * Build the base SELECT query that joins feature_property_type for type_name.
    *
@@ -36,7 +115,9 @@ export class FeaturePropertyRepository extends BaseRepository {
         'fp.display_name',
         'fp.description',
         knex.ref('fpt.name').as('type_name'),
-        'fp.calculated_value'
+        'fp.calculated_value',
+        'fp.record_effective_date',
+        'fp.record_end_date'
       ]);
   }
 
@@ -141,7 +222,7 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Get active feature properties with optional search and pagination.
+   * Get active and retired feature properties with optional search and pagination.
    *
    * @param {FeaturePropertyFilters} [filters] - Optional filter set.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
@@ -152,13 +233,15 @@ export class FeaturePropertyRepository extends BaseRepository {
     filters?: FeaturePropertyFilters,
     pagination?: ApiPaginationOptions
   ): Promise<FeatureProperty[]> {
-    const query = this.applyFilters(this.baseQuery().whereNull('fp.record_end_date'), filters);
+    const query = this.applyFilters(this.baseQuery(), filters);
 
-    query.orderBy('fp.name', 'asc');
-
-    if (pagination) {
+    if (pagination?.sort && pagination.order) {
+      this.applyPagination(query, pagination);
+    } else {
+      query.orderBy('fp.name', 'asc');
       this.applyPagination(query, pagination);
     }
+    query.orderBy('fp.feature_property_id', 'asc');
 
     const response = await this.connection.knex(query, FeatureProperty);
 
@@ -166,7 +249,7 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Get count of active feature properties matching optional filters.
+   * Get count of active and retired feature properties matching optional filters.
    *
    * @param {FeaturePropertyFilters} [filters] - Optional filter set.
    * @return {Promise<number>}
@@ -174,7 +257,7 @@ export class FeaturePropertyRepository extends BaseRepository {
    */
   async getFeaturePropertiesCount(filters?: FeaturePropertyFilters): Promise<number> {
     const knex = getKnex();
-    const baseQuery = this.applyFilters(knex.from('feature_property as fp').whereNull('fp.record_end_date'), filters);
+    const baseQuery = this.applyFilters(knex.from('feature_property as fp'), filters);
 
     const countQuery = baseQuery.clone().select(knex.raw('coalesce(count(*), 0)::integer as count')).first();
     const countResult = await this.connection.knex(countQuery, CountResult);
@@ -182,7 +265,7 @@ export class FeaturePropertyRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing feature property record.
+   * Update descriptive metadata on an active or retired feature property record.
    *
    * @param {number} featurePropertyId - The ID of the feature property to update.
    * @param {UpdateFeatureProperty} data - The data to update.
@@ -195,13 +278,9 @@ export class FeaturePropertyRepository extends BaseRepository {
     const query = knex
       .table('feature_property')
       .update({
-        name: data.name,
         display_name: data.display_name,
-        description: data.description,
-        calculated_value: data.calculated_value,
-        record_end_date: data.record_end_date
+        description: data.description
       })
-      .whereNull('record_end_date')
       .where('feature_property_id', featurePropertyId);
 
     const response = await this.connection.knex(query);
@@ -226,8 +305,7 @@ export class FeaturePropertyRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .table('feature_property')
-      .update({ record_end_date: knex.fn.now() })
-      .whereNull('record_end_date')
+      .update({ record_end_date: knex.raw('COALESCE(record_end_date, CURRENT_DATE)') })
       .where('feature_property_id', featurePropertyId)
       .returning(['feature_property_id']);
 
@@ -260,5 +338,177 @@ export class FeaturePropertyRepository extends BaseRepository {
     }
 
     return query;
+  }
+
+  /**
+   * Get the property metadata a predicate is validated and typed against.
+   *
+   * Without an assignment, the property is resolved on its own. With one, the assignment must carry the
+   * property; it is accepted at any lifecycle, since a predicate may target values stored under a
+   * Blueprint version that has since been superseded. Retired property definitions remain valid for reads.
+   *
+   * @param {number} featurePropertyId - Shared feature property identifier.
+   * @param {number | null} blueprintFeatureTypePropertyId - Optional Blueprint assignment the predicate narrows to.
+   * @return {Promise<ExpressionPredicatePropertyMetadata>} Resolved metadata.
+   * @throws {ApiNotFoundError} If no matching property, or no such assignment of it, exists.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeaturePropertyRepository
+   */
+  async getExpressionPredicatePropertyMetadata(
+    featurePropertyId: number,
+    blueprintFeatureTypePropertyId: number | null
+  ): Promise<ExpressionPredicatePropertyMetadata> {
+    const sqlStatement =
+      blueprintFeatureTypePropertyId === null
+        ? SQL`
+            SELECT
+              fp.feature_property_id,
+              NULL::integer as blueprint_feature_type_property_id,
+              fpt.feature_property_type_id,
+              fpt.name as feature_property_type_name,
+              fp.display_name
+            FROM feature_property fp
+            INNER JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+            WHERE fp.feature_property_id = ${featurePropertyId};
+          `
+        : SQL`
+            SELECT
+              fp.feature_property_id,
+              bftp.blueprint_feature_type_property_id,
+              fpt.feature_property_type_id,
+              fpt.name as feature_property_type_name,
+              fp.display_name
+            FROM blueprint_feature_type_property bftp
+            INNER JOIN feature_property fp
+              ON fp.feature_property_id = bftp.feature_property_id
+            INNER JOIN feature_property_type fpt
+              ON fpt.feature_property_type_id = fp.feature_property_type_id
+            WHERE fp.feature_property_id = ${featurePropertyId}
+              AND bftp.blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
+          `;
+
+    const response = await this.connection.sql(sqlStatement, ExpressionPredicatePropertyMetadata);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property metadata not found', [
+        'FeaturePropertyRepository->getExpressionPredicatePropertyMetadata',
+        { featurePropertyId, blueprintFeatureTypePropertyId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeaturePropertyRepository->getExpressionPredicatePropertyMetadata',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Build contextual selector predicates before pagination.
+   *
+   * @param query Global definition base query.
+   * @param blueprintFeatureTypeId Owning blueprint feature-type assignment.
+   * @param keyword Global definition search.
+   * @returns Eligible global definition query.
+   */
+  private applyAvailableFeaturePropertyForBlueprintFeatureTypeFilters(
+    query: Knex.QueryBuilder,
+    blueprintFeatureTypeId: number,
+    keyword?: string
+  ): Knex.QueryBuilder {
+    const knex = getKnex();
+    query
+      .whereNull('g.record_end_date')
+      .whereNotExists(
+        knex('blueprint_feature_type_property as a')
+          .select(1)
+          .where('a.blueprint_feature_type_id', blueprintFeatureTypeId)
+          .whereRaw('a.feature_property_id = g.feature_property_id')
+          .whereNull('a.record_end_date')
+      );
+    if (keyword) {
+      query.where(function () {
+        this.whereILike('g.name', `%${keyword}%`).orWhereILike('g.display_name', `%${keyword}%`);
+      });
+    }
+    return query;
+  }
+  /**
+   * Search eligible definitions without dropping items after pagination.
+   *
+   * @param blueprintFeatureTypeId Membership scope.
+   * @param keyword Search term.
+   * @param pagination Requested page.
+   * @returns Selector options.
+   */
+  async getAvailableFeaturePropertiesForBlueprintFeatureType(
+    blueprintFeatureTypeId: number,
+    keyword: string | undefined,
+    pagination: ApiPaginationOptions
+  ) {
+    const knex = getKnex();
+    const query = knex('feature_property as g');
+    this.applyAvailableFeaturePropertyForBlueprintFeatureTypeFilters(query, blueprintFeatureTypeId, keyword)
+      .select('g.feature_property_id as id', 'g.name', 'g.display_name')
+      .orderBy('g.name', pagination.order ?? 'asc')
+      .orderBy('g.feature_property_id', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+    const response = await this.connection.knex(query, BlueprintCompositionOption);
+    return response.rows;
+  }
+  /**
+   * Count eligible definitions using selector predicates.
+   *
+   * @param blueprintFeatureTypeId Membership scope.
+   * @param keyword Search term.
+   * @returns Count row.
+   */
+  async getAvailableFeaturePropertiesForBlueprintFeatureTypeCount(
+    blueprintFeatureTypeId: number,
+    keyword?: string
+  ): Promise<CountResult> {
+    const knex = getKnex();
+    const query = knex('feature_property as g');
+    this.applyAvailableFeaturePropertyForBlueprintFeatureTypeFilters(query, blueprintFeatureTypeId, keyword).select(
+      knex.raw('count(*)::integer as count')
+    );
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active or retired feature property by ID.
+   *
+   * @param {number} featurePropertyId - The ID of the feature property to retrieve.
+   * @return {Promise<FeatureProperty>} The feature property record.
+   * @throws {ApiNotFoundError} If no feature property exists for the id.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
+   * @memberof FeaturePropertyRepository
+   */
+  async getAdminFeatureProperty(featurePropertyId: number): Promise<FeatureProperty> {
+    const query = this.baseQuery().where('fp.feature_property_id', featurePropertyId);
+
+    const response = await this.connection.knex(query, FeatureProperty);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property not found', [
+        'FeaturePropertyRepository->getAdminFeatureProperty',
+        { featurePropertyId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'FeaturePropertyRepository->getAdminFeatureProperty',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 }

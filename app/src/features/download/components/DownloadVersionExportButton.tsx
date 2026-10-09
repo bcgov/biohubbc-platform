@@ -1,5 +1,8 @@
 import { mdiDownload } from '@mdi/js';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Icon from '@mdi/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { PrimaryButton } from 'components/button/PrimaryButton';
 import { EXPORT_CONFIG_VERSION, EXPORT_TYPE } from 'constants/export-config-constants';
 import { useApi } from 'hooks/useApi';
@@ -26,11 +29,12 @@ export const DownloadVersionExportButton = ({
   status
 }: DownloadVersionExportButtonProps) => {
   const api = useApi();
+  const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
   const [isExporting, setIsExporting] = useState(false);
 
   /**
-   * Create a per-feature-type CSV export for the selected version.
+   * Create a per-feature-type CSV export for the selected version, then refresh the download's cached exports.
    *
    * @param {MouseEvent<HTMLButtonElement>} event - The export button click event.
    * @return {Promise<void>}
@@ -49,6 +53,7 @@ export const DownloadVersionExportButton = ({
         merge_steps: []
       };
       await api.downloadExport.createExport(downloadId, downloadVersionId, payload);
+      void refreshChangedQueries(queryClient, changedQueryKeys.downloadExport(downloadId, downloadVersionId));
       dialogContext.setSnackbar({ open: true, snackbarMessage: 'Export started.' });
     } catch {
       dialogContext.setErrorDialog({

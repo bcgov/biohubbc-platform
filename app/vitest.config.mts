@@ -34,6 +34,8 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: 'jsdom',
+      // Bound concurrent JSDOM renderers so UI tests retain CPU time on CI runners.
+      maxWorkers: 2,
       server: {
         // Fixes an error caused by Vite trying to load .css required for x-data-grid
         // See https://stackoverflow.com/questions/79592526/testing-error-after-upgrading-mui-x-data-grid-to-v8-1-0-unknown-file-extensio

@@ -6,6 +6,7 @@ import {
   featureReferencePropertyValueJson,
   isAccessibleToUser,
   isEffectivelySecured,
+  isSubmissionFeatureActive,
   isSubmissionFeatureCurrent,
   isSubmissionFeaturePublished,
   taxonPropertyValueJson
@@ -27,6 +28,16 @@ describe('sql-fragments', () => {
       expect(sql).to.include('sf.record_effective_date <= now()');
       expect(sql).to.include('(sf.record_end_date IS NULL OR now() < sf.record_end_date)');
       expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+    });
+  });
+
+  describe('isSubmissionFeatureActive', () => {
+    it('requires only that the record has not ended, in the partial index form', () => {
+      const sql = isSubmissionFeatureActive('sf');
+
+      expect(sql).to.equal('sf.record_end_date IS NULL');
+      // Never published-gated: pending upload features have a null effective date.
+      expect(sql).to.not.include('record_effective_date');
     });
   });
 

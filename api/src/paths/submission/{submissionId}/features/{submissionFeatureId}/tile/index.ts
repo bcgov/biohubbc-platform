@@ -8,7 +8,7 @@ import {
 } from '../../../../../../constants/martin';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { martinFeatureSessionResponseSchema } from '../../../../../../openapi/schemas/martin';
+import { martinExtentSessionResponseSchema } from '../../../../../../openapi/schemas/martin';
 import { martinTokenRateLimiter } from '../../../../../../request-handlers/rate-limit';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
 import { MartinTokenService } from '../../../../../../services/martin-token-service';
@@ -69,7 +69,7 @@ POST.apiDoc = {
     200: {
       description: 'A tile session, or a statement that the feature has no spatial properties to map.',
       content: {
-        'application/json': { schema: martinFeatureSessionResponseSchema }
+        'application/json': { schema: martinExtentSessionResponseSchema }
       }
     },
     ...defaultErrorResponses

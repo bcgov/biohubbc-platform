@@ -82,7 +82,9 @@ describe('DownloadSidebarDownloads', () => {
       render(<DownloadSidebarDownloads />);
 
       await waitFor(() => {
-        expect(mockGetDownloads).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 }));
+        expect(mockGetDownloads).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 }), {
+          signal: expect.any(AbortSignal)
+        });
       });
     });
 
@@ -166,7 +168,7 @@ describe('DownloadSidebarDownloads', () => {
 
       // Step 3: Feature types are fetched for THIS download before building the recipe.
       await waitFor(() => {
-        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123');
+        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123', { signal: expect.any(AbortSignal) });
       });
 
       // Step 4: createExport gets the selected version id plus the all-types per_feature_type recipe.
@@ -227,7 +229,7 @@ describe('DownloadSidebarDownloads', () => {
 
       // Step 3: Feature types are fetched for the configured download.
       await waitFor(() => {
-        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123');
+        expect(mockGetDownloadFeatureTypes).toHaveBeenCalledWith('abc-123', { signal: expect.any(AbortSignal) });
       });
 
       // Step 4: The dialog mounts (title only renders when EditDialog is open).

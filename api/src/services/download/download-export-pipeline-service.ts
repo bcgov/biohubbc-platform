@@ -31,6 +31,7 @@ import {
 } from '../../utils/export-utils';
 import { _getS3Client, getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
+import { derivePropertiesFromParquetSchema, readParquetPropertiesMetadata } from '../../utils/parquet-utils';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
@@ -586,27 +587,69 @@ export class DownloadExportPipelineService extends DBService {
   }
 
   /**
-   * Build a lookup map from feature-type name to property definitions.
+   * Describe each feature type's Parquet file from the file itself.
    *
-   * Mirrors `DownloadPipelineService.buildSchemaLookup` so both pipelines see
-   * the same schema projection. Private because the service is the sole
-   * caller — callers depend on `listExportFeatureTypes` + this lookup jointly,
-   * not either in isolation.
+   * Column names and types come from the property list the writer stored in the footer, so the
+   * export of a file is fixed at the time the file was written: a Blueprint change, a retired
+   * assignment or a new default Blueprint cannot add or drop a column afterwards. A file written
+   * before the footer entry existed is described from its physical schema instead; the one type
+   * that schema cannot express, `artifact_key`, is recovered for those files from the
+   * Blueprint-independent property catalogue.
+   *
+   * @param {string} downloadId - The download the version belongs to.
+   * @param {string} downloadVersionId - The version whose files to describe.
+   * @param {string[]} featureTypeNames - The feature types that materialized a file.
+   * @return {Promise<Map<string, CsvPropertyDefinition[]>>} Property definitions per feature type, in file order.
+   * @memberof DownloadExportPipelineService
    */
-  private async buildSchemaLookup(): Promise<Map<string, CsvPropertyDefinition[]>> {
-    const allFeatureTypeCodes = await this.codeService.getFeatureTypePropertyCodes();
-
+  async readSchemaLookup(
+    downloadId: string,
+    downloadVersionId: string,
+    featureTypeNames: string[]
+  ): Promise<Map<string, CsvPropertyDefinition[]>> {
     const lookup = new Map<string, CsvPropertyDefinition[]>();
-    for (const ftCode of allFeatureTypeCodes) {
-      lookup.set(
-        ftCode.feature_type.name,
-        ftCode.properties.map((p) => ({
-          feature_property_name: p.name,
-          feature_property_type_name: p.type_name
-        }))
-      );
+    let artifactKeyColumnsByType: Map<string, string[]> | undefined;
+
+    for (const featureTypeName of featureTypeNames) {
+      const reader = await this.openParquetReader(downloadId, downloadVersionId, featureTypeName);
+      try {
+        const stored = readParquetPropertiesMetadata(reader);
+        if (stored) {
+          lookup.set(featureTypeName, stored);
+          continue;
+        }
+
+        artifactKeyColumnsByType ??= await this.readArtifactKeyColumnsByFeatureType();
+        lookup.set(
+          featureTypeName,
+          derivePropertiesFromParquetSchema(reader.getSchema(), artifactKeyColumnsByType.get(featureTypeName) ?? [])
+        );
+      } finally {
+        await reader.close();
+      }
     }
+
     return lookup;
+  }
+
+  /**
+   * The artifact-key property names of every feature type, from the Blueprint-independent
+   * catalogue. Read only to describe a file that carries no property list of its own.
+   *
+   * @return {Promise<Map<string, string[]>>} Artifact-key property names per feature type name.
+   * @memberof DownloadExportPipelineService
+   */
+  private async readArtifactKeyColumnsByFeatureType(): Promise<Map<string, string[]>> {
+    const featureTypes = await this.codeService.getFeatureTypeProperties();
+
+    return new Map(
+      featureTypes.map((featureType) => [
+        featureType.feature_type.name,
+        featureType.properties
+          .filter((property) => property.type_name === 'artifact_key')
+          .map((property) => property.name)
+      ])
+    );
   }
 
   /**
@@ -1130,7 +1173,8 @@ export class DownloadExportPipelineService extends DBService {
     const downloadId = version.download_id;
     const downloadVersionId = group.download_version_id;
 
-    const schemaLookup = await this.buildSchemaLookup();
+    const materializedFeatureTypes = await this.listExportFeatureTypes(downloadId, downloadVersionId);
+    const schemaLookup = await this.readSchemaLookup(downloadId, downloadVersionId, materializedFeatureTypes);
     const config = group.config;
     const maxPartSizeBytes = BigInt(group.max_part_size_bytes);
 
@@ -1153,9 +1197,7 @@ export class DownloadExportPipelineService extends DBService {
     // materialized type; restrict it to the config's selection so a type that was
     // materialized but not requested is not exported.
     const selectedColumnsByType = this.buildSelectedColumnsByType(config.output_columns);
-    const featureTypes = (await this.listExportFeatureTypes(downloadId, downloadVersionId)).filter((featureType) =>
-      config.feature_types.includes(featureType)
-    );
+    const featureTypes = materializedFeatureTypes.filter((featureType) => config.feature_types.includes(featureType));
 
     // Fail loud if the version has no Parquet artifacts — otherwise the
     // archiver finalizes an empty zip (just the central-directory record) and the

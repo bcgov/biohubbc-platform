@@ -3,196 +3,51 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { PatchSubmissionRecord } from '../../../../repositories/submission-repository';
+import { updateSubmissionRequestSchema } from '../../../../openapi/schemas/submission';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
-import { getLogger } from '../../../../utils/logger';
-
-const defaultLog = getLogger('paths/administrative/submission/{submissionId}');
 
 export const PATCH: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  patchSubmissionRecord()
+  authorizeRequestHandler(() => ({
+    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+  })),
+  updateSubmission()
 ];
 
 PATCH.apiDoc = {
-  description: 'Patch a submission record.',
+  description:
+    "Update a submission's administrative settings. `default_blueprint_id` sets the blueprint its future uploads use when the upload request does not name one; existing uploads keep the blueprint they were created with.",
   tags: ['admin'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
-  parameters: [
-    {
-      description: 'Submission ID',
-      in: 'path',
-      name: 'submissionId',
-      schema: {
-        type: 'integer',
-        minimum: 1
-      },
-      required: true
-    }
-  ],
+  security: [{ Bearer: [] }],
+  parameters: [{ in: 'path', name: 'submissionId', required: true, schema: { type: 'integer', minimum: 1 } }],
   requestBody: {
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          description: 'Patch operations to perform on the submission record. At least one operation must be provided.',
-          anyOf: [{ required: ['security_reviewed'] }, { required: ['published'] }],
-          properties: {
-            security_reviewed: {
-              type: 'boolean',
-              description:
-                'Set or unset the security_review_timestamp of the record, indicating whether or not the submission record has completed security review.'
-            },
-            published: {
-              type: 'boolean',
-              description:
-                'Set or unset the publish_timestamp of the record, indicating whether or not the submission record has been published for public consumption.'
-            }
-          }
-        }
-      }
-    }
+    required: true,
+    content: { 'application/json': { schema: updateSubmissionRequestSchema } }
   },
   responses: {
-    200: {
-      description: 'The patched submission record.',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'object',
-            required: [
-              'submission_id',
-              'uuid',
-              'security_review_timestamp',
-              'publish_timestamp',
-              'submitted_timestamp',
-              'system_user_id',
-              'contributor_id',
-              'name',
-              'description',
-              'comment',
-              'create_date',
-              'create_user',
-              'update_date',
-              'update_user',
-              'revision_count'
-            ],
-            properties: {
-              submission_id: {
-                type: 'integer',
-                minimum: 1
-              },
-              uuid: {
-                type: 'string',
-                format: 'uuid'
-              },
-              security_review_timestamp: {
-                type: 'string',
-                nullable: true
-              },
-              publish_timestamp: {
-                type: 'string',
-                nullable: true
-              },
-              submitted_timestamp: {
-                type: 'string'
-              },
-              system_user_id: {
-                type: 'integer',
-                minimum: 1
-              },
-              contributor_id: {
-                type: 'integer',
-                minimum: 1
-              },
-              name: {
-                type: 'string',
-                maxLength: 200
-              },
-              description: {
-                type: 'string',
-                maxLength: 3000
-              },
-              comment: {
-                type: 'string',
-                maxLength: 3000
-              },
-              record_end_date: {
-                type: 'string',
-                nullable: true
-              },
-              create_date: {
-                type: 'string'
-              },
-              create_user: {
-                type: 'integer',
-                minimum: 1
-              },
-              update_date: {
-                type: 'string',
-                nullable: true
-              },
-              update_user: {
-                type: 'integer',
-                minimum: 1,
-                nullable: true
-              },
-              revision_count: {
-                type: 'integer',
-                minimum: 0
-              }
-            },
-            additionalProperties: false
-          }
-        }
-      }
-    },
+    204: { description: 'Submission updated.' },
     ...defaultErrorResponses
   }
 };
 
 /**
- * Patch a submission record.
- *
- * @returns {RequestHandler}
+ * Update a submission within an administrator-owned transaction.
+ * @returns {RequestHandler} Handler with transaction cleanup.
  */
-export function patchSubmissionRecord(): RequestHandler {
+export function updateSubmission(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-
-    const submissionId = Number(req.params.submissionId);
-
-    const patch = req.body as PatchSubmissionRecord;
-
     try {
       await connection.open();
-
       const service = new SubmissionService(connection);
-      const response = await service.patchSubmissionRecord(submissionId, patch);
-
+      await service.updateSubmissionDefaultBlueprint(Number(req.params.submissionId), req.body.default_blueprint_id);
       await connection.commit();
-
-      return res.status(200).json(response);
+      return res.status(204).send();
     } catch (error) {
-      defaultLog.error({ label: 'patchSubmissionRecord', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

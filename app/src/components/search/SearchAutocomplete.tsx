@@ -9,7 +9,7 @@ import { SearchOption } from './SearchAutocomplete.interface';
 
 type SearchAutocompletePassthroughProps = Pick<
   MuiAutocompleteProps<SearchOption, false, false, false>,
-  'disabled' | 'id' | 'loading' | 'noOptionsText' | 'onKeyDown' | 'openOnFocus' | 'size' | 'sx'
+  'disabled' | 'getOptionDisabled' | 'id' | 'loading' | 'noOptionsText' | 'onKeyDown' | 'openOnFocus' | 'size' | 'sx'
 >;
 
 interface SearchAutocompleteProps extends SearchAutocompletePassthroughProps {

@@ -1,9 +1,41 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { CreateUpload, UpdateUpload, Upload } from '../../models/upload';
+import { CreateUpload, UpdateUpload, Upload, UploadCompletionAccess } from '../../models/upload';
 import { BaseRepository } from '../base-repository';
 
 export class UploadRepository extends BaseRepository {
+  /**
+   * Find the creator and contributor membership used to authorize upload completion.
+   * Upload expiry and completion state are validated by UploadService.
+   *
+   * @param {string} uploadId Upload session identifier.
+   * @param {number} systemUserId Authenticated caller whose contributor membership is checked.
+   * @returns {Promise<UploadCompletionAccess | undefined>} Access information when the submission association is current.
+   */
+  async findUploadCompletionAccess(
+    uploadId: string,
+    systemUserId: number
+  ): Promise<UploadCompletionAccess | undefined> {
+    const sql = SQL`
+      SELECT u.create_user, EXISTS (
+        SELECT 1
+        FROM contributor c
+        JOIN contributor_system_user csu ON csu.contributor_id = c.contributor_id
+        WHERE c.contributor_id = s.contributor_id
+          AND c.record_end_date IS NULL
+          AND csu.system_user_id = ${systemUserId}
+          AND csu.record_end_date IS NULL
+      ) AS is_contributor_member
+      FROM upload u
+      JOIN submission_upload su ON su.upload_id = u.upload_id AND su.record_end_date IS NULL
+      JOIN submission s ON s.submission_id = su.submission_id
+      WHERE u.upload_id = ${uploadId}
+        AND (s.record_end_date IS NULL OR s.record_end_date > NOW());
+    `;
+    const response = await this.connection.sql(sql, UploadCompletionAccess);
+    return response.rows[0];
+  }
+
   /**
    * Get a single upload record by ID
    *

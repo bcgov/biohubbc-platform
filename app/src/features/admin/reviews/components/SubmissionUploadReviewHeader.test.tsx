@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { DialogContext, defaultSnackbarProps } from 'contexts/dialogContext';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import { MemoryRouter } from 'react-router-dom';
@@ -44,7 +44,35 @@ const review: ISubmissionUploadReviewDetail = {
   requested_by: 1
 };
 
+const tabs = [
+  { value: 'features', label: 'Features' },
+  { value: 'errors', label: 'Errors' }
+];
+const onTabChange = vi.fn();
+
 describe('SubmissionUploadReviewHeader', () => {
+  it('renders the given tabs, marks the active one and reports a tab change', () => {
+    render(
+      <MemoryRouter>
+        <DialogContext.Provider value={dialogContext}>
+          <SubmissionUploadReviewHeader
+            submissionId={16}
+            review={review}
+            tabs={tabs}
+            activeTab="errors"
+            onTabChange={onTabChange}
+            onStatusActionClick={vi.fn()}
+          />
+        </DialogContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Features', 'Errors']);
+    expect(screen.getByRole('tab', { name: 'Errors' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: 'Features' }));
+    expect(onTabChange).toHaveBeenCalledWith('features');
+  });
+
   it('renders the review breadcrumbs, name, description, and Features tab', () => {
     render(
       <MemoryRouter>
@@ -52,17 +80,17 @@ describe('SubmissionUploadReviewHeader', () => {
           <SubmissionUploadReviewHeader
             submissionId={16}
             review={review}
-            isSavingStatus={false}
-            onStatusActionClick={vi.fn()}
+            tabs={tabs}
             activeTab="features"
-            onTabChange={vi.fn()}
+            onTabChange={onTabChange}
+            onStatusActionClick={vi.fn()}
           />
         </DialogContext.Provider>
       </MemoryRouter>
     );
 
     const breadcrumbs = screen.getByLabelText('review breadcrumb');
-    expect(breadcrumbs).toHaveTextContent(`Submission>Review>${review.name}`);
+    expect(breadcrumbs).toHaveTextContent(`Submission/Review/${review.name}`);
     expect(within(breadcrumbs).getByRole('link', { name: 'Submission' })).toHaveAttribute(
       'href',
       '/admin/submissions/16'
@@ -80,16 +108,17 @@ describe('SubmissionUploadReviewHeader', () => {
           <SubmissionUploadReviewHeader
             submissionId={16}
             review={{ ...review, scope: 'security', name: 'Access rules review' }}
-            isSavingStatus={false}
-            onStatusActionClick={vi.fn()}
+            tabs={tabs}
             activeTab="features"
-            onTabChange={vi.fn()}
+            onTabChange={onTabChange}
+            onStatusActionClick={vi.fn()}
           />
         </DialogContext.Provider>
       </MemoryRouter>
     );
 
-    expect(screen.getByLabelText('review breadcrumb')).toHaveTextContent('Submission>Review>Access rules review');
+    expect(screen.getByLabelText('review breadcrumb')).toHaveTextContent('Submission/Review/Access rules review');
+    expect(screen.queryByRole('tab', { name: 'Security' })).not.toBeInTheDocument();
   });
 
   it('shows Reopen Review when the review is completed', () => {
@@ -99,10 +128,10 @@ describe('SubmissionUploadReviewHeader', () => {
           <SubmissionUploadReviewHeader
             submissionId={16}
             review={{ ...review, status: 'completed' }}
-            isSavingStatus={false}
-            onStatusActionClick={vi.fn()}
+            tabs={tabs}
             activeTab="features"
-            onTabChange={vi.fn()}
+            onTabChange={onTabChange}
+            onStatusActionClick={vi.fn()}
           />
         </DialogContext.Provider>
       </MemoryRouter>

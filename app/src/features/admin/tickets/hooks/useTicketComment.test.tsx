@@ -1,7 +1,9 @@
-import { act, renderHook } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketArtifact, ITicketCommentLog, ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { createTestQueryClient } from 'test-helpers/query-client';
+import { act, renderHook } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { useTicketComment } from './useTicketComment';
 
@@ -18,6 +20,7 @@ vi.mock('hooks/useContext', () => ({
 const ticketId = '22222222-2222-4222-8222-222222222222';
 const ticketArtifactId = '90b6df74-1b23-4064-ad62-f83c291d31d2';
 const maxTicketAttachmentFileSize = 15728640;
+const ticketQueryKey = ['ticket', 'admin', 'detail', ticketId];
 
 const makeTicket = (): ITicketExtended => ({
   ticket_id: ticketId,
@@ -59,7 +62,8 @@ const setupUploadHook = (
   createTicketComment = vi.fn().mockResolvedValue(makeTicketComment('New comment'))
 ) => {
   const setSnackbar = vi.fn();
-  const setTicketData = vi.fn();
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(ticketQueryKey, makeTicket());
   const createTicketUpload = vi.fn().mockResolvedValue({
     upload_id: '44444444-4444-4444-8444-444444444444',
     presigned_upload_url: 'https://object-store.example/upload'
@@ -83,29 +87,25 @@ const setupUploadHook = (
   (useConfigContext as Mock).mockReturnValue({
     MAX_TICKET_ATTACHMENT_FILE_SIZE: maxTicketAttachmentFileSize
   });
-  (useTicketContext as Mock).mockReturnValue({
-    ticketId,
-    ticketDataLoader: {
-      data: makeTicket(),
-      error: undefined,
-      isLoading: false,
-      isReady: true,
-      load: vi.fn(),
-      refresh: vi.fn(),
-      clear: vi.fn(),
-      setData: setTicketData
-    }
-  });
+  (useTicketContext as Mock).mockReturnValue({ ticketId, ticketQueryKey });
 
   return {
     completeTicketUpload,
     createTicketComment,
     createTicketUpload,
+    queryClient,
     setSnackbar,
-    setTicketData,
     uploadFileToUrl
   };
 };
+
+/**
+ * Renders the comment hook against a test's query client.
+ *
+ * @param {QueryClient} queryClient The client holding the cached ticket.
+ * @returns The RTL renderHook result.
+ */
+const renderCommentHook = (queryClient: QueryClient) => renderHook(() => useTicketComment(), { queryClient });
 
 describe('useTicketComment', () => {
   beforeEach(() => {
@@ -114,8 +114,8 @@ describe('useTicketComment', () => {
   });
 
   it('appends image markdown for files with image MIME types', async () => {
-    const { uploadFileToUrl } = setupUploadHook(makeTicketArtifact('diagram.png'));
-    const { result } = renderHook(() => useTicketComment());
+    const { queryClient, uploadFileToUrl } = setupUploadHook(makeTicketArtifact('diagram.png'));
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['image'], 'diagram.png', { type: 'image/png' });
 
     await act(async () => {
@@ -131,8 +131,8 @@ describe('useTicketComment', () => {
   });
 
   it('falls back to image markdown for known image extensions without MIME types', async () => {
-    const { createTicketUpload, uploadFileToUrl } = setupUploadHook(makeTicketArtifact('field-photo.jpg'));
-    const { result } = renderHook(() => useTicketComment());
+    const { createTicketUpload, queryClient, uploadFileToUrl } = setupUploadHook(makeTicketArtifact('field-photo.jpg'));
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['image'], 'field-photo.jpg', { type: '' });
 
     await act(async () => {
@@ -153,8 +153,8 @@ describe('useTicketComment', () => {
   });
 
   it('appends link markdown for non-image files', async () => {
-    setupUploadHook(makeTicketArtifact('notes.pdf'));
-    const { result } = renderHook(() => useTicketComment());
+    const { queryClient } = setupUploadHook(makeTicketArtifact('notes.pdf'));
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
 
     await act(async () => {
@@ -165,8 +165,8 @@ describe('useTicketComment', () => {
   });
 
   it('adds a space before attachment markdown when appending to existing comment text', async () => {
-    setupUploadHook(makeTicketArtifact('notes.pdf'));
-    const { result } = renderHook(() => useTicketComment());
+    const { queryClient } = setupUploadHook(makeTicketArtifact('notes.pdf'));
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
 
     act(() => {
@@ -188,8 +188,8 @@ describe('useTicketComment', () => {
         resolveCreateComment = resolve;
       })
     );
-    const { setTicketData } = setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
-    const { result } = renderHook(() => useTicketComment());
+    const { queryClient } = setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
+    const { result } = renderCommentHook(queryClient);
 
     act(() => {
       result.current.setComment('Review the attachment');
@@ -205,14 +205,14 @@ describe('useTicketComment', () => {
     expect(createTicketComment).toHaveBeenCalledWith(ticketId, {
       comment: 'Review the attachment'
     });
-    expect(setTicketData).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual(makeTicket());
 
     await act(async () => {
       resolveCreateComment(createdComment);
       await submitPromise;
     });
 
-    expect(setTicketData).toHaveBeenCalledWith({
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual({
       ...makeTicket(),
       comments: [createdComment]
     });
@@ -221,8 +221,8 @@ describe('useTicketComment', () => {
   it('preserves authored line breaks when creating a comment', async () => {
     const authoredComment = 'First line\nSecond line\n';
     const createTicketComment = vi.fn().mockResolvedValue(makeTicketComment(authoredComment));
-    setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
-    const { result } = renderHook(() => useTicketComment());
+    const { queryClient } = setupUploadHook(makeTicketArtifact('notes.pdf'), createTicketComment);
+    const { result } = renderCommentHook(queryClient);
 
     act(() => {
       result.current.setComment(authoredComment);
@@ -241,11 +241,8 @@ describe('useTicketComment', () => {
     const createdComment = makeTicketComment(`See attached [notes.pdf](/artifact/${ticketArtifactId})`, [
       makeTicketArtifact('notes.pdf')
     ]);
-    const { setTicketData } = setupUploadHook(
-      makeTicketArtifact('notes.pdf'),
-      vi.fn().mockResolvedValue(createdComment)
-    );
-    const { result } = renderHook(() => useTicketComment());
+    const { queryClient } = setupUploadHook(makeTicketArtifact('notes.pdf'), vi.fn().mockResolvedValue(createdComment));
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
 
     await act(async () => {
@@ -256,7 +253,7 @@ describe('useTicketComment', () => {
       await result.current.handleAddComment();
     });
 
-    expect(setTicketData).toHaveBeenCalledWith({
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual({
       ...makeTicket(),
       comments: [createdComment]
     });
@@ -265,11 +262,11 @@ describe('useTicketComment', () => {
 
   it('keeps the draft when comment creation fails', async () => {
     const createError = new Error('Failed to add comment.');
-    const { setSnackbar, setTicketData } = setupUploadHook(
+    const { queryClient, setSnackbar } = setupUploadHook(
       makeTicketArtifact('notes.pdf'),
       vi.fn().mockRejectedValue(createError)
     );
-    const { result } = renderHook(() => useTicketComment());
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
 
     await act(async () => {
@@ -280,7 +277,7 @@ describe('useTicketComment', () => {
       await result.current.handleAddComment();
     });
 
-    expect(setTicketData).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(ticketQueryKey)).toEqual(makeTicket());
     expect(setSnackbar).toHaveBeenCalledWith({
       open: true,
       snackbarMessage: 'Failed to add comment.'
@@ -289,10 +286,10 @@ describe('useTicketComment', () => {
   });
 
   it('rejects attachments larger than the API limit before starting upload', async () => {
-    const { completeTicketUpload, createTicketUpload, setSnackbar, uploadFileToUrl } = setupUploadHook(
+    const { completeTicketUpload, createTicketUpload, queryClient, setSnackbar, uploadFileToUrl } = setupUploadHook(
       makeTicketArtifact('notes.pdf')
     );
-    const { result } = renderHook(() => useTicketComment());
+    const { result } = renderCommentHook(queryClient);
     const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' });
 
     Object.defineProperty(file, 'size', { value: maxTicketAttachmentFileSize + 1 });

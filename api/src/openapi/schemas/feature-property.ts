@@ -24,6 +24,8 @@ export const FeaturePropertySchema: OpenAPIV3.SchemaObject = {
     'calculated_value'
   ],
   properties: {
+    record_effective_date: { type: 'string', format: 'date' },
+    record_end_date: { type: 'string', format: 'date', nullable: true },
     feature_property_id: {
       type: 'integer',
       minimum: 1,
@@ -148,11 +150,6 @@ export const UpdateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    name: {
-      type: 'string',
-      maxLength: 100,
-      description: 'Canonical name of the feature property'
-    },
     display_name: {
       type: 'string',
       maxLength: 100,
@@ -163,10 +160,6 @@ export const UpdateFeaturePropertyRequestSchema: OpenAPIV3.SchemaObject = {
       maxLength: 500,
       nullable: true,
       description: 'Description of the feature property'
-    },
-    calculated_value: {
-      type: 'boolean',
-      description: 'Whether the property value is calculated rather than supplied'
     }
   }
 };

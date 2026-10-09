@@ -12,7 +12,7 @@
  *
  * Serializes every writer of a submission's published feature state and its derived
  * closure: upload activation and closure recompute jobs both take the blocking form so
- * every upload continues to its upload-specific security screening.
+ * a recompute queued behind an activation always runs, and rebuilds from the activated state.
  *
  * Use with {@link SUBMISSION_ACTIVE_STATE_LOCK_SEED} as
  * `hashtextextended('<prefix>:' || submission_id, seed)`.

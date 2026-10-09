@@ -1,10 +1,10 @@
-import { APIError } from 'hooks/api/useAxios';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshChangedQueries } from 'utils/query-client';
+import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useIsMounted from 'hooks/useIsMounted';
-import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
 
@@ -38,11 +38,22 @@ export const useSearchResultDownload = ({
   const api = useApi();
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
-  const isMounted = useIsMounted();
-  const { runSerialized } = useSerializedAsync();
+  const queryClient = useQueryClient();
+  // Scopes the in-flight check below to this hook instance.
+  const createDownloadMutationKey = ['search-result', 'create-download', useId()];
+  const createDownloadMutation = useMutation({
+    mutationKey: createDownloadMutationKey,
+    mutationFn: (values: ICreateDownloadFormValues) =>
+      api.download.createDownload({
+        name: values.name,
+        description: values.description,
+        expression: expressionTree
+      }),
+    onSuccess: () => refreshChangedQueries(queryClient, changedQueryKeys.download())
+  });
+  const { mutate: createDownload } = createDownloadMutation;
 
   const [isCreateDownloadDialogOpen, setIsCreateDownloadDialogOpen] = useState(false);
-  const [isSubmittingDownload, setIsSubmittingDownload] = useState(false);
 
   useEffect(() => {
     setIsCreateDownloadDialogOpen(false);
@@ -73,45 +84,27 @@ export const useSearchResultDownload = ({
 
   /**
    * Submits the create-download form for the current expression search.
-   * Serialized to prevent duplicate downloads. On success the dialog closes and
-   * navigates to the download page at `/download/:downloadId`, where the user
-   * can monitor status and obtain exports. Failure keeps the dialog open and
-   * shows the API error. State updates are skipped after unmount.
+   * Ignored while a submission from this hook is in flight, so a double submit creates one download. On success the
+   * dialog closes and navigates to the download page at `/download/:downloadId`, where the user can monitor status
+   * and obtain exports. Failure keeps the dialog open and shows the API error. Neither runs once the page has
+   * unmounted.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name and description.
-   * @returns Promise from the serialized create-download operation, or `undefined` when another submission is already running.
+   * @returns {void}
    */
-  const handleCreateDownload = useCallback(
-    (values: ICreateDownloadFormValues) =>
-      runSerialized(async () => {
-        setIsSubmittingDownload(true);
-        try {
-          const response = await api.download.createDownload({
-            name: values.name,
-            description: values.description,
-            expression: expressionTree
-          });
-          if (!isMounted()) {
-            return;
-          }
-          setIsCreateDownloadDialogOpen(false);
-          navigate(`/download/${response.download_id}`);
-        } catch (error) {
-          if (!isMounted()) {
-            return;
-          }
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: (error as APIError).message
-          });
-        } finally {
-          if (isMounted()) {
-            setIsSubmittingDownload(false);
-          }
-        }
-      }),
-    [api.download, dialogContext, expressionTree, navigate, runSerialized, isMounted]
-  );
+  const handleCreateDownload = (values: ICreateDownloadFormValues) => {
+    if (queryClient.isMutating({ mutationKey: createDownloadMutationKey }) > 0) {
+      return;
+    }
+
+    createDownload(values, {
+      onSuccess: (response) => {
+        setIsCreateDownloadDialogOpen(false);
+        navigate(`/download/${response.download_id}`);
+      },
+      onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
+    });
+  };
 
   /**
    * Closes the create-download dialog without submitting.
@@ -124,7 +117,7 @@ export const useSearchResultDownload = ({
   return {
     downloadView: 'Downloads',
     isCreateDownloadDialogOpen,
-    isSubmittingDownload,
+    isSubmittingDownload: createDownloadMutation.isPending,
     handleOpenCreateDownload,
     handleCreateDownload,
     handleCancelCreateDownload

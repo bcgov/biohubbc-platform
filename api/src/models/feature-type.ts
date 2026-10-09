@@ -1,10 +1,12 @@
 import { z } from 'zod';
-import { FeatureTypeProperty } from './feature-type-property';
+import { FeaturePropertyDefinition, FeatureTypeProperty } from './feature-property';
 
 /**
  * Schema for feature type basic info.
  */
 export const FeatureType = z.object({
+  record_effective_date: z.string().optional(),
+  record_end_date: z.string().nullable().optional(),
   feature_type_id: z.number(),
   name: z.string(),
   display_name: z.string(),
@@ -23,6 +25,16 @@ export const FeatureTypeWithProperties = z.object({
 
 export type FeatureTypeWithProperties = z.infer<typeof FeatureTypeWithProperties>;
 
+/**
+ * Feature type with every property ever assigned to it, as definitions rather than assignments.
+ */
+export const FeatureTypeWithPropertyDefinitions = z.object({
+  feature_type: FeatureType,
+  properties: z.array(FeaturePropertyDefinition)
+});
+
+export type FeatureTypeWithPropertyDefinitions = z.infer<typeof FeatureTypeWithPropertyDefinitions>;
+
 /** Fields required to create a feature type. */
 export interface CreateFeatureType {
   /** Canonical name of the feature type. */
@@ -33,10 +45,10 @@ export interface CreateFeatureType {
   description?: string | null;
 }
 
-/** Partial fields accepted when updating a feature type. */
+/**
+ * Editable presentation metadata; canonical names remain immutable.
+ */
 export interface UpdateFeatureType {
-  name?: string;
   display_name?: string;
   description?: string | null;
-  record_end_date?: string;
 }

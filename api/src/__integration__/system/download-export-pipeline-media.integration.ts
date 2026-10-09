@@ -30,6 +30,7 @@ import { BucketType, ObjectStorageService } from '../../services/object-storage/
 import { ArtifactService } from '../../services/upload/artifact-service';
 import { canonicalizeExportConfig, computeConfigHash } from '../../utils/export-config-utils';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
+import { buildParquetPropertiesMetadata, PARQUET_PROPERTIES_METADATA_KEY } from '../../utils/parquet-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 const TEST_PREFIX = 'dev-artifacts/export-media';
@@ -135,6 +136,13 @@ function stubParquetReaderWithRows(rows: Record<string, unknown>[]): void {
     };
     return {
       getCursor: () => cursor,
+      // The fake describes itself the way a written file does: one artifact-key column, `file`,
+      // which is what makes the pipeline stream the referenced binary into the part-zip.
+      getMetadata: () => ({
+        [PARQUET_PROPERTIES_METADATA_KEY]: buildParquetPropertiesMetadata([
+          { feature_property_name: 'file', feature_property_type_name: 'artifact_key' }
+        ])
+      }),
       close: async () => undefined
     } as unknown as parquetjs.ParquetReader;
   });
@@ -519,10 +527,8 @@ describe('Download Export pipeline — media (system)', function () {
     // (default ~4k rows per group), small enough to write in a minute or two.
     const fixtureTargetBytes = 96 * 1024 * 1024;
 
-    // Seed a download with one feature of type 'survey'. The export pipeline
-    // reads properties via `getFeatureTypePropertyCodes`, so the feature type
-    // must exist in seed data — 'survey' is a root type already used by the
-    // sibling integration tests.
+    // Seed a download with one feature of type 'survey'. The fixture file carries no property
+    // list in its footer, so the export describes it from its physical schema.
     const submissionId = await createTestSubmission(connection);
     await createTestFeature(connection, submissionId, 'survey', {
       name: 'oom-seed'

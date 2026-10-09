@@ -5,22 +5,23 @@ import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { optimizeExpression } from '../utils/expression-optimization';
 import { parseTimestamp } from '../utils/timestamp';
 import {
-  applyTaxonExpressionOperator,
   buildBroadFeatureTypeCountSubquery,
   buildBroadFeatureTypeSubquery,
   buildExpressionTreeCountFeatureIdsSubquery,
   buildExpressionTreeFeatureIdsSubquery,
   buildUnfilteredExpressionTreeFeatureIdsSubquery
 } from './expression-evaluation';
+import { applyTaxonExpressionOperator } from './expression-predicate-sql';
+import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-feature-search';
 
 const normalizedPredicate = (
   feature_property_id: number,
-  feature_type_property_id: number | null,
+  blueprint_feature_type_property_id: number | null,
   internal_predicate: any
 ) => ({
   type: 'predicate' as const,
   feature_property_id,
-  feature_type_property_id,
+  blueprint_feature_type_property_id,
   operator: internal_predicate.operator,
   ...(internal_predicate.value !== undefined ? { value: internal_predicate.value } : {}),
   feature_property_type_id: internal_predicate.type === 'number' ? 2 : 1,
@@ -52,8 +53,59 @@ describe('expression-evaluation', () => {
     Sinon.restore();
   });
 
+  describe('published and upload-review evidence boundaries', () => {
+    const equality = (value: string) => normalizedPredicate(46, null, { type: 'string', operator: 'Equals', value });
+    const multiValue: NormalizedExpressionTree = {
+      type: 'expression',
+      operator: 'AND',
+      clauses: [equality('elk'), equality('deer')]
+    };
+    const expressions: NormalizedExpressionTree[] = [
+      { type: 'expression', operator: 'OR', clauses: [equality('elk'), equality('deer')] },
+      multiValue,
+      {
+        type: 'expression',
+        operator: 'AND',
+        clauses: [
+          multiValue,
+          {
+            type: 'expression',
+            operator: 'OR',
+            clauses: [
+              normalizedPredicate(47, null, { type: 'number', operator: 'GreaterThan', value: 5 }),
+              equality('moose')
+            ]
+          }
+        ]
+      }
+    ];
+    for (const [index, expression] of expressions.entries()) {
+      it(`keeps visibility and relationships separate for expression shape ${index + 1}`, () => {
+        const published = buildExpressionTreeFeatureIdsSubquery('survey', expression, null).toString();
+        const upload = buildSubmissionUploadFeatureIdsSubquery(
+          1,
+          '00000000-0000-0000-0000-000000000001',
+          expression
+        ).toString();
+        expect(published).to.include('submission_feature_closure');
+        expect(published).to.include('anchor_sf.successor_submission_feature_id IS NULL');
+        expect(published).to.include('anchor_sf.record_end_date IS NULL OR now() < anchor_sf.record_end_date');
+        expect(published).to.include('submission_feature_security');
+        expect(published).not.to.include('upload_evidence');
+        expect(upload).to.include('"upload_evidence" as materialized');
+        expect(upload).to.include('"upload_ancestors"');
+        expect(upload).to.include('"upload_descendants"');
+        expect(upload).not.to.include('submission_feature_closure');
+        expect(upload).not.to.include('submission_feature_security');
+        if (index > 0) {
+          expect(upload).to.include('count(DISTINCT upload_grouped_evidence.matched_value) = 2');
+        }
+      });
+    }
+  });
+
   describe('buildExpressionTreeFeatureIdsSubquery', () => {
-    it('should build typed property SQL that matches shared properties through feature_type_property', () => {
+    it('should build typed property SQL that matches shared properties through their Blueprint assignments', () => {
       const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
@@ -79,8 +131,8 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('submission_feature_property_number');
       expect(sql).to.include('submission_feature_property_string');
-      expect(sql).to.include('from "feature_type_property" as "ftp"');
-      expect(sql).to.include('"ftp"."feature_property_id"');
+      expect(sql).to.include('from "blueprint_feature_type_property" as "bftp"');
+      expect(sql).to.include('"bftp"."feature_property_id"');
       expect(sql).to.include('"anchor_ft"."name" = \'survey\'');
       expect(sql).to.not.include(' union ');
       expect(sql).to.not.include(' intersect ');
@@ -218,7 +270,7 @@ describe('expression-evaluation', () => {
       expect(sql.match(/security_scope_anchor/g)).to.have.length.greaterThan(1);
     });
 
-    it('should narrow predicate evidence by feature_type_property_id when provided', () => {
+    it('should narrow predicate evidence by blueprint_feature_type_property_id when provided', () => {
       const expressionTree: NormalizedExpressionTree = {
         type: 'expression',
         operator: 'AND',
@@ -235,8 +287,8 @@ describe('expression-evaluation', () => {
 
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, null).toString();
 
-      expect(sql).to.include('"ftp"."feature_property_id" = 46');
-      expect(sql).to.include('"ftp"."feature_type_property_id" = 123');
+      expect(sql).to.include('"bftp"."feature_property_id" = 46');
+      expect(sql).to.include('"bftp"."blueprint_feature_type_property_id" = 123');
     });
 
     it('should project related predicate evidence to anchor feature ids through closure probes', () => {
@@ -368,7 +420,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('from "submission_feature_property_string" as "p"');
       expect(sql).to.include('not exists');
       expect(sql).to.include('p_not_equals.submission_feature_id = p.submission_feature_id');
-      expect(sql).to.include('"ftp_not_equals"."feature_property_id" = 48');
+      expect(sql).to.include('"bftp_not_equals"."feature_property_id" = 48');
       expect(sql).to.include('"p_not_equals"."value" = \'red\'');
     });
 
@@ -509,7 +561,7 @@ describe('expression-evaluation', () => {
       const sql = buildExpressionTreeFeatureIdsSubquery('species_observation', expressionTree, null).toString();
 
       expect(sql).to.include('submission_feature_property_string');
-      expect(sql).to.include('"ftp"."feature_property_id"');
+      expect(sql).to.include('"bftp"."feature_property_id"');
       expect(sql).to.include('from "submission_feature" as "anchor_sf"');
       expect(sql).to.include('submission_feature_closure" as "closure_forward"');
       expect(sql).to.include('submission_feature_closure" as "closure_reverse"');
@@ -531,10 +583,11 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('"sf"."submission_feature_id"');
       expect(sql).to.include('from "submission_feature" as "sf"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
       expect(sql).to.not.include('inner join "feature_type" as "ft"');
       expect(sql).to.include('"sf"."feature_type_id" = (select "ft"."feature_type_id"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).not.to.include('"ft"."record_end_date" is null');
       expect(sql).to.include('SELECT true');
       expect(sql).to.include('sfc.source_submission_feature_id = sf.submission_feature_id');
       expect(sql).to.include('sfc.target_submission_feature_id = sf.submission_feature_id');
@@ -549,6 +602,8 @@ describe('expression-evaluation', () => {
       const sql = buildBroadFeatureTypeSubquery('fish', 42).toString();
 
       expect(sql).to.include('inner join "feature_type" as "ft"');
+      expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
+      expect(sql).to.include('sf.record_end_date IS NULL OR now() < sf.record_end_date');
       expect(sql).to.include('exists');
       expect(sql).to.not.include('SELECT true');
       expect(sql).to.not.include('LIMIT 1');
@@ -562,7 +617,7 @@ describe('expression-evaluation', () => {
       }).toString();
 
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).not.to.include('"ft"."record_end_date" is null');
       expect(sql.toLowerCase()).to.include('not exists');
       expect(sql).to.not.include('security_scope_anchor');
     });

@@ -9,12 +9,9 @@ import { DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS } from '../../constants/download';
 import { ApiConflictError } from '../../errors/api-error';
 import { MergeStep, OutputColumn } from '../../models/download-export-config';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
-import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
-import { CodeService } from '../code-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { DownloadExportPipelineService } from './download-export-pipeline-service';
 
@@ -275,28 +272,9 @@ describe('DownloadExportPipelineService', () => {
   });
 
   describe('runExportGroup', () => {
-    const mockCodes: FeatureTypeWithProperties[] = [
-      {
-        feature_type: {
-          feature_type_id: 1,
-          name: 'observation',
-          display_name: 'Observation',
-          description: null
-        },
-        properties: [
-          {
-            feature_type_property_id: 1,
-            name: 'species',
-            display_name: 'Species',
-            description: 'Species',
-            type_name: FEATURE_PROPERTY_TYPE.STRING,
-            required_value: false,
-            calculated_value: false,
-            allow_multiple: false
-          }
-        ]
-      }
-    ];
+    const observationSchemaLookup = new Map<string, CsvPropertyDefinition[]>([
+      ['observation', [{ feature_property_name: 'species', feature_property_type_name: 'string' }]]
+    ]);
 
     it('transitions PROCESSING then READY on happy path and discovers feature types from the pinned version', async () => {
       // Verifies: the orchestrator resolves the version from the GROUP (group.download_version_id),
@@ -313,7 +291,7 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: Stub the transition + the streaming seams so no real S3/archiver runs
       const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
@@ -358,7 +336,7 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: Discovery returns no feature types
       const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
@@ -394,7 +372,7 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: One feature type discovered, but the writer reports zero chunks written
       const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
@@ -431,7 +409,7 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: The writer rejects
       const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
@@ -1188,7 +1166,10 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
-      sinon.stub(service as any, 'buildSchemaLookup').resolves(new Map<string, CsvPropertyDefinition[]>());
+      sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
+      sinon
+        .stub(DownloadExportPipelineService.prototype, 'readSchemaLookup')
+        .resolves(new Map<string, CsvPropertyDefinition[]>());
 
       // Step 2: Stub the transition + both export seams so no real S3/archiver/join runs
       const transitionStub = sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
@@ -1210,28 +1191,9 @@ describe('DownloadExportPipelineService', () => {
   });
 
   describe('runExportGroup per-part file refs', () => {
-    const mockCodes: FeatureTypeWithProperties[] = [
-      {
-        feature_type: {
-          feature_type_id: 1,
-          name: 'observation',
-          display_name: 'Observation',
-          description: null
-        },
-        properties: [
-          {
-            feature_type_property_id: 1,
-            name: 'species',
-            display_name: 'Species',
-            description: 'Species',
-            type_name: FEATURE_PROPERTY_TYPE.STRING,
-            required_value: false,
-            calculated_value: false,
-            allow_multiple: false
-          }
-        ]
-      }
-    ];
+    const observationSchemaLookup = new Map<string, CsvPropertyDefinition[]>([
+      ['observation', [{ feature_property_name: 'species', feature_property_type_name: 'string' }]]
+    ]);
 
     it('streams each part its own file refs only (per-part bookkeeping survives roll-over)', async () => {
       // Verifies: across a roll-over, each part's binary refs stream into that part only — finalized
@@ -1247,7 +1209,7 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
         .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
       sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
 

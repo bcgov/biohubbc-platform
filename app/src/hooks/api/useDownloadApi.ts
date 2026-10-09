@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   CreateDownloadRequest,
   CreateDownloadResponse,
@@ -20,10 +20,14 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    * Get paginated downloads accessible to the current user.
    *
    * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination params (page, limit, sort, order).
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] - Request cancellation.
    * @return {Promise<DownloadListResponse>}
    */
-  const getDownloads = async (pagination?: ApiPaginationRequestOptions): Promise<DownloadListResponse> => {
-    const { data } = await axios.get<DownloadListResponse>('/api/download', { params: pagination });
+  const getDownloads = async (
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadListResponse> => {
+    const { data } = await axios.get<DownloadListResponse>('/api/download', { params: pagination, ...options });
     return data;
   };
 
@@ -43,10 +47,14 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    * download page — status, header name, description, and lifecycle timestamps.
    *
    * @param {string} downloadId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {Promise<DownloadDetail>}
    */
-  const getDownload = async (downloadId: string): Promise<DownloadDetail> => {
-    const { data } = await axios.get<DownloadDetail>(`/api/download/${downloadId}`);
+  const getDownload = async (
+    downloadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadDetail> => {
+    const { data } = await axios.get<DownloadDetail>(`/api/download/${downloadId}`, options);
     return data;
   };
 
@@ -55,14 +63,17 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    *
    * @param {string} downloadId
    * @param {ApiPaginationRequestOptions} [pagination]
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<DownloadVersionListResponse>}
    */
   const listDownloadVersions = async (
     downloadId: string,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<DownloadVersionListResponse> => {
     const { data } = await axios.get<DownloadVersionListResponse>(`/api/download/${downloadId}/version`, {
-      params: pagination
+      params: pagination,
+      ...options
     });
     return data;
   };
@@ -72,10 +83,18 @@ export const useDownloadApi = (axios: AxiosInstance) => {
    *
    * @param {string} downloadId - The parent download ID.
    * @param {string} downloadVersionId - The download version ID.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
    * @return {Promise<DownloadVersion>} The requested download version.
    */
-  const getDownloadVersion = async (downloadId: string, downloadVersionId: string): Promise<DownloadVersion> => {
-    const { data } = await axios.get<DownloadVersion>(`/api/download/${downloadId}/version/${downloadVersionId}`);
+  const getDownloadVersion = async (
+    downloadId: string,
+    downloadVersionId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<DownloadVersion> => {
+    const { data } = await axios.get<DownloadVersion>(
+      `/api/download/${downloadId}/version/${downloadVersionId}`,
+      options
+    );
     return data;
   };
 

@@ -7,6 +7,8 @@ import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
+import { ContributorService } from '../../services/contributor-service';
+import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { createTestSubmission, createTestUploadWithFeatures } from '../helpers/test-submission-helpers';
 
@@ -21,6 +23,10 @@ describe('submission upload processing status (integration)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
+    const contributorService = new ContributorService(connection);
+    const contributorId = await contributorService.ensureContributor('SIMS');
+    const memberships = new ContributorSystemUserService(connection);
+    await memberships.ensureContributorSystemUser(contributorId, connection.systemUserId());
     service = new SubmissionUploadService(connection);
     processingStatusRepository = new SubmissionUploadProcessingStatusRepository(connection);
   });

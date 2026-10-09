@@ -61,6 +61,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon
       .stub(indexSubmissionFeaturesJobDependencies, 'publishComputeSubmissionFeatureClosureJob')
       .resolves({ status: 'published', jobId: 'job-xyz' });
+    sinon
+      .stub(indexSubmissionFeaturesJobDependencies, 'publishSubmissionUploadSecurityJob')
+      .resolves({ status: 'published', jobId: 'screening-job' });
   });
 
   it('indexes successfully and sets indexed', async () => {
@@ -85,6 +88,27 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(toIndexedStub.calledBefore(publishStub)).to.be.true;
   });
 
+  it('queues security screening for the indexed upload in the indexing transaction', async () => {
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .resolves({ status: 'ok' });
+
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
+
+    const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
+    const publishClosureStub =
+      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
+    expect(publishScreeningStub).to.have.been.calledOnce;
+    expect(publishScreeningStub.firstCall.args[1]).to.deep.equal({
+      submissionId: 777,
+      submissionUploadId: 'submission-upload-1'
+    });
+    expect(publishScreeningStub.firstCall.args[0]).to.equal(publishClosureStub.firstCall.args[0]);
+    expect(toIndexedStub.calledBefore(publishScreeningStub)).to.be.true;
+  });
+
   it('marks invalid for deterministic validation outcomes', async () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
@@ -100,9 +124,12 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
     const publishStub =
       indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
     expect(toInvalidStub.calledWith('submission-upload-1')).to.be.true;
     // An invalid outcome must not enqueue a closure recompute — prior closure rows stay untouched.
     expect(publishStub.notCalled).to.be.true;
+    expect(publishScreeningStub.notCalled).to.be.true;
   });
 
   it('skips work when status is terminal', async () => {
@@ -163,7 +190,10 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     }
 
     const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToFailed as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
     expect(toFailedStub.called).to.be.false;
+    expect(publishScreeningStub.notCalled).to.be.true;
   });
 
   it('allows retry/resume when status is already indexing', async () => {
@@ -207,35 +237,33 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(toIndexingStub.called).to.be.false;
   });
 
-  it('processes multiple jobs in sequence', async () => {
-    (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub)
-      .onFirstCall()
-      .resolves({
-        submission_upload_id: 'upload-1',
-        submission_id: 1,
-        upload_id: 'artifact-1',
-        status: 'reconciled',
-        ticket_id: '11111111-1111-1111-1111-111111111111',
-        blueprint_id: 1
-      })
-      .onSecondCall()
-      .resolves({
-        submission_upload_id: 'upload-2',
-        submission_id: 2,
-        upload_id: 'artifact-2',
-        status: 'reconciled',
-        ticket_id: '22222222-2222-2222-2222-222222222222',
-        blueprint_id: 1
-      });
+  it('processes every job in a batch', async () => {
+    const getUploadWithLock = SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub;
+    getUploadWithLock.withArgs('upload-1').resolves({
+      submission_upload_id: 'upload-1',
+      submission_id: 1,
+      upload_id: 'artifact-1',
+      status: 'reconciled',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
+    });
+    getUploadWithLock.withArgs('upload-2').resolves({
+      submission_upload_id: 'upload-2',
+      submission_id: 2,
+      upload_id: 'artifact-2',
+      status: 'reconciled',
+      ticket_id: '22222222-2222-2222-2222-222222222222',
+      blueprint_id: 1
+    });
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
 
     await indexSubmissionFeaturesJobHandler([createMockJob('upload-1', 'job-1'), createMockJob('upload-2', 'job-2')]);
 
-    expect(indexStub.callCount).to.equal(2);
-    expect(indexStub.firstCall.calledWith(1, 'upload-1')).to.be.true;
-    expect(indexStub.secondCall.calledWith(2, 'upload-2')).to.be.true;
+    expect(indexStub).to.have.been.calledTwice;
+    expect(indexStub).to.have.been.calledWith(1, 'upload-1');
+    expect(indexStub).to.have.been.calledWith(2, 'upload-2');
   });
 
   it('should handle empty jobs array', async () => {
@@ -267,6 +295,10 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
   it('marks upload failed and logs failure with error output without throwing', async () => {
     stubConnections();
     const toFailedStub = sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
+    const publishScreeningStub = sinon.stub(
+      indexSubmissionFeaturesJobDependencies,
+      'publishSubmissionUploadSecurityJob'
+    );
 
     const job = {
       id: 'job-1',
@@ -284,6 +316,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
 
     expect(thrownError).to.be.undefined;
     expect(toFailedStub).to.have.been.calledOnceWith('submission-upload-1');
+    expect(publishScreeningStub).not.to.have.been.called;
   });
 
   it('should mark upload failed and log default message when output is null', async () => {

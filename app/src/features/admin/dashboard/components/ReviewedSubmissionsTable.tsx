@@ -1,5 +1,6 @@
 import { mdiTextBoxSearchOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { useQuery } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -17,25 +18,29 @@ import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/Su
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
+import { useSubmissionRecordOrder } from '../hooks/useSubmissionRecordOrder';
 import { Link as RouterLink } from 'react-router-dom';
+import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
+/**
+ * Admin dashboard list of submissions that have completed security review, in the order the sort menu last chose.
+ *
+ * @returns {JSX.Element}
+ */
 const ReviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getReviewedSubmissionsForAdmins());
+  const reviewedSubmissionsQuery = useQuery({
+    queryKey: submissionQueryKeys.adminList('reviewed'),
+    queryFn: ({ signal }) => biohubApi.submissions.getReviewedSubmissionsForAdmins({ signal })
+  });
 
-  reviewedSubmissionsDataLoader.load();
+  const { orderedRecords: submissionRecords, handleSortSubmissions } = useSubmissionRecordOrder(
+    reviewedSubmissionsQuery.data
+  );
 
-  const submissionRecords = reviewedSubmissionsDataLoader.data || [];
-
-  const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
-    reviewedSubmissionsDataLoader.setData(submissions);
-  };
-
-  if (reviewedSubmissionsDataLoader.isLoading) {
+  if (reviewedSubmissionsQuery.isPending) {
     return (
       <>
         <RecordsFoundSkeletonLoader />
@@ -195,7 +200,7 @@ const ReviewedSubmissionsTable = () => {
                     {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">
                         <dd>{p(submissionRecord.regions.length, 'Region')}:</dd>
-                        <dt>{submissionRecord.regions.sort().join(', ')}</dt>
+                        <dt>{[...submissionRecord.regions].sort((a, b) => a.localeCompare(b)).join(', ')}</dt>
                       </Stack>
                     )}
                   </Stack>

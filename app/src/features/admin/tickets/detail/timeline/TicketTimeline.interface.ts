@@ -8,7 +8,6 @@ import {
 
 export interface ITicketTimelineProps {
   ticket: ITicketExtended;
-  isLoading: boolean;
 }
 
 export interface TimelineEventBase {

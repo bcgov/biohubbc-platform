@@ -1,0 +1,6 @@
+{
+  "extension": ["ts"],
+  "spec": "src/__integration__/benchmark/*.benchmark.ts",
+  "timeout": 0,
+  "exit": true
+}

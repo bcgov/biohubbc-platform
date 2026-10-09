@@ -1,8 +1,10 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SearchAutocomplete } from 'components/search/SearchAutocomplete';
 import { SearchOption } from 'components/search/SearchAutocomplete.interface';
 import { useApi } from 'hooks/useApi';
 import useDebounce from 'hooks/useDebounce';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { searchQueryKeys } from 'utils/query-keys/search-query-keys';
 import { ExpressionBuilderPredicateTokenTaxonProps } from './ExpressionBuilderPredicateToken.interface';
 import { ExpressionBuilderPredicateTokenValueControl } from './ExpressionBuilderPredicateTokenValueControl';
 
@@ -23,25 +25,31 @@ export const ExpressionBuilderPredicateTokenTaxon = ({
   onChange
 }: ExpressionBuilderPredicateTokenTaxonProps) => {
   const api = useApi();
-  const [taxonOptions, setTaxonOptions] = useState<SearchOption[]>([]);
   const [selectedTaxonOption, setSelectedTaxonOption] = useState<SearchOption | null>(null);
-  const activeTaxonSearchIdRef = useRef(0);
+  // The settled text local taxonomy is searched for; empty searches nothing and offers no options.
+  const [taxonSearch, setTaxonSearch] = useState('');
+
+  const taxonOptionsQuery = useQuery({
+    queryKey: searchQueryKeys.taxonOptions(taxonSearch),
+    queryFn: ({ signal }) => api.search.searchTaxon({ keyword: taxonSearch }, { page: 1, limit: 25 }, { signal }),
+    enabled: taxonSearch.length > 0,
+    placeholderData: keepPreviousData
+  });
+  const taxonOptions = useMemo<SearchOption[]>(
+    () =>
+      taxonSearch
+        ? (taxonOptionsQuery.data?.taxonomy.map((taxon) => ({
+            label: taxon.itis_scientific_name,
+            value: taxon.itis_tsn
+          })) ?? [])
+        : [],
+    [taxonOptionsQuery.data, taxonSearch]
+  );
 
   // Use for local taxonomy autocomplete lookups while the user types a taxon value.
-  const debouncedTaxonSearch = useDebounce(async (searchTerm: string, searchId: number) => {
-    const response = await api.search.searchTaxon({ keyword: searchTerm }, { page: 1, limit: 25 });
+  const debouncedTaxonSearch = useDebounce(setTaxonSearch, 300);
 
-    if (searchId !== activeTaxonSearchIdRef.current) {
-      return;
-    }
-
-    setTaxonOptions(
-      response.taxonomy.map((taxon) => ({
-        label: taxon.itis_scientific_name,
-        value: taxon.itis_tsn
-      }))
-    );
-  }, 300);
+  useEffect(() => () => debouncedTaxonSearch.cancel(), [debouncedTaxonSearch]);
 
   let selectedTaxon: SearchOption | null = null;
 
@@ -56,9 +64,8 @@ export const ExpressionBuilderPredicateTokenTaxon = ({
     const searchTerm = inputValue.trim();
 
     if (!searchTerm) {
-      activeTaxonSearchIdRef.current += 1;
       debouncedTaxonSearch.cancel();
-      setTaxonOptions([]);
+      setTaxonSearch('');
       setSelectedTaxonOption(null);
       onChange(undefined);
       return;
@@ -72,13 +79,11 @@ export const ExpressionBuilderPredicateTokenTaxon = ({
       onChange(undefined);
     }
 
-    const searchId = ++activeTaxonSearchIdRef.current;
-    debouncedTaxonSearch(searchTerm, searchId);
+    debouncedTaxonSearch(searchTerm);
   };
 
   // Use when a returned taxon option is explicitly selected from the menu.
   const handleTaxonOptionChange = (option: SearchOption | null) => {
-    activeTaxonSearchIdRef.current += 1;
     debouncedTaxonSearch.cancel();
     setSelectedTaxonOption(option);
     onChange(option?.value === undefined ? undefined : Number(option.value));

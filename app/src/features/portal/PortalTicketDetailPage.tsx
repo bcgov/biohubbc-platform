@@ -1,7 +1,8 @@
 import { useTicketComment } from 'features/admin/tickets/hooks/useTicketComment';
+import { useTicketQuery } from 'features/admin/tickets/hooks/useTicketQuery';
 import { TicketSkeleton } from 'features/admin/tickets/detail/skeleton/TicketSkeleton';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { useTicketContext } from 'hooks/useContext';
+import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import { PortalTicketDetailPageContent } from './detail/content/PortalTicketDetailPageContent';
 
 /**
@@ -10,28 +11,30 @@ import { PortalTicketDetailPageContent } from './detail/content/PortalTicketDeta
  * @return {*}
  */
 export const PortalTicketDetailPage = () => {
-  const { ticketDataLoader } = useTicketContext();
+  const ticketQuery = useTicketQuery();
   const { comment, setComment, isSavingComment, isUploadingAttachment, handleAddComment, handleUploadAttachment } =
     useTicketComment();
-  const ticket = ticketDataLoader.data;
+  const ticket = ticketQuery.data;
 
   return (
-    <LoadingGuard
-      isLoading={ticketDataLoader.isLoading || !ticket}
-      isLoadingFallback={<TicketSkeleton />}
-      isLoadingFallbackDelay={300}>
-      {ticket ? (
-        <PortalTicketDetailPageContent
-          ticket={ticket}
-          isLoading={ticketDataLoader.isLoading}
-          comment={comment}
-          setComment={setComment}
-          isSavingComment={isSavingComment}
-          isUploadingAttachment={isUploadingAttachment}
-          onAddComment={handleAddComment}
-          onUploadAttachment={handleUploadAttachment}
-        />
-      ) : null}
-    </LoadingGuard>
+    <>
+      <QueryErrorDialog error={ticketQuery.error} label="ticket" />
+      <LoadingGuard
+        isLoading={ticketQuery.isFetching && !ticket}
+        isLoadingFallback={<TicketSkeleton />}
+        isLoadingFallbackDelay={300}>
+        {ticket ? (
+          <PortalTicketDetailPageContent
+            ticket={ticket}
+            comment={comment}
+            setComment={setComment}
+            isSavingComment={isSavingComment}
+            isUploadingAttachment={isUploadingAttachment}
+            onAddComment={handleAddComment}
+            onUploadAttachment={handleUploadAttachment}
+          />
+        ) : null}
+      </LoadingGuard>
+    </>
   );
 };

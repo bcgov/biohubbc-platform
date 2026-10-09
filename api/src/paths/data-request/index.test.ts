@@ -216,7 +216,7 @@ describe('data-request', () => {
         {
           type: 'predicate' as const,
           feature_property_id: 1,
-          feature_type_property_id: null,
+          blueprint_feature_type_property_id: null,
           operator: 'Equals' as const,
           value: 'mammalia'
         }

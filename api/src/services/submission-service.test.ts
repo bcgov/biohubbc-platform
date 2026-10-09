@@ -3,10 +3,13 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ApiNotFoundError } from '../errors/api-error';
+import { HTTP400 } from '../errors/http-error';
+import { Blueprint } from '../models/blueprint';
+import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionModel,
-  PatchSubmissionRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
@@ -19,6 +22,7 @@ import {
 } from '../repositories/submission-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { BlueprintService } from './blueprint-service';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
@@ -48,7 +52,8 @@ describe('SubmissionService', () => {
           description: 'description',
           name: 'name',
           contributor_id: 1,
-          system_user_id: 1
+          system_user_id: 1,
+          default_blueprint_id: 4
         },
         [2, 1]
       );
@@ -60,11 +65,90 @@ describe('SubmissionService', () => {
       );
       expect(repo).to.have.been.calledOnceWith(
         sinon.match({
-          team_id: '11111111-1111-1111-1111-111111111111'
+          team_id: '11111111-1111-1111-1111-111111111111',
+          default_blueprint_id: 4
         })
       );
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('submission default blueprint', () => {
+    const blueprint: Blueprint = {
+      blueprint_id: 3,
+      name: 'Wildlife',
+      version_number: 1,
+      description: null,
+      is_default: false,
+      parent_blueprint_id: null,
+      record_effective_date: '2026-01-01',
+      record_end_date: '2026-06-01'
+    };
+    let submissionService: SubmissionService;
+
+    beforeEach(() => {
+      submissionService = new SubmissionService(getMockDBConnection());
+    });
+
+    it('uses the submission default without consulting the system default or its availability', async () => {
+      sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: 3 } as ISubmissionModel);
+      const systemDefault = sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId');
+      const active = sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById');
+      sinon.stub(BlueprintService.prototype, 'getBlueprint').resolves(blueprint);
+
+      expect(await submissionService.findSubmissionDefaultBlueprintId(7)).to.equal(3);
+      expect(await submissionService.getSubmissionDefaultBlueprint(7)).to.equal(blueprint);
+      expect(systemDefault).not.to.have.been.called;
+      expect(active).not.to.have.been.called;
+    });
+
+    it('falls back to the system default when the submission has no default', async () => {
+      sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: null } as ISubmissionModel);
+      sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId').resolves(1);
+
+      expect(await submissionService.findSubmissionDefaultBlueprintId(7)).to.equal(1);
+    });
+
+    it('reports not found when neither default exists', async () => {
+      sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: null } as ISubmissionModel);
+      sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId').resolves(null);
+
+      expect(await submissionService.findSubmissionDefaultBlueprintId(7)).to.be.null;
+      try {
+        await submissionService.getSubmissionDefaultBlueprint(7);
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+    });
+
+    it('sets an available blueprint as the submission default', async () => {
+      sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(3);
+      const update = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionDefaultBlueprint').resolves();
+
+      await submissionService.updateSubmissionDefaultBlueprint(7, 3);
+
+      expect(update).to.have.been.calledOnceWithExactly(7, 3);
+    });
+
+    it('rejects a blueprint that is not available without changing the submission', async () => {
+      sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(null);
+      const update = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionDefaultBlueprint');
+
+      try {
+        await submissionService.updateSubmissionDefaultBlueprint(7, 99);
+        expect.fail('Expected HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+      }
+      expect(update).not.to.have.been.called;
     });
   });
 
@@ -709,45 +793,6 @@ describe('SubmissionService', () => {
         }
       ]);
       expect(response).to.be.undefined;
-    });
-  });
-
-  describe('patchSubmissionRecord', () => {
-    it('should patch the submission record and return the updated record', async () => {
-      const submissionId = 1;
-
-      const patch: PatchSubmissionRecord = { security_reviewed: true };
-
-      const mockSubmissionRecord: SubmissionRecord = {
-        submission_id: 1,
-        uuid: '123-456-789',
-        security_review_timestamp: '2023-12-12',
-        submitted_timestamp: '2023-12-12',
-        system_user_id: 3,
-        contributor_id: 1,
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        publish_timestamp: '2023-12-12',
-        record_end_date: '2023-12-12',
-        create_date: '2023-12-12',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-      const mockDBConnection = getMockDBConnection();
-
-      const patchSubmissionRecordStub = sinon
-        .stub(SubmissionRepository.prototype, 'patchSubmissionRecord')
-        .resolves(mockSubmissionRecord);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.patchSubmissionRecord(submissionId, patch);
-
-      expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
-      expect(response).to.be.eql(mockSubmissionRecord);
     });
   });
 

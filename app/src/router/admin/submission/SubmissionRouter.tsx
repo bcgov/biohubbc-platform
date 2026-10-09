@@ -1,4 +1,5 @@
-import { SubmissionContextProvider } from 'contexts/submissionContext';
+import { AdminSubmissionUploadFeatureTypePage } from 'features/submissions/upload/AdminSubmissionUploadFeatureTypePage';
+import { AdminSubmissionUploadPage } from 'features/submissions/upload/AdminSubmissionUploadPage';
 import DashboardPage from 'features/admin/dashboard/DashboardPage';
 import { AdminSubmissionPage } from 'features/submissions/AdminSubmissionPage';
 import { CreateSubmissionPage } from 'features/submissions/create/CreateSubmissionPage';
@@ -37,10 +38,31 @@ export const SubmissionsRouter = () => {
       <Route
         path="/:submission_id"
         element={
-          <SubmissionContextProvider>
+          <>
             <PageTitle title="Submission Details" description="Details of a specific submission" />
             <AdminSubmissionPage />
-          </SubmissionContextProvider>
+          </>
+        }
+      />
+      <Route
+        path="/:submissionId/uploads/:submissionUploadId"
+        element={
+          <>
+            <PageTitle title="Submission Upload" description="Features in a submission upload" />
+            <AdminSubmissionUploadPage />
+          </>
+        }
+      />
+      <Route
+        path="/:submissionId/uploads/:submissionUploadId/feature-types/:featureType"
+        element={
+          <>
+            <PageTitle
+              title="Feature Type Properties"
+              description="Property definitions of a feature type within a submission upload"
+            />
+            <AdminSubmissionUploadFeatureTypePage />
+          </>
         }
       />
       {/* Catch any unknown routes, and re-direct to the not found page */}

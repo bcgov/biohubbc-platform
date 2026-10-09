@@ -30,6 +30,9 @@ const appTheme = createTheme({
     }
   },
   palette: {
+    action: {
+      selectedOpacity: 0.06
+    },
     background: {
       default: '#f5f5f5'
     },

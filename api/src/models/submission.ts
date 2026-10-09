@@ -30,3 +30,9 @@ export const SubmissionFeatureForReview = z.object({
 });
 
 export type SubmissionFeatureForReview = z.infer<typeof SubmissionFeatureForReview>;
+
+/** Submission owner and the requesting user's active contributor membership. */
+export const SubmissionContributorMembership = z.object({
+  is_member: z.boolean()
+});
+export type SubmissionContributorMembership = z.infer<typeof SubmissionContributorMembership>;

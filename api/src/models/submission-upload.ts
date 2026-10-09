@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { ApiPaginationResults } from '../zod-schema/pagination';
+import { ReconciliationType } from './reconciliation';
 import { SubmissionUploadReview } from './submission-upload-review';
 import { TicketSubmissionValidation } from './submission-validation';
 import { UploadArtifactRoleEnum } from './upload-artifact';
@@ -40,6 +42,26 @@ export const SubmissionUpload = z.object({
   record_end_date: z.coerce.date().nullable().optional()
 });
 export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
+
+/** Active upload fields shown in the administrative submission list. */
+export const AdminSubmissionUpload = SubmissionUpload.pick({
+  submission_upload_id: true,
+  upload_id: true,
+  status: true,
+  decision: true,
+  ticket_id: true
+}).extend({
+  comment: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  submitted_by_identifier: z.string().nullable()
+});
+export type AdminSubmissionUpload = z.infer<typeof AdminSubmissionUpload>;
+
+export interface AdminSubmissionUploadsResponse {
+  uploads: AdminSubmissionUpload[];
+  pagination: ApiPaginationResults;
+}
 
 /**
  * Payload for creating a new SubmissionUpload
@@ -101,3 +123,73 @@ export const TicketSubmissionUpload = z.object({
   reviews: TicketSubmissionUploadReviews
 });
 export type TicketSubmissionUpload = z.infer<typeof TicketSubmissionUpload>;
+
+/** Identity supplied for an additional submission/upload team member. */
+export interface SubmissionUploadSubmitter {
+  guid: string;
+  identifier: string;
+  identitySource: string;
+}
+
+export type SubmissionArchiveFormat = 'tar' | 'tar.gz';
+
+/** Request fields for creating a submission and its first archive upload. */
+export interface CreateSubmissionArchiveUploadInput {
+  contributorId: number;
+  bytes: number;
+  archiveFormat?: SubmissionArchiveFormat;
+  name: string;
+  description: string;
+  comment: string;
+  submitters?: SubmissionUploadSubmitter[];
+  blueprintId?: number | null;
+}
+
+/** Request fields for appending an archive to an existing submission. */
+export interface CreateExistingSubmissionArchiveUploadInput {
+  bytes: number;
+  archiveFormat?: SubmissionArchiveFormat;
+  submissionUuid: string;
+  submitters?: SubmissionUploadSubmitter[];
+  blueprintId?: number | null;
+}
+
+/** Resolved submission context for starting an archive upload. */
+export interface StartSubmissionArchiveUploadInput {
+  bytes: number;
+  submissionId: number;
+  submissionUuid: string;
+  systemUserIds: number[];
+  submitterSystemUserIds: number[];
+  comment: string | null;
+  requestedBlueprintId?: number | null;
+  archiveFormat?: SubmissionArchiveFormat;
+}
+
+/** Submission and upload ownership boundary for administrative browsing. */
+export interface SubmissionUploadScope {
+  submissionId: number;
+  submissionUploadId: string;
+}
+
+/** Sortable columns of the administrative submission upload feature type list. */
+export const SUBMISSION_UPLOAD_FEATURE_TYPE_SORT_COLUMNS = ['feature_type_name', 'count'];
+
+/** A feature type stored in an upload and the number of its features, including historical rows. */
+export const SubmissionUploadFeatureType = z.object({
+  feature_type_name: z.string(),
+  count: z.number().int().nonnegative()
+});
+
+export type SubmissionUploadFeatureType = z.infer<typeof SubmissionUploadFeatureType>;
+
+/** Filters of the administrative submission upload feature type list. */
+export interface SubmissionUploadFeatureTypeFilters {
+  /** Stored reconciliation outcome whose features are counted, or null for every feature of the upload. */
+  reconciliation: ReconciliationType | null;
+}
+
+export interface SubmissionUploadFeatureTypesResponse {
+  feature_types: SubmissionUploadFeatureType[];
+  pagination: ApiPaginationResults;
+}

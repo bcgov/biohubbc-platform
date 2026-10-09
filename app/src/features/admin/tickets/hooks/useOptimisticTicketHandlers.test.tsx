@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook } from 'test-helpers/test-utils';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
@@ -7,8 +7,6 @@ import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 const mockUpdateTicketStatus = vi.fn();
 const mockSetYesNoDialog = vi.fn();
 const mockSetSnackbar = vi.fn();
-const mockSetTicketData = vi.fn();
-let mockTicketData: ITicketExtended;
 
 const baseDataRequest: DataRequestResponse = {
   data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -53,17 +51,14 @@ vi.mock('hooks/useContext', () => ({
   }),
   useTicketContext: () => ({
     ticketId: baseTicket.ticket_id,
-    ticketDataLoader: {
-      data: mockTicketData,
-      setData: mockSetTicketData
-    }
+    ticketScope: 'admin',
+    ticketQueryKey: ['ticket', 'admin', 'detail', baseTicket.ticket_id]
   })
 }));
 
 describe('useOptimisticTicketHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockTicketData = baseTicket;
   });
 
   it('shows snackbar and blocks close confirmation when ticket has requested data requests', () => {
@@ -71,8 +66,6 @@ describe('useOptimisticTicketHandlers', () => {
       ...baseTicket,
       data_requests: [baseDataRequest]
     };
-
-    mockTicketData = ticketWithUnaddressedDataRequest;
 
     const { result } = renderHook(() => useOptimisticTicketHandlers({ ticket: ticketWithUnaddressedDataRequest }));
 
@@ -97,8 +90,6 @@ describe('useOptimisticTicketHandlers', () => {
         }
       ]
     };
-
-    mockTicketData = ticketWithActionedDataRequest;
 
     const { result } = renderHook(() => useOptimisticTicketHandlers({ ticket: ticketWithActionedDataRequest }));
 
