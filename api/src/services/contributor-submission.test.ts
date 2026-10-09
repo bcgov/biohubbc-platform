@@ -69,9 +69,11 @@ describe('Explicit submission contributor selection', () => {
       .stub(uploadIngestionService.userService, 'ensureSystemUser')
       .resolves({ system_user_id: 12 } as any);
     const start = sinon.stub(uploadIngestionService, 'startArchiveUpload').resolves({} as PresignedUploadUrlResponse);
+    sinon.stub(uploadIngestionService.submissionUploadService, 'resolveBlueprintIdForNewSubmission').resolves(7);
     await uploadIngestionService.createSubmissionArchiveUpload({
       contributorId: 2,
       bytes: 100,
+      archiveFormat: 'tar.gz',
       name: 'Test',
       description: 'Description',
       comment: 'Comment',
@@ -82,9 +84,10 @@ describe('Explicit submission contributor selection', () => {
       ]
     });
     expect(ensure.calledOnce).is.true;
-    expect(start.firstCall.args[1]).include({ contributor_id: 2, system_user_id: 5 });
+    expect(start.firstCall.args[1]).include({ contributor_id: 2, system_user_id: 5, default_blueprint_id: 7 });
     expect(start.firstCall.args[2]).eql([12]);
     expect(start.firstCall.args[3]).equals(7);
+    expect(start.firstCall.args[4]).equals('tar.gz');
   });
 
   it('waits for all submitters before propagating a failure to the transaction boundary', async () => {

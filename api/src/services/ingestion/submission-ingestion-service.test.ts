@@ -69,50 +69,54 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'getKnownFeatureTypeMap').resolves(new Map());
     };
 
-    it('streams archive in one pass and persists media/codes/features', async () => {
-      const service = new SubmissionIngestionService();
-      setupTarballContext();
+    for (const archiveFormat of ['tar', 'tar.gz'] as const) {
+      it(`streams ${archiveFormat} in one pass and persists media/codes/features`, async () => {
+        const service = new SubmissionIngestionService();
+        setupTarballContext();
+        (ArtifactService.prototype.getArtifact as sinon.SinonStub).resolves({ ...mockArtifact, format: archiveFormat });
 
-      const deleteFeaturesStub = sinon
-        .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
-        .resolves();
-      const deleteUploadArtifactsStub = sinon
-        .stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId')
-        .resolves();
-      const contributorByUploadStub = sinon
-        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
-        .resolves(mockContributor);
-      const streamArchiveStub = sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({
-        featureCount: 1,
-        uploadedCount: 2,
-        codesetFileCount: 1
-      });
-
-      const result = await service.ingestSubmissionUpload(mockSubmissionUpload);
-
-      expect(result).to.eql({
-        valid: true,
-        errors: [],
-        metadata: {
-          errorCount: 0,
-          recordCount: 0,
+        const deleteFeaturesStub = sinon
+          .stub(SubmissionFeatureIngestionService.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
+          .resolves();
+        const deleteUploadArtifactsStub = sinon
+          .stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId')
+          .resolves();
+        const contributorByUploadStub = sinon
+          .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
+          .resolves(mockContributor);
+        const streamArchiveStub = sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({
           featureCount: 1,
           uploadedCount: 2,
-          codesetFileCount: 1,
-          featureBatchCount: 0,
-          codesetBatchCount: 0,
-          mediaBatchCount: 0,
-          featureRowsPersisted: 0,
-          mediaFilesPersisted: 0,
-          mediaBytesPersisted: 0
-        }
+          codesetFileCount: 1
+        });
+
+        const result = await service.ingestSubmissionUpload(mockSubmissionUpload);
+
+        expect(result).to.eql({
+          valid: true,
+          errors: [],
+          metadata: {
+            errorCount: 0,
+            recordCount: 0,
+            featureCount: 1,
+            uploadedCount: 2,
+            codesetFileCount: 1,
+            featureBatchCount: 0,
+            codesetBatchCount: 0,
+            mediaBatchCount: 0,
+            featureRowsPersisted: 0,
+            mediaFilesPersisted: 0,
+            mediaBytesPersisted: 0
+          }
+        });
+        expect(deleteFeaturesStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
+        expect(deleteUploadArtifactsStub.calledOnceWithExactly(mockSubmissionUpload.upload_id)).to.be.true;
+        expect(deleteUploadArtifactsStub.calledBefore(streamArchiveStub)).to.be.true;
+        expect(contributorByUploadStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
+        expect(streamArchiveStub.calledOnce).to.be.true;
+        expect(streamArchiveStub.firstCall.args[1].archiveFormat).to.equal(archiveFormat);
       });
-      expect(deleteFeaturesStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
-      expect(deleteUploadArtifactsStub.calledOnceWithExactly(mockSubmissionUpload.upload_id)).to.be.true;
-      expect(deleteUploadArtifactsStub.calledBefore(streamArchiveStub)).to.be.true;
-      expect(contributorByUploadStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
-      expect(streamArchiveStub.calledOnce).to.be.true;
-    });
+    }
 
     it('throws when archive stream parsing fails', async () => {
       const service = new SubmissionIngestionService();

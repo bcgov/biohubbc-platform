@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -508,12 +509,14 @@ async function insertFeatures(
     data: JSON.stringify(feature.data),
     data_byte_size: feature.data_byte_size,
     parent_submission_feature_id: null,
+    // Synthetic outcomes populate validation review without changing the captured feature data.
+    reconciliation: faker.helpers.arrayElement(['new', 'unmodified', 'modified']),
     record_effective_date: effectiveDate,
     create_user: context.systemUserId
   }));
 
-  const inserted: { uuid: string; submission_feature_id: number }[] = await knex
-    .batchInsert('submission_feature', rows, BATCH_SIZE)
+  const inserted = await knex
+    .batchInsert<{ uuid: string; submission_feature_id: number }>('submission_feature', rows, BATCH_SIZE)
     .returning(['uuid', 'submission_feature_id']);
 
   const idMap = buildUuidIdMap(inserted);

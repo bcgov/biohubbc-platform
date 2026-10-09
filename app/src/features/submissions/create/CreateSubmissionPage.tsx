@@ -34,9 +34,9 @@ export const SubmissionYupSchema = yup.object().shape({
   comment: yup.string().max(500).required('Comment is required'),
   file: yup
     .mixed<File>()
-    .required('You must submit a .tar file')
-    .test('fileType', 'Only .tar files are supported', (value) => {
-      return value instanceof File && value.name.toLowerCase().endsWith('.tar');
+    .required('You must submit a .tar or .tar.gz file')
+    .test('fileType', 'Only .tar and .tar.gz files are supported', (value) => {
+      return value instanceof File && /\.tar(?:\.gz)?$/i.test(value.name);
     })
 });
 
@@ -71,7 +71,8 @@ export const CreateSubmissionPage = () => {
       const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls({
         ...submission,
         ...(selectedClientId ? { client_id: selectedClientId } : {}),
-        bytes: file.size
+        bytes: file.size,
+        archiveFormat: file.name.toLowerCase().endsWith('.tar.gz') ? 'tar.gz' : 'tar'
       });
 
       // Client follows backend-provided multipart instructions:

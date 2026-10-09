@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import nodePath from 'node:path';
 import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { createGunzip } from 'node:zlib';
 import * as tar from 'tar-stream';
 import { z, ZodError } from 'zod';
 import { UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES } from '../constants/upload';
@@ -337,20 +338,6 @@ function createChecksumTransform(checksum: ReturnType<typeof createHash>): Trans
 }
 
 /**
- * Resolve with a hex digest when the checksum stream completes.
- *
- * @param {Transform} checksumStream - Stream producing checksum updates.
- * @param {ReturnType<typeof createHash>} checksum - Hash state finalized on stream finish.
- * @returns {Promise<string>} SHA-256 digest in hex format.
- */
-function waitForChecksum(checksumStream: Transform, checksum: ReturnType<typeof createHash>): Promise<string> {
-  return new Promise((resolve, reject) => {
-    checksumStream.on('finish', () => resolve(checksum.digest('hex')));
-    checksumStream.on('error', reject);
-  });
-}
-
-/**
  * Upload a single media entry to object storage while computing checksum metadata.
  *
  * @param {Readable} stream - Tar entry stream.
@@ -367,7 +354,6 @@ async function uploadMediaEntry(
   const checksum = createHash('sha256');
   const passThrough = new PassThrough();
   const checksumStream = createChecksumTransform(checksum);
-  const checksumReady = waitForChecksum(checksumStream, checksum);
 
   const uploadPromise = objectStorageService.uploadStream(
     BucketType.MAIN,
@@ -376,16 +362,23 @@ async function uploadMediaEntry(
     context.s3Key
   );
 
-  stream.pipe(checksumStream).pipe(passThrough);
-  await uploadPromise;
+  const streamPromise = pipeline(stream, checksumStream, passThrough);
+  try {
+    await Promise.all([streamPromise, uploadPromise]);
+  } catch (error) {
+    stream.destroy();
+    checksumStream.destroy();
+    passThrough.destroy();
+    await Promise.allSettled([streamPromise, uploadPromise]);
+    throw error;
+  }
 
-  const checksumSha256 = await checksumReady;
   const uploadedFile: IUploadedMediaFile = {
     fileName: context.fileName,
     s3Key: context.s3Key,
     path: context.path,
     byteSize: context.byteSize,
-    checksumSha256,
+    checksumSha256: checksum.digest('hex'),
     mimetype: context.mimetype
   };
 
@@ -624,7 +617,7 @@ async function processSubmissionArchiveEntry(
 }
 
 /**
- * Stream a submission archive once and persist media, codesets, and features.
+ * Stream a TAR or gzip-compressed TAR once and persist media, codesets, and features.
  *
  * Processing rules:
  * - `features/*.json` are parsed and batched to `ingestFeatureBatch`.
@@ -634,8 +627,8 @@ async function processSubmissionArchiveEntry(
  * - Function resolves only after all in-flight media uploads complete and all
  *   pending feature/media batches have been flushed.
  *
- * @param {Readable} inputStream
- * @param {StreamSubmissionArchiveOptions} options
+ * @param {Readable} inputStream Stored archive bytes, compressed when archiveFormat is tar.gz.
+ * @param {StreamSubmissionArchiveOptions} options Archive encoding, batching limits, and persistence callbacks.
  * @returns {Promise<{ featureCount: number; uploadedCount: number; codesetFileCount: number }>}
  */
 export async function streamSubmissionArchive(
@@ -684,6 +677,7 @@ export async function streamSubmissionArchive(
   let pendingUploadedFiles: IUploadedMediaFile[] = [];
   let pendingUploadedBytes = 0;
   const inFlightMediaUploads = new Set<Promise<void>>();
+  const inFlightEntries = new Set<Promise<void>>();
 
   /**
    * Flush buffered feature blocks to caller persistence callback.
@@ -738,12 +732,9 @@ export async function streamSubmissionArchive(
     return nextWrite;
   };
 
-  let rejectEntryPromise: (err: unknown) => void;
   const entryPromise = new Promise<void>((resolve, reject) => {
-    rejectEntryPromise = reject;
-
-    extract.on('entry', (header, stream, next) => {
-      processSubmissionArchiveEntry(header, stream, next, reject, {
+    extract.on('entry', async (header, stream, next) => {
+      const entryTask = processSubmissionArchiveEntry(header, stream, next, reject, {
         ingestFeatureEntry: async (entryValue, entryName, entryBytesEstimate) => {
           const block = extractFeatureFromTarballEntry(entryValue, entryName);
           pendingFeatureBlocks.push(block);
@@ -766,37 +757,59 @@ export async function streamSubmissionArchive(
         },
         mediaConcurrency,
         inFlightMediaUploads
-      }).catch(reject);
-    });
-
-    extract.on('finish', async () => {
+      });
+      inFlightEntries.add(entryTask);
       try {
-        // Wait for uploads and serialized media queue before final flushes so no
-        // late-arriving media rows are dropped.
-        await Promise.all(inFlightMediaUploads);
-        await mediaStateQueue;
-        await flushPendingFeatures();
-        await flushPendingMedia();
-        defaultLog.debug({
-          label: 'streamSubmissionArchive',
-          message: 'Completed archive stream',
-          uploadedCount,
-          featureCount,
-          codesetFileCount
-        });
-        resolve();
+        await entryTask;
       } catch (error) {
         reject(error);
+      } finally {
+        inFlightEntries.delete(entryTask);
       }
     });
+
+    extract.on('finish', resolve);
     extract.on('error', reject);
   });
 
-  pipeline(inputStream, extract).catch((error) => {
-    rejectEntryPromise(error);
-  });
+  // Keep decompression in the pipeline so backpressure and stream failures propagate
+  // to storage, and wait for the gzip trailer validation before reporting success.
+  const gunzip = options.archiveFormat === 'tar.gz' ? createGunzip() : undefined;
+  const pipelinePromise = gunzip ? pipeline(inputStream, gunzip, extract) : pipeline(inputStream, extract);
 
-  await entryPromise;
+  try {
+    await Promise.all([pipelinePromise, entryPromise]);
+    await Promise.all(inFlightEntries);
+    await Promise.all(inFlightMediaUploads);
+    await mediaStateQueue;
+    await flushPendingFeatures();
+    await flushPendingMedia();
+    defaultLog.debug({
+      label: 'streamSubmissionArchive',
+      message: 'Completed archive stream',
+      uploadedCount,
+      featureCount,
+      codesetFileCount
+    });
+  } catch (error) {
+    const streamError = error instanceof Error ? error : new Error('Archive processing failed');
+    inputStream.destroy(streamError);
+    gunzip?.destroy(streamError);
+    extract.destroy(streamError);
+    // Entry callbacks may still be committing feature/codeset batches when the
+    // stream fails. Settle them before the caller can clean up or retry this upload.
+    await Promise.allSettled([pipelinePromise, ...inFlightEntries]);
+    await Promise.allSettled([...inFlightMediaUploads, mediaStateQueue]);
+    if (
+      gunzip &&
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'Z_DATA_ERROR' || error.code === 'Z_BUF_ERROR')
+    ) {
+      throw new IngestionValidationError(`Invalid gzip archive: ${error.message}`);
+    }
+    throw error;
+  }
 
   return { featureCount, uploadedCount, codesetFileCount };
 }

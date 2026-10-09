@@ -20,6 +20,34 @@ describe('SubmissionUploadRepository', () => {
     sinon.restore();
   });
 
+  describe('administrative upload pagination', () => {
+    it('scopes active uploads before limiting and uses a stable tie-breaker without joining artifacts', async () => {
+      const execute = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ knex: execute }));
+      const result = await repo.listAdminSubmissionUploads(17, { page: 3, limit: 10 });
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(result).to.eql([]);
+      expect(execute).to.have.been.calledOnce;
+      expect(query.sql).to.include('"su"."submission_id" = ?');
+      expect(query.sql).to.include('"su"."record_end_date" is null');
+      expect(query.sql).to.include('order by "su"."create_date" desc, "su"."submission_upload_id" desc');
+      expect(query.sql).not.to.include('upload_artifact');
+      expect(query.bindings).to.eql([17, 10, 20]);
+    });
+
+    it('counts only active uploads for the same submission, including zero matches', async () => {
+      const execute = sinon.stub().resolves({ rows: [{ count: 0 }], rowCount: 1 });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ knex: execute }));
+      expect(await repo.countAdminSubmissionUploads(17)).to.equal(0);
+      const query = execute.firstCall.args[0].toSQL();
+      expect(query.sql).to.include('"submission_id" = ?');
+      expect(query.sql).to.include('"record_end_date" is null');
+      expect(query.bindings).to.eql([17]);
+      expect(execute).to.have.been.calledOnce;
+    });
+  });
+
   describe('getSubmissionUpload', () => {
     it('throws an error if no matching record found', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
@@ -339,37 +367,6 @@ describe('SubmissionUploadRepository', () => {
       expect(sqlStub.firstCall.args[0].text).to.contain('team_id');
       expect(sqlStub.firstCall.args[0].values).to.include('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
       expect(sqlStub.firstCall.args[0].text).to.contain('successor_submission_upload_id');
-    });
-  });
-
-  describe('findMostRecentBlueprintIdBySubmissionId', () => {
-    it('returns the most recent prior blueprint_id ordered by create_date', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ blueprint_id: 9 }] } as any as Promise<QueryResult<any>>;
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const repo = new SubmissionUploadRepository(mockDBConnection);
-
-      const result = await repo.findMostRecentBlueprintIdBySubmissionId(123);
-
-      expect(result).to.equal(9);
-      const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.contain('FROM');
-      expect(sqlText).to.contain('submission_upload');
-      expect(sqlText).to.contain('create_date DESC');
-      expect(sqlText).to.contain('LIMIT 1');
-      // Soft-deleted prior uploads still pin a valid Blueprint, so record_end_date is not filtered.
-      expect(sqlText).to.not.contain('record_end_date');
-      expect(sqlStub.firstCall.args[0].values).to.include(123);
-    });
-
-    it('returns null when the submission has no prior upload', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new SubmissionUploadRepository(mockDBConnection);
-
-      const result = await repo.findMostRecentBlueprintIdBySubmissionId(123);
-
-      expect(result).to.be.null;
     });
   });
 

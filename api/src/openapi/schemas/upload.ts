@@ -43,6 +43,12 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
       description:
         "Contributor client ID that owns the new submission. When omitted, defaults to the token's clientId or azp. Active membership in the selected contributor is required; supply client_id when submitting for a different contributor."
     },
+    archiveFormat: {
+      type: 'string',
+      enum: ['tar', 'tar.gz'],
+      default: 'tar',
+      description: 'Archive format. Upload gzip-compressed bytes unchanged for tar.gz; bytes is the compressed size.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -71,7 +77,7 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     blueprint_id: {
       type: 'integer',
       description:
-        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
+        'Optional Blueprint to index this upload against. Must be currently available or be the submission default Blueprint. Defaults to the submission default Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -157,6 +163,12 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['bytes'],
   properties: {
+    archiveFormat: {
+      type: 'string',
+      enum: ['tar', 'tar.gz'],
+      default: 'tar',
+      description: 'Archive format. Upload gzip-compressed bytes unchanged for tar.gz; bytes is the compressed size.'
+    },
     bytes: {
       type: 'integer',
       minimum: 1,
@@ -185,7 +197,7 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     blueprint_id: {
       type: 'integer',
       description:
-        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
+        'Optional Blueprint to index this upload against. Must be currently available or be the submission default Blueprint. Defaults to the submission default Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };

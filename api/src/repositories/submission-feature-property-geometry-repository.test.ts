@@ -170,7 +170,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       });
       const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId);
+      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, null);
 
       expect(result).to.eql({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 3 });
     });
@@ -193,7 +193,23 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       });
       const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
 
-      await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId);
+      await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, null);
+    });
+
+    it('limits the extent to one reconciliation outcome when requested', async () => {
+      const sqlStub = sinon.stub().callsFake((statement: any) => {
+        expect(statement.text).to.contain('sf.reconciliation =');
+        expect(statement.text).to.contain('sf.record_end_date IS NULL');
+        expect(statement.values).to.eql([submissionUploadId, 12, 'modified']);
+        return Promise.resolve(
+          mockQueryResult([{ min_x: -125.1, min_y: 49.1, max_x: -125.0, max_y: 49.2, geometry_count: 1 }])
+        );
+      });
+      const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, 'modified');
+
+      expect(result).to.eql({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
     });
 
     it('returns null bounds when the upload has no active spatial properties', async () => {
@@ -206,7 +222,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
         })
       );
 
-      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId);
+      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, null);
 
       expect(result).to.eql({ bbox: null, geometry_count: 0 });
     });

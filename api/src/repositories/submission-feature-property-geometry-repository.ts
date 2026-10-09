@@ -1,5 +1,6 @@
 import SQL, { SQLStatement } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { ReconciliationType } from '../models/reconciliation';
 import {
   CreateSubmissionFeaturePropertyGeometry,
   GeometryBoundingBox,
@@ -177,12 +178,14 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
    *
    * @param {number} submissionId
    * @param {string} submissionUploadId
+   * @param {ReconciliationType | null} reconciliation Outcome whose features are framed, or null for every outcome.
    * @return {Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }>}
    * @memberof SubmissionFeaturePropertyGeometryRepository
    */
   async getSubmissionUploadGeometryExtent(
     submissionId: number,
-    submissionUploadId: string
+    submissionUploadId: string,
+    reconciliation: ReconciliationType | null
   ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
     const scope = SQL`
         FROM submission_feature sf
@@ -200,6 +203,12 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
     scope.append(`
           AND ${isSubmissionFeatureActive('sf')}
     `);
+
+    if (reconciliation) {
+      scope.append(SQL`
+          AND sf.reconciliation = ${reconciliation}
+      `);
+    }
 
     return this.queryGeometryExtent(scope);
   }

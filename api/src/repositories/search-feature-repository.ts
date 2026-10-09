@@ -5,16 +5,23 @@ import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureProperty } from '../models/feature-property';
+import { ReconciliationFeatureScope } from '../models/reconciliation';
 import {
   NormalizedSubmissionUploadFeatureSearchFilters,
   SearchFeatureFilters,
   SearchFeatureSecurityContext
 } from '../models/search';
 import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
+import {
+  SubmissionUploadFeatureType,
+  SubmissionUploadFeatureTypeFilters,
+  SubmissionUploadScope
+} from '../models/submission-upload';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
-import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
+import { ApiCursorPaginationOptions, ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
+import { applySearchQueryOptions } from './search-feature-pagination-sql';
 import {
   codePropertyValueJson,
   featureReferencePropertyValueJson,
@@ -29,6 +36,141 @@ import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-fea
  * Repository for searching submission features by expression-tree criteria.
  */
 export class SearchFeatureRepository extends BaseRepository {
+  /**
+   * List one page of the feature types stored in an upload with the number of features of each, including ended and
+   * unpublished rows.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @param {ApiPaginationOptions} pagination Page size, offset and validated sort.
+   * @returns {Promise<SubmissionUploadFeatureType[]>} One page of feature types, with stable ordering.
+   */
+  async listSubmissionUploadFeatureTypes(
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionUploadFeatureType[]> {
+    const knex = getKnex();
+    const query = knex('submission_feature as sf')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .where('sf.submission_id', scope.submissionId)
+      .where('sf.submission_upload_id', scope.submissionUploadId)
+      .select('ft.name as feature_type_name', knex.raw('count(*)::integer as count'))
+      .groupBy('ft.name')
+      .orderBy(pagination.sort ?? 'feature_type_name', pagination.order ?? 'asc')
+      .orderBy('feature_type_name', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    if (filters.reconciliation) {
+      query.where('sf.reconciliation', filters.reconciliation);
+    }
+
+    const response = await this.connection.knex(query, SubmissionUploadFeatureType);
+    return response.rows;
+  }
+
+  /**
+   * Count the feature types stored in an upload, including those of ended and unpublished rows.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @returns {Promise<number>} Number of feature types.
+   */
+  async countSubmissionUploadFeatureTypes(
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters
+  ): Promise<number> {
+    const knex = getKnex();
+    const query = knex('submission_feature as sf')
+      .select(knex.raw('count(distinct sf.feature_type_id)::integer as count'))
+      .where('sf.submission_id', scope.submissionId)
+      .where('sf.submission_upload_id', scope.submissionUploadId);
+
+    if (filters.reconciliation) {
+      query.where('sf.reconciliation', filters.reconciliation);
+    }
+
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
+  }
+
+  /**
+   * Page stored reconciliation rows before hydrating their typed properties.
+   * Historical rows and feature types remain eligible, independently of published closure.
+   * Security reflects current assignments along immutable, upload-local parent links.
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {string} featureType Feature type to display.
+   * @param {ApiCursorPaginationOptions} pagination Cursor ordering and bounded page size.
+   * @returns {Promise<SearchFeatureResultWithRelevancy[]>} Hydrated rows in display order.
+   */
+  async getReconciliationFeatures(
+    scope: ReconciliationFeatureScope,
+    featureType: string,
+    pagination: ApiCursorPaginationOptions
+  ): Promise<SearchFeatureResultWithRelevancy[]> {
+    const knex = getKnex();
+    const options = this.getExpressionSearchQueryOptions(pagination);
+    const candidates = knex('submission_feature as sf')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .where('sf.submission_id', scope.submissionId)
+      .where('sf.submission_upload_id', scope.submissionUploadId)
+      .where('sf.reconciliation', scope.reconciliation)
+      .where('ft.name', featureType)
+      .select(
+        'sf.submission_feature_id',
+        'sf.parent_submission_feature_id',
+        'sf.submission_id',
+        'sf.uuid',
+        'sf.feature_type_id',
+        'ft.name as feature_type_name',
+        'sf.create_date'
+      );
+    applySearchQueryOptions(candidates, 'sf', options);
+    const referenceScope = knex.raw(
+      'referenced_sf.submission_id = ? AND referenced_sf.submission_upload_id = ?::uuid',
+      [scope.submissionId, scope.submissionUploadId]
+    );
+    const propertiesJoin = this.buildTypedPropertiesLateralJoinSql(referenceScope);
+    const query = knex
+      .from(candidates.as('authorized_features'))
+      .join('submission as s', 's.submission_id', 'authorized_features.submission_id')
+      .select(
+        'authorized_features.*',
+        's.name as submission_name',
+        knex.raw('1.0 as relevancy_score'),
+        knex.raw("COALESCE(typed_properties.properties, '{}'::jsonb) as properties"),
+        'security.provenance',
+        knex.raw('security.provenance IS NOT NULL AS is_secured')
+      )
+      .joinRaw('?', [propertiesJoin])
+      .joinRaw(
+        `LEFT JOIN LATERAL (
+        WITH RECURSIVE ancestors AS (
+          SELECT authorized_features.submission_feature_id AS target_id
+          UNION
+          SELECT parent.submission_feature_id
+          FROM ancestors
+          JOIN submission_feature child ON child.submission_feature_id = ancestors.target_id
+          JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
+          WHERE parent.submission_id = ? AND parent.submission_upload_id = ?::uuid
+        )
+        SELECT CASE WHEN bool_or(sfs.submission_feature_id = authorized_features.submission_feature_id)
+          THEN 'direct' ELSE 'inherited' END AS provenance
+        FROM ancestors
+        JOIN submission_feature_security sfs ON sfs.submission_feature_id = ancestors.target_id
+        JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id AND sr.record_end_date IS NULL
+        JOIN security_category sc ON sc.security_category_id = sr.security_category_id AND sc.record_end_date IS NULL
+        WHERE sfs.record_effective_date <= now() AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+        HAVING count(*) > 0
+      ) security ON true`,
+        [scope.submissionId, scope.submissionUploadId]
+      );
+    this.applyExpressionSearchOrder(query, 'authorized_features', options);
+    const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
+    return response.rows;
+  }
+
   /**
    * Search review-upload features and resolve security through upload-local parent ancestry.
    * Published closure is neither required nor consulted; properties are not hydrated.
@@ -267,7 +409,6 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('submission_feature as sf', 'sf.submission_feature_id', 'ancestry.source_submission_feature_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .where('ft.name', anchorFeatureType)
-      .whereNull('ft.record_end_date')
       .whereRaw(isSubmissionFeatureCurrent('sf'))
       .whereRaw('sfs.record_effective_date <= now()')
       .where((activeSecurity) => {
@@ -340,8 +481,8 @@ export class SearchFeatureRepository extends BaseRepository {
    * of the expression prevents the full expression from being evaluated once per typed value table.
    * One column is returned per property ever assigned to the feature type, under any Blueprint at
    * any lifecycle, so every value hydrated below has a column whatever Blueprint it was stored
-   * under. `allow_multiple` is true when any assignment of the property allows several values;
-   * the order is the earliest assignment sort, then display name.
+   * under. Retired definitions remain readable for previously indexed data. `allow_multiple` is true
+   * when any assignment of the property allows several values; the order is the earliest assignment sort, then display name.
    *
    * @param {string} anchorFeatureType - Target feature type returned by the search
    * @return {Promise<SearchFeatureProperty[]>} Property columns of the anchor feature type.
@@ -369,9 +510,6 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('feature_property as fp', 'fp.feature_property_id', 'bftp.feature_property_id')
       .join('feature_property_type as fpt', 'fpt.feature_property_type_id', 'fp.feature_property_type_id')
       .where('ft.name', anchorFeatureType)
-      .whereNull('ft.record_end_date')
-      .whereNull('fp.record_end_date')
-      .whereNull('fpt.record_end_date')
       .groupBy(
         'fp.feature_property_id',
         'fpt.feature_property_type_id',
@@ -430,9 +568,10 @@ export class SearchFeatureRepository extends BaseRepository {
         if (anchorFeatureType !== null) {
           query.where('ft.name', anchorFeatureType);
         }
-      })
-      .whereNull('ft.record_end_date');
+      });
 
+    const referenceScope = knex.raw(isSubmissionFeatureCurrent('referenced_sf'));
+    const propertiesJoin = this.buildTypedPropertiesLateralJoinSql(referenceScope);
     const finalQuery = knex
       .from(authorizedFeatures.as('authorized_features'))
       .select(
@@ -457,7 +596,7 @@ export class SearchFeatureRepository extends BaseRepository {
         'authorized_features.create_date'
       )
       .join('submission as s', 'authorized_features.submission_id', 's.submission_id')
-      .joinRaw(this.buildTypedPropertiesLateralJoinSql());
+      .joinRaw('?', [propertiesJoin]);
 
     this.applyExpressionSearchOrder(finalQuery, 'authorized_features', queryOptions);
 
@@ -476,10 +615,13 @@ export class SearchFeatureRepository extends BaseRepository {
    * - code: `{ codeset_key, codeset_label, code_key, code_label, label }`
    * - feature: `{ urn, label }`
    *
-   * @return {string} LEFT JOIN LATERAL SQL fragment
+   * @param {Knex.Raw} referenceScope Eligibility of referenced features for the owning workflow.
+   * @return {Knex.Raw} Parameterized LEFT JOIN LATERAL SQL fragment
    */
-  private buildTypedPropertiesLateralJoinSql(): string {
-    return `
+  private buildTypedPropertiesLateralJoinSql(referenceScope: Knex.Raw): Knex.Raw {
+    const knex = getKnex();
+    return knex.raw(
+      `
       LEFT JOIN LATERAL (
         SELECT jsonb_object_agg(grouped_properties.name, grouped_properties.value ORDER BY grouped_properties.sort, grouped_properties.name) AS properties
         FROM (
@@ -503,10 +645,9 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
-             AND fpt.name = 'number'
+             AND fpt.name IN ('string', 'number')
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
@@ -522,7 +663,6 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
@@ -538,7 +678,6 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
@@ -562,7 +701,6 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
@@ -578,7 +716,6 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             JOIN contributor_codeset_code ccc
               ON ccc.contributor_codeset_code_id = p.contributor_codeset_code_id
              AND ccc.record_end_date IS NULL
@@ -599,7 +736,6 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
              AND fpt.name = 'taxon'
@@ -621,7 +757,22 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              bftp.sort,
+              bftp.allow_multiple,
+              p.submission_feature_property_artifact_id AS ordinal,
+              to_jsonb(a.object_key::text) AS value
+            FROM submission_feature_property_artifact p
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
+            JOIN feature_property fp
+              ON fp.feature_property_id = bftp.feature_property_id
+            JOIN artifact a ON a.artifact_id = p.artifact_id AND a.artifact_status = 'uploaded'
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
 
             UNION ALL
@@ -637,16 +788,17 @@ export class SearchFeatureRepository extends BaseRepository {
               ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
             JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-             AND fp.record_end_date IS NULL
             JOIN submission_feature referenced_sf
               ON referenced_sf.submission_feature_id = p.referenced_submission_feature_id
-             AND ${isSubmissionFeatureCurrent('referenced_sf')}
+             AND ?
             WHERE p.submission_feature_id = authorized_features.submission_feature_id
           ) AS property_values
           GROUP BY property_values.name
         ) AS grouped_properties
       ) AS typed_properties ON true
-    `;
+    `,
+      [referenceScope]
+    );
   }
 
   /**

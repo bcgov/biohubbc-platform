@@ -1,63 +1,32 @@
-import { Paper } from '@mui/material';
-import Container from '@mui/material/Container';
-import Stack from '@mui/material/Stack';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Box, Breadcrumbs, Container, Link, Skeleton, Stack, Typography } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from 'components/header/PageHeader';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Link from '@mui/material/Link';
-import Typography from '@mui/material/Typography';
-import { Link as RouterLink } from 'react-router';
+import { TabGroup } from 'components/tabs/TabGroup';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
-import { useMemo } from 'react';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
-import { SecurityReviewFeatures } from '../features/SecurityReviewFeatures';
-import { FeatureRow } from '../features/table/SecurityReviewFeaturesTable.interface';
-import { SubmissionUploadStatus } from '../page/status/SubmissionUploadStatus';
-import SubmissionHeaderSecurityStatus from './SubmissionHeaderSecurityStatus';
+import { AdminSubmissionMetadata } from './content/AdminSubmissionMetadata';
+import { AdminSubmissionUploads } from './content/AdminSubmissionUploads';
 
 interface AdminSubmissionPageContentProps {
   submissionId: number;
 }
 
 /**
- * Displays submission features and upload status without submission-wide security editing.
+ * Displays administrative submission uploads and lifecycle metadata in separate tabs.
  *
  * @param {AdminSubmissionPageContentProps} props The submission to show.
- * @returns {JSX.Element | null} Read-only submission overview when loaded.
+ * @returns {JSX.Element} Submission header, tabs and their loading states.
  */
 export const AdminSubmissionPageContent = ({ submissionId }: AdminSubmissionPageContentProps) => {
   const api = useApi();
-  const grid = useServerPaginatedGridState({ defaultSort: { field: 'submission_feature_id', sort: 'asc' } });
-
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'metadata' ? 'metadata' : 'uploads';
   const submissionQuery = useQuery({
     queryKey: submissionQueryKeys.record(submissionId),
     queryFn: ({ signal }) => api.submissions.getSubmissionRecordWithSecurity(submissionId, { signal })
   });
-  const featuresQuery = useQuery({
-    queryKey: submissionQueryKeys.adminFeatures(submissionId, grid.apiPagination),
-    queryFn: ({ signal }) => api.admin.getSubmissionFeatures(submissionId, grid.apiPagination, { signal }),
-    placeholderData: keepPreviousData
-  });
-
   const submission = submissionQuery.data;
-
-  const rows: FeatureRow[] = useMemo(() => {
-    return (
-      featuresQuery.data?.features.map((feature) => ({
-        id: feature.submission_feature_id,
-        submission_feature_id: feature.submission_feature_id,
-        feature_type_name: feature.feature_type_name,
-        secured: feature.secured
-      })) ?? []
-    );
-  }, [featuresQuery.data]);
-
-  const rowCount = featuresQuery.data?.pagination.total ?? 0;
-
-  if (!submission) {
-    return null;
-  }
 
   return (
     <>
@@ -68,33 +37,58 @@ export const AdminSubmissionPageContent = ({ submissionId }: AdminSubmissionPage
               Submissions
             </Link>
             <Typography variant="inherit" color="text.primary" aria-current="page">
-              {submission.name}
+              {submission?.name ?? 'Submission'}
             </Typography>
           </Breadcrumbs>
         }
-        label={submission.name}
-        subheader={
-          <Stack direction="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
-            <SubmissionHeaderSecurityStatus submission={submission} />
-          </Stack>
+        label={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
+        description={submission?.description}
+        tabs={
+          <TabGroup
+            value={activeTab}
+            onChange={(value) => {
+              const next = new URLSearchParams(searchParams);
+              next.set('tab', value);
+              setSearchParams(next);
+            }}
+            ariaLabel="Submission detail sections"
+            tabs={[
+              {
+                value: 'uploads',
+                label: 'Uploads',
+                id: 'submission-uploads-tab',
+                ariaControls: 'submission-uploads-panel'
+              },
+              {
+                value: 'metadata',
+                label: 'Metadata',
+                id: 'submission-metadata-tab',
+                ariaControls: 'submission-metadata-panel'
+              }
+            ]}
+          />
         }
       />
-
-      <Container maxWidth="xl">
-        <Paper sx={{ my: 3 }}>
-          <SubmissionUploadStatus submissionId={submission.submission_id} />
-        </Paper>
-
-        <Paper sx={{ my: 3 }}>
-          <SecurityReviewFeatures
-            rows={rows}
-            rowCount={rowCount}
-            paginationModel={grid.paginationModel}
-            setPaginationModel={grid.handlePaginationChange}
-            sortModel={grid.sortModel}
-            setSortModel={grid.handleSortChange}
-          />
-        </Paper>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Stack gap={3}>
+          {submissionQuery.isPending && <Skeleton variant="rectangular" height={300} />}
+          {submission && (
+            <>
+              <Box
+                role="tabpanel"
+                id="submission-uploads-panel"
+                aria-labelledby="submission-uploads-tab"
+                hidden={activeTab !== 'uploads'}>
+                <AdminSubmissionUploads submissionId={submissionId} />
+              </Box>
+              {activeTab === 'metadata' && (
+                <Box role="tabpanel" id="submission-metadata-panel" aria-labelledby="submission-metadata-tab">
+                  <AdminSubmissionMetadata submission={submission} />
+                </Box>
+              )}
+            </>
+          )}
+        </Stack>
       </Container>
     </>
   );

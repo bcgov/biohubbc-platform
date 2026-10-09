@@ -3,11 +3,11 @@ import { parseRouteId } from 'utils/routes';
 import { SubmissionReviewFeaturePageContent } from './components/content/SubmissionReviewFeaturePageContent';
 
 /**
- * Render a feature detail page scoped to an administrative submission-upload review.
+ * Resolve an existing administrative review feature URL to feature-type properties.
  *
- * Validates route identifiers and delegates feature loading and presentation to the content component.
+ * Validates route identifiers and delegates feature-type resolution to the content component.
  *
- * @returns {JSX.Element} Administrative review feature detail page.
+ * @returns {JSX.Element} Administrative review feature-type redirect.
  */
 export const SubmissionReviewFeaturePage = () => {
   const params = useParams<{
