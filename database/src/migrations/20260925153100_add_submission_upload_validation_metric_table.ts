@@ -47,9 +47,9 @@ export async function up(knex: Knex): Promise<void> {
     -- Add indexes for foreign keys
     CREATE INDEX submission_upload_validation_metric_idx1 ON submission_upload_validation_metric (submission_upload_id);
 
-    CREATE INDEX submission_upload_validation_metric_idx1 ON submission_upload_validation_metric (blueprint_feature_type_property_id);
+    CREATE INDEX submission_upload_validation_metric_idx2 ON submission_upload_validation_metric (blueprint_feature_type_property_id);
 
-    CREATE INDEX submission_upload_validation_metric_idx1 ON submission_upload_validation_metric (validation_metric_id);
+    CREATE INDEX submission_upload_validation_metric_idx3 ON submission_upload_validation_metric (validation_metric_id);
 
     ----------------------------------------------------------------------------------------
     -- Table and column comments
