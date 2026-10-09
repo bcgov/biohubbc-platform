@@ -15,6 +15,19 @@ describe('useSubmissionApi', () => {
     mock.restore();
   });
 
+  describe('listAdminSubmissionUploads', () => {
+    it('sends pagination to the submission-scoped admin endpoint', async () => {
+      const response = { uploads: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+      mock.onGet('api/administrative/submission/17/upload').reply(200, response);
+      const pagination = { page: 2, limit: 10, sort: 'create_date', order: 'desc' as const };
+      const signal = new AbortController().signal;
+      const result = await useSubmissionsApi(axios).listAdminSubmissionUploads(17, pagination, { signal });
+      expect(result).toEqual(response);
+      expect(mock.history.get[0].params).toEqual(pagination);
+      expect(mock.history.get[0].signal).toBe(signal);
+    });
+  });
+
   describe('getSubmissionFeatures', () => {
     it('uses the user-scoped submission-feature endpoint', async () => {
       const mockResponse = {

@@ -3,5 +3,5 @@ export interface ICreateSubmissionForm {
   name: string;
   description: string;
   comment: string;
-  file: File; // raw .tar submission archive
+  file: File; // raw .tar or .tar.gz submission archive
 }

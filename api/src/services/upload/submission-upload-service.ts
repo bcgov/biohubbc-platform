@@ -2,10 +2,13 @@ import { ACTIVE_UPLOAD_PROCESSING_STAGES } from '../../constants/submission-uplo
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
+import { Blueprint } from '../../models/blueprint';
 import {
+  AdminSubmissionUploadsResponse,
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  SubmissionUploadScope,
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
@@ -20,9 +23,11 @@ import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { getLogger } from '../../utils/logger';
+import { makePaginationResponse } from '../../utils/pagination';
 import { getSupersededProcessingStatuses } from '../../utils/submission-upload-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
+import { BlueprintService } from '../blueprint-service';
 import { DBService } from '../db-service';
 import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
 import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
@@ -48,6 +53,7 @@ export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
   submissionUploadProcessingStatusRepository: SubmissionUploadProcessingStatusRepository;
   blueprintRepository: BlueprintRepository;
+  blueprintService: BlueprintService;
   submissionFeatureService: SubmissionFeatureService;
   teamService: TeamService;
   submissionService: SubmissionService;
@@ -69,6 +75,7 @@ export class SubmissionUploadService extends DBService {
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
     this.submissionUploadProcessingStatusRepository = new SubmissionUploadProcessingStatusRepository(connection);
     this.blueprintRepository = new BlueprintRepository(connection);
+    this.blueprintService = new BlueprintService(connection);
     this.submissionFeatureService = new SubmissionFeatureService(connection);
     this.teamService = new TeamService(connection);
     this.submissionService = new SubmissionService(connection);
@@ -76,54 +83,130 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Resolve the Blueprint a new upload should be pinned to.
+   * Retrieve a bounded page of active uploads for the administrative submission view.
+   *
+   * @param {number} submissionId Submission whose uploads are listed.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<AdminSubmissionUploadsResponse>} Uploads and pagination totals, including empty pages.
+   */
+  async listAdminSubmissionUploads(
+    submissionId: number,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUploadsResponse> {
+    const uploads = await this.submissionUploadRepository.listAdminSubmissionUploads(submissionId, pagination);
+    const total = await this.submissionUploadRepository.countAdminSubmissionUploads(submissionId);
+
+    return { uploads, pagination: makePaginationResponse(total, pagination) };
+  }
+
+  /**
+   * Resolve the Blueprint a new submission starts with: it becomes the submission's default and pins its first upload.
    *
    * Resolution order:
-   * 1. If a `blueprint_id` was supplied, validate it is currently available (`record_end_date IS
-   *    NULL`) and use it. An unavailable id is a client error (HTTP 400).
-   * 2. Otherwise inherit the most recent prior upload's Blueprint for the same submission, so
-   *    re-submissions stay stable when the system default Blueprint changes.
-   * 3. Otherwise (no prior upload) fall back to the active default Blueprint.
+   * 1. If a `blueprint_id` was supplied, validate it is currently available and use it. An unavailable id is a
+   *    client error (HTTP 400).
+   * 2. Otherwise use the active system default Blueprint.
    *
-   * @param {number} submissionId - The submission the upload belongs to.
    * @param {number | null} [requestedBlueprintId] - Optional caller-supplied Blueprint id.
-   * @returns {Promise<number>} - The resolved `blueprint_id` to store on the upload.
+   * @returns {Promise<number>} - The resolved `blueprint_id` to store as the submission's default.
    * @throws {HTTP400} If a requested Blueprint id is not available.
-   * @throws {ApiGeneralError} If no Blueprint can be resolved (no prior upload and no default).
+   * @throws {ApiGeneralError} If no Blueprint can be resolved (none requested and no system default).
    * @memberof SubmissionUploadService
    */
-  async resolveBlueprintIdForUpload(submissionId: number, requestedBlueprintId?: number | null): Promise<number> {
+  async resolveBlueprintIdForNewSubmission(requestedBlueprintId?: number | null): Promise<number> {
     if (requestedBlueprintId != null) {
-      const blueprintId = await this.blueprintRepository.findActiveBlueprintById(requestedBlueprintId);
-
-      if (blueprintId === null) {
-        throw new HTTP400('Requested Blueprint is not available', [
-          'SubmissionUploadService->resolveBlueprintIdForUpload',
-          `blueprint_id ${requestedBlueprintId} does not exist or is no longer available for new uploads`
-        ]);
-      }
-
-      return blueprintId;
-    }
-
-    const priorBlueprintId = await this.submissionUploadRepository.findMostRecentBlueprintIdBySubmissionId(
-      submissionId
-    );
-
-    if (priorBlueprintId !== null) {
-      return priorBlueprintId;
+      return this.getAvailableBlueprintId(requestedBlueprintId);
     }
 
     const defaultBlueprintId = await this.blueprintRepository.findDefaultBlueprintId();
 
     if (defaultBlueprintId === null) {
       throw new ApiGeneralError('No default Blueprint is configured', [
-        'SubmissionUploadService->resolveBlueprintIdForUpload',
-        `submission_id ${submissionId} has no prior upload and no active default Blueprint exists`
+        'SubmissionUploadService->resolveBlueprintIdForNewSubmission',
+        'no Blueprint was requested and no active default Blueprint exists'
       ]);
     }
 
     return defaultBlueprintId;
+  }
+
+  /**
+   * Resolve the Blueprint a new upload should be pinned to. Once stored on the upload it never changes.
+   *
+   * Resolution order:
+   * 1. If a `blueprint_id` was supplied, use it when it is the submission's own default Blueprint (grandfathered
+   *    in, even if since retired) or is currently available. Any other id is a client error (HTTP 400).
+   * 2. Otherwise use the submission's default Blueprint, whether or not it has since been retired, so
+   *    re-submissions stay stable when the system default Blueprint changes.
+   * 3. Otherwise (the submission has no default) fall back to the active system default Blueprint.
+   *
+   * @param {number} submissionId - The submission the upload belongs to.
+   * @param {number | null} [requestedBlueprintId] - Optional caller-supplied Blueprint id.
+   * @returns {Promise<number>} - The resolved `blueprint_id` to store on the upload.
+   * @throws {HTTP400} If a requested Blueprint id is neither the submission's default nor available.
+   * @throws {ApiGeneralError} If no Blueprint can be resolved (no submission default and no system default).
+   * @memberof SubmissionUploadService
+   */
+  async resolveBlueprintIdForUpload(submissionId: number, requestedBlueprintId?: number | null): Promise<number> {
+    if (requestedBlueprintId != null) {
+      const submission = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+      if (submission.default_blueprint_id === requestedBlueprintId) {
+        return requestedBlueprintId;
+      }
+
+      return this.getAvailableBlueprintId(requestedBlueprintId);
+    }
+
+    const defaultBlueprintId = await this.submissionService.findSubmissionDefaultBlueprintId(submissionId);
+
+    if (defaultBlueprintId === null) {
+      throw new ApiGeneralError('No default Blueprint is configured', [
+        'SubmissionUploadService->resolveBlueprintIdForUpload',
+        `submission_id ${submissionId} has no default Blueprint and no active default Blueprint exists`
+      ]);
+    }
+
+    return defaultBlueprintId;
+  }
+
+  /**
+   * Validate that a caller-supplied Blueprint is currently available for new uploads.
+   *
+   * @private
+   * @param {number} requestedBlueprintId - Caller-supplied Blueprint id.
+   * @returns {Promise<number>} - The available `blueprint_id`.
+   * @throws {HTTP400} If the Blueprint does not exist or is not available.
+   * @memberof SubmissionUploadService
+   */
+  private async getAvailableBlueprintId(requestedBlueprintId: number): Promise<number> {
+    const blueprintId = await this.blueprintRepository.findActiveBlueprintById(requestedBlueprintId);
+
+    if (blueprintId === null) {
+      throw new HTTP400('Requested Blueprint is not available', [
+        'SubmissionUploadService->getAvailableBlueprintId',
+        `blueprint_id ${requestedBlueprintId} does not exist or is no longer available for new uploads`
+      ]);
+    }
+
+    return blueprintId;
+  }
+
+  /**
+   * Get the blueprint an active upload is pinned to, including a blueprint that has since been retired.
+   *
+   * @param {SubmissionUploadScope} scope - Submission and upload ownership boundary.
+   * @returns {Promise<Blueprint>} - The upload's blueprint.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadBlueprint(scope: SubmissionUploadScope): Promise<Blueprint> {
+    const upload = await this.submissionUploadRepository.getSubmissionUploadBySubmissionId(
+      scope.submissionId,
+      scope.submissionUploadId
+    );
+
+    return this.blueprintService.getBlueprint(upload.blueprint_id);
   }
 
   /**

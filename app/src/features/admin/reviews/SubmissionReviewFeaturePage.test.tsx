@@ -1,18 +1,12 @@
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render, screen, within } from 'test-helpers/test-utils';
+import { SubmissionUploadReviewValidationFeatureTypePage } from './SubmissionUploadReviewValidationFeatureTypePage';
 import { Mock } from 'vitest';
 import { SubmissionReviewFeaturePage } from './SubmissionReviewFeaturePage';
 
 vi.mock('hooks/useApi');
-vi.mock('features/submissions/page/features/components/SubmissionFeatureLayout', () => ({
-  SubmissionFeatureLayout: ({ breadcrumbs, children }: { breadcrumbs: React.ReactNode; children: React.ReactNode }) => (
-    <>
-      {breadcrumbs}
-      {children}
-    </>
-  )
-}));
+vi.mock('hooks/useContext', () => ({ useDialogContext: () => ({ setSnackbar: vi.fn() }) }));
 
 const submissionUploadId = '11111111-1111-4111-8111-111111111111';
 const submissionUploadReviewId = '22222222-2222-4222-8222-222222222222';
@@ -34,6 +28,11 @@ const renderAt = (path: string) =>
           path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/feature/:submissionFeatureId"
           element={<SubmissionReviewFeaturePage />}
         />
+        <Route
+          path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId/feature-type/:featureType"
+          element={<SubmissionUploadReviewValidationFeatureTypePage />}
+        />
+        <Route path="/page-not-found" element={<div>Not found</div>} />
         <Route path="/forbidden" element={<div>Forbidden</div>} />
       </Routes>
     </MemoryRouter>
@@ -46,7 +45,8 @@ describe('SubmissionReviewFeaturePage', () => {
       admin: {
         getSubmissionUploadFeature: getFeature,
         getSubmissionUploadReview: getReview,
-        getSubmissionUploadFeatureProperties: getProperties
+        getSubmissionUploadFeatureTypeProperties: getProperties,
+        getSubmissionUploadFeatureProperties: vi.fn()
       }
     });
     getFeature.mockResolvedValue({ feature: { feature_type_name: 'animal' } });
@@ -62,45 +62,38 @@ describe('SubmissionReviewFeaturePage', () => {
     getProperties.mockResolvedValue({
       properties: [
         {
-          id: 'feature:1',
-          property: 'sample site',
-          value: { urn: 'urn:16:sample_site:14', label: 'urn:16:sample_site:14' }
-        },
-        {
-          id: 'feature:2',
-          property: 'external sample site',
-          value: { urn: 'urn:18:sample_site:99', label: 'urn:18:sample_site:99' }
+          feature_property_id: 1,
+          feature_property_type_id: 1,
+          name: 'count',
+          display_name: 'Count',
+          type_name: 'number',
+          description: null,
+          calculated_value: false
         }
-      ],
-      pagination: { total: 2, current_page: 1, last_page: 1, per_page: 10 }
+      ]
     });
   });
 
-  it('loads the upload feature and renders review-scoped breadcrumbs', async () => {
-    renderAt(`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}/feature/12`);
-
-    const breadcrumbs = screen.getByLabelText('review feature breadcrumb');
-    expect(await within(breadcrumbs).findByText('Animal')).toBeInTheDocument();
-    expect(getFeature).toHaveBeenCalledWith(16, submissionUploadId, 12, { signal: expect.any(AbortSignal) });
-    expect(getReview).toHaveBeenCalledWith(16, submissionUploadId, submissionUploadReviewId, {
-      signal: expect.any(AbortSignal)
-    });
-    expect(breadcrumbs).toHaveTextContent('Submission/Upload/Review/Validation/Animal');
-    expect(within(breadcrumbs).getByRole('link', { name: 'Submission' })).toHaveAttribute(
-      'href',
-      '/admin/submissions/16'
+  it('resolves old feature URLs to upload-wide properties without individual values or detail sections', async () => {
+    renderAt(
+      `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}/feature/12?feature_type=animal`
     );
-    expect(within(breadcrumbs).getByRole('link', { name: 'Validation' })).toHaveAttribute(
+    expect(await screen.findByRole('heading', { name: 'Animal' })).toBeVisible();
+    expect(await screen.findByRole('gridcell', { name: 'Count' })).toBeVisible();
+    expect(getFeature).toHaveBeenCalledWith(16, submissionUploadId, 12, { signal: expect.any(AbortSignal) });
+    expect(getProperties).toHaveBeenCalledWith(16, submissionUploadId, 'animal', { signal: expect.any(AbortSignal) });
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: 'Properties' })).toBeVisible();
+    expect(screen.getAllByRole('columnheader')).toHaveLength(1);
+    expect(screen.getByRole('columnheader', { name: 'Property' })).toBeVisible();
+    expect(screen.queryByText('Value')).not.toBeInTheDocument();
+    expect(screen.queryByText('Map')).not.toBeInTheDocument();
+    expect(screen.queryByText('About')).not.toBeInTheDocument();
+    expect((useApi as Mock)().admin.getSubmissionUploadFeatureProperties).not.toHaveBeenCalled();
+    const breadcrumbs = screen.getByLabelText('feature type properties breadcrumb');
+    expect(within(breadcrumbs).getByRole('link', { name: 'Validation pass' })).toHaveAttribute(
       'href',
       `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`
-    );
-    expect(await screen.findByRole('link', { name: 'urn:16:sample_site:14' })).toHaveAttribute(
-      'href',
-      `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}/feature/14`
-    );
-    expect(screen.getByRole('link', { name: 'urn:18:sample_site:99' })).toHaveAttribute(
-      'href',
-      '/submission/18/feature/99'
     );
   });
 

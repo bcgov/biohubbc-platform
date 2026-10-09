@@ -207,7 +207,7 @@ const splitTarFileIntoRanges = (
 
 /**
  * Uploads a single data chunk to a presigned URL using HTTP PUT.
- * Sets appropriate headers for TAR content and includes timeout handling.
+ * Uses the slice MIME type for TAR or gzip content and includes timeout handling.
  * The ETag from the response is cleaned (quotes removed) for easier handling.
  *
  * @param url - The presigned URL to upload to
@@ -218,7 +218,7 @@ const splitTarFileIntoRanges = (
  */
 const uploadChunk = async (url: string, chunk: Blob, partNumber: number): Promise<UploadResult> => {
   const response = await axios.put(url, chunk, {
-    headers: { 'Content-Type': 'application/x-tar' },
+    headers: { 'Content-Type': chunk.type },
     timeout: 30000
   });
 
@@ -238,13 +238,13 @@ const uploadChunk = async (url: string, chunk: Blob, partNumber: number): Promis
 };
 
 /**
- * Uploads a TAR archive using multipart upload with presigned URLs.
- * Slices the TAR file into Blob chunks matching backend byte instructions,
+ * Uploads a TAR or gzip-compressed TAR using multipart upload with presigned URLs.
+ * Slices the original file into Blob chunks matching backend byte instructions,
  * then uploads chunks in parallel batches to respect concurrency limits.
  * Progress can be tracked via optional callback function.
  *
  * @param presignedParts - Array of presigned part instructions for multipart upload
- * @param tarFile - The complete TAR archive file to upload (must not be empty)
+ * @param tarFile - The original .tar or .tar.gz file to upload unchanged (must not be empty)
  * @param options - Configuration options for upload behavior
  * @param options.concurrencyLimit - Maximum number of simultaneous uploads (default: 4)
  * @param options.onProgress - Callback function called after each batch completion
@@ -278,13 +278,14 @@ export const uploadMultipartTar = async (
   const orderedPresignedParts = [...presignedParts].sort((a, b) => a.partNumber - b.partNumber);
   const ranges = splitTarFileIntoRanges(tarFile.size, orderedPresignedParts);
   const results: UploadResult[] = [];
+  const contentType = tarFile.name.toLowerCase().endsWith('.tar.gz') ? 'application/gzip' : 'application/x-tar';
 
   for (let i = 0; i < ranges.length; i += concurrencyLimit) {
     const batch = ranges.slice(i, i + concurrencyLimit);
 
     // Upload each batch in parallel while preserving deterministic part numbers.
     const batchResults = await Promise.all(
-      batch.map((part) => uploadChunk(part.url, tarFile.slice(part.start, part.end), part.partNumber))
+      batch.map((part) => uploadChunk(part.url, tarFile.slice(part.start, part.end, contentType), part.partNumber))
     );
 
     results.push(...batchResults);

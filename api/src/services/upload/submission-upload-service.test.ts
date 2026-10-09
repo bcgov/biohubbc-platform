@@ -5,12 +5,15 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
+import { Blueprint } from '../../models/blueprint';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { SubmissionUploadProcessingStatus } from '../../models/submission-upload-processing-status';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
+import { ISubmissionModel } from '../../repositories/submission-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { TeamService } from '../access-policy/team-service';
+import { BlueprintService } from '../blueprint-service';
 import { SubmissionFeatureService } from '../submission-feature-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionUploadService } from './submission-upload-service';
@@ -20,6 +23,27 @@ chai.use(sinonChai);
 describe('SubmissionUploadService', () => {
   let mockDBConnection: IDBConnection;
   let service: SubmissionUploadService;
+  const blueprintScope = { submissionId: 7, submissionUploadId: '11111111-1111-4111-8111-111111111111' };
+  const blueprintUpload: SubmissionUpload = {
+    submission_upload_id: blueprintScope.submissionUploadId,
+    submission_id: 7,
+    upload_id: '22222222-2222-4222-8222-222222222222',
+    team_id: '33333333-3333-4333-8333-333333333333',
+    status: 'indexed',
+    decision: 'pending',
+    ticket_id: '44444444-4444-4444-8444-444444444444',
+    blueprint_id: 1
+  };
+  const blueprint: Blueprint = {
+    blueprint_id: 1,
+    name: 'Wildlife',
+    version_number: 1,
+    description: null,
+    is_default: true,
+    parent_blueprint_id: null,
+    record_effective_date: '2026-09-01',
+    record_end_date: null
+  };
 
   beforeEach(() => {
     mockDBConnection = getMockDBConnection();
@@ -31,6 +55,39 @@ describe('SubmissionUploadService', () => {
 
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('listAdminSubmissionUploads', () => {
+    it('preserves totals for a requested page beyond the last upload', async () => {
+      const list = sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([]);
+      const count = sinon.stub(SubmissionUploadRepository.prototype, 'countAdminSubmissionUploads').resolves(11);
+      const pagination = { page: 3, limit: 10, sort: 'create_date', order: 'desc' as const };
+
+      const result = await service.listAdminSubmissionUploads(17, pagination);
+
+      expect(list).to.have.been.calledOnceWithExactly(17, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(17);
+      expect(result).to.eql({
+        uploads: [],
+        pagination: {
+          total: 11,
+          per_page: 10,
+          current_page: 3,
+          last_page: 2,
+          sort: 'create_date',
+          order: 'desc'
+        }
+      });
+    });
+
+    it('returns a valid empty first page for a submission without uploads', async () => {
+      sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([]);
+      sinon.stub(SubmissionUploadRepository.prototype, 'countAdminSubmissionUploads').resolves(0);
+      const result = await service.listAdminSubmissionUploads(17, { page: 1, limit: 10 });
+      expect(result.uploads).to.eql([]);
+      expect(result.pagination.total).to.equal(0);
+      expect(result.pagination.last_page).to.equal(1);
+    });
   });
 
   describe('getSubmissionUpload', () => {
@@ -268,67 +325,121 @@ describe('SubmissionUploadService', () => {
     });
   });
 
-  describe('resolveBlueprintIdForUpload', () => {
+  describe('resolveBlueprintIdForNewSubmission', () => {
     it('uses a supplied blueprint_id when it is available', async () => {
-      const getActiveStub = sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(5);
-      const priorStub = sinon.stub(SubmissionUploadRepository.prototype, 'findMostRecentBlueprintIdBySubmissionId');
+      sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(5);
       const defaultStub = sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId');
 
-      const result = await service.resolveBlueprintIdForUpload(1, 5);
+      const result = await service.resolveBlueprintIdForNewSubmission(5);
 
       expect(result).to.equal(5);
-      expect(getActiveStub).to.have.been.calledOnceWith(5);
-      // A supplied id short-circuits the prior-upload and default fallbacks.
-      expect(priorStub).to.not.have.been.called;
-      expect(defaultStub).to.not.have.been.called;
+      expect(defaultStub).not.to.have.been.called;
     });
 
     it('throws HTTP400 when a supplied blueprint_id is not available', async () => {
       sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(null);
 
       try {
-        await service.resolveBlueprintIdForUpload(1, 999);
-        expect.fail('Expected error not thrown');
+        await service.resolveBlueprintIdForNewSubmission(999);
+        expect.fail('Expected HTTP400');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP400);
-        expect((error as HTTP400).message).to.equal('Requested Blueprint is not available');
       }
     });
 
-    it('defaults to the most recent prior upload Blueprint when none is supplied', async () => {
-      const priorStub = sinon
-        .stub(SubmissionUploadRepository.prototype, 'findMostRecentBlueprintIdBySubmissionId')
-        .resolves(8);
-      const defaultStub = sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId');
+    it('falls back to the system default Blueprint when none is supplied', async () => {
+      sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId').resolves(1);
 
-      const result = await service.resolveBlueprintIdForUpload(1);
-
-      expect(result).to.equal(8);
-      expect(priorStub).to.have.been.calledOnceWith(1);
-      // The prior upload Blueprint wins over the system default for re-submissions.
-      expect(defaultStub).to.not.have.been.called;
+      expect(await service.resolveBlueprintIdForNewSubmission()).to.equal(1);
     });
 
-    it('falls back to the default Blueprint when there is no prior upload', async () => {
-      sinon.stub(SubmissionUploadRepository.prototype, 'findMostRecentBlueprintIdBySubmissionId').resolves(null);
-      const defaultStub = sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId').resolves(1);
-
-      const result = await service.resolveBlueprintIdForUpload(1);
-
-      expect(result).to.equal(1);
-      expect(defaultStub).to.have.been.calledOnce;
-    });
-
-    it('throws when no prior upload and no default Blueprint exist', async () => {
-      sinon.stub(SubmissionUploadRepository.prototype, 'findMostRecentBlueprintIdBySubmissionId').resolves(null);
+    it('throws when none is supplied and no system default Blueprint exists', async () => {
       sinon.stub(BlueprintRepository.prototype, 'findDefaultBlueprintId').resolves(null);
 
       try {
-        await service.resolveBlueprintIdForUpload(1);
-        expect.fail('Expected error not thrown');
+        await service.resolveBlueprintIdForNewSubmission(null);
+        expect.fail('Expected ApiGeneralError');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiGeneralError);
-        expect((error as ApiGeneralError).message).to.equal('No default Blueprint is configured');
+      }
+    });
+  });
+
+  describe('resolveBlueprintIdForUpload', () => {
+    it('uses a supplied blueprint_id that is available but is not the submission default', async () => {
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: 3 } as ISubmissionModel);
+      const activeStub = sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(5);
+      const defaultStub = sinon.stub(SubmissionService.prototype, 'findSubmissionDefaultBlueprintId');
+
+      const result = await service.resolveBlueprintIdForUpload(1, 5);
+
+      expect(result).to.equal(5);
+      expect(activeStub).to.have.been.calledOnceWith(5);
+      expect(defaultStub).not.to.have.been.called;
+    });
+
+    it('accepts a supplied blueprint_id that is the submission default without checking its availability', async () => {
+      const submissionStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: 3 } as ISubmissionModel);
+      const activeStub = sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(null);
+
+      const result = await service.resolveBlueprintIdForUpload(1, 3);
+
+      expect(result).to.equal(3);
+      expect(submissionStub).to.have.been.calledOnceWithExactly(1);
+      expect(activeStub).not.to.have.been.called;
+    });
+
+    it('throws HTTP400 when a supplied blueprint_id is neither the submission default nor available', async () => {
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: 3 } as ISubmissionModel);
+      sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(null);
+
+      try {
+        await service.resolveBlueprintIdForUpload(1, 999);
+        expect.fail('Expected HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+      }
+    });
+
+    it('does not treat a missing submission default as matching an unavailable blueprint_id', async () => {
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ default_blueprint_id: null } as ISubmissionModel);
+      sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById').resolves(null);
+
+      try {
+        await service.resolveBlueprintIdForUpload(1, 999);
+        expect.fail('Expected HTTP400');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+      }
+    });
+
+    it('uses the submission default Blueprint without checking its availability when none is supplied', async () => {
+      const defaultStub = sinon.stub(SubmissionService.prototype, 'findSubmissionDefaultBlueprintId').resolves(3);
+      const activeStub = sinon.stub(BlueprintRepository.prototype, 'findActiveBlueprintById');
+
+      const result = await service.resolveBlueprintIdForUpload(1);
+
+      expect(result).to.equal(3);
+      expect(defaultStub).to.have.been.calledOnceWithExactly(1);
+      expect(activeStub).not.to.have.been.called;
+    });
+
+    it('throws when neither the submission nor the system has a default Blueprint', async () => {
+      sinon.stub(SubmissionService.prototype, 'findSubmissionDefaultBlueprintId').resolves(null);
+
+      try {
+        await service.resolveBlueprintIdForUpload(1, null);
+        expect.fail('Expected ApiGeneralError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiGeneralError);
       }
     });
   });
@@ -408,6 +519,37 @@ describe('SubmissionUploadService', () => {
         expect(error).to.be.instanceOf(HTTP409);
       }
       expect(update).not.to.have.been.called;
+    });
+  });
+
+  describe('getSubmissionUploadBlueprint', () => {
+    it('returns the blueprint of an upload belonging to the submission, even when retired', async () => {
+      const retiredBlueprint = { ...blueprint, record_end_date: '2026-10-01' };
+      const getUpload = sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId')
+        .resolves(blueprintUpload);
+      const getBlueprint = sinon.stub(BlueprintService.prototype, 'getBlueprint').resolves(retiredBlueprint);
+
+      const result = await service.getSubmissionUploadBlueprint(blueprintScope);
+
+      expect(getUpload).to.have.been.calledOnceWithExactly(7, blueprintScope.submissionUploadId);
+      expect(getBlueprint).to.have.been.calledOnceWithExactly(1);
+      expect(result).to.equal(retiredBlueprint);
+    });
+
+    it('does not read a blueprint for an upload outside the submission', async () => {
+      sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId')
+        .rejects(new ApiNotFoundError('Submission upload not found'));
+      const getBlueprint = sinon.stub(BlueprintService.prototype, 'getBlueprint');
+
+      try {
+        await service.getSubmissionUploadBlueprint(blueprintScope);
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+      expect(getBlueprint).not.to.have.been.called;
     });
   });
 

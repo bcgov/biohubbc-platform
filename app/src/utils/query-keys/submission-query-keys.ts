@@ -44,22 +44,22 @@ const submission = (submissionId: number) => [QUERY_KEY_ROOT.SUBMISSION, submiss
 const record = (submissionId: number) => [...submission(submissionId), 'record'] as const;
 
 /**
- * Key of one submission's upload status: malware scans, processing state and file count.
+ * Key of the blueprint a submission's future uploads use by default.
  *
  * @param {number} submissionId The submission.
- * @returns The upload status key.
+ * @returns The submission default blueprint key.
  */
-const uploadStatus = (submissionId: number) => [...submission(submissionId), 'upload-status'] as const;
+const defaultBlueprint = (submissionId: number) => [...submission(submissionId), 'default-blueprint'] as const;
 
 /**
- * Key of one page of a submission's features as administrators review them.
+ * Key of one page of uploads in the administrative submission view.
  *
- * @param {number} submissionId The submission.
- * @param {ApiPaginationRequestOptions} pagination The page and sort.
- * @returns The admin features key.
+ * @param {number} submissionId Submission being viewed.
+ * @param {ApiPaginationRequestOptions} pagination Requested page and sorting.
+ * @returns The submission uploads query key.
  */
-const adminFeatures = (submissionId: number, pagination: ApiPaginationRequestOptions) =>
-  [...submission(submissionId), 'admin-features', { pagination }] as const;
+const adminUploads = (submissionId: number, pagination: ApiPaginationRequestOptions) =>
+  [...submission(submissionId), 'admin-uploads', { pagination }] as const;
 
 /**
  * Key of one page of a submission's features as its submitter or the public sees them.
@@ -115,8 +115,8 @@ export const submissionQueryKeys = {
   adminList,
   submission,
   record,
-  uploadStatus,
-  adminFeatures,
+  defaultBlueprint,
+  adminUploads,
   features,
   feature,
   featureDetail,

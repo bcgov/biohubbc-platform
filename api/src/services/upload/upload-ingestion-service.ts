@@ -7,6 +7,8 @@ import { SecurityStatusEnum } from '../../models/security-status';
 import {
   CreateExistingSubmissionArchiveUploadInput,
   CreateSubmissionArchiveUploadInput,
+  StartSubmissionArchiveUploadInput,
+  SubmissionArchiveFormat,
   SubmissionUploadSubmitter
 } from '../../models/submission-upload';
 import { UploadStatusEnum } from '../../models/upload';
@@ -54,15 +56,24 @@ export class UploadIngestionService extends DBService {
   async createSubmissionArchiveUpload(input: CreateSubmissionArchiveUploadInput): Promise<PresignedUploadUrlResponse> {
     const systemUserId = this.connection.systemUserId();
     const submitterSystemUserIds = await this.resolveSubmissionUploadSubmitters(input.submitters ?? []);
+    // The Blueprint of a new submission's first upload becomes the default for its later uploads.
+    const defaultBlueprintId = await this.submissionUploadService.resolveBlueprintIdForNewSubmission(input.blueprintId);
     const submission: ICreateSubmission = {
       uuid: v4(),
       system_user_id: systemUserId,
       contributor_id: input.contributorId,
       name: input.name,
       description: input.description,
-      comment: input.comment
+      comment: input.comment,
+      default_blueprint_id: defaultBlueprintId
     };
-    return this.startArchiveUpload(input.bytes, submission, submitterSystemUserIds, input.blueprintId);
+    return this.startArchiveUpload(
+      input.bytes,
+      submission,
+      submitterSystemUserIds,
+      input.blueprintId,
+      input.archiveFormat
+    );
   }
 
   /**
@@ -115,14 +126,16 @@ export class UploadIngestionService extends DBService {
    * @param {ICreateSubmission} submission
    * @param {number[]} [submitterSystemUserIds] Optional additional people who may access this submission and upload.
    * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
-   * the system default Blueprint when omitted (new submissions have no prior upload to inherit from).
+   * the new submission's default Blueprint when omitted.
+   * @param {SubmissionArchiveFormat} [archiveFormat] Archive encoding; defaults to uncompressed TAR.
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
   async startArchiveUpload(
     bytes: number,
     submission: ICreateSubmission,
     submitterSystemUserIds: number[] = [],
-    requestedBlueprintId?: number | null
+    requestedBlueprintId?: number | null,
+    archiveFormat: SubmissionArchiveFormat = 'tar'
   ): Promise<PresignedUploadUrlResponse> {
     // 1. Create submission (intent) and its upload-creation team.
     const { submission_id } = await this.submissionService.insertSubmissionRecord(submission, submitterSystemUserIds);
@@ -131,15 +144,16 @@ export class UploadIngestionService extends DBService {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submission_id);
     const submissionUuidFromTable = submissionRecord.uuid;
 
-    return this._startArchiveUploadForSubmission(
+    return this._startArchiveUploadForSubmission({
       bytes,
-      submission_id,
-      submissionUuidFromTable,
-      [submission.system_user_id],
+      submissionId: submission_id,
+      submissionUuid: submissionUuidFromTable,
+      systemUserIds: [submission.system_user_id],
       submitterSystemUserIds,
-      submission.comment,
-      requestedBlueprintId
-    );
+      comment: submission.comment,
+      requestedBlueprintId,
+      archiveFormat
+    });
   }
 
   /**
@@ -149,7 +163,7 @@ export class UploadIngestionService extends DBService {
    * Requires prior middleware authorization for submission-team access or administrator access.
    * Validates owning-contributor membership before changing the submission.
    * Resolves additional submitters and adds them to both teams.
-   * The Blueprint defaults to the submission's most recent prior upload Blueprint when omitted.
+   * The Blueprint defaults to the submission's default Blueprint when omitted.
    *
    * @param {CreateExistingSubmissionArchiveUploadInput} input - Submission UUID, archive size, optional
    * submitter identities, and optional Blueprint selection.
@@ -170,42 +184,42 @@ export class UploadIngestionService extends DBService {
     const submissionTeamSystemUserIds = [authenticatedSystemUserId, ...submitterSystemUserIds];
     await this.submissionService.addSubmissionTeamMembers(submissionRecord.team_id, submissionTeamSystemUserIds);
 
-    return this._startArchiveUploadForSubmission(
+    return this._startArchiveUploadForSubmission({
       bytes,
-      byUuid.submission_id,
-      submissionRecord.uuid,
-      [authenticatedSystemUserId],
+      submissionId: byUuid.submission_id,
+      submissionUuid: submissionRecord.uuid,
+      systemUserIds: [authenticatedSystemUserId],
       submitterSystemUserIds,
-      submissionRecord.comment ?? null,
-      blueprintId
-    );
+      comment: submissionRecord.comment ?? null,
+      requestedBlueprintId: blueprintId,
+      archiveFormat: input.archiveFormat
+    });
   }
 
   /**
    * Internal helper: creates a new upload session, submission_upload record, review status,
    * artifact, upload_archive, and presigned URLs for the given submissionId.
    *
-   * @param {number} bytes
-   * @param {number} submissionId - Integer PK for DB operations
-   * @param {string} submissionUuid - Submission UUID; used when building the response.
-   * @param {number[]} systemUserIds - System users to associate with the upload's ticket.
-   * @param {number[]} submitterSystemUserIds - Additional users to add to the upload's dedicated
-   * access team. The authenticated requestor is always added by the upload service.
-   * @param {string | null} [comment] - Optional upload comment.
-   * @param {number | null} [requestedBlueprintId] - Optional Blueprint to pin the upload to; resolved
-   * to provided → most recent prior upload → system default.
-   * @returns {Promise<PresignedUploadUrlResponse>}
+   * @param {StartSubmissionArchiveUploadInput} input - Submission identity, archive metadata, ticket users,
+   * upload access-team members, and comment. The Blueprint resolves from the requested value,
+   * the submission's default, or system default. Archive encoding defaults to uncompressed TAR.
+   * @returns {Promise<PresignedUploadUrlResponse>} The archive upload session and presigned part URLs.
    */
   async _startArchiveUploadForSubmission(
-    bytes: number,
-    submissionId: number,
-    submissionUuid: string,
-    systemUserIds: number[],
-    submitterSystemUserIds: number[],
-    comment?: string | null,
-    requestedBlueprintId?: number | null
+    input: StartSubmissionArchiveUploadInput
   ): Promise<PresignedUploadUrlResponse> {
-    // 0. Pin the Blueprint this upload will be indexed with (provided → prior upload → default).
+    const {
+      bytes,
+      submissionId,
+      submissionUuid,
+      systemUserIds,
+      submitterSystemUserIds,
+      comment,
+      requestedBlueprintId,
+      archiveFormat = 'tar'
+    } = input;
+
+    // 0. Pin the Blueprint this upload will be indexed with (provided → submission default → system default).
     const blueprint_id = await this.submissionUploadService.resolveBlueprintIdForUpload(
       submissionId,
       requestedBlueprintId
@@ -241,7 +255,7 @@ export class UploadIngestionService extends DBService {
     );
 
     // 4. Create placeholder artifact for archive
-    const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
+    const key = `submissions/${submissionId}/uploads/${upload_id}.${archiveFormat}`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
       artifact_status: ArtifactStatusEnum.PENDING,
@@ -249,7 +263,7 @@ export class UploadIngestionService extends DBService {
       byte_size: bytes,
       checksum_sha256: null,
       uploaded_at: null,
-      format: 'tar'
+      format: archiveFormat
     });
 
     // 5. Create upload_archive metadata
@@ -266,7 +280,7 @@ export class UploadIngestionService extends DBService {
       partCount
     } = await UploadIngestionService.dependencies.generateMultipartUploadPresignedUrls({
       key,
-      contentType: 'application/x-tar',
+      contentType: archiveFormat === 'tar.gz' ? 'application/gzip' : 'application/x-tar',
       bytes
     });
 

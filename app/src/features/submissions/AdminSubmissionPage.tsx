@@ -1,4 +1,4 @@
-import { Navigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router-dom';
 import { parseRouteId } from 'utils/routes';
 import { AdminSubmissionPageContent } from './components/AdminSubmissionPageContent';
 

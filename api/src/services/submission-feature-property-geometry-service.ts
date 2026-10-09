@@ -1,4 +1,5 @@
 import { IDBConnection } from '../database/db';
+import { ReconciliationType } from '../models/reconciliation';
 import {
   CreateSubmissionFeaturePropertyGeometry,
   GeometryBoundingBox,
@@ -88,16 +89,19 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
    *
    * @param {number} submissionId
    * @param {string} submissionUploadId
+   * @param {ReconciliationType | null} reconciliation Outcome whose features are framed, or null for every outcome.
    * @return {*}  {Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }>}
    * @memberof SubmissionFeaturePropertyGeometryService
    */
   getSubmissionUploadGeometryExtent(
     submissionId: number,
-    submissionUploadId: string
+    submissionUploadId: string,
+    reconciliation: ReconciliationType | null
   ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
     return this.submissionFeaturePropertyGeometryRepository.getSubmissionUploadGeometryExtent(
       submissionId,
-      submissionUploadId
+      submissionUploadId,
+      reconciliation
     );
   }
 

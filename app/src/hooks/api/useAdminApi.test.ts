@@ -14,6 +14,49 @@ describe('useAdminApi', () => {
     mock.restore();
   });
 
+  it('sends pagination to the upload-scoped error endpoint', async () => {
+    const response = { errors: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+    mock.onGet('/api/administrative/submission/16/upload/upload-id/error').reply(200, response);
+    const pagination = { page: 2, limit: 10, sort: 'count', order: 'desc' as const };
+    const signal = new AbortController().signal;
+    const result = await useAdminApi(axios).listSubmissionFeatureErrors(
+      { submissionId: 16, submissionUploadId: 'upload-id' },
+      pagination,
+      { signal }
+    );
+    expect(result).toEqual(response);
+    expect(mock.history.get[0].params).toEqual(pagination);
+    expect(mock.history.get[0].signal).toBe(signal);
+  });
+
+  it('loads feature-type property definitions for the upload without feature IDs or outcome filters', async () => {
+    const signal = new AbortController().signal;
+    const response = { properties: [] };
+    mock
+      .onGet('/api/administrative/submission/16/upload/upload-id/feature-types/animal/properties')
+      .reply(200, response);
+    expect(
+      await useAdminApi(axios).getSubmissionUploadFeatureTypeProperties(16, 'upload-id', 'animal', { signal })
+    ).toEqual(response);
+    expect(mock.history.get[0].signal).toBe(signal);
+    expect(mock.history.get[0].params).toBeUndefined();
+  });
+
+  it('sends the outcome filter and pagination to the upload-scoped feature type endpoint', async () => {
+    const scope = { submissionId: 7, submissionUploadId: 'upload-1' };
+    const signal = new AbortController().signal;
+    const response = { feature_types: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+    const pagination = { page: 2, limit: 10, sort: 'count', order: 'desc' as const };
+    mock.onGet('/api/administrative/submission/7/upload/upload-1/feature-types').reply(200, response);
+    expect(
+      await useAdminApi(axios).listSubmissionUploadFeatureTypes(scope, { reconciliation: 'unmodified' }, pagination, {
+        signal
+      })
+    ).toEqual(response);
+    expect(mock.history.get[0].params).toEqual({ reconciliation: 'unmodified', ...pagination });
+    expect(mock.history.get[0].signal).toBe(signal);
+  });
+
   it('requests the upload-feature extent without creating a tile session', async () => {
     const response = { bbox: null, geometry_count: 0 };
     const signal = new AbortController().signal;

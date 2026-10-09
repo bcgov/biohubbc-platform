@@ -1,7 +1,10 @@
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
-import { HTTP403 } from '../errors/http-error';
+import { ApiNotFoundError } from '../errors/api-error';
+import { HTTP400, HTTP403 } from '../errors/http-error';
+import { Blueprint } from '../models/blueprint';
 import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
+import { BlueprintRepository } from '../repositories/blueprint-repository';
 import {
   ICreateSubmission,
   ISubmissionModel,
@@ -18,11 +21,14 @@ import {
 } from '../repositories/submission-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { BlueprintService } from './blueprint-service';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
+  blueprintRepository: BlueprintRepository;
+  blueprintService: BlueprintService;
   teamService: TeamService;
   userService: UserService;
 
@@ -30,6 +36,8 @@ export class SubmissionService extends DBService {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
+    this.blueprintRepository = new BlueprintRepository(connection);
+    this.blueprintService = new BlueprintService(connection);
     this.teamService = new TeamService(connection);
     this.userService = new UserService(connection);
   }
@@ -91,6 +99,73 @@ export class SubmissionService extends DBService {
       ...submissionData,
       team_id: team.team_id
     });
+  }
+
+  /**
+   * Find the blueprint a submission's next upload uses when the upload request does not name one.
+   *
+   * The submission's own default applies even after that blueprint is retired. A submission without one falls back
+   * to the system default blueprint.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<number | null>} The default `blueprint_id`, or null when neither default exists.
+   * @memberof SubmissionService
+   */
+  async findSubmissionDefaultBlueprintId(submissionId: number): Promise<number | null> {
+    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+
+    if (submission.default_blueprint_id != null) {
+      return submission.default_blueprint_id;
+    }
+
+    return this.blueprintRepository.findDefaultBlueprintId();
+  }
+
+  /**
+   * Get the blueprint a submission's next upload uses when the upload request does not name one.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<Blueprint>} The submission's default blueprint, including a retired one.
+   * @throws {ApiNotFoundError} When neither the submission nor the system has a default blueprint.
+   * @memberof SubmissionService
+   */
+  async getSubmissionDefaultBlueprint(submissionId: number): Promise<Blueprint> {
+    const defaultBlueprintId = await this.findSubmissionDefaultBlueprintId(submissionId);
+
+    if (defaultBlueprintId === null) {
+      throw new ApiNotFoundError('Default Blueprint not found', [
+        'SubmissionService->getSubmissionDefaultBlueprint',
+        `submission_id ${submissionId} has no default Blueprint and no active default Blueprint exists`
+      ]);
+    }
+
+    return this.blueprintService.getBlueprint(defaultBlueprintId);
+  }
+
+  /**
+   * Change the blueprint a submission's future uploads use when the upload request does not name one.
+   *
+   * Existing uploads keep the blueprint they were created with. The new default must be available now; it keeps
+   * applying to this submission if it is retired later.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @param {number} blueprintId The submission's new default blueprint.
+   * @returns {Promise<void>} Resolves after the submission's default blueprint has been changed.
+   * @throws {HTTP400} When the requested blueprint is not available.
+   * @throws {ApiNotFoundError} When the submission does not exist.
+   * @memberof SubmissionService
+   */
+  async updateSubmissionDefaultBlueprint(submissionId: number, blueprintId: number): Promise<void> {
+    const availableBlueprintId = await this.blueprintRepository.findActiveBlueprintById(blueprintId);
+
+    if (availableBlueprintId === null) {
+      throw new HTTP400('Requested Blueprint is not available', [
+        'SubmissionService->updateSubmissionDefaultBlueprint',
+        `blueprint_id ${blueprintId} does not exist or is no longer available for new uploads`
+      ]);
+    }
+
+    await this.submissionRepository.updateSubmissionDefaultBlueprint(submissionId, availableBlueprintId);
   }
 
   /**

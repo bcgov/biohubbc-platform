@@ -14,6 +14,8 @@ export interface SearchResultContentProps {
   rows: SearchFeatureResultWithRelevancy[];
   /** Feature type property metadata used to build table columns. */
   featureTypeProperties: SearchFeatureProperty[];
+  /** Optional destination for property headings when the owning workflow exposes type-level definitions. */
+  featureTypePropertiesPath?: string;
   /** Path resolvers for handling redirects when clicking hyperlinked feature values. */
   pathResolvers: SubmissionPropertyValuePathResolvers;
   /** Whether the result request is currently loading. */
@@ -57,6 +59,7 @@ export interface SearchResultContentProps {
 export const SearchResultContent = ({
   rows,
   featureTypeProperties,
+  featureTypePropertiesPath,
   pathResolvers,
   isLoading,
   cursor,
@@ -113,6 +116,7 @@ export const SearchResultContent = ({
           <SearchResultOptions
             rows={rows}
             featureTypeProperties={featureTypeProperties}
+            featureTypePropertiesPath={featureTypePropertiesPath}
             pathResolvers={pathResolvers}
             isLoading={isLoading}
             view={view}

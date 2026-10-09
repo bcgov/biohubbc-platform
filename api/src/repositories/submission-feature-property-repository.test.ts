@@ -33,7 +33,8 @@ describe('SubmissionFeaturePropertyRepository', () => {
       expect(sqlText).to.include('submission_feature_property_number');
       expect(sqlText).to.include('submission_feature_property_timestamp');
       expect(sqlText).to.include('submission_feature_artifact');
-      expect(sqlText).to.include("fpt.name = 'number'");
+      expect(sqlText).to.include("fpt.name IN ('string', 'number')");
+      expect(sqlText).not.to.include('fp.record_end_date');
       expect(sqlText).to.include("fpt.name = 'taxon'");
       expect(sqlText).to.include(`${taxonPropertyValueJson('t')} AS value`);
       expect(sqlText).to.include('t.record_end_date IS NULL');

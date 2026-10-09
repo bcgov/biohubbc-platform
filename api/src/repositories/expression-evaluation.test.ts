@@ -587,7 +587,7 @@ describe('expression-evaluation', () => {
       expect(sql).to.not.include('inner join "feature_type" as "ft"');
       expect(sql).to.include('"sf"."feature_type_id" = (select "ft"."feature_type_id"');
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).not.to.include('"ft"."record_end_date" is null');
       expect(sql).to.include('SELECT true');
       expect(sql).to.include('sfc.source_submission_feature_id = sf.submission_feature_id');
       expect(sql).to.include('sfc.target_submission_feature_id = sf.submission_feature_id');
@@ -617,7 +617,7 @@ describe('expression-evaluation', () => {
       }).toString();
 
       expect(sql).to.include('"ft"."name" = \'fish\'');
-      expect(sql).to.include('"ft"."record_end_date" is null');
+      expect(sql).not.to.include('"ft"."record_end_date" is null');
       expect(sql.toLowerCase()).to.include('not exists');
       expect(sql).to.not.include('security_scope_anchor');
     });

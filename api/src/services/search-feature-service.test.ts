@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import type { ExpressionTree } from '../models/expression-tree';
 import type { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
@@ -11,12 +11,118 @@ import { SubmissionRepository } from '../repositories/submission-repository';
 import { decodeSearchFeatureCursor } from '../utils/pagination';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureService } from './search-feature-service';
+import { SubmissionUploadService } from './upload/submission-upload-service';
 
 chai.use(sinonChai);
 
 describe('SearchFeatureService', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('reconciliation browsing', () => {
+    const scope = { submissionId: 7, submissionUploadId: 'upload', reconciliation: 'unmodified' as const };
+
+    beforeEach(() => {
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({ submission_id: 7 } as any);
+    });
+
+    it('preserves totals for a requested feature type page beyond the last one, including an empty outcome', async () => {
+      const ownership = sinon
+        .stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId')
+        .resolves({ submission_id: 7 } as any);
+      const list = sinon.stub(SearchFeatureRepository.prototype, 'listSubmissionUploadFeatureTypes').resolves([]);
+      const count = sinon.stub(SearchFeatureRepository.prototype, 'countSubmissionUploadFeatureTypes');
+      count.onFirstCall().resolves(11);
+      count.onSecondCall().resolves(0);
+      const uploadScope = { submissionId: 7, submissionUploadId: 'upload' };
+      const filters = { reconciliation: 'unmodified' as const };
+      const pagination = { page: 3, limit: 10, sort: 'count', order: 'desc' as const };
+      const service = new SearchFeatureService(getMockDBConnection());
+
+      expect(await service.listSubmissionUploadFeatureTypes(uploadScope, filters, pagination)).to.deep.equal({
+        feature_types: [],
+        pagination: { total: 11, per_page: 10, current_page: 3, last_page: 2, sort: 'count', order: 'desc' }
+      });
+      expect(ownership).to.have.been.calledWithExactly(7, 'upload');
+      expect(list).to.have.been.calledOnceWithExactly(uploadScope, filters, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(uploadScope, filters);
+
+      const empty = await service.listSubmissionUploadFeatureTypes(uploadScope, filters, { page: 1, limit: 10 });
+      expect(empty.pagination.total).to.equal(0);
+      expect(empty.pagination.last_page).to.equal(1);
+    });
+
+    it('rejects a foreign submission before reading feature types or features', async () => {
+      const failure = new ApiNotFoundError('Submission upload not found');
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId').rejects(failure);
+      const list = sinon.stub(SearchFeatureRepository.prototype, 'listSubmissionUploadFeatureTypes');
+      const count = sinon.stub(SearchFeatureRepository.prototype, 'countSubmissionUploadFeatureTypes');
+      const rows = sinon.stub(SearchFeatureRepository.prototype, 'getReconciliationFeatures');
+      const service = new SearchFeatureService(getMockDBConnection());
+      for (const request of [
+        () =>
+          service.listSubmissionUploadFeatureTypes(
+            { submissionId: 8, submissionUploadId: 'upload' },
+            { reconciliation: 'unmodified' },
+            { page: 1, limit: 10 }
+          ),
+        () =>
+          service.getReconciliationFeatures({ ...scope, submissionId: 8 }, 'animal', {
+            limit: 2,
+            sort: 'submission_feature_id',
+            order: 'asc'
+          })
+      ]) {
+        try {
+          await request();
+          expect.fail('Expected ownership rejection');
+        } catch (error) {
+          expect((error as Error).message).to.equal('Submission upload not found');
+        }
+      }
+      expect(list).not.to.have.been.called;
+      expect(count).not.to.have.been.called;
+      expect(rows).not.to.have.been.called;
+    });
+
+    it('trims forward and backward lookahead and emits adjacent-page cursors', async () => {
+      const rows = [1, 2, 3].map((id) => ({
+        ...mockFeatures[0],
+        submission_feature_id: id,
+        parent_submission_feature_id: null,
+        provenance: null
+      }));
+      sinon.stub(SearchFeatureRepository.prototype, 'getReconciliationFeatures').resolves(rows);
+      sinon.stub(SearchFeatureRepository.prototype, 'getFeatureTypeProperties').resolves(mockProperties);
+      const service = new SearchFeatureService(getMockDBConnection());
+      const pagination = { limit: 2, sort: 'submission_feature_id', order: 'asc' as const };
+      const first = await service.getReconciliationFeatures(scope, 'animal', pagination);
+      expect(first.features.map((row) => row.submission_feature_id)).to.deep.equal([1, 2]);
+      expect(first.properties).to.deep.equal(mockProperties);
+      expect(first.pagination.previous_cursor).to.be.null;
+      expect(decodeSearchFeatureCursor(first.pagination.next_cursor!).submission_feature_id).to.equal(2);
+      const previous = await service.getReconciliationFeatures(scope, 'animal', {
+        ...pagination,
+        boundary: { direction: 'previous', submission_feature_id: 4, create_date: rows[0].create_date }
+      });
+      expect(previous.features.map((row) => row.submission_feature_id)).to.deep.equal([2, 3]);
+      expect(decodeSearchFeatureCursor(previous.pagination.previous_cursor!).submission_feature_id).to.equal(2);
+      expect(decodeSearchFeatureCursor(previous.pagination.next_cursor!).submission_feature_id).to.equal(3);
+    });
+
+    it('returns no cursors for an empty page', async () => {
+      sinon.stub(SearchFeatureRepository.prototype, 'getReconciliationFeatures').resolves([]);
+      sinon.stub(SearchFeatureRepository.prototype, 'getFeatureTypeProperties').resolves([]);
+      const page = await new SearchFeatureService(getMockDBConnection()).getReconciliationFeatures(scope, 'animal', {
+        limit: 2,
+        sort: 'submission_feature_id',
+        order: 'asc'
+      });
+      expect(page.features).to.deep.equal([]);
+      expect(page.pagination.next_cursor).to.be.null;
+      expect(page.pagination.previous_cursor).to.be.null;
+    });
   });
 
   const mockFeatures = [

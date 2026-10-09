@@ -46,7 +46,8 @@ describe('SubmissionRepository', () => {
           name: 'name',
           contributor_id: 1,
           system_user_id: 1,
-          team_id: '11111111-1111-1111-1111-111111111111'
+          team_id: '11111111-1111-1111-1111-111111111111',
+          default_blueprint_id: 4
         });
         expect.fail();
       } catch (actualError) {
@@ -343,6 +344,36 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.ERROR, '');
 
       expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('updateSubmissionDefaultBlueprint', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('updates only the active submission', async () => {
+      const sql = sinon.stub().resolves({ rowCount: 1, rows: [] });
+      const submissionRepository = new SubmissionRepository(getMockDBConnection({ sql }));
+
+      await submissionRepository.updateSubmissionDefaultBlueprint(7, 4);
+
+      expect(sql).to.have.been.calledOnce;
+      const statement = sql.firstCall.args[0];
+      expect(statement.text).to.match(/submission_id = \$2\s+AND record_end_date IS NULL/);
+      expect(statement.values).to.deep.equal([4, 7]);
+    });
+
+    it('throws not found when no active submission was updated', async () => {
+      const sql = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const submissionRepository = new SubmissionRepository(getMockDBConnection({ sql }));
+
+      try {
+        await submissionRepository.updateSubmissionDefaultBlueprint(7, 4);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
     });
   });
 

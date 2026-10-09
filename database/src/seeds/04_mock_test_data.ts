@@ -507,6 +507,11 @@ export const insertSubmission = (
 `;
 };
 
+/**
+ * Build a mock feature insert with a random reconciliation outcome for validation review.
+ * @param options Owning submission and upload, feature type, parent, and source data.
+ * @returns SQL inserting one published mock feature and returning its identifier.
+ */
 export const insertSubmissionFeature = (options: {
   submission_id: number;
   submission_upload_id: string;
@@ -522,6 +527,7 @@ export const insertSubmissionFeature = (options: {
         feature_type_id,
         source_id,
         data,
+        reconciliation,
         record_effective_date
     )
     values
@@ -532,6 +538,7 @@ export const insertSubmissionFeature = (options: {
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
         public.gen_random_uuid(),
         ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
+        '${faker.helpers.arrayElement(['new', 'unmodified', 'modified'])}',
         now()
     )
     RETURNING submission_feature_id;

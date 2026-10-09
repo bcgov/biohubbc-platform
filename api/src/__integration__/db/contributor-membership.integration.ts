@@ -73,7 +73,8 @@ describe('multiple contributor memberships (integration)', function () {
       contributor_id: firstContributorId,
       name: 'Independent authorization checks',
       description: 'Selected contributor and submission-team access are independent.',
-      comment: 'Integration test'
+      comment: 'Integration test',
+      default_blueprint_id: null
     });
     await contributorSystemUserService.ensureContributorSystemUser(secondContributorId, systemUserId);
 
@@ -119,7 +120,8 @@ describe('multiple contributor memberships (integration)', function () {
       contributor_id: firstContributorId,
       name: 'Contributor revocation',
       description: 'Retained unrelated membership',
-      comment: 'Integration test'
+      comment: 'Integration test',
+      default_blueprint_id: null
     });
     const uploads = new SubmissionUploadService(connection);
     const ingestion = new UploadIngestionService(connection);
@@ -192,7 +194,8 @@ describe('multiple contributor memberships (integration)', function () {
       contributor_id: firstContributorId,
       name: 'Owner membership',
       description: 'Owner authorization',
-      comment: 'Integration test'
+      comment: 'Integration test',
+      default_blueprint_id: null
     });
     await contributorSystemUserService.ensureContributorSystemUser(firstContributorId, systemUserId);
     await submissionService.assertSubmissionContributorWriteAccess(submissionUuid);

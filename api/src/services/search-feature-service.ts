@@ -1,23 +1,35 @@
 import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security';
 import { IDBConnection } from '../database/db';
+import { ApiNotFoundError } from '../errors/api-error';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureProperty } from '../models/feature-property';
+import { ReconciliationFeaturePage, ReconciliationFeatureScope } from '../models/reconciliation';
 import {
   SearchFeatureFilters,
   SearchFeaturePage,
   SearchFeatureSecurityContext,
   SubmissionUploadFeatureSearchFilters
 } from '../models/search';
+import {
+  SubmissionUploadFeatureTypeFilters,
+  SubmissionUploadFeatureTypesResponse,
+  SubmissionUploadScope
+} from '../models/submission-upload';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { optimizeExpression } from '../utils/expression-optimization';
 import { getLogger } from '../utils/logger';
-import { encodeSearchFeatureCursor, ensureCompleteCursorPaginationOptions } from '../utils/pagination';
-import { ApiCursorPaginationOptions, ApiCursorPaginationResults } from '../zod-schema/pagination';
+import {
+  encodeSearchFeatureCursor,
+  ensureCompleteCursorPaginationOptions,
+  makePaginationResponse
+} from '../utils/pagination';
+import { ApiCursorPaginationOptions, ApiCursorPaginationResults, ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
+import { SubmissionUploadService } from './upload/submission-upload-service';
 
 const defaultLog = getLogger('services/search-feature-service');
 
@@ -27,6 +39,7 @@ const defaultLog = getLogger('services/search-feature-service');
  */
 export class SearchFeatureService extends DBService {
   searchFeatureRepository: SearchFeatureRepository;
+  submissionUploadService: SubmissionUploadService;
   expressionTreeNormalizationService: ExpressionTreeNormalizationService;
 
   /**
@@ -36,8 +49,86 @@ export class SearchFeatureService extends DBService {
    */
   constructor(connection: IDBConnection) {
     super(connection);
+    this.submissionUploadService = new SubmissionUploadService(connection);
     this.searchFeatureRepository = new SearchFeatureRepository(connection);
     this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
+  }
+
+  /**
+   * Retrieve a bounded page of the feature types stored in an upload across its complete lifecycle, after checking
+   * ownership.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<SubmissionUploadFeatureTypesResponse>} Feature types and pagination totals, including empty
+   * pages.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   */
+  async listSubmissionUploadFeatureTypes(
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionUploadFeatureTypesResponse> {
+    await this.submissionUploadService.getSubmissionUploadBySubmissionId(scope.submissionId, scope.submissionUploadId);
+
+    const featureTypes = await this.searchFeatureRepository.listSubmissionUploadFeatureTypes(
+      scope,
+      filters,
+      pagination
+    );
+    const total = await this.searchFeatureRepository.countSubmissionUploadFeatureTypes(scope, filters);
+
+    return { feature_types: featureTypes, pagination: makePaginationResponse(total, pagination) };
+  }
+
+  /**
+   * Browse one feature type within an immutable reconciliation outcome.
+   * @param {ReconciliationFeatureScope} scope Required submission, upload, and outcome.
+   * @param {string} featureType Selected feature type.
+   * @param {ApiCursorPaginationOptions} cursorPagination Requested page and sort.
+   * @returns {Promise<ReconciliationFeaturePage>} Hydrated page and columns.
+   */
+  async getReconciliationFeatures(
+    scope: ReconciliationFeatureScope,
+    featureType: string,
+    cursorPagination: ApiCursorPaginationOptions
+  ): Promise<ReconciliationFeaturePage> {
+    await this.validateReconciliationUpload(scope);
+    const pagination = ensureCompleteCursorPaginationOptions(cursorPagination);
+    const [rows, properties] = await Promise.all([
+      this.searchFeatureRepository.getReconciliationFeatures(scope, featureType, {
+        ...pagination,
+        limit: pagination.limit + 1
+      }),
+      this.searchFeatureRepository.getFeatureTypeProperties(featureType)
+    ]);
+    const isPrevious = pagination.boundary?.direction === 'previous';
+    const hasLookahead = rows.length > pagination.limit;
+    const features = isPrevious ? rows.slice(-pagination.limit) : rows.slice(0, pagination.limit);
+    return {
+      features,
+      properties,
+      pagination: this.buildSearchFeatureCursorPagination(
+        features,
+        pagination,
+        isPrevious || hasLookahead,
+        pagination.boundary?.direction === 'next' || (isPrevious && hasLookahead)
+      )
+    };
+  }
+
+  /**
+   * Check upload ownership before exposing reconciliation data.
+   * @param {ReconciliationFeatureScope} scope Requested upload and submission.
+   * @returns {Promise<void>} Resolves when the upload belongs to the submission.
+   * @throws {ApiNotFoundError} When the upload belongs to another submission.
+   */
+  private async validateReconciliationUpload(scope: ReconciliationFeatureScope): Promise<void> {
+    const upload = await this.submissionUploadService.getSubmissionUpload(scope.submissionUploadId);
+    if (upload.submission_id !== scope.submissionId) {
+      throw new ApiNotFoundError('Submission upload not found');
+    }
   }
 
   /**

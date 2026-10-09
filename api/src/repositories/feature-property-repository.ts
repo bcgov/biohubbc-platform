@@ -23,6 +23,78 @@ import { BaseRepository } from './base-repository';
  */
 export class FeaturePropertyRepository extends BaseRepository {
   /**
+   * List distinct property definitions actually used by one feature type in an upload.
+   * Includes historical feature rows and all reconciliation outcomes. Values stay in SQL;
+   * the result is bounded by the feature type's property definitions.
+   * @param {number} submissionId Owning submission.
+   * @param {string} submissionUploadId Reviewed upload.
+   * @param {string} featureType Canonical feature type name.
+   * @returns {Promise<FeatureProperty[]>} Unique definitions ordered by display name.
+   */
+  async getSubmissionUploadFeatureTypeProperties(
+    submissionId: number,
+    submissionUploadId: string,
+    featureType: string
+  ): Promise<FeatureProperty[]> {
+    const query = SQL`
+      WITH upload_features AS (
+        SELECT sf.submission_feature_id
+        FROM submission_feature sf
+        JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+        WHERE sf.submission_id = ${submissionId}
+          AND sf.submission_upload_id = ${submissionUploadId}::uuid
+          AND ft.name = ${featureType}
+      ), property_assignments AS (
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_string p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_number p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_boolean p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_timestamp p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_code p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_taxon p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_geometry p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_feature p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_artifact p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+      )
+      SELECT DISTINCT fp.feature_property_id, fp.feature_property_type_id,
+        fp.name, fp.display_name, fp.description, fpt.name AS type_name, fp.calculated_value
+      FROM property_assignments used
+      JOIN blueprint_feature_type_property bftp
+        ON bftp.blueprint_feature_type_property_id = used.blueprint_feature_type_property_id
+      JOIN feature_property fp ON fp.feature_property_id = bftp.feature_property_id
+      JOIN feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+      ORDER BY fp.display_name, fp.name, fp.feature_property_id;
+    `;
+    const response = await this.connection.sql(query, FeatureProperty);
+    return response.rows;
+  }
+
+  /**
    * Build the base SELECT query that joins feature_property_type for type_name.
    *
    * @returns {Knex.QueryBuilder}
@@ -273,12 +345,12 @@ export class FeaturePropertyRepository extends BaseRepository {
    *
    * Without an assignment, the property is resolved on its own. With one, the assignment must carry the
    * property; it is accepted at any lifecycle, since a predicate may target values stored under a
-   * Blueprint version that has since been superseded.
+   * Blueprint version that has since been superseded. Retired property definitions remain valid for reads.
    *
    * @param {number} featurePropertyId - Shared feature property identifier.
    * @param {number | null} blueprintFeatureTypePropertyId - Optional Blueprint assignment the predicate narrows to.
    * @return {Promise<ExpressionPredicatePropertyMetadata>} Resolved metadata.
-   * @throws {ApiNotFoundError} If no matching active property, or no such assignment of it, exists.
+   * @throws {ApiNotFoundError} If no matching property, or no such assignment of it, exists.
    * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
    * @memberof FeaturePropertyRepository
    */
@@ -298,9 +370,7 @@ export class FeaturePropertyRepository extends BaseRepository {
             FROM feature_property fp
             INNER JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
-              AND fpt.record_end_date IS NULL
-            WHERE fp.feature_property_id = ${featurePropertyId}
-              AND fp.record_end_date IS NULL;
+            WHERE fp.feature_property_id = ${featurePropertyId};
           `
         : SQL`
             SELECT
@@ -312,10 +382,8 @@ export class FeaturePropertyRepository extends BaseRepository {
             FROM blueprint_feature_type_property bftp
             INNER JOIN feature_property fp
               ON fp.feature_property_id = bftp.feature_property_id
-              AND fp.record_end_date IS NULL
             INNER JOIN feature_property_type fpt
               ON fpt.feature_property_type_id = fp.feature_property_type_id
-              AND fpt.record_end_date IS NULL
             WHERE fp.feature_property_id = ${featurePropertyId}
               AND bftp.blueprint_feature_type_property_id = ${blueprintFeatureTypePropertyId};
           `;
