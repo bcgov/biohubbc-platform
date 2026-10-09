@@ -2,12 +2,52 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
 import { AdminSubmissionPage } from './AdminSubmissionPage';
 
-const mocks = vi.hoisted(() => ({ getSubmission: vi.fn(), listUploads: vi.fn() }));
+// Interaction-heavy DataGrid + dialog Autocomplete suite: each test renders the full page and chains
+// dialog interactions, which can exceed the default 5s ceiling when the whole app suite is running.
+const interactionTimeout = 20000;
+vi.setConfig({ testTimeout: interactionTimeout });
+
+const mocks = vi.hoisted(() => ({
+  getSubmission: vi.fn(),
+  listUploads: vi.fn(),
+  getDefaultBlueprint: vi.fn(),
+  updateDefaultBlueprint: vi.fn(),
+  getBlueprints: vi.fn(),
+  setSnackbar: vi.fn(),
+  roleNames: [] as string[]
+}));
 vi.mock('hooks/useApi', () => ({
   useApi: () => ({
-    submissions: { getSubmissionRecordWithSecurity: mocks.getSubmission, listAdminSubmissionUploads: mocks.listUploads }
+    submissions: {
+      getSubmissionRecordWithSecurity: mocks.getSubmission,
+      listAdminSubmissionUploads: mocks.listUploads
+    },
+    admin: {
+      getSubmissionDefaultBlueprint: mocks.getDefaultBlueprint,
+      updateSubmissionDefaultBlueprint: mocks.updateDefaultBlueprint
+    },
+    blueprints: { getBlueprints: mocks.getBlueprints }
   })
 }));
+vi.mock('hooks/useContext', () => ({
+  useDialogContext: () => ({ setSnackbar: mocks.setSnackbar, setOkDialog: vi.fn() })
+}));
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: () => ({ biohubUserWrapper: { roleNames: mocks.roleNames } })
+}));
+
+const blueprint = {
+  blueprint_id: 1,
+  name: 'Wildlife',
+  version_number: 1,
+  description: null,
+  is_default: true,
+  parent_blueprint_id: null,
+  record_effective_date: '2026-01-01',
+  record_end_date: null
+};
+const telemetryBlueprint = { ...blueprint, blueprint_id: 2, name: 'Telemetry', version_number: 2, is_default: false };
+const draftBlueprint = { ...blueprint, blueprint_id: 3, name: 'Draft plan', record_effective_date: null };
 
 const upload = {
   submission_upload_id: '22222222-2222-4222-8222-222222222222',
@@ -44,6 +84,9 @@ const renderAt = (path: string) =>
 describe('AdminSubmissionPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.roleNames = ['System Administrator'];
+    mocks.getDefaultBlueprint.mockResolvedValue(blueprint);
+    mocks.getBlueprints.mockResolvedValue({ blueprints: [blueprint, telemetryBlueprint, draftBlueprint] });
     mocks.getSubmission.mockResolvedValue({
       submission_id: 7,
       name: 'Submission seven',
@@ -70,6 +113,15 @@ describe('AdminSubmissionPage', () => {
     expect(screen.getByRole('tab', { name: 'Uploads' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('Updated observations')).toBeVisible();
     expect(screen.queryByRole('columnheader', { name: 'Ticket' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Upload ID',
+      'Status',
+      'Comment',
+      'Decision',
+      'Created'
+    ]);
+    expect(screen.getByRole('gridcell', { name: 'Indexed' })).toBeVisible();
+    expect(screen.getByRole('gridcell', { name: 'Pending' })).toBeVisible();
     expect(mocks.listUploads).toHaveBeenCalledWith(
       7,
       { page: 1, limit: 10, sort: 'create_date', order: 'desc' },
@@ -77,6 +129,95 @@ describe('AdminSubmissionPage', () => {
     );
     fireEvent.click(screen.getByText('Updated observations'));
     expect(await screen.findByText('Upload details')).toBeVisible();
+  });
+
+  /**
+   * Open the default blueprint edit dialog from the Metadata tab.
+   * @returns Queries scoped to the open dialog.
+   */
+  const openDefaultBlueprintDialog = async () => {
+    renderAt('/admin/submissions/7?tab=metadata');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit default_blueprint' }));
+    return within(await screen.findByRole('dialog'));
+  };
+
+  it('saves a default blueprint selected in the edit dialog', async () => {
+    mocks.updateDefaultBlueprint.mockResolvedValue(undefined);
+    const dialog = await openDefaultBlueprintDialog();
+    expect(mocks.getDefaultBlueprint).toHaveBeenCalledWith(7, { signal: expect.any(AbortSignal) });
+    expect(dialog.getByText('Wildlife (Version 1)')).toBeVisible();
+    fireEvent.mouseDown(dialog.getByRole('combobox', { name: 'Search blueprints' }));
+    expect(await screen.findByRole('option', { name: 'Draft plan (Version 1) - Draft' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    fireEvent.click(screen.getByRole('option', { name: 'Telemetry (Version 2)' }));
+    expect(dialog.getByText('Telemetry (Version 2)')).toBeVisible();
+    expect(dialog.queryByText('Wildlife (Version 1)')).not.toBeInTheDocument();
+    expect(mocks.updateDefaultBlueprint).not.toHaveBeenCalled();
+    mocks.getDefaultBlueprint.mockResolvedValue(telemetryBlueprint);
+    fireEvent.click(dialog.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mocks.updateDefaultBlueprint).toHaveBeenCalledWith(7, 2));
+    expect(await screen.findByRole('gridcell', { name: 'Telemetry (Version 2)' })).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mocks.setSnackbar).toHaveBeenCalledWith({ open: true, snackbarMessage: 'Default blueprint updated' });
+  });
+
+  it('blocks saving after the selected blueprint is removed until another is picked', async () => {
+    mocks.updateDefaultBlueprint.mockResolvedValue(undefined);
+    const dialog = await openDefaultBlueprintDialog();
+    fireEvent.click(dialog.getByRole('button', { name: 'remove Wildlife (Version 1)' }));
+    expect(dialog.queryByText('Wildlife (Version 1)')).not.toBeInTheDocument();
+    fireEvent.click(dialog.getByRole('button', { name: 'Save' }));
+    expect(await dialog.findByText('Select a blueprint')).toBeVisible();
+    expect(mocks.updateDefaultBlueprint).not.toHaveBeenCalled();
+    fireEvent.mouseDown(dialog.getByRole('combobox', { name: 'Search blueprints' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Telemetry (Version 2)' }));
+    expect(dialog.queryByText('Select a blueprint')).not.toBeInTheDocument();
+    fireEvent.click(dialog.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mocks.updateDefaultBlueprint).toHaveBeenCalledWith(7, 2));
+  });
+
+  it('discards a removed selection on cancel and saves nothing when unchanged', async () => {
+    const dialog = await openDefaultBlueprintDialog();
+    fireEvent.click(dialog.getByRole('button', { name: 'remove Wildlife (Version 1)' }));
+    fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('gridcell', { name: 'Wildlife (Version 1)' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit default_blueprint' }));
+    const reopened = within(await screen.findByRole('dialog'));
+    expect(reopened.getByText('Wildlife (Version 1)')).toBeVisible();
+    fireEvent.click(reopened.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mocks.updateDefaultBlueprint).not.toHaveBeenCalled();
+  });
+
+  it('searches blueprints on the server by keyword', async () => {
+    const dialog = await openDefaultBlueprintDialog();
+    fireEvent.change(dialog.getByRole('combobox', { name: 'Search blueprints' }), { target: { value: 'tele' } });
+    await waitFor(() => expect(mocks.getBlueprints).toHaveBeenLastCalledWith({ keyword: 'tele' }, expect.any(Object)));
+  });
+
+  it('reports a rejected save in a snackbar and keeps the selection', async () => {
+    mocks.updateDefaultBlueprint.mockRejectedValue(new Error('Requested Blueprint is not available'));
+    const dialog = await openDefaultBlueprintDialog();
+    fireEvent.mouseDown(dialog.getByRole('combobox', { name: 'Search blueprints' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Telemetry (Version 2)' }));
+    fireEvent.click(dialog.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(mocks.setSnackbar).toHaveBeenCalledWith({
+        open: true,
+        snackbarMessage: 'Requested Blueprint is not available'
+      })
+    );
+    expect(dialog.queryByText('Requested Blueprint is not available')).not.toBeInTheDocument();
+    expect(dialog.getByText('Telemetry (Version 2)')).toBeVisible();
+  });
+
+  it('shows the default blueprint without an edit action to data administrators', async () => {
+    mocks.roleNames = ['Data Administrator'];
+    renderAt('/admin/submissions/7?tab=metadata');
+    expect(await screen.findByRole('gridcell', { name: 'Wildlife (Version 1)' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit default_blueprint' })).not.toBeInTheDocument();
   });
 
   it('keeps pagination when switching to metadata and back', async () => {
@@ -95,7 +236,7 @@ describe('AdminSubmissionPage', () => {
     expect(metadata.getByRole('row', { name: 'create_user 42' })).toBeVisible();
     expect(metadata.getByRole('row', { name: 'create_date 2026-09-01T12:00:00Z' })).toBeVisible();
     expect(metadata.getByRole('row', { name: 'contributor_name SIMS' })).toBeVisible();
-    expect(metadata.getAllByRole('row')).toHaveLength(6);
+    expect(metadata.getAllByRole('row')).toHaveLength(7);
     expect(metadata.queryByText('contributor_id')).not.toBeInTheDocument();
     expect(metadata.queryByText('update_date')).not.toBeInTheDocument();
     expect(metadata.queryByText('update_user')).not.toBeInTheDocument();

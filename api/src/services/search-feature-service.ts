@@ -4,23 +4,28 @@ import { ApiNotFoundError } from '../errors/api-error';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureProperty } from '../models/feature-property';
-import {
-  ReconciliationFeatureCounts,
-  ReconciliationFeaturePage,
-  ReconciliationFeatureScope
-} from '../models/reconciliation';
+import { ReconciliationFeaturePage, ReconciliationFeatureScope } from '../models/reconciliation';
 import {
   SearchFeatureFilters,
   SearchFeaturePage,
   SearchFeatureSecurityContext,
   SubmissionUploadFeatureSearchFilters
 } from '../models/search';
+import {
+  SubmissionUploadFeatureTypeFilters,
+  SubmissionUploadFeatureTypesResponse,
+  SubmissionUploadScope
+} from '../models/submission-upload';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { optimizeExpression } from '../utils/expression-optimization';
 import { getLogger } from '../utils/logger';
-import { encodeSearchFeatureCursor, ensureCompleteCursorPaginationOptions } from '../utils/pagination';
-import { ApiCursorPaginationOptions, ApiCursorPaginationResults } from '../zod-schema/pagination';
+import {
+  encodeSearchFeatureCursor,
+  ensureCompleteCursorPaginationOptions,
+  makePaginationResponse
+} from '../utils/pagination';
+import { ApiCursorPaginationOptions, ApiCursorPaginationResults, ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
@@ -50,15 +55,31 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
-   * Get outcome totals and its feature-type sidebar across the complete upload lifecycle.
-   * @param {ReconciliationFeatureScope} scope Required submission, upload, and outcome.
-   * @returns {Promise<ReconciliationFeatureCounts>} Total and per-type counts.
+   * Retrieve a bounded page of the feature types stored in an upload across its complete lifecycle, after checking
+   * ownership.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<SubmissionUploadFeatureTypesResponse>} Feature types and pagination totals, including empty
+   * pages.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
    */
-  async countReconciliationFeatures(scope: ReconciliationFeatureScope): Promise<ReconciliationFeatureCounts> {
-    await this.validateReconciliationUpload(scope);
-    const featureTypes = await this.searchFeatureRepository.countReconciliationFeatures(scope);
-    const total = featureTypes.reduce((sum, featureType) => sum + featureType.count, 0);
-    return { total, feature_types: featureTypes };
+  async listSubmissionUploadFeatureTypes(
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionUploadFeatureTypesResponse> {
+    await this.submissionUploadService.getSubmissionUploadBySubmissionId(scope.submissionId, scope.submissionUploadId);
+
+    const featureTypes = await this.searchFeatureRepository.listSubmissionUploadFeatureTypes(
+      scope,
+      filters,
+      pagination
+    );
+    const total = await this.searchFeatureRepository.countSubmissionUploadFeatureTypes(scope, filters);
+
+    return { feature_types: featureTypes, pagination: makePaginationResponse(total, pagination) };
   }
 
   /**

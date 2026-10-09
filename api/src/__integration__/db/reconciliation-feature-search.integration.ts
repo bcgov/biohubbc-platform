@@ -68,15 +68,30 @@ describe('Reconciliation feature browsing (integration)', function () {
     await connection.sql(
       SQL`UPDATE submission_feature SET reconciliation = 'unmodified' WHERE submission_feature_id = ${other}`
     );
-    const counts = await service.countReconciliationFeatures(scope);
+    const filters = { reconciliation: scope.reconciliation };
+    const featureTypes = await service.listSubmissionUploadFeatureTypes(scope, filters, { page: 1, limit: 10 });
     const overview = await new SubmissionFeatureReconciliationRepository(
       connection
     ).getSubmissionFeatureReconciliationOverviewCounts(scope.submissionUploadId);
-    expect(counts.total).to.equal(overview.unmodified).and.to.equal(3);
-    expect(counts.feature_types).to.deep.equal([
+    expect(overview.unmodified).to.equal(3);
+    expect(featureTypes.pagination.total).to.equal(2);
+    expect(featureTypes.feature_types).to.deep.equal([
       { feature_type_name: 'animal', count: 2 },
       { feature_type_name: 'survey', count: 1 }
     ]);
+    const secondPage = await service.listSubmissionUploadFeatureTypes(scope, filters, {
+      page: 2,
+      limit: 1,
+      sort: 'count',
+      order: 'desc'
+    });
+    expect(secondPage.feature_types).to.deep.equal([{ feature_type_name: 'survey', count: 1 }]);
+    const allOutcomes = await service.listSubmissionUploadFeatureTypes(
+      scope,
+      { reconciliation: null },
+      { page: 1, limit: 10 }
+    );
+    expect(allOutcomes.feature_types.find((type) => type.feature_type_name === 'animal')?.count).to.equal(5);
     const page = await service.getReconciliationFeatures(scope, 'animal', {
       limit: 10,
       sort: 'submission_feature_id',
@@ -84,7 +99,11 @@ describe('Reconciliation feature browsing (integration)', function () {
     });
     expect(page.features.map((row) => row.submission_feature_id)).to.deep.equal([first, second]);
     expect(
-      await new SearchFeatureRepository(connection).countReconciliationFeatures({ ...scope, submissionId: -1 })
+      await new SearchFeatureRepository(connection).listSubmissionUploadFeatureTypes(
+        { ...scope, submissionId: -1 },
+        filters,
+        { page: 1, limit: 10 }
+      )
     ).to.deep.equal([]);
   });
 
@@ -171,7 +190,12 @@ describe('Reconciliation feature browsing (integration)', function () {
     const property = page.properties.find((item) => item.feature_property_id === text.featurePropertyId);
     expect(property).not.to.be.undefined;
     expect(page.features[0].properties[property!.name]).to.deep.equal(['Retained value']);
-    expect((await service.countReconciliationFeatures(scope)).total).to.equal(1);
+    const featureTypes = await service.listSubmissionUploadFeatureTypes(
+      scope,
+      { reconciliation: scope.reconciliation },
+      { page: 1, limit: 10 }
+    );
+    expect(featureTypes.feature_types.map((type) => type.count)).to.deep.equal([1]);
     const definitions = await new FeaturePropertyRepository(connection).getSubmissionUploadFeatureTypeProperties(
       scope.submissionId,
       scope.submissionUploadId,
@@ -242,7 +266,13 @@ describe('Reconciliation feature browsing (integration)', function () {
   });
 
   it('returns empty counts and pages for an outcome without matches', async () => {
-    expect(await service.countReconciliationFeatures(scope)).to.deep.equal({ total: 0, feature_types: [] });
+    const featureTypes = await service.listSubmissionUploadFeatureTypes(
+      scope,
+      { reconciliation: scope.reconciliation },
+      { page: 1, limit: 10 }
+    );
+    expect(featureTypes.feature_types).to.deep.equal([]);
+    expect(featureTypes.pagination.total).to.equal(0);
     const page = await service.getReconciliationFeatures(scope, 'animal', {
       limit: 10,
       sort: 'submission_feature_id',

@@ -11,15 +11,40 @@ vi.mock('hooks/useContext');
 vi.mock('./components/SubmissionUploadReviewHeader', () => ({
   SubmissionUploadReviewHeader: ({
     review,
+    tabs,
+    activeTab,
+    onTabChange,
     onStatusActionClick
   }: {
     review: { name: string };
+    tabs: { value: string; label: string }[];
+    activeTab: string;
+    onTabChange: (tab: string) => void;
     onStatusActionClick: () => void;
   }) => (
     <div data-testid="review-header">
       {review.name}
+      {tabs.map((tab) => (
+        <button
+          key={tab.value}
+          role="tab"
+          aria-selected={tab.value === activeTab}
+          onClick={() => onTabChange(tab.value)}>
+          {tab.label}
+        </button>
+      ))}
       <button onClick={onStatusActionClick}>Change status</button>
     </div>
+  )
+}));
+// The errors grid is exercised with the upload page; here we only care that the tab shows it for the reviewed upload.
+vi.mock('features/submissions/upload/components/content/AdminSubmissionUploadErrors', () => ({
+  AdminSubmissionUploadErrors: ({ scope }: { scope: { submissionId: number; submissionUploadId: string } }) => (
+    <div
+      data-testid="upload-errors"
+      data-submission-id={scope.submissionId}
+      data-upload-id={scope.submissionUploadId}
+    />
   )
 }));
 // The map owns its own session and is exercised by its own suite; here we only care that the page mounts it for the
@@ -58,6 +83,57 @@ describe('SubmissionUploadReviewValidationPage', () => {
       }
     });
     getReconciliationCounts.mockResolvedValue({ new: 4, modified: 2, unmodified: 7 });
+  });
+
+  it('shows the upload errors on the Errors tab and keeps the Features tab mounted behind it', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[`/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}`]}>
+        <Routes>
+          <Route
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={validationReview} />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const map = await screen.findByTestId('upload-map');
+    expect(screen.getByRole('tab', { name: 'Features' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('upload-errors')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Errors' }));
+
+    const errors = await screen.findByTestId('upload-errors');
+    expect(errors).toHaveAttribute('data-submission-id', '16');
+    expect(errors).toHaveAttribute('data-upload-id', submissionUploadId);
+    expect(screen.getByRole('tab', { name: 'Errors' })).toHaveAttribute('aria-selected', 'true');
+    expect(map).not.toBeVisible();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Features' }));
+
+    await waitFor(() => expect(map).toBeVisible());
+    expect(screen.getByTestId('upload-map')).toBe(map);
+    expect(screen.queryByTestId('upload-errors')).not.toBeInTheDocument();
+  });
+
+  it('opens on the Errors tab from the URL without mounting the Features tab', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          `/admin/submission/16/upload/${submissionUploadId}/review/${submissionUploadReviewId}?tab=errors`
+        ]}>
+        <Routes>
+          <Route
+            path="/admin/submission/:submissionId/upload/:submissionUploadId/review/:submissionUploadReviewId"
+            element={<SubmissionUploadReviewValidationPage review={validationReview} />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTestId('upload-errors')).toBeVisible();
+    expect(screen.queryByTestId('upload-map')).not.toBeInTheDocument();
   });
 
   it('renders the review overview without requesting or displaying a feature list', async () => {

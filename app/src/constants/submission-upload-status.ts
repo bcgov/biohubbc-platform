@@ -1,4 +1,5 @@
 import { mdiCheck, mdiClose, mdiCloudUploadOutline, mdiHelpCircleOutline, mdiProgressClock } from '@mdi/js';
+import { ChipProps } from '@mui/material/Chip';
 import { SubmissionUploadDecision, SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 
@@ -60,3 +61,20 @@ export const SUBMISSION_UPLOAD_DECISION_BUTTON_COLORS: Partial<Record<Submission
     approved: 'success',
     denied: 'error'
   };
+
+/** Chip colour for a terminal processing status; statuses still in progress use {@link SUBMISSION_UPLOAD_ACTIVE_JOB_STATUS_CHIP_COLOR}. */
+export const SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_CHIP_COLORS: Partial<
+  Record<SubmissionUploadJobStatus, ChipProps['color']>
+> = {
+  indexed: 'success',
+  invalid: 'error',
+  failed: 'error'
+};
+
+export const SUBMISSION_UPLOAD_ACTIVE_JOB_STATUS_CHIP_COLOR: ChipProps['color'] = 'info';
+
+export const SUBMISSION_UPLOAD_DECISION_CHIP_COLORS: Record<SubmissionUploadDecision, ChipProps['color']> = {
+  pending: 'default',
+  approved: 'success',
+  denied: 'error'
+};

@@ -63,6 +63,9 @@ export const SubmissionUploadReviewSecurityPage = ({ review }: SubmissionUploadR
       <SubmissionUploadReviewHeader
         submissionId={Number(submissionId)}
         review={review}
+        tabs={[{ value: 'features', label: 'Features' }]}
+        activeTab="features"
+        onTabChange={() => {}}
         onStatusActionClick={openStatusDialog}
       />
       <Container maxWidth="xl" sx={{ py: 4 }}>

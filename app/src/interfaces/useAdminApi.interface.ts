@@ -1,5 +1,4 @@
 import { IFeatureProperty } from './useFeaturePropertiesApi.interface';
-import { SearchFeatureProperty, SearchFeatureResultWithRelevancy } from './useSearchApi.interface';
 import { ExpressionTreeExpression } from './expression.interface';
 import { ApiCursorResponseParams, ApiPaginationResponseParams } from 'types/pagination';
 
@@ -108,18 +107,46 @@ export interface ReconciliationFeatureScope {
   reconciliation: ReconciliationType;
 }
 
-export interface ReconciliationFeatureCounts {
-  total: number;
-  feature_types: { feature_type_name: string; count: number }[];
+/** A feature type stored in an upload and the number of its features. */
+export interface SubmissionUploadFeatureType {
+  feature_type_name: string;
+  count: number;
 }
 
-export interface ReconciliationFeaturePage {
-  features: SearchFeatureResultWithRelevancy[];
-  properties: SearchFeatureProperty[];
-  pagination: ApiCursorResponseParams;
+/** Filters of the administrative submission upload feature type list. */
+export interface SubmissionUploadFeatureTypeFilters {
+  /** Count only features with this stored reconciliation outcome. Every feature is counted when omitted. */
+  reconciliation?: ReconciliationType;
+}
+
+export interface SubmissionUploadFeatureTypesResponse {
+  feature_types: SubmissionUploadFeatureType[];
+  pagination: ApiPaginationResponseParams;
 }
 
 /** Property definitions observed for one feature type across an upload. */
 export interface ISubmissionUploadFeatureTypePropertiesResponse {
   properties: IFeatureProperty[];
+}
+
+/** Ownership boundary for administrative upload browsing. */
+export interface SubmissionUploadScope {
+  submissionId: number;
+  submissionUploadId: string;
+}
+
+/** An aggregated ingestion error of a submission upload. */
+export interface SubmissionFeatureError {
+  submission_feature_error_id: number;
+  error_code: string;
+  error_message: string;
+  /** Feature type of the property the error is about. Null for an error that is not about a property. */
+  feature_type_name: string | null;
+  property_name: string | null;
+  count: number;
+}
+
+export interface SubmissionFeatureErrorsResponse {
+  errors: SubmissionFeatureError[];
+  pagination: ApiPaginationResponseParams;
 }

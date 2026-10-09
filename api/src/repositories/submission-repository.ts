@@ -52,6 +52,8 @@ export interface ICreateSubmission {
   name: string;
   description: string;
   comment: string;
+  /** Blueprint for uploads that do not name one; null falls back to the system default blueprint. */
+  default_blueprint_id: number | null;
 }
 
 export interface ICreateSubmissionWithTeam extends ICreateSubmission {
@@ -141,6 +143,7 @@ export interface ISubmissionModel {
   system_user_id: number;
   team_id: string;
   comment?: string | null;
+  default_blueprint_id?: number | null;
   security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
@@ -375,7 +378,8 @@ export class SubmissionRepository extends BaseRepository {
         contributor_id,
         name,
         description,
-        comment
+        comment,
+        default_blueprint_id
       ) VALUES (
         ${submissionData.uuid},
         ${submissionData.system_user_id},
@@ -383,7 +387,8 @@ export class SubmissionRepository extends BaseRepository {
         ${submissionData.contributor_id},
         ${submissionData.name},
         ${submissionData.description},
-        ${submissionData.comment}
+        ${submissionData.comment},
+        ${submissionData.default_blueprint_id}
       )
       RETURNING
         submission_id;
@@ -399,6 +404,35 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Set the blueprint that new uploads of an active submission use when the upload request does not name one.
+   *
+   * @param {number} submissionId - The submission to update.
+   * @param {number} blueprintId - The submission's new default blueprint.
+   * @returns {Promise<void>} - Resolves after the submission's default blueprint has been updated.
+   * @throws {ApiNotFoundError} - If no active submission was updated.
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionDefaultBlueprint(submissionId: number, blueprintId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission
+      SET
+        default_blueprint_id = ${blueprintId}
+      WHERE
+        submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Submission not found', [
+        'SubmissionRepository->updateSubmissionDefaultBlueprint',
+        { submissionId }
+      ]);
+    }
   }
 
   /**

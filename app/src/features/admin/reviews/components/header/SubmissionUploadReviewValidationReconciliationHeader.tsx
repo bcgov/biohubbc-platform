@@ -13,7 +13,7 @@ interface SubmissionUploadReviewValidationReconciliationHeaderProps {
 }
 
 /**
- * Render outcome navigation and the single Features tab.
+ * Render outcome navigation and the single Feature types tab.
  * @param {SubmissionUploadReviewValidationReconciliationHeaderProps} props Review ancestry and outcome label.
  * @returns {JSX.Element} Outcome page header.
  */
@@ -47,10 +47,10 @@ export const SubmissionUploadReviewValidationReconciliationHeader = ({
     label={<Typography variant="h1">{label}</Typography>}
     tabs={
       <TabGroup
-        value="features"
+        value="feature-types"
         onChange={() => {}}
         ariaLabel="Reconciliation sections"
-        tabs={[{ value: 'features', label: 'Features' }]}
+        tabs={[{ value: 'feature-types', label: 'Feature types' }]}
       />
     }
   />

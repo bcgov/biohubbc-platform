@@ -44,6 +44,14 @@ const submission = (submissionId: number) => [QUERY_KEY_ROOT.SUBMISSION, submiss
 const record = (submissionId: number) => [...submission(submissionId), 'record'] as const;
 
 /**
+ * Key of the blueprint a submission's future uploads use by default.
+ *
+ * @param {number} submissionId The submission.
+ * @returns The submission default blueprint key.
+ */
+const defaultBlueprint = (submissionId: number) => [...submission(submissionId), 'default-blueprint'] as const;
+
+/**
  * Key of one page of uploads in the administrative submission view.
  *
  * @param {number} submissionId Submission being viewed.
@@ -107,6 +115,7 @@ export const submissionQueryKeys = {
   adminList,
   submission,
   record,
+  defaultBlueprint,
   adminUploads,
   features,
   feature,

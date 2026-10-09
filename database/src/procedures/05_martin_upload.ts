@@ -34,6 +34,10 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * whether a map is offered and where it opens. If the two disagree the map either frames empty space
  * or claims the upload has no spatial properties while tiles still render. Change both together.
  *
+ * The context may end with a reconciliation outcome (`su:<submission>:<upload>:<outcome>`), which
+ * limits the tile to the active features stored with that outcome. Without it every active feature
+ * of the upload is drawn. The extent query takes the same optional outcome.
+ *
  * There is no low zoom clustering. `martin_search` clusters because its candidate set is the whole
  * corpus; here the candidate set is bounded by one upload's features whatever the zoom, and the
  * query is driven from that side (see the join order comment) so a province-wide tile never scans
@@ -70,6 +74,7 @@ export async function seed(knex: Knex): Promise<void> {
       v_context_text         text;
       v_submission_id        integer;
       v_submission_upload_id uuid;
+      v_reconciliation       biohub.submission_feature_reconciliation_type;
       v_env_3857             public.geometry;
       v_candidates_4326      public.geometry;
       v_mvt                  bytea;
@@ -82,13 +87,15 @@ export async function seed(knex: Knex): Promise<void> {
       -- Case insensitive so a token minted from an upper case uuid still resolves; the API mints from
       -- the stored (lower case) value, so in practice the two never differ.
       IF v_context_text IS NULL
-         OR v_context_text !~* '^su:[0-9]{1,10}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+         OR v_context_text !~* '^su:[0-9]{1,10}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:(new|modified|unmodified))?$' THEN
         RETURN NULL;
       END IF;
 
       BEGIN
         v_submission_id        := split_part(v_context_text, ':', 2)::integer;
         v_submission_upload_id := split_part(v_context_text, ':', 3)::uuid;
+        -- Absent for an unfiltered session; the pattern above admits only the stored outcomes.
+        v_reconciliation       := NULLIF(split_part(v_context_text, ':', 4), '')::biohub.submission_feature_reconciliation_type;
       EXCEPTION
         -- The pattern above bounds the digit count, not the magnitude, so a ten digit value can still
         -- overflow integer. The uuid cast is belt and braces: the pattern already guarantees the shape.
@@ -157,6 +164,7 @@ export async function seed(knex: Knex): Promise<void> {
           AND sf.submission_id = v_submission_id
           -- Active, not published: see the function comment. Keep this literal form.
           AND sf.record_end_date IS NULL
+          AND (v_reconciliation IS NULL OR sf.reconciliation = v_reconciliation)
           AND g.value && v_candidates_4326
       ) feature_rows
       WHERE feature_rows.geom IS NOT NULL;
@@ -170,7 +178,7 @@ export async function seed(knex: Knex): Promise<void> {
     -- Martin parses the function comment as TileJSON metadata and logs a warning if it is not valid
     -- JSON, so the description is provided as a TileJSON fragment rather than prose.
     COMMENT ON FUNCTION biohub.martin_upload(integer, integer, integer, json) IS
-      '{"description": "Spatial property vector tiles for every active submission feature of one submission upload. The submission and upload identifiers are carried by the verified token, and the upload to submission relationship is re-checked here."}';
+      '{"description": "Spatial property vector tiles for every active submission feature of one submission upload. The submission and upload identifiers, and an optional reconciliation outcome, are carried by the verified token, and the upload to submission relationship is re-checked here."}';
 
     ----------------------------------------------------------------------------------------
     -- Grants

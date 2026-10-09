@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ApiPaginationResults } from '../zod-schema/pagination';
+import { ReconciliationType } from './reconciliation';
 import { SubmissionUploadReview } from './submission-upload-review';
 import { TicketSubmissionValidation } from './submission-validation';
 import { UploadArtifactRoleEnum } from './upload-artifact';
@@ -163,4 +164,32 @@ export interface StartSubmissionArchiveUploadInput {
   comment: string | null;
   requestedBlueprintId?: number | null;
   archiveFormat?: SubmissionArchiveFormat;
+}
+
+/** Submission and upload ownership boundary for administrative browsing. */
+export interface SubmissionUploadScope {
+  submissionId: number;
+  submissionUploadId: string;
+}
+
+/** Sortable columns of the administrative submission upload feature type list. */
+export const SUBMISSION_UPLOAD_FEATURE_TYPE_SORT_COLUMNS = ['feature_type_name', 'count'];
+
+/** A feature type stored in an upload and the number of its features, including historical rows. */
+export const SubmissionUploadFeatureType = z.object({
+  feature_type_name: z.string(),
+  count: z.number().int().nonnegative()
+});
+
+export type SubmissionUploadFeatureType = z.infer<typeof SubmissionUploadFeatureType>;
+
+/** Filters of the administrative submission upload feature type list. */
+export interface SubmissionUploadFeatureTypeFilters {
+  /** Stored reconciliation outcome whose features are counted, or null for every feature of the upload. */
+  reconciliation: ReconciliationType | null;
+}
+
+export interface SubmissionUploadFeatureTypesResponse {
+  feature_types: SubmissionUploadFeatureType[];
+  pagination: ApiPaginationResults;
 }
