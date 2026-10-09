@@ -105,13 +105,37 @@ describe('createSubmissionUploadTileSession', () => {
     await index.createSubmissionUploadTileSession()(mockReq, mockRes, mockNext);
 
     expect(ownershipStub).to.have.been.calledOnceWith(16, submissionUploadId);
-    expect(extentStub).to.have.been.calledOnceWith(16, submissionUploadId);
+    expect(extentStub).to.have.been.calledOnceWith(16, submissionUploadId, null);
     expect(ownershipStub).to.have.been.calledBefore(extentStub);
     // The context is the source of truth at serve time, so it must carry exactly the identifiers the
     // ownership check just approved, spelled as stored rather than as sent.
     expect(mintTokenStub).to.have.been.calledOnceWith({
       source: 'upload',
       ctx: `su:16:${submissionUploadId}`
+    });
+  });
+
+  it('limits the extent and the token context to a requested reconciliation outcome', async () => {
+    const dbConnectionObj = getMockDBConnection();
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+
+    stubOwnership();
+    const extentStub = sinon
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getSubmissionUploadGeometryExtent')
+      .resolves({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
+
+    const mintTokenStub = stubMintToken();
+    sinon.stub(MartinTokenService.prototype, 'getMartinUrlTemplate').returns('/martin/upload/{z}/{x}/{y}');
+
+    const { mockReq, mockRes, mockNext } = buildRequest();
+    mockReq.body = { reconciliation: 'modified' };
+
+    await index.createSubmissionUploadTileSession()(mockReq, mockRes, mockNext);
+
+    expect(extentStub).to.have.been.calledOnceWith(16, submissionUploadId, 'modified');
+    expect(mintTokenStub).to.have.been.calledOnceWith({
+      source: 'upload',
+      ctx: `su:16:${submissionUploadId}:modified`
     });
   });
 

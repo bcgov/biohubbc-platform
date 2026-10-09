@@ -1,9 +1,10 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
-  ReconciliationFeatureScope,
-  ReconciliationFeatureCounts,
-  ReconciliationFeaturePage,
+  SubmissionUploadScope,
+  SubmissionFeatureErrorsResponse,
+  SubmissionUploadFeatureTypeFilters,
+  SubmissionUploadFeatureTypesResponse,
   ISubmissionUploadFeatureGeometryExtent,
   ISubmissionUploadFeatureTypePropertiesResponse,
   IgcNotifyGenericMessage,
@@ -16,6 +17,7 @@ import {
   ISubmissionUploadReviewSelectedFeatureRuleResponse,
   SubmissionFeatureSecurityRulesFilters
 } from 'interfaces/useAdminApi.interface';
+import { IBlueprint } from 'interfaces/useBlueprintsApi.interface';
 import { ISubmissionFeaturePropertiesResponse, ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface';
 import { ISubmissionFeatureForReviewResponse } from 'interfaces/useSubmissionsApi.interface';
 import qs from 'qs';
@@ -28,6 +30,67 @@ import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from '
  * @return {*} object whose properties are supported api methods.
  */
 const useAdminApi = (axios: AxiosInstance) => {
+  /**
+   * Fetch one page of the aggregated ingestion errors of a submission upload.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<SubmissionFeatureErrorsResponse>} Errors with server pagination totals.
+   */
+  const listSubmissionFeatureErrors = async (
+    scope: SubmissionUploadScope,
+    pagination: ApiPaginationRequestOptions,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<SubmissionFeatureErrorsResponse> => {
+    const { data } = await axios.get<SubmissionFeatureErrorsResponse>(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/error`,
+      { params: pagination, ...options }
+    );
+    return data;
+  };
+
+  /**
+   * Load the blueprint a submission upload was created with.
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<IBlueprint>} The upload's blueprint.
+   */
+  const getSubmissionUploadBlueprint = async (
+    scope: SubmissionUploadScope,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IBlueprint> => {
+    const { data } = await axios.get(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/blueprint`,
+      options
+    );
+    return data;
+  };
+
+  /**
+   * Load the blueprint a submission's future uploads use by default.
+   * @param {number} submissionId Submission identifier.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<IBlueprint>} The submission's default blueprint.
+   */
+  const getSubmissionDefaultBlueprint = async (
+    submissionId: number,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IBlueprint> => {
+    const { data } = await axios.get(`/api/administrative/submission/${submissionId}/blueprint`, options);
+    return data;
+  };
+
+  /**
+   * Set the blueprint a submission's future uploads use by default.
+   * @param {number} submissionId Submission identifier.
+   * @param {number} blueprintId Available blueprint to use for future uploads.
+   * @returns {Promise<void>} Resolves after the submission has been updated.
+   */
+  const updateSubmissionDefaultBlueprint = async (submissionId: number, blueprintId: number): Promise<void> => {
+    await axios.patch(`/api/administrative/submission/${submissionId}`, { default_blueprint_id: blueprintId });
+  };
+
   /**
    * Get unique property definitions present for a feature type across the whole upload.
    * @param {number} submissionId Owning submission.
@@ -50,40 +113,23 @@ const useAdminApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Load feature-type counts for all rows with a stored reconciliation outcome.
-   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * Fetch one page of the feature types stored in a submission upload, with the number of features of each.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
    * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
-   * @returns {Promise<ReconciliationFeatureCounts>} Outcome total and feature-type sidebar counts.
+   * @returns {Promise<SubmissionUploadFeatureTypesResponse>} Feature types with server pagination totals.
    */
-  const countReconciliationFeatures = async (
-    scope: ReconciliationFeatureScope,
+  const listSubmissionUploadFeatureTypes = async (
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters,
+    pagination: ApiPaginationRequestOptions,
     options: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<ReconciliationFeatureCounts> => {
-    const { data } = await axios.get(
-      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/reconciliation/${scope.reconciliation}/features/count`,
-      options
-    );
-    return data;
-  };
-
-  /**
-   * Load a bounded, hydrated page of reconciliation features.
-   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
-   * @param {string} featureType Selected feature type.
-   * @param {ApiCursorPaginationRequestOptions} pagination Cursor and sorting options.
-   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
-   * @returns {Promise<ReconciliationFeaturePage>} Features, property columns, and adjacent-page cursors.
-   */
-  const getReconciliationFeatures = async (
-    scope: ReconciliationFeatureScope,
-    featureType: string,
-    pagination: ApiCursorPaginationRequestOptions,
-    options: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<ReconciliationFeaturePage> => {
-    const { data } = await axios.post(
-      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/reconciliation/${scope.reconciliation}/features`,
-      { featureType, pagination },
-      options
+  ): Promise<SubmissionUploadFeatureTypesResponse> => {
+    const { data } = await axios.get<SubmissionUploadFeatureTypesResponse>(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/feature-types`,
+      { params: { ...filters, ...pagination }, ...options }
     );
     return data;
   };
@@ -510,9 +556,12 @@ const useAdminApi = (axios: AxiosInstance) => {
   };
 
   return {
+    listSubmissionFeatureErrors,
+    getSubmissionUploadBlueprint,
+    getSubmissionDefaultBlueprint,
+    updateSubmissionDefaultBlueprint,
     getSubmissionUploadFeatureTypeProperties,
-    countReconciliationFeatures,
-    getReconciliationFeatures,
+    listSubmissionUploadFeatureTypes,
     getSubmissionUploadReconciliationCounts,
     getSubmissionUploadFeatureGeometryExtent,
     getSubmissionUploadReview,

@@ -1,5 +1,6 @@
 import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
+import { ReconciliationType } from 'interfaces/useAdminApi.interface';
 import { CreateTileExtentSessionResponse, IMartinSession } from 'interfaces/useMartinApi.interface';
 
 /**
@@ -68,7 +69,8 @@ export const useMartinApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Create a tile session for the spatial properties of every active feature of a submission upload.
+   * Create a tile session for the spatial properties of every active feature of a submission upload, or only those
+   * with one reconciliation outcome when `options.reconciliation` is given.
    *
    * Restricted to system administrators, for the upload review page. The API verifies that the upload belongs to the
    * submission before issuing a token scoped to that upload alone; the identifiers travel inside the token, so
@@ -78,17 +80,19 @@ export const useMartinApi = (axios: AxiosInstance) => {
    *
    * @param {number} submissionId
    * @param {string} submissionUploadId
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
+   * @param {Pick<AxiosRequestConfig, 'signal'> & { reconciliation?: ReconciliationType }} [options]
    * @return {Promise<CreateTileExtentSessionResponse>}
    */
   const createSubmissionUploadTileSession = async (
     submissionId: number,
     submissionUploadId: string,
-    options?: Pick<AxiosRequestConfig, 'signal'>
+    options?: Pick<AxiosRequestConfig, 'signal'> & { reconciliation?: ReconciliationType }
   ): Promise<CreateTileExtentSessionResponse> => {
+    const body = options?.reconciliation ? { reconciliation: options.reconciliation } : undefined;
+
     const { data } = await axios.post<CreateTileExtentSessionResponse>(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/tile`,
-      undefined,
+      body,
       { signal: options?.signal }
     );
 

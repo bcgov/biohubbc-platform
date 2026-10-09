@@ -131,6 +131,9 @@ describe('Martin upload function (integration)', function () {
         'su:1:not-a-uuid',
         `su:${uuid}:1`,
         `su:1:${uuid}:x`,
+        `su:1:${uuid}:`,
+        `su:1:${uuid}:deleted`,
+        `su:1:${uuid}:new:new`,
         `sf:1:${uuid}`,
         'sf:1:1',
         `su:1:${uuid}'; SELECT 1--`
@@ -193,6 +196,44 @@ describe('Martin upload function (integration)', function () {
       expect(geometries.map((geometry) => geometry.properties.submission_feature_property_geometry_id)).to.not.include(
         other.geometryId
       );
+    });
+
+    it('draws only the features stored with the reconciliation outcome named in the context', async () => {
+      const { submissionId, uploadId, featureId, geometryId } = await createUploadWithPoint();
+      // Same upload, same location: only the stored outcome can tell them apart.
+      const modifiedFeatureId = await insertFeature(submissionId, uploadId);
+      const modifiedGeometryId = await addGeometry(modifiedFeatureId, `POINT(${TEST_LNG} ${TEST_LAT})`);
+      await fixture.connection.sql(
+        SQL`
+          UPDATE submission_feature
+          SET reconciliation = CASE submission_feature_id
+            WHEN ${featureId} THEN 'new'::submission_feature_reconciliation_type
+            ELSE 'modified'::submission_feature_reconciliation_type
+          END
+          WHERE submission_feature_id IN (${featureId}, ${modifiedFeatureId});
+        `
+      );
+      const context = contextFor(submissionId, uploadId);
+
+      const modified = await decodeGeometries(`${context}:modified`);
+      expect(modified.map((geometry) => geometry.properties.submission_feature_property_geometry_id)).to.eql([
+        modifiedGeometryId
+      ]);
+      const unfiltered = await decodeGeometries(context);
+      expect(unfiltered.map((geometry) => geometry.properties.submission_feature_property_geometry_id)).to.have.members(
+        [geometryId, modifiedGeometryId]
+      );
+      expect(await renderTileBuffer(`${context}:unmodified`)).to.be.null;
+
+      const service = new SubmissionFeaturePropertyGeometryService(fixture.connection);
+      expect(await service.getSubmissionUploadGeometryExtent(submissionId, uploadId, 'modified')).to.eql({
+        bbox: [TEST_LNG, TEST_LAT, TEST_LNG, TEST_LAT],
+        geometry_count: 1
+      });
+      expect(await service.getSubmissionUploadGeometryExtent(submissionId, uploadId, 'unmodified')).to.eql({
+        bbox: null,
+        geometry_count: 0
+      });
     });
 
     it('returns an empty tile when the upload belongs to a different submission', async () => {

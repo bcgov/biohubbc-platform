@@ -5,15 +5,20 @@ import { ApiValidationError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureProperty } from '../models/feature-property';
-import { ReconciliationFeatureScope, ReconciliationFeatureTypeCount } from '../models/reconciliation';
+import { ReconciliationFeatureScope } from '../models/reconciliation';
 import {
   NormalizedSubmissionUploadFeatureSearchFilters,
   SearchFeatureFilters,
   SearchFeatureSecurityContext
 } from '../models/search';
 import { SearchFeatureSort, type SearchFeatureQueryOptions } from '../models/search-feature-pagination';
+import {
+  SubmissionUploadFeatureType,
+  SubmissionUploadFeatureTypeFilters,
+  SubmissionUploadScope
+} from '../models/submission-upload';
 import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
-import { ApiCursorPaginationOptions } from '../zod-schema/pagination';
+import { ApiCursorPaginationOptions, ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { dependencies as expressionEvaluation } from './expression-evaluation';
 import { applySearchQueryOptions } from './search-feature-pagination-sql';
@@ -32,22 +37,62 @@ import { buildSubmissionUploadFeatureIdsSubquery } from './submission-upload-fea
  */
 export class SearchFeatureRepository extends BaseRepository {
   /**
-   * Count every stored outcome row by feature type, including ended and unpublished rows.
-   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
-   * @returns {Promise<ReconciliationFeatureTypeCount[]>} Ordered feature-type counts.
+   * List one page of the feature types stored in an upload with the number of features of each, including ended and
+   * unpublished rows.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @param {ApiPaginationOptions} pagination Page size, offset and validated sort.
+   * @returns {Promise<SubmissionUploadFeatureType[]>} One page of feature types, with stable ordering.
    */
-  async countReconciliationFeatures(scope: ReconciliationFeatureScope): Promise<ReconciliationFeatureTypeCount[]> {
+  async listSubmissionUploadFeatureTypes(
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionUploadFeatureType[]> {
     const knex = getKnex();
     const query = knex('submission_feature as sf')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .where('sf.submission_id', scope.submissionId)
       .where('sf.submission_upload_id', scope.submissionUploadId)
-      .where('sf.reconciliation', scope.reconciliation)
       .select('ft.name as feature_type_name', knex.raw('count(*)::integer as count'))
       .groupBy('ft.name')
-      .orderBy('ft.name');
-    const response = await this.connection.knex(query, ReconciliationFeatureTypeCount);
+      .orderBy(pagination.sort ?? 'feature_type_name', pagination.order ?? 'asc')
+      .orderBy('feature_type_name', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    if (filters.reconciliation) {
+      query.where('sf.reconciliation', filters.reconciliation);
+    }
+
+    const response = await this.connection.knex(query, SubmissionUploadFeatureType);
     return response.rows;
+  }
+
+  /**
+   * Count the feature types stored in an upload, including those of ended and unpublished rows.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload boundary.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @returns {Promise<number>} Number of feature types.
+   */
+  async countSubmissionUploadFeatureTypes(
+    scope: SubmissionUploadScope,
+    filters: SubmissionUploadFeatureTypeFilters
+  ): Promise<number> {
+    const knex = getKnex();
+    const query = knex('submission_feature as sf')
+      .select(knex.raw('count(distinct sf.feature_type_id)::integer as count'))
+      .where('sf.submission_id', scope.submissionId)
+      .where('sf.submission_upload_id', scope.submissionUploadId);
+
+    if (filters.reconciliation) {
+      query.where('sf.reconciliation', filters.reconciliation);
+    }
+
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
   }
 
   /**

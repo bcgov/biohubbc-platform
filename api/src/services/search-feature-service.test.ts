@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import type { ExpressionTree } from '../models/expression-tree';
 import type { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
@@ -27,30 +27,46 @@ describe('SearchFeatureService', () => {
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({ submission_id: 7 } as any);
     });
 
-    it('sums grouped counts, including an empty outcome', async () => {
-      const count = sinon.stub(SearchFeatureRepository.prototype, 'countReconciliationFeatures');
-      count.onFirstCall().resolves([
-        { feature_type_name: 'animal', count: 2 },
-        { feature_type_name: 'survey', count: 3 }
-      ]);
-      count.onSecondCall().resolves([]);
+    it('preserves totals for a requested feature type page beyond the last one, including an empty outcome', async () => {
+      const ownership = sinon
+        .stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId')
+        .resolves({ submission_id: 7 } as any);
+      const list = sinon.stub(SearchFeatureRepository.prototype, 'listSubmissionUploadFeatureTypes').resolves([]);
+      const count = sinon.stub(SearchFeatureRepository.prototype, 'countSubmissionUploadFeatureTypes');
+      count.onFirstCall().resolves(11);
+      count.onSecondCall().resolves(0);
+      const uploadScope = { submissionId: 7, submissionUploadId: 'upload' };
+      const filters = { reconciliation: 'unmodified' as const };
+      const pagination = { page: 3, limit: 10, sort: 'count', order: 'desc' as const };
       const service = new SearchFeatureService(getMockDBConnection());
-      expect(await service.countReconciliationFeatures(scope)).to.deep.equal({
-        total: 5,
-        feature_types: [
-          { feature_type_name: 'animal', count: 2 },
-          { feature_type_name: 'survey', count: 3 }
-        ]
+
+      expect(await service.listSubmissionUploadFeatureTypes(uploadScope, filters, pagination)).to.deep.equal({
+        feature_types: [],
+        pagination: { total: 11, per_page: 10, current_page: 3, last_page: 2, sort: 'count', order: 'desc' }
       });
-      expect(await service.countReconciliationFeatures(scope)).to.deep.equal({ total: 0, feature_types: [] });
+      expect(ownership).to.have.been.calledWithExactly(7, 'upload');
+      expect(list).to.have.been.calledOnceWithExactly(uploadScope, filters, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(uploadScope, filters);
+
+      const empty = await service.listSubmissionUploadFeatureTypes(uploadScope, filters, { page: 1, limit: 10 });
+      expect(empty.pagination.total).to.equal(0);
+      expect(empty.pagination.last_page).to.equal(1);
     });
 
-    it('rejects a foreign submission before reading counts or features', async () => {
-      const count = sinon.stub(SearchFeatureRepository.prototype, 'countReconciliationFeatures');
+    it('rejects a foreign submission before reading feature types or features', async () => {
+      const failure = new ApiNotFoundError('Submission upload not found');
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId').rejects(failure);
+      const list = sinon.stub(SearchFeatureRepository.prototype, 'listSubmissionUploadFeatureTypes');
+      const count = sinon.stub(SearchFeatureRepository.prototype, 'countSubmissionUploadFeatureTypes');
       const rows = sinon.stub(SearchFeatureRepository.prototype, 'getReconciliationFeatures');
       const service = new SearchFeatureService(getMockDBConnection());
       for (const request of [
-        () => service.countReconciliationFeatures({ ...scope, submissionId: 8 }),
+        () =>
+          service.listSubmissionUploadFeatureTypes(
+            { submissionId: 8, submissionUploadId: 'upload' },
+            { reconciliation: 'unmodified' },
+            { page: 1, limit: 10 }
+          ),
         () =>
           service.getReconciliationFeatures({ ...scope, submissionId: 8 }, 'animal', {
             limit: 2,
@@ -65,6 +81,7 @@ describe('SearchFeatureService', () => {
           expect((error as Error).message).to.equal('Submission upload not found');
         }
       }
+      expect(list).not.to.have.been.called;
       expect(count).not.to.have.been.called;
       expect(rows).not.to.have.been.called;
     });

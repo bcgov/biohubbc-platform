@@ -69,8 +69,8 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
     const stub = sinon
       .stub(SubmissionFeaturePropertyGeometryRepository.prototype, 'getSubmissionUploadGeometryExtent')
       .resolves(extent);
-    const result = await service.getSubmissionUploadGeometryExtent(12, '11111111-1111-4111-8111-111111111111');
-    expect(stub).to.have.been.calledOnceWith(12, '11111111-1111-4111-8111-111111111111');
+    const result = await service.getSubmissionUploadGeometryExtent(12, '11111111-1111-4111-8111-111111111111', 'new');
+    expect(stub).to.have.been.calledOnceWith(12, '11111111-1111-4111-8111-111111111111', 'new');
     expect(result).to.eql(extent);
   });
   it('propagates repository errors', async () => {

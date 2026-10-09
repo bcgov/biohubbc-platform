@@ -8,6 +8,11 @@ import { Mock } from 'vitest';
 import { BlueprintPage } from './BlueprintPage';
 import { BlueprintFeatureTypePage } from './feature/BlueprintFeatureTypePage';
 
+// Interaction-heavy DataGrid + dialog Autocomplete suite: each test renders the full page and chains
+// dialog interactions, which can exceed the default 5s ceiling when the whole app suite is running.
+const interactionTimeout = 20000;
+vi.setConfig({ testTimeout: interactionTimeout });
+
 vi.mock('hooks/useApi');
 vi.mock('@mui/x-data-grid', async () => {
   const actual = await vi.importActual<typeof import('@mui/x-data-grid')>('@mui/x-data-grid');

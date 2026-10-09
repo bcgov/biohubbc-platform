@@ -1,17 +1,15 @@
-import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonTable } from 'components/loading/SkeletonLoaders';
-import { PageSection } from 'components/section/PageSection';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISubmissionUploadReviewDetail, ReconciliationFeatureScope } from 'interfaces/useAdminApi.interface';
 import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { keepPreviousDataWithin } from 'utils/query-client';
 import { submissionUploadQueryKeys } from '../../submission-upload-query-keys';
-import { SubmissionUploadReviewValidationReconciliationFeatures } from '../features/SubmissionUploadReviewValidationReconciliationFeatures';
 import { SubmissionUploadReviewValidationReconciliationHeader } from '../header/SubmissionUploadReviewValidationReconciliationHeader';
+import { SubmissionUploadReviewValidationReconciliationFeatureTypesTable } from '../table/SubmissionUploadReviewValidationReconciliationFeatureTypesTable';
 
 interface SubmissionUploadReviewValidationReconciliationContentProps {
   scope: ReconciliationFeatureScope;
@@ -20,9 +18,9 @@ interface SubmissionUploadReviewValidationReconciliationContentProps {
 }
 
 /**
- * Load outcome metadata and compose the header and Features section.
+ * Load one page of the outcome's feature types and compose the header and Feature types section.
  * @param {SubmissionUploadReviewValidationReconciliationContentProps} props Validated outcome and review.
- * @returns {JSX.Element} Outcome layout with its feature-type counts.
+ * @returns {JSX.Element} Outcome layout with its feature types.
  */
 export const SubmissionUploadReviewValidationReconciliationContent = ({
   scope,
@@ -30,17 +28,22 @@ export const SubmissionUploadReviewValidationReconciliationContent = ({
   label
 }: SubmissionUploadReviewValidationReconciliationContentProps) => {
   const api = useApi();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { setSnackbar } = useDialogContext();
-  const countsQuery = useQuery({
-    queryKey: submissionUploadQueryKeys.reconciliationFeatures(scope),
-    queryFn: ({ signal }) => api.admin.countReconciliationFeatures(scope, { signal })
+  const grid = useServerPaginatedGridState({ defaultSort: { field: 'feature_type_name', sort: 'asc' } });
+  const filters = { reconciliation: scope.reconciliation };
+  const featureTypesQuery = useQuery({
+    queryKey: submissionUploadQueryKeys.featureTypes(scope, filters, grid.apiPagination),
+    queryFn: ({ signal }) => api.admin.listSubmissionUploadFeatureTypes(scope, filters, grid.apiPagination, { signal }),
+    placeholderData: keepPreviousDataWithin(submissionUploadQueryKeys.featureTypesAll(scope, filters))
   });
 
   useEffect(() => {
-    if (countsQuery.error) {
-      setSnackbar({ open: true, snackbarMessage: countsQuery.error.message });
+    if (featureTypesQuery.error) {
+      setSnackbar({ open: true, snackbarMessage: featureTypesQuery.error.message });
     }
-  }, [countsQuery.error, setSnackbar]);
+  }, [featureTypesQuery.error, setSnackbar]);
 
   return (
     <>
@@ -50,27 +53,16 @@ export const SubmissionUploadReviewValidationReconciliationContent = ({
         label={label}
       />
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <PageSection id="reconciliation-features" label="Features">
-          <LoadingGuard
-            isLoading={countsQuery.isLoading}
-            isLoadingFallback={<SkeletonTable />}
-            hasNoData={!countsQuery.data?.feature_types.length}
-            hasNoDataFallback={
-              <Box p={2}>
-                <Typography color="text.secondary">
-                  {countsQuery.isError ? 'Unable to load features.' : 'No features found.'}
-                </Typography>
-              </Box>
-            }>
-            {countsQuery.data && (
-              <SubmissionUploadReviewValidationReconciliationFeatures
-                scope={scope}
-                reviewId={review.submission_upload_review_id}
-                featureTypes={countsQuery.data.feature_types}
-              />
-            )}
-          </LoadingGuard>
-        </PageSection>
+        <SubmissionUploadReviewValidationReconciliationFeatureTypesTable
+          featureTypes={featureTypesQuery.data?.feature_types ?? []}
+          rowCount={featureTypesQuery.data?.pagination.total ?? 0}
+          grid={grid}
+          isLoading={featureTypesQuery.isLoading}
+          hasError={featureTypesQuery.isError}
+          onFeatureTypeClick={(featureTypeName) =>
+            navigate(`${location.pathname}/feature-type/${encodeURIComponent(featureTypeName)}`)
+          }
+        />
       </Container>
     </>
   );

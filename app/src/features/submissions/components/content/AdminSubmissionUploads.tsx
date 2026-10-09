@@ -1,36 +1,23 @@
+import Chip from '@mui/material/Chip';
 import { GridColDef } from '@mui/x-data-grid';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import {
+  SUBMISSION_UPLOAD_ACTIVE_JOB_STATUS_CHIP_COLOR,
+  SUBMISSION_UPLOAD_DECISION_CHIP_COLORS,
+  SUBMISSION_UPLOAD_DECISION_LABELS,
+  SUBMISSION_UPLOAD_JOB_STATUS_LABELS,
+  SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_CHIP_COLORS
+} from 'constants/submission-upload-status';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { AdminSubmissionUpload } from 'interfaces/useSubmissionsApi.interface';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFormattedDate } from 'utils/Utils';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
-
-const columns: GridColDef<AdminSubmissionUpload>[] = [
-  { field: 'submission_upload_id', headerName: 'Upload ID', minWidth: 220, flex: 1, sortable: false },
-  {
-    field: 'create_date',
-    headerName: 'Created',
-    minWidth: 180,
-    flex: 1,
-    valueFormatter: (value: string) => getFormattedDate(DATE_FORMAT.ShortMediumDateTimeFormat, value)
-  },
-  {
-    field: 'create_user',
-    headerName: 'Created by',
-    minWidth: 160,
-    flex: 1,
-    valueGetter: (_value, row) => row.submitted_by_identifier ?? String(row.create_user)
-  },
-  { field: 'status', headerName: 'Status', minWidth: 110, flex: 0.6 },
-  { field: 'decision', headerName: 'Decision', minWidth: 110, flex: 0.6 },
-  { field: 'comment', headerName: 'Comment', minWidth: 180, flex: 1, sortable: false }
-];
 
 /**
  * Display server-paginated uploads scoped to a single submission.
@@ -48,6 +35,51 @@ export const AdminSubmissionUploads = ({ submissionId }: { submissionId: number 
     placeholderData: keepPreviousData
   });
   const [rowCount, setRowCount] = useState(0);
+  const columns = useMemo<GridColDef<AdminSubmissionUpload>[]>(
+    () => [
+      { field: 'submission_upload_id', headerName: 'Upload ID', minWidth: 220, flex: 1, sortable: false },
+      {
+        field: 'status',
+        headerName: 'Status',
+        minWidth: 130,
+        flex: 0.6,
+        renderCell: ({ row }) => (
+          <Chip
+            label={SUBMISSION_UPLOAD_JOB_STATUS_LABELS[row.status]}
+            size="small"
+            color={
+              SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_CHIP_COLORS[row.status] ??
+              SUBMISSION_UPLOAD_ACTIVE_JOB_STATUS_CHIP_COLOR
+            }
+            sx={{ fontWeight: 700 }}
+          />
+        )
+      },
+      { field: 'comment', headerName: 'Comment', minWidth: 180, flex: 1, sortable: false },
+      {
+        field: 'decision',
+        headerName: 'Decision',
+        minWidth: 130,
+        flex: 0.6,
+        renderCell: ({ row }) => (
+          <Chip
+            label={SUBMISSION_UPLOAD_DECISION_LABELS[row.decision]}
+            size="small"
+            color={SUBMISSION_UPLOAD_DECISION_CHIP_COLORS[row.decision]}
+            sx={{ fontWeight: 700 }}
+          />
+        )
+      },
+      {
+        field: 'create_date',
+        headerName: 'Created',
+        minWidth: 180,
+        flex: 1,
+        valueFormatter: (value: string) => getFormattedDate(DATE_FORMAT.ShortMediumDateTimeFormat, value)
+      }
+    ],
+    []
+  );
 
   // Preserve pagination when a later page fails to load.
   useEffect(() => {

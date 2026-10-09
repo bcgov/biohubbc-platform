@@ -489,37 +489,6 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Find the `blueprint_id` of the most recent prior submission_upload for a submission.
-   *
-   * Used to pin a new upload to the same Blueprint as the submission's previous upload, so
-   * re-submissions remain stable when the default Blueprint changes. The most recent upload is
-   * selected by `create_date` regardless of `record_end_date` — a soft-deleted prior upload's
-   * Blueprint is still a valid pin.
-   *
-   * @param {number} submissionId - The submission whose prior uploads should be inspected.
-   * @returns {Promise<number | null>} - The prior upload's `blueprint_id`, or null if none exists.
-   * @memberof SubmissionUploadRepository
-   */
-  async findMostRecentBlueprintIdBySubmissionId(submissionId: number): Promise<number | null> {
-    const sqlStatement = SQL`
-      SELECT
-        blueprint_id
-      FROM
-        submission_upload
-      WHERE
-        submission_id = ${submissionId}
-      ORDER BY
-        create_date DESC,
-        submission_upload_id DESC
-      LIMIT 1;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ blueprint_id: z.number() }));
-
-    return response.rows[0]?.blueprint_id ?? null;
-  }
-
-  /**
    * Update an existing submission_upload record.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record to update.

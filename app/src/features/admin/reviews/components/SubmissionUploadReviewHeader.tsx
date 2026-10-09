@@ -3,28 +3,34 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { PrimaryButton } from 'components/button/PrimaryButton';
 import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
+import { ITabGroupItem, TabGroup } from 'components/tabs/TabGroup';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 
 interface SubmissionUploadReviewHeaderProps {
   submissionId: number;
   review: ISubmissionUploadReviewDetail;
+  tabs: ITabGroupItem[];
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   onStatusActionClick: () => void;
 }
 
 /**
  * Renders the header for a submission upload review page.
  *
- * Displays review breadcrumbs, name, description, status action, and Features tab. The
+ * Displays review breadcrumbs, name, description, status action, and the review's tabs. The
  * action is labelled Complete Review or Reopen Review from the review's status.
  *
- * @param {SubmissionUploadReviewHeaderProps} props Review metadata and status action.
+ * @param {SubmissionUploadReviewHeaderProps} props Review metadata, tabs and status action.
  * @returns {JSX.Element} The submission upload review page header.
  */
 export const SubmissionUploadReviewHeader = ({
   submissionId,
   review,
+  tabs,
+  activeTab,
+  onTabChange,
   onStatusActionClick
 }: SubmissionUploadReviewHeaderProps) => {
   const isCompleted = review.status === 'completed';
@@ -59,12 +65,7 @@ export const SubmissionUploadReviewHeader = ({
       description={review.description}
       descriptionDialogTitle="Review Description"
       tabs={
-        <TabGroup
-          value="features"
-          onChange={() => {}}
-          ariaLabel="Submission upload review sections"
-          tabs={[{ value: 'features', label: 'Features' }]}
-        />
+        <TabGroup value={activeTab} onChange={onTabChange} ariaLabel="Submission upload review sections" tabs={tabs} />
       }
     />
   );

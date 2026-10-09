@@ -108,3 +108,17 @@ export const SubmissionListResponseSchema: OpenAPIV3.SchemaObject = {
     pagination: paginationResponseSchema
   }
 };
+
+/** Request body for updating a submission's administrative settings. */
+export const updateSubmissionRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['default_blueprint_id'],
+  additionalProperties: false,
+  properties: {
+    default_blueprint_id: {
+      type: 'integer',
+      minimum: 1,
+      description: "Available blueprint to use for the submission's future uploads."
+    }
+  }
+};

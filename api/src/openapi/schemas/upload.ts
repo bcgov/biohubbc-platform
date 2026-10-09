@@ -77,7 +77,7 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     blueprint_id: {
       type: 'integer',
       description:
-        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
+        'Optional Blueprint to index this upload against. Must be currently available or be the submission default Blueprint. Defaults to the submission default Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -197,7 +197,7 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     blueprint_id: {
       type: 'integer',
       description:
-        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
+        'Optional Blueprint to index this upload against. Must be currently available or be the submission default Blueprint. Defaults to the submission default Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };

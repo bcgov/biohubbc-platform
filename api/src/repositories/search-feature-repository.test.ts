@@ -59,18 +59,51 @@ describe('SearchFeatureRepository', () => {
       expect(sql.indexOf('limit 3')).to.be.lessThan(sql.indexOf('LEFT JOIN LATERAL'));
     });
 
-    it('groups counts without pagination or current-row predicates', async () => {
+    it('groups one outcome by feature type before limiting, with a stable order and no current-row predicates', async () => {
       const execute = Sinon.stub().resolves({ rows: [{ feature_type_name: 'animal', count: 2 }] });
       const repository = new SearchFeatureRepository(getMockDBConnection({ knex: execute }));
-      expect(await repository.countReconciliationFeatures(scope)).to.deep.equal([
-        { feature_type_name: 'animal', count: 2 }
-      ]);
+      expect(
+        await repository.listSubmissionUploadFeatureTypes(
+          scope,
+          { reconciliation: 'unmodified' },
+          { page: 3, limit: 10, sort: 'count', order: 'desc' }
+        )
+      ).to.deep.equal([{ feature_type_name: 'animal', count: 2 }]);
       expect(execute).to.have.been.calledOnce;
       const sql = execute.firstCall.args[0].toString();
       expect(sql).to.include('"sf"."submission_id" = 7');
+      expect(sql).to.include('"sf"."submission_upload_id" = \'upload\'');
       expect(sql).to.include('"sf"."reconciliation" = \'unmodified\'');
       expect(sql).to.include('group by "ft"."name"');
+      expect(sql).to.include('order by "count" desc, "feature_type_name" asc');
+      expect(sql).to.include('limit 10 offset 20');
       expect(sql).not.to.include('record_end_date');
+    });
+
+    it('lists and counts every feature type of the upload when no outcome is given', async () => {
+      const execute = Sinon.stub().resolves({ rows: [{ count: 0 }] });
+      const repository = new SearchFeatureRepository(getMockDBConnection({ knex: execute }));
+      await repository.listSubmissionUploadFeatureTypes(scope, { reconciliation: null }, { page: 1, limit: 25 });
+      expect(await repository.countSubmissionUploadFeatureTypes(scope, { reconciliation: null })).to.equal(0);
+      const listSql = execute.firstCall.args[0].toString();
+      const countSql = execute.secondCall.args[0].toString();
+      expect(listSql).to.include('order by "feature_type_name" asc');
+      for (const sql of [listSql, countSql]) {
+        expect(sql).to.include('"sf"."submission_id" = 7');
+        expect(sql).to.include('"sf"."submission_upload_id" = \'upload\'');
+        expect(sql).not.to.include('reconciliation');
+      }
+    });
+
+    it('counts the distinct feature types of one outcome, including zero matches', async () => {
+      const execute = Sinon.stub().resolves({ rows: [{ count: 0 }] });
+      const repository = new SearchFeatureRepository(getMockDBConnection({ knex: execute }));
+      expect(await repository.countSubmissionUploadFeatureTypes(scope, { reconciliation: 'unmodified' })).to.equal(0);
+      expect(execute).to.have.been.calledOnce;
+      const sql = execute.firstCall.args[0].toString();
+      expect(sql).to.include('count(distinct sf.feature_type_id)');
+      expect(sql).to.include('"sf"."submission_id" = 7');
+      expect(sql).to.include('"sf"."reconciliation" = \'unmodified\'');
       expect(sql).not.to.include('limit');
     });
   });
