@@ -62,7 +62,7 @@ export async function up(knex: Knex): Promise<void> {
     ----------------------------------------------------------------------------------------
 
     -- Add unique end-date key constraint (don't allow 2 records with the same key and a NULL record_end_date)
-    CREATE UNIQUE INDEX validation_metric_idx1 ON validation_metric (key, (record_end_date is NULL)) where record_end_date is null;
+    CREATE UNIQUE INDEX validation_metric_idx1 ON validation_metric (key) where record_end_date is null;
 
     ----------------------------------------------------------------------------------------
     -- Create audit and journal triggers
