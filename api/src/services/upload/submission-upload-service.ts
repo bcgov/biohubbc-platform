@@ -1,9 +1,10 @@
-import { ACTIVE_UPLOAD_PROCESSING_STAGES } from '../../constants/submission-upload';
+import { ACTIVE_UPLOAD_PROCESSING_STAGES, REINDEX_START_STATUSES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { Blueprint } from '../../models/blueprint';
 import {
+  AdminSubmissionUpload,
   AdminSubmissionUploadsResponse,
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -18,7 +19,7 @@ import {
   UpdateSubmissionUploadDecision
 } from '../../models/submission-upload-decision';
 import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
-import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher';
+import { publishComputeSubmissionFeatureClosureJob, publishIndexSubmissionFeaturesJob } from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
@@ -61,7 +62,8 @@ export class SubmissionUploadService extends DBService {
 
   /** Mutable dependency bag used by tests to stub queue publication under ESM. */
   static readonly dependencies = {
-    publishComputeSubmissionFeatureClosureJob
+    publishComputeSubmissionFeatureClosureJob,
+    publishIndexSubmissionFeaturesJob
   };
 
   /**
@@ -97,6 +99,18 @@ export class SubmissionUploadService extends DBService {
     const total = await this.submissionUploadRepository.countAdminSubmissionUploads(submissionId);
 
     return { uploads, pagination: makePaginationResponse(total, pagination) };
+  }
+
+  /**
+   * Get one active upload of a submission for the administrative upload page.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @returns {Promise<AdminSubmissionUpload>} The upload record, including its status and decision.
+   * @throws {ApiNotFoundError} When the upload is not an active upload of the submission.
+   * @memberof SubmissionUploadService
+   */
+  async getAdminSubmissionUpload(scope: SubmissionUploadScope): Promise<AdminSubmissionUpload> {
+    return this.submissionUploadRepository.getAdminSubmissionUpload(scope);
   }
 
   /**
@@ -604,6 +618,105 @@ export class SubmissionUploadService extends DBService {
     await this.assertSubmissionUploadHasNoActivatedFeatures(upload.submission_upload_id);
 
     return this.recordDecision(upload.submission_upload_id, data.decision);
+  }
+
+  /**
+   * Re-index an unapproved upload, optionally against a different blueprint.
+   *
+   * Returns the upload to `reconciled` and queues the index job in the caller's transaction, so the request either
+   * commits both or neither. The index job then rebuilds the upload's validation errors, property rows and
+   * relationships in one transaction, recomputes closure and re-runs automatic security screening. Reconciled features
+   * are reused unchanged.
+   *
+   * The current status is checked before taking the row lock, so a request for an upload that a processing job is
+   * still working on is rejected straight away instead of waiting for the job's transaction to commit.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {number} blueprintId Blueprint to index with: the upload's current blueprint (even if since retired), the
+   *   submission's default blueprint, or an available blueprint.
+   * @returns {Promise<void>} Resolves after the upload is returned to `reconciled` and its index job is queued.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @throws {HTTP409} When the upload is approved, decided, superseded, or not in a re-indexable status.
+   * @throws {HTTP400} When the requested blueprint cannot be used.
+   * @memberof SubmissionUploadService
+   */
+  async reindexSubmissionUpload(scope: SubmissionUploadScope, blueprintId: number): Promise<void> {
+    const { submissionId, submissionUploadId } = scope;
+
+    const upload = await this.submissionUploadRepository.getSubmissionUploadBySubmissionId(
+      submissionId,
+      submissionUploadId
+    );
+    this.assertSubmissionUploadStatusCanBeReindexed(upload);
+
+    const lockedUpload = await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
+    await this.assertSubmissionUploadCanBeReindexed(scope, lockedUpload);
+
+    if (blueprintId !== lockedUpload.blueprint_id) {
+      const resolvedBlueprintId = await this.resolveBlueprintIdForUpload(submissionId, blueprintId);
+      await this.submissionUploadRepository.updateSubmissionUploadBlueprint(submissionUploadId, resolvedBlueprintId);
+    }
+
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciled', REINDEX_START_STATUSES);
+    await SubmissionUploadService.dependencies.publishIndexSubmissionFeaturesJob(this.connection, {
+      submissionUploadId
+    });
+  }
+
+  /**
+   * Assert that an upload's status allows re-indexing.
+   *
+   * @param {SubmissionUpload} upload Submission upload.
+   * @returns {void}
+   * @throws {HTTP409} When the upload is still processing or never reached a re-indexable status.
+   * @memberof SubmissionUploadService
+   */
+  private assertSubmissionUploadStatusCanBeReindexed(upload: SubmissionUpload): void {
+    if (!REINDEX_START_STATUSES.includes(upload.status)) {
+      throw new HTTP409(`Submission upload cannot be re-indexed while its status is ${upload.status}`);
+    }
+  }
+
+  /**
+   * Assert that a locked upload can be re-indexed.
+   *
+   * Only unapproved, undecided and current uploads can be re-indexed: published feature state is immutable, and a
+   * superseded upload's pending features have already been ended. A failed upload can be re-indexed only when it
+   * failed after reconciliation, because indexing reuses the reconciled features.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {SubmissionUpload} lockedUpload Locked submission upload.
+   * @returns {Promise<void>} Resolves when the upload can be re-indexed.
+   * @throws {HTTP409} When the upload is decided, superseded, or not in a re-indexable status.
+   * @memberof SubmissionUploadService
+   */
+  private async assertSubmissionUploadCanBeReindexed(
+    scope: SubmissionUploadScope,
+    lockedUpload: SubmissionUpload
+  ): Promise<void> {
+    this.assertSubmissionUploadStatusCanBeReindexed(lockedUpload);
+
+    if (lockedUpload.decision !== 'pending') {
+      throw new HTTP409(`Submission upload cannot be re-indexed after it was ${lockedUpload.decision}`);
+    }
+
+    if (lockedUpload.successor_submission_upload_id) {
+      throw new HTTP409('Submission upload has been superseded by a newer upload');
+    }
+
+    if (lockedUpload.status !== 'failed') {
+      return;
+    }
+
+    const history = await this.submissionUploadProcessingStatusRepository.findSubmissionUploadProcessingStatusHistory(
+      scope.submissionId,
+      scope.submissionUploadId
+    );
+    const wasReconciled = history.some((row) => row.status === 'reconciled');
+
+    if (!wasReconciled) {
+      throw new HTTP409('Submission upload failed before reconciliation and cannot be re-indexed');
+    }
   }
 
   /**

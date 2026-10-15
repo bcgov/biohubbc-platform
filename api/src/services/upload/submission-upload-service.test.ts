@@ -1040,6 +1040,151 @@ describe('SubmissionUploadService', () => {
       }
     });
   });
+
+  describe('reindexSubmissionUpload', () => {
+    const scope = { submissionId: 1, submissionUploadId: 'artifact-1' };
+
+    /**
+     * Stub the reads and writes a re-index makes, returning the given upload for both the unlocked and locked reads.
+     *
+     * @param {SubmissionUpload} upload Upload returned by the reads.
+     * @returns Stubs for the reads, writes and queue publication.
+     */
+    const stubReindex = (upload: SubmissionUpload) => ({
+      getStub: sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId').resolves(upload),
+      lockStub: sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadWithLock').resolves(upload),
+      blueprintStub: sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadBlueprint').resolves(),
+      publishStub: sinon
+        .stub(SubmissionUploadService.dependencies, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'job-1' }),
+      ...stubTransitionWrites()
+    });
+
+    /**
+     * Assert that a re-index is rejected with HTTP409 before anything is written or queued.
+     *
+     * @param {ReturnType<typeof stubReindex>} stubs Stubs returned by `stubReindex`.
+     * @returns {Promise<void>} Resolves after the rejection is asserted.
+     */
+    const expectRejected = async (stubs: ReturnType<typeof stubReindex>): Promise<void> => {
+      try {
+        await service.reindexSubmissionUpload(scope, 1);
+        expect.fail('Expected HTTP409 not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
+
+      expect(stubs.blueprintStub).not.to.have.been.called;
+      expect(stubs.updateStub).not.to.have.been.called;
+      expect(stubs.publishStub).not.to.have.been.called;
+    };
+
+    for (const status of ['indexed', 'invalid'] as const) {
+      it(`returns an ${status} upload to reconciled and queues indexing with its current blueprint`, async () => {
+        const stubs = stubReindex(buildUpload(status));
+        const resolveStub = sinon.stub(service, 'resolveBlueprintIdForUpload');
+
+        await service.reindexSubmissionUpload(scope, 1);
+
+        expect(resolveStub).not.to.have.been.called;
+        expect(stubs.blueprintStub).not.to.have.been.called;
+        expect(stubs.updateStub).to.have.been.calledOnceWith('artifact-1', 'reconciled');
+        expect(stubs.publishStub).to.have.been.calledOnceWith(mockDBConnection, { submissionUploadId: 'artifact-1' });
+        expect(stubs.updateStub).to.have.been.calledBefore(stubs.publishStub);
+      });
+    }
+
+    it('validates and stores a different blueprint before queueing indexing', async () => {
+      const stubs = stubReindex(buildUpload('indexed'));
+      const resolveStub = sinon.stub(service, 'resolveBlueprintIdForUpload').resolves(5);
+
+      await service.reindexSubmissionUpload(scope, 5);
+
+      expect(resolveStub).to.have.been.calledOnceWith(1, 5);
+      expect(stubs.blueprintStub).to.have.been.calledOnceWith('artifact-1', 5);
+      expect(stubs.blueprintStub).to.have.been.calledBefore(stubs.publishStub);
+    });
+
+    it('rejects an unusable blueprint without changing the upload', async () => {
+      const stubs = stubReindex(buildUpload('indexed'));
+      sinon.stub(service, 'resolveBlueprintIdForUpload').rejects(new HTTP400('Requested Blueprint is not available'));
+
+      try {
+        await service.reindexSubmissionUpload(scope, 5);
+        expect.fail('Expected HTTP400 not thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP400);
+      }
+
+      expect(stubs.blueprintStub).not.to.have.been.called;
+      expect(stubs.updateStub).not.to.have.been.called;
+      expect(stubs.publishStub).not.to.have.been.called;
+    });
+
+    it('rejects an upload that is still processing without waiting for its row lock', async () => {
+      const stubs = stubReindex(buildUpload('indexing'));
+
+      await expectRejected(stubs);
+
+      expect(stubs.lockStub).not.to.have.been.called;
+    });
+
+    for (const decision of ['approved', 'denied'] as const) {
+      it(`rejects an upload that was ${decision}`, async () => {
+        const stubs = stubReindex(buildUpload('indexed', { decision }));
+
+        await expectRejected(stubs);
+      });
+    }
+
+    it('rejects a superseded upload', async () => {
+      const stubs = stubReindex(buildUpload('indexed', { successor_submission_upload_id: 'artifact-2' }));
+
+      await expectRejected(stubs);
+    });
+
+    it('rejects an upload with activated features', async () => {
+      const stubs = stubReindex(buildUpload('indexed'));
+      (
+        SubmissionFeatureService.prototype.getActivatedSubmissionFeatureCountBySubmissionUploadId as sinon.SinonStub
+      ).resolves(1);
+
+      await expectRejected(stubs);
+    });
+
+    it('re-indexes a failed upload that had been reconciled', async () => {
+      const stubs = stubReindex(buildUpload('failed'));
+      const historyStub = sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          {
+            submission_upload_id: 'artifact-1',
+            submission_upload_status_id: 1,
+            status: 'reconciled',
+            create_date: 'a'
+          },
+          { submission_upload_id: 'artifact-1', submission_upload_status_id: 2, status: 'failed', create_date: 'b' }
+        ]);
+
+      await service.reindexSubmissionUpload(scope, 1);
+
+      expect(historyStub).to.have.been.calledOnceWith(1, 'artifact-1');
+      expect(stubs.updateStub).to.have.been.calledOnceWith('artifact-1', 'reconciled');
+      expect(stubs.publishStub).to.have.been.calledOnce;
+    });
+
+    it('rejects a failed upload that never reached reconciliation', async () => {
+      const stubs = stubReindex(buildUpload('failed'));
+      sinon
+        .stub(SubmissionUploadProcessingStatusRepository.prototype, 'findSubmissionUploadProcessingStatusHistory')
+        .resolves([
+          { submission_upload_id: 'artifact-1', submission_upload_status_id: 1, status: 'ingesting', create_date: 'a' },
+          { submission_upload_id: 'artifact-1', submission_upload_status_id: 2, status: 'failed', create_date: 'b' }
+        ]);
+
+      await expectRejected(stubs);
+    });
+  });
 });
 
 /**

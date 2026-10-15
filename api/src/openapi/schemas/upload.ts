@@ -318,6 +318,23 @@ export const UpdateSubmissionUploadDecisionRequestSchema: OpenAPIV3.SchemaObject
   }
 };
 
+/**
+ * Request body for re-indexing a submission upload
+ */
+export const ReindexSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['blueprintId'],
+  properties: {
+    blueprintId: {
+      type: 'integer',
+      minimum: 1,
+      description:
+        "Blueprint to index the upload with: the upload's current blueprint, the submission's default blueprint, or an available blueprint."
+    }
+  }
+};
+
 export const SubmissionUploadReviewResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,

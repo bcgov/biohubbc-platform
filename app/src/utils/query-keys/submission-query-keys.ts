@@ -52,6 +52,14 @@ const record = (submissionId: number) => [...submission(submissionId), 'record']
 const defaultBlueprint = (submissionId: number) => [...submission(submissionId), 'default-blueprint'] as const;
 
 /**
+ * Key prefix of every page of uploads in the administrative submission view.
+ *
+ * @param {number} submissionId Submission being viewed.
+ * @returns The submission uploads query key prefix.
+ */
+const adminUploadLists = (submissionId: number) => [...submission(submissionId), 'admin-uploads'] as const;
+
+/**
  * Key of one page of uploads in the administrative submission view.
  *
  * @param {number} submissionId Submission being viewed.
@@ -59,7 +67,7 @@ const defaultBlueprint = (submissionId: number) => [...submission(submissionId),
  * @returns The submission uploads query key.
  */
 const adminUploads = (submissionId: number, pagination: ApiPaginationRequestOptions) =>
-  [...submission(submissionId), 'admin-uploads', { pagination }] as const;
+  [...adminUploadLists(submissionId), { pagination }] as const;
 
 /**
  * Key of one page of a submission's features as its submitter or the public sees them.
@@ -116,6 +124,7 @@ export const submissionQueryKeys = {
   submission,
   record,
   defaultBlueprint,
+  adminUploadLists,
   adminUploads,
   features,
   feature,

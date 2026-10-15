@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { IDBConnection } from '../../database/db';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
@@ -174,6 +175,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       // Phase 5b: ensure missing taxa and their full ITIS hierarchy exist locally, then resolve any
       // taxon candidates that were previously unresolved. This runs before taxon resolution errors are
       // recorded so that valid-but-uncached taxa are fetched from ITIS rather than failing ingestion.
+      // When ITIS is unavailable the affected taxon values are recorded as errors in Phase 6 instead,
+      // so the upload ends invalid and can be re-indexed once ITIS recovers.
       currentPhase = 'ensure taxon hierarchy for unresolved taxon candidates';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
@@ -182,7 +185,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(submissionUploadId);
+      const isTaxonomyAvailable = await this.ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(
+        submissionUploadId,
+        submissionId
+      );
 
       // Phase 6: FK reference validation/resolution diagnostics.
       currentPhase = 'record code, taxon, artifact, and feature resolution errors';
@@ -196,9 +202,15 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       await this.submissionFeaturePropertyIngestionRepository.recordCodePropertyResolutionErrorsBySubmissionUploadId(
         submissionUploadId
       );
-      await this.submissionFeaturePropertyIngestionRepository.recordTaxonPropertyResolutionErrorsBySubmissionUploadId(
-        submissionUploadId
-      );
+      if (isTaxonomyAvailable) {
+        await this.submissionFeaturePropertyIngestionRepository.recordTaxonPropertyResolutionErrorsBySubmissionUploadId(
+          submissionUploadId
+        );
+      } else {
+        await this.submissionFeaturePropertyIngestionRepository.recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId(
+          submissionUploadId
+        );
+      }
       await this.submissionFeaturePropertyIngestionRepository.recordArtifactPropertyResolutionErrorsBySubmissionUploadId(
         submissionUploadId
       );
@@ -470,26 +482,54 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * not yet cached locally are fetched from ITIS (with their full lineage and parent links) rather than
    * failing ingestion.
    *
+   * An ITIS request failure (including a timeout) is reported as an unavailable taxonomy rather than thrown:
+   * the caller records the affected taxon values as validation errors and the upload ends invalid instead of
+   * failing the job. The taxonomy service makes every ITIS request before writing any taxon rows, so a
+   * failure leaves the local taxonomy unchanged. Database errors still propagate.
+   *
    * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>} Resolves after the scoped property-ingestion operation completes.
+   * @param {number} submissionId Submission scope, for logging.
+   * @returns {Promise<boolean>} True when every unresolved taxon could be looked up; false when ITIS was unavailable.
    * @memberof SubmissionFeaturePropertyIngestionService
    */
   private async ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId(
-    submissionUploadId: string
-  ): Promise<void> {
+    submissionUploadId: string,
+    submissionId: number
+  ): Promise<boolean> {
     const unresolvedTsns =
       await this.submissionFeaturePropertyIngestionRepository.getUnresolvedTaxonTsnsBySubmissionUploadId(
         submissionUploadId
       );
 
     if (!unresolvedTsns.length) {
-      return;
+      return true;
     }
 
-    await this.taxonomyService.ensureTaxonHierarchyByTsnIds(unresolvedTsns);
+    try {
+      await this.taxonomyService.ensureTaxonHierarchyByTsnIds(unresolvedTsns);
+    } catch (error) {
+      if (!isAxiosError(error)) {
+        throw error;
+      }
+
+      // Log only the message and code: an AxiosError holds circular request objects the logger cannot serialize.
+      defaultLog.warn({
+        label: 'ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId',
+        message: 'ITIS unavailable; recording unresolved taxon values as validation errors',
+        submissionId,
+        submissionUploadId,
+        unresolvedTsnCount: unresolvedTsns.length,
+        errorMessage: error.message,
+        errorCode: error.code
+      });
+
+      return false;
+    }
 
     await this.submissionFeaturePropertyIngestionRepository.resolveTaxonCandidateTaxonIdsBySubmissionUploadId(
       submissionUploadId
     );
+
+    return true;
   }
 }
