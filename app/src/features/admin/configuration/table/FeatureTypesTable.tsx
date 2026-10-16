@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import SearchTextField from 'components/fields/SearchTextField';
 import { GridColDef } from '@mui/x-data-grid';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
@@ -45,7 +46,14 @@ export const FeatureTypesTable = ({
     <PageSection
       addButtonSize="small"
       id="feature-types"
-      label="Feature Types"
+      label={
+        <>
+          Feature Types{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }
       addLabel="Create"
       onAdd={onCreate}
       headerContent={

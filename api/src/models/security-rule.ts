@@ -83,3 +83,8 @@ export interface UpdateSecurityRule {
 export interface SecuritySearchFilters {
   search?: string;
 }
+
+export interface SecurityRuleFilters {
+  search?: string;
+  security_category_id?: number;
+}

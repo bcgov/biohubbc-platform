@@ -3,13 +3,10 @@ import Box from '@mui/material/Box';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditDialog } from 'components/dialog/EditDialog';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { AddSystemUserI18N, BlockSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { APIError } from 'hooks/api/useAxios';
@@ -18,24 +15,26 @@ import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import groupBy from 'lodash-es/groupBy';
 import { useCallback, useMemo, useState } from 'react';
 import { userQueryKeys } from 'utils/query-keys/user-query-keys';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import ActiveUsersList from './ActiveUsersList';
+import ActiveUsersList from 'features/admin/users/ActiveUsersList';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
   AddSystemUsersFormYupSchema,
   IAddSystemUsersForm
-} from './AddSystemUsersForm';
-import { ContributorPanel } from './contributors/content/ContributorPanel';
+} from 'features/admin/users/AddSystemUsersForm';
+import { ContributorPanel } from 'features/admin/users/contributors/content/ContributorPanel';
 
 /**
- * Page to display user management data/functionality.
+ * Administrative users page: system users, and for system administrators contributors, in the shared
+ * administrative page layout.
  *
  * @return {*}
  */
-const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
+export const AdminUsersPage = () => {
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
 
@@ -294,8 +293,8 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <>
-      <PageHeader
-        label="Administrative"
+      <AdminPageLayout
+        title="Users"
         breadcrumbs={
           <Breadcrumbs aria-label="users breadcrumb">
             <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
@@ -306,39 +305,31 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
             </Typography>
           </Breadcrumbs>
         }
-        tabs={
-          <TabGroup
-            value={activeTab}
-            onChange={(value) => {
-              setSearchParams(value === 'users' ? {} : { tab: value });
-              if (value === 'users') {
-                usersGrid.handlePaginationChange({ ...usersGrid.paginationModel, page: 0 });
-              }
-            }}
-            ariaLabel="administrative tabs"
-            tabs={[
-              {
-                value: 'users',
-                label: 'Users',
-                id: 'administrative-users-tab',
-                ariaControls: 'administrative-users-tabpanel'
-              },
-              ...(isSystemAdmin
-                ? [
-                    {
-                      value: 'contributors',
-                      label: 'Contributors',
-                      id: 'administrative-contributors-tab',
-                      ariaControls: 'administrative-contributors-tabpanel'
-                    }
-                  ]
-                : [])
-            ]}
-          />
-        }
-      />
-
-      <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+        tabs={[
+          {
+            value: 'users',
+            label: 'Users',
+            id: 'administrative-users-tab',
+            ariaControls: 'administrative-users-tabpanel'
+          },
+          ...(isSystemAdmin
+            ? [
+                {
+                  value: 'contributors',
+                  label: 'Contributors',
+                  id: 'administrative-contributors-tab',
+                  ariaControls: 'administrative-contributors-tabpanel'
+                }
+              ]
+            : [])
+        ]}
+        activeTab={activeTab}
+        onTabChange={(value) => {
+          setSearchParams(value === 'users' ? {} : { tab: value });
+          if (value === 'users') {
+            usersGrid.handlePaginationChange({ ...usersGrid.paginationModel, page: 0 });
+          }
+        }}>
         <QueryErrorDialog error={usersQuery.error} label="users" />
         <QueryErrorDialog error={rolesQuery.error} label="user roles" />
         <Box
@@ -368,7 +359,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
             <ContributorPanel />
           </Box>
         )}
-      </Container>
+      </AdminPageLayout>
 
       <EditDialog
         isLoading={false}
@@ -393,5 +384,3 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
     </>
   );
 };
-
-export default ManageUsersPage;

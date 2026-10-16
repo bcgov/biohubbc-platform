@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { ConfigurationStatusChip } from './ConfigurationStatusChip';
 import { IBlueprintTableRow } from './BlueprintsTable.interface';
@@ -98,7 +99,14 @@ export const BlueprintsTable = ({
     <PageSection
       addButtonSize="small"
       id="blueprints"
-      label="Blueprints"
+      label={
+        <>
+          Blueprints{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }
       addLabel="Create"
       onAdd={onCreateBlueprint}
       headerContent={

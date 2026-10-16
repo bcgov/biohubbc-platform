@@ -44,6 +44,13 @@ GET.apiDoc = {
       required: false,
       schema: { type: 'string' },
       description: 'Search term to filter reasons by name'
+    },
+    {
+      in: 'query',
+      name: 'security_category_id',
+      required: false,
+      schema: { type: 'integer', minimum: 1 },
+      description: 'Security category to limit the reasons to'
     }
   ],
   responses: {
@@ -60,7 +67,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get all active security reasons with pagination.
+ * Get all active security reasons with pagination, optionally limited to one security category.
  *
  * @returns {RequestHandler}
  */
@@ -69,7 +76,8 @@ export function getSecurityReasons(): RequestHandler {
     const connection = getDBConnection(req.keycloak_token);
 
     const search = req.query.search as string | undefined;
-    const filters = { search };
+    const securityCategoryId = req.query.security_category_id ? Number(req.query.security_category_id) : undefined;
+    const filters = { search, security_category_id: securityCategoryId };
 
     try {
       await connection.open();

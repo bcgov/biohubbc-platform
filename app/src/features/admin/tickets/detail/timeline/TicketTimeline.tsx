@@ -1,6 +1,5 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { SYSTEM_ROLE } from 'constants/roles';
-import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { hasAtLeastOneValidValue } from 'utils/authUtils';
 import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
@@ -38,16 +37,9 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   } = useTicketTimelineCommentActions();
   const {
     updatingDataRequestId,
-    isEditPolicyDialogOpen,
-    selectedPolicy,
-    isLoadingPolicy,
-    isSavingPolicy,
     handleConfirmDataRequestStatusUpdate,
     handleConfirmResetToReviewed,
-    handleOpenPolicyDialog,
-    handleOpenPolicyDetailPage,
-    handleClosePolicyDialog,
-    handleSavePolicy
+    handleOpenDataRequestPage
   } = useTicketTimelineDataRequestActions();
   const {
     handleCreateSubmissionUploadReview,
@@ -69,8 +61,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}
         onDeleteComment={handleConfirmDeleteComment}
-        onViewPolicy={handleOpenPolicyDialog}
-        onViewFinalizedPolicy={handleOpenPolicyDetailPage}
+        onViewRequest={handleOpenDataRequestPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
         canViewSubmissionUploadStatusHistory={canViewSubmissionUploadStatusHistory}
@@ -79,16 +70,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onConfirmSubmissionUploadDecisionUpdate={handleConfirmSubmissionUploadDecisionUpdate}
         onConfirmSubmissionUploadDecisionReset={handleConfirmSubmissionUploadDecisionReset}
       />
-
-      {selectedPolicy && (
-        <EditPolicyDialog
-          open={isEditPolicyDialogOpen}
-          isLoading={isLoadingPolicy || isSavingPolicy}
-          policy={selectedPolicy}
-          onCancel={handleClosePolicyDialog}
-          onSave={handleSavePolicy}
-        />
-      )}
 
       {selectedComment && (
         <EditDialog<ITicketCommentEditFormValues>

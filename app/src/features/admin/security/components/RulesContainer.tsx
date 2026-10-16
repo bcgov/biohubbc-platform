@@ -1,7 +1,6 @@
 import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Chip from '@mui/material/Chip';
-import Container from '@mui/material/Container';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -14,35 +13,40 @@ import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ISecurityReasonWithFeatureCount } from 'interfaces/useSecurityApi.interface';
+import { ISecurityRuleWithFeatureCount } from 'interfaces/useSecurityApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { useCallback, useState } from 'react';
-import { IAddReasonFormValues } from './AddReasonForm';
-import { AddReasonFormInitialValues, ReasonDialog } from './ReasonDialog';
+import { IAddRuleFormValues } from './AddRuleForm';
+import { AddRuleFormInitialValues, RuleDialog } from './RuleDialog';
 
-export interface IReasonsContainerProps extends IServerPaginationProps {
-  reasons: ISecurityReasonWithFeatureCount[];
-  /** Callback after create/update/delete, which refreshes the reasons and categories (whose rule_count it changes) */
+export interface IRulesContainerProps extends IServerPaginationProps {
+  rules: ISecurityRuleWithFeatureCount[];
+  /** Callback after create/update/delete, which refreshes the rules and categories (whose rule_count it changes) */
   refresh: () => void;
   searchTerm: string;
   onSearch: (term: string) => void;
+  /**
+   * The security category whose rules are listed. When set, the Category column is hidden and new rules default
+   * to this category.
+   */
+  securityCategoryId?: number;
 }
 
 /**
- * Container component for managing security reasons.
+ * Container component for managing security rules.
  *
  * Provides functionality to:
- * - View reasons in a searchable, paginated table
- * - Create new reasons via ReasonDialog (EditDialog + Formik)
- * - Edit existing reasons via ReasonDialog
- * - Delete reasons with confirmation
+ * - View rules in a searchable, paginated table
+ * - Create new rules via RuleDialog (EditDialog + Formik)
+ * - Edit existing rules via RuleDialog
+ * - Delete rules with confirmation
  *
- * @param {IReasonsContainerProps} props
+ * @param {IRulesContainerProps} props
  * @returns {React.ReactElement}
  */
-export const ReasonsContainer = (props: IReasonsContainerProps) => {
+export const RulesContainer = (props: IRulesContainerProps) => {
   const {
-    reasons,
+    rules,
     rowCount,
     paginationModel,
     setPaginationModel,
@@ -50,16 +54,21 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     setSortModel,
     refresh,
     searchTerm,
-    onSearch
+    onSearch,
+    securityCategoryId
   } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
   const { setErrorDialog } = dialogContext;
+  const addRuleInitialValues: IAddRuleFormValues = {
+    ...AddRuleFormInitialValues,
+    security_category_id: securityCategoryId
+  };
 
-  const [openAddReasonDialog, setOpenAddReasonDialog] = useState(false);
-  const [openEditReasonDialog, setOpenEditReasonDialog] = useState(false);
-  const [editingReason, setEditingReason] = useState<ISecurityReasonWithFeatureCount | null>(null);
+  const [openAddRuleDialog, setOpenAddRuleDialog] = useState(false);
+  const [openEditRuleDialog, setOpenEditRuleDialog] = useState(false);
+  const [editingRule, setEditingRule] = useState<ISecurityRuleWithFeatureCount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
@@ -73,7 +82,7 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
    * @param {string} text
    * @param {unknown} error
    */
-  const showLoadError = useCallback(
+  const showApiErrorDialog = useCallback(
     (title: string, text: string, error: unknown) => {
       const apiError = error as APIError;
       setErrorDialog({
@@ -90,19 +99,19 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
   );
 
   /**
-   * Open confirmation dialog to delete a security reason.
+   * Open confirmation dialog to delete a security rule.
    *
-   * @param {ISecurityReasonWithFeatureCount} reason
+   * @param {ISecurityRuleWithFeatureCount} rule
    */
-  const handleDeleteReasonClick = (reason: ISecurityReasonWithFeatureCount) => {
+  const handleDeleteRuleClick = (rule: ISecurityRuleWithFeatureCount) => {
     dialogContext.setYesNoDialog({
-      dialogTitle: 'Delete reason?',
+      dialogTitle: 'Delete rule?',
       dialogContent: (
         <Typography variant="body1" component="div" color="textSecondary">
-          Deleting reason <strong>{reason.name}</strong> will remove it permanently. Are you sure you want to proceed?
+          Deleting rule <strong>{rule.name}</strong> will remove it permanently. Are you sure you want to proceed?
         </Typography>
       ),
-      yesButtonLabel: 'Delete Reason',
+      yesButtonLabel: 'Delete Rule',
       noButtonLabel: 'Cancel',
       yesButtonProps: { color: 'error' },
       onClose: () => dialogContext.setYesNoDialog({ open: false }),
@@ -110,53 +119,44 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
       open: true,
       onYes: () => {
         dialogContext.setYesNoDialog({ open: false });
-        void deleteReason(reason);
+        void deleteRule(rule);
       }
     });
   };
 
   /**
-   * Delete a security reason via API.
+   * Delete a security rule via API.
    *
-   * @param {ISecurityReasonWithFeatureCount} reason
+   * @param {ISecurityRuleWithFeatureCount} rule
    * @returns {Promise<void>}
    */
-  const deleteReason = async (reason: ISecurityReasonWithFeatureCount) => {
+  const deleteRule = async (rule: ISecurityRuleWithFeatureCount) => {
     try {
-      await biohubApi.security.deleteSecurityReason(reason.security_rule_id);
-      showSnackBar({ snackbarMessage: 'Deleted reason' });
+      await biohubApi.security.deleteSecurityRule(rule.security_rule_id);
+      showSnackBar({ snackbarMessage: 'Deleted rule' });
       refresh();
     } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Error Deleting Reason',
-        dialogText: 'An error occurred while deleting the reason.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => dialogContext.setErrorDialog({ open: false }),
-        onOk: () => dialogContext.setErrorDialog({ open: false })
-      });
+      showApiErrorDialog('Error Deleting Rule', 'An error occurred while deleting the rule.', error);
     }
   };
 
   /**
-   * Open the edit dialog for a security reason.
+   * Open the edit dialog for a security rule.
    *
-   * @param {ISecurityReasonWithFeatureCount} reason
+   * @param {ISecurityRuleWithFeatureCount} rule
    */
-  const handleEditReasonClick = (reason: ISecurityReasonWithFeatureCount) => {
-    setEditingReason(reason);
-    setOpenEditReasonDialog(true);
+  const handleEditRuleClick = (rule: ISecurityRuleWithFeatureCount) => {
+    setEditingRule(rule);
+    setOpenEditRuleDialog(true);
   };
 
   /**
-   * Handle saving a new security reason from the add dialog.
+   * Handle saving a new security rule from the add dialog.
    *
-   * @param {IAddReasonFormValues} values
+   * @param {IAddRuleFormValues} values
    * @returns {Promise<void>}
    */
-  const handleAddReasonSave = async (values: IAddReasonFormValues) => {
+  const handleAddRuleSave = async (values: IAddRuleFormValues) => {
     if (!values.security_category_id) {
       return;
     }
@@ -164,68 +164,50 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     setIsLoading(true);
 
     try {
-      await biohubApi.security.createSecurityReason({
+      await biohubApi.security.createSecurityRule({
         name: values.name,
         description: values.description,
         security_category_id: values.security_category_id,
         is_active: values.is_active
       });
 
-      setOpenAddReasonDialog(false);
+      setOpenAddRuleDialog(false);
       refresh();
-      showSnackBar({ snackbarMessage: 'Created reason' });
+      showSnackBar({ snackbarMessage: 'Created rule' });
     } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Create Reason',
-        dialogText: 'An error occurred while creating the reason.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => dialogContext.setErrorDialog({ open: false }),
-        onOk: () => dialogContext.setErrorDialog({ open: false })
-      });
+      showApiErrorDialog('Failed to Create Rule', 'An error occurred while creating the rule.', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   /**
-   * Handle saving an edited security reason.
+   * Handle saving an edited security rule.
    *
-   * @param {IAddReasonFormValues} values
+   * @param {IAddRuleFormValues} values
    * @returns {Promise<void>}
    */
-  const handleEditReasonSave = async (values: IAddReasonFormValues) => {
-    if (!editingReason || !values.security_category_id) {
+  const handleEditRuleSave = async (values: IAddRuleFormValues) => {
+    if (!editingRule || !values.security_category_id) {
       return;
     }
 
     setIsLoading(true);
 
     try {
-      await biohubApi.security.updateSecurityReason(editingReason.security_rule_id, {
+      await biohubApi.security.updateSecurityRule(editingRule.security_rule_id, {
         name: values.name,
         description: values.description,
         security_category_id: values.security_category_id,
         is_active: values.is_active
       });
 
-      setOpenEditReasonDialog(false);
-      setEditingReason(null);
+      setOpenEditRuleDialog(false);
+      setEditingRule(null);
       refresh();
-      showSnackBar({ snackbarMessage: 'Updated reason' });
+      showSnackBar({ snackbarMessage: 'Updated rule' });
     } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Update Reason',
-        dialogText: 'An error occurred while updating the reason.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => dialogContext.setErrorDialog({ open: false }),
-        onOk: () => dialogContext.setErrorDialog({ open: false })
-      });
+      showApiErrorDialog('Failed to Update Rule', 'An error occurred while updating the rule.', error);
     } finally {
       setIsLoading(false);
     }
@@ -234,22 +216,22 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
   /**
    * Get initial form values for the edit dialog.
    *
-   * @returns {IAddReasonFormValues}
+   * @returns {IAddRuleFormValues}
    */
-  const getEditReasonInitialValues = (): IAddReasonFormValues => {
-    if (!editingReason) {
-      return AddReasonFormInitialValues;
+  const getEditRuleInitialValues = (): IAddRuleFormValues => {
+    if (!editingRule) {
+      return AddRuleFormInitialValues;
     }
 
     return {
-      name: editingReason.name,
-      description: editingReason.description || '',
-      security_category_id: editingReason.security_category_id,
-      is_active: editingReason.is_active
+      name: editingRule.name,
+      description: editingRule.description || '',
+      security_category_id: editingRule.security_category_id,
+      is_active: editingRule.is_active
     };
   };
 
-  const columns: GridColDef<ISecurityReasonWithFeatureCount>[] = [
+  const allColumns: GridColDef<ISecurityRuleWithFeatureCount>[] = [
     {
       field: 'name',
       headerName: 'Name',
@@ -304,13 +286,13 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
           menuItems={[
             {
               menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
-              menuLabel: 'Edit reason',
-              menuOnClick: () => handleEditReasonClick(params.row)
+              menuLabel: 'Edit rule',
+              menuOnClick: () => handleEditRuleClick(params.row)
             },
             {
               menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-              menuLabel: 'Delete reason',
-              menuOnClick: () => handleDeleteReasonClick(params.row)
+              menuLabel: 'Delete rule',
+              menuOnClick: () => handleDeleteRuleClick(params.row)
             }
           ]}
         />
@@ -318,24 +300,26 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
     }
   ];
 
+  const columns = securityCategoryId ? allColumns.filter((column) => column.field !== 'category_name') : allColumns;
+
   return (
-    <Container maxWidth="xl">
+    <>
       <PageSection
-        id="reasons"
+        id="rules"
         label={
           <>
-            Reasons{' '}
+            Rules{' '}
             <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
               ({rowCount})
             </Typography>
           </>
         }
-        onAdd={() => setOpenAddReasonDialog(true)}
+        onAdd={() => setOpenAddRuleDialog(true)}
         headerContent={
           <Stack gap={1} direction="row" alignItems="center">
             <TextField
               size="small"
-              placeholder="Search by reason name"
+              placeholder="Search by rule name"
               value={searchTerm}
               onChange={(e) => onSearch(e.target.value)}
               slotProps={{
@@ -351,12 +335,12 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
             />
           </Stack>
         }>
-        <ServerPaginatedDataGrid<ISecurityReasonWithFeatureCount>
-          dataTestId="reasons-table"
-          rows={reasons}
+        <ServerPaginatedDataGrid<ISecurityRuleWithFeatureCount>
+          dataTestId="rules-table"
+          rows={rules}
           columns={columns}
           getRowId={(row) => row.security_rule_id}
-          noRowsMessage="No Reasons"
+          noRowsMessage="No Rules"
           rowCount={rowCount}
           paginationModel={paginationModel}
           setPaginationModel={setPaginationModel}
@@ -365,30 +349,30 @@ export const ReasonsContainer = (props: IReasonsContainerProps) => {
         />
       </PageSection>
 
-      <ReasonDialog
-        open={openAddReasonDialog}
+      <RuleDialog
+        open={openAddRuleDialog}
         isLoading={isLoading}
-        dialogTitle="Add Reason"
+        dialogTitle="Add Rule"
         dialogSaveButtonLabel="Create"
-        initialValues={AddReasonFormInitialValues}
-        onLoadError={showLoadError}
-        onCancel={() => setOpenAddReasonDialog(false)}
-        onSave={handleAddReasonSave}
+        initialValues={addRuleInitialValues}
+        onLoadError={showApiErrorDialog}
+        onCancel={() => setOpenAddRuleDialog(false)}
+        onSave={handleAddRuleSave}
       />
 
-      <ReasonDialog
-        open={openEditReasonDialog}
+      <RuleDialog
+        open={openEditRuleDialog}
         isLoading={isLoading}
-        dialogTitle="Edit Reason"
+        dialogTitle="Edit Rule"
         dialogSaveButtonLabel="Save"
-        initialValues={getEditReasonInitialValues()}
-        onLoadError={showLoadError}
+        initialValues={getEditRuleInitialValues()}
+        onLoadError={showApiErrorDialog}
         onCancel={() => {
-          setOpenEditReasonDialog(false);
-          setEditingReason(null);
+          setOpenEditRuleDialog(false);
+          setEditingRule(null);
         }}
-        onSave={handleEditReasonSave}
+        onSave={handleEditRuleSave}
       />
-    </Container>
+    </>
   );
 };

@@ -6,12 +6,12 @@ import { createTestQueryClient } from 'test-helpers/query-client';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import ManageUsersPage from './ManageUsersPage';
+import { AdminUsersPage } from './AdminUsersPage';
 
 const renderContainer = (queryClient?: QueryClient) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <ManageUsersPage />
+      <AdminUsersPage />
     </MemoryRouter>,
     { queryClient }
   );
@@ -62,7 +62,7 @@ const mockUseApi = {
   }
 };
 
-describe('ManageUsersPage', () => {
+describe('AdminUsersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useAuthStateContext).mockReturnValue({
@@ -93,7 +93,7 @@ describe('ManageUsersPage', () => {
     const { getByRole } = renderContainer();
 
     await waitFor(() => {
-      expect(getByRole('heading', { name: 'Administrative' })).toBeVisible();
+      expect(getByRole('heading', { name: 'Users' })).toBeVisible();
       expect(getByRole('tab', { name: 'Users' })).toBeVisible();
     });
   });

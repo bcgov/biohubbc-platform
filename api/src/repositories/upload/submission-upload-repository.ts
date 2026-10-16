@@ -10,6 +10,7 @@ import {
   SubmissionUploadDecision,
   SubmissionUploadFilters,
   SubmissionUploadJobStatus,
+  SubmissionUploadScope,
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
@@ -55,6 +56,45 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, AdminSubmissionUpload);
     return response.rows;
+  }
+
+  /**
+   * Get one active upload of a submission, in the shape administrators list uploads with.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @returns {Promise<AdminSubmissionUpload>} The upload record.
+   * @throws {ApiNotFoundError} When the upload is not an active upload of the submission.
+   * @memberof SubmissionUploadRepository
+   */
+  async getAdminSubmissionUpload(scope: SubmissionUploadScope): Promise<AdminSubmissionUpload> {
+    const knex = getKnex();
+    const query = knex('submission_upload as su')
+      .select(
+        'su.submission_upload_id',
+        'su.upload_id',
+        'su.status',
+        'su.decision',
+        'su.ticket_id',
+        'su.comment',
+        'su.create_date',
+        'su.create_user',
+        'u.user_identifier as submitted_by_identifier'
+      )
+      .leftJoin('system_user as u', 'u.system_user_id', 'su.create_user')
+      .where('su.submission_id', scope.submissionId)
+      .where('su.submission_upload_id', scope.submissionUploadId)
+      .whereNull('su.record_end_date');
+
+    const response = await this.connection.knex(query, AdminSubmissionUpload);
+
+    if (!response.rowCount) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getAdminSubmissionUpload',
+        scope
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**
@@ -122,8 +162,11 @@ export class SubmissionUploadRepository extends BaseRepository {
   /**
    * Get and lock a single active submission_upload record by ID.
    *
-   * Uses `FOR UPDATE` to serialize concurrent workers attempting to start
-   * process-stage work for the same submission_upload_id.
+   * Uses `FOR NO KEY UPDATE` to serialize concurrent workers attempting to start
+   * process-stage work for the same submission_upload_id. Feature pipeline jobs hold this lock for
+   * their whole stage transaction, so it must not be `FOR UPDATE`: that mode conflicts with the
+   * `FOR KEY SHARE` lock taken by foreign key checks, and would block inserts of rows that reference
+   * the upload (such as reviews) until the stage commits.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record.
    * @returns {Promise<SubmissionUpload>} - The locked submission_upload record.
@@ -149,7 +192,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       WHERE
         submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL
-      FOR UPDATE;
+      FOR NO KEY UPDATE;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
@@ -440,7 +483,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         WHERE submission_id = ${submissionUpload.submission_id}
         ORDER BY create_date DESC, submission_upload_id DESC
         LIMIT 1
-        FOR UPDATE
+        FOR NO KEY UPDATE
       ),
       inserted AS (
         INSERT INTO submission_upload (
@@ -522,6 +565,38 @@ export class SubmissionUploadRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Set the blueprint an active submission_upload record is indexed with.
+   *
+   * Only `SubmissionUploadService.reindexSubmissionUpload` should call this: it holds the row lock, validates the
+   * blueprint and queues the re-index that rebuilds the upload's property rows against it.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to update.
+   * @param {number} blueprintId - The blueprint to index the upload with.
+   * @returns {Promise<void>} Resolves after the active record is updated.
+   * @throws {ApiExecuteSQLError} - If no active record was updated.
+   * @memberof SubmissionUploadRepository
+   */
+  async updateSubmissionUploadBlueprint(submissionUploadId: string, blueprintId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET
+        blueprint_id = ${blueprintId}
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission_upload blueprint', [
+        'SubmissionUploadRepository->updateSubmissionUploadBlueprint',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
   }
 
   /**
@@ -746,7 +821,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       WHERE submission_id = ${submissionId}
         AND record_end_date IS NULL
       ORDER BY submission_upload_id
-      FOR UPDATE;
+      FOR NO KEY UPDATE;
     `;
 
     await this.connection.sql(sqlStatement);

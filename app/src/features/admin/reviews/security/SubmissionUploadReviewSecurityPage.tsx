@@ -1,4 +1,3 @@
-import Container from '@mui/material/Container';
 import { useDialogContext } from 'hooks/useContext';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
 import { useParams } from 'react-router-dom';
@@ -59,23 +58,19 @@ export const SubmissionUploadReviewSecurityPage = ({ review }: SubmissionUploadR
   };
 
   return (
-    <>
-      <SubmissionUploadReviewHeader
+    <SubmissionUploadReviewHeader
+      submissionId={Number(submissionId)}
+      review={review}
+      tabs={[{ value: 'features', label: 'Features' }]}
+      activeTab="features"
+      onTabChange={() => {}}
+      onStatusActionClick={openStatusDialog}>
+      <SecurityReviewFeaturesTab
+        key={submissionUploadReviewId}
         submissionId={Number(submissionId)}
-        review={review}
-        tabs={[{ value: 'features', label: 'Features' }]}
-        activeTab="features"
-        onTabChange={() => {}}
-        onStatusActionClick={openStatusDialog}
+        submissionUploadId={submissionUploadId}
+        submissionUploadReviewId={submissionUploadReviewId}
       />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <SecurityReviewFeaturesTab
-          key={submissionUploadReviewId}
-          submissionId={Number(submissionId)}
-          submissionUploadId={submissionUploadId}
-          submissionUploadReviewId={submissionUploadReviewId}
-        />
-      </Container>
-    </>
+    </SubmissionUploadReviewHeader>
   );
 };

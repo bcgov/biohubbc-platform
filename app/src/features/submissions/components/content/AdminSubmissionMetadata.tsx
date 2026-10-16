@@ -86,7 +86,7 @@ export const AdminSubmissionMetadata = ({ submission }: { submission: Submission
   ];
 
   return (
-    <PageSection id="submission-metadata" label="Metadata">
+    <PageSection id="submission-metadata" label="About">
       <CustomDataGrid autoHeight rows={rows} columns={columns} disableColumnSelector hideFooter rowSelection={false} />
       <SubmissionDefaultBlueprintDialog
         open={blueprintDialogOpen}

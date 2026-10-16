@@ -1604,6 +1604,74 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Record taxon values that could not be looked up because the taxonomy service was unavailable.
+   *
+   * Covers every candidate the taxonomy lookup would have repaired: TSNs with no local taxon, and TSNs whose local
+   * taxon is missing its parent link or rank. Both are grouped by upload/property/feature-type-property and written as
+   * `TAXONOMY_SERVICE_UNAVAILABLE`, in place of `UNRESOLVED_TAXON`, so the upload fails validation rather than being
+   * indexed against an incomplete taxonomy.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
+   */
+  async recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.blueprint_feature_type_property_id,
+          'TAXONOMY_SERVICE_UNAVAILABLE'::text AS error_code,
+          'Taxonomy service was unavailable to resolve taxon TSN; re-index the upload to retry'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_upload_staging_taxon_candidate c
+        LEFT JOIN taxon t
+          ON t.taxon_id = c.taxon_id
+         AND t.record_end_date IS NULL
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.tsn IS NOT NULL
+          AND (
+            c.taxon_id IS NULL
+            OR (t.parent_taxon_id IS NULL AND lower(t.rank) <> 'kingdom')
+            OR t.rank IS NULL
+          )
+        GROUP BY c.submission_upload_id, c.property_name, c.blueprint_feature_type_property_id
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        property_name,
+        blueprint_feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        details
+      )
+      SELECT
+        submission_upload_id,
+        property_name,
+        blueprint_feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        blueprint_feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Record unresolved or invalid artifact references for artifact-backed properties.
    *
    * This phase records:

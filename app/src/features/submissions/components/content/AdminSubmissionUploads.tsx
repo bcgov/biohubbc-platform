@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import { GridColDef } from '@mui/x-data-grid';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -89,7 +90,16 @@ export const AdminSubmissionUploads = ({ submissionId }: { submissionId: number 
   }, [query.data]);
 
   return (
-    <PageSection id="submission-uploads" label="Uploads">
+    <PageSection
+      id="submission-uploads"
+      label={
+        <>
+          Uploads{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({query.data?.pagination.total ?? rowCount})
+          </Typography>
+        </>
+      }>
       <CustomDataGrid
         autoHeight
         rows={query.data?.uploads ?? []}

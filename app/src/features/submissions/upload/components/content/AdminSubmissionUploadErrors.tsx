@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
@@ -53,7 +54,16 @@ export const AdminSubmissionUploadErrors = ({ scope }: AdminSubmissionUploadErro
   }, [query.data]);
 
   return (
-    <PageSection id="submission-upload-errors" label="Errors">
+    <PageSection
+      id="submission-upload-errors"
+      label={
+        <>
+          Errors{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({query.data?.pagination.total ?? rowCount})
+          </Typography>
+        </>
+      }>
       <CustomDataGrid
         autoHeight
         rows={query.data?.errors ?? []}

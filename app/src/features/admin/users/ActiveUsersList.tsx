@@ -14,7 +14,6 @@ import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
 import { useMemo } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
-import { getUserLabel } from 'utils/Utils';
 
 export interface IUsersListRowActions {
   onChangeRole: (user: ISystemUser, roleId: number, roleName: string) => void;
@@ -55,26 +54,16 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const columns: GridColDef<ISystemUser>[] = useMemo(
     () => [
       {
-        field: 'user_identifier',
-        headerName: 'Name',
+        field: 'display_name',
+        headerName: 'Display Name',
         minWidth: 220,
-        flex: 1,
-        renderCell: (params) => {
-          const label = getUserLabel(params.row);
-
-          return (
-            <Stack>
-              <Typography variant="body2" noWrap title={label || 'No identifier'}>
-                {label || 'No identifier'}
-              </Typography>
-              {params.row.display_name?.trim() ? (
-                <Typography variant="caption" color="textSecondary" noWrap title={params.row.user_identifier}>
-                  {params.row.user_identifier}
-                </Typography>
-              ) : null}
-            </Stack>
-          );
-        }
+        flex: 1
+      },
+      {
+        field: 'user_identifier',
+        headerName: 'IDIR',
+        minWidth: 160,
+        flex: 0.8
       },
       {
         field: 'identity_source',

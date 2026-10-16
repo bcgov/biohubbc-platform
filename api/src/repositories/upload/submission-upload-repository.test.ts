@@ -460,6 +460,33 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('updateSubmissionUploadBlueprint', () => {
+    it('throws an error if no active record was updated', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.updateSubmissionUploadBlueprint('id-1', 5);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update submission_upload blueprint');
+      }
+    });
+
+    it('updates only the active record and binds the blueprint', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [] } as any as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      await repo.updateSubmissionUploadBlueprint('id-1', 5);
+
+      expect(sqlStub.firstCall.args[0].text).to.contain('record_end_date IS NULL');
+      expect(sqlStub.firstCall.args[0].values).to.eql([5, 'id-1']);
+    });
+  });
+
   describe('updateSubmissionUploadStatus', () => {
     it('throws an error if no active record was updated', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
@@ -563,7 +590,7 @@ describe('SubmissionUploadRepository', () => {
 
       const text = sqlStub.firstCall.args[0].text as string;
       expect(text).to.include('ORDER BY submission_upload_id');
-      expect(text).to.include('FOR UPDATE');
+      expect(text).to.include('FOR NO KEY UPDATE');
     });
   });
 });

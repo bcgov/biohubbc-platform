@@ -1,18 +1,22 @@
-import { Box, Breadcrumbs, Container, Link, Skeleton, Typography } from '@mui/material';
+import { Box, Breadcrumbs, Button, Link, Skeleton, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { PageHeader } from 'components/header/PageHeader';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { RECONCILIATION_OUTCOMES } from 'constants/reconciliation';
+import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { SubmissionUploadScope } from 'interfaces/useAdminApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useEffect, useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { hasAtLeastOneValidValue } from 'utils/authUtils';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
+import { adminSubmissionUploadQueryKeys } from '../submission-upload-query-keys';
 import { AdminSubmissionUploadErrors } from './content/AdminSubmissionUploadErrors';
 import { AdminSubmissionUploadMetadata } from './content/AdminSubmissionUploadMetadata';
 import { AdminSubmissionUploadReconciliation } from './content/AdminSubmissionUploadReconciliation';
+import { ReindexSubmissionUploadDialog } from './dialog/ReindexSubmissionUploadDialog';
 
 interface AdminSubmissionUploadPageContentProps {
   scope: SubmissionUploadScope;
@@ -25,7 +29,8 @@ const METADATA_TAB = 'metadata';
  * Display an upload under the submission header, with one tab per reconciliation outcome, an Errors tab and a Metadata
  * tab. The outcome tabs share one feature types table and map; the selected tab decides which outcome they show. An
  * absent or unknown tab shows the first outcome. Once an outcome has been shown, the table and map stay mounted for
- * the life of the page, hidden behind the other tabs, so returning to an outcome does not rebuild them.
+ * the life of the page, hidden behind the other tabs, so returning to an outcome does not rebuild them. System
+ * administrators can reindex the upload from the header until it is accepted.
  *
  * @param {AdminSubmissionUploadPageContentProps} props Submission and upload to display.
  * @returns {JSX.Element} Administrative upload detail page.
@@ -46,6 +51,21 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
     queryFn: ({ signal }) => api.submissions.getSubmissionRecordWithSecurity(scope.submissionId, { signal })
   });
   const submission = submissionQuery.data;
+  const authStateContext = useAuthStateContext();
+  const canReindex = hasAtLeastOneValidValue([SYSTEM_ROLE.SYSTEM_ADMIN], authStateContext.biohubUserWrapper.roleNames);
+  const [isReindexDialogOpen, setIsReindexDialogOpen] = useState(false);
+  const uploadQuery = useQuery({
+    queryKey: adminSubmissionUploadQueryKeys.record(scope),
+    queryFn: ({ signal }) => api.admin.getAdminSubmissionUpload(scope, { signal }),
+    enabled: canReindex
+  });
+  const blueprintQuery = useQuery({
+    queryKey: adminSubmissionUploadQueryKeys.blueprint(scope),
+    queryFn: ({ signal }) => api.admin.getSubmissionUploadBlueprint(scope, { signal }),
+    enabled: canReindex
+  });
+  // An accepted upload's features are published and immutable; the server also refuses other ineligible uploads.
+  const isReindexDisabled = !uploadQuery.data || uploadQuery.data.decision === 'approved' || blueprintQuery.isPending;
 
   useEffect(() => {
     if (isOutcomeTab) {
@@ -58,9 +78,12 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
   }
   return (
     <>
-      <PageHeader
+      <AdminPageLayout
         breadcrumbs={
           <Breadcrumbs aria-label="submission upload breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
             <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
               Submissions
             </Link>
@@ -76,41 +99,47 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
             </Typography>
           </Breadcrumbs>
         }
-        label={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
+        title={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
         description={submission?.description}
-        tabs={
-          <TabGroup
-            value={activeTab}
-            onChange={(value) => {
-              const next = new URLSearchParams(searchParams);
-              next.set('tab', value);
-              setSearchParams(next);
-            }}
-            ariaLabel="Submission upload sections"
-            tabs={[
-              ...RECONCILIATION_OUTCOMES.map(({ route, label }) => ({
-                value: route,
-                label,
-                id: `upload-${route}-tab`,
-                ariaControls: `upload-${route}-panel`
-              })),
-              {
-                value: ERRORS_TAB,
-                label: 'Errors',
-                id: 'upload-errors-tab',
-                ariaControls: 'upload-errors-panel'
-              },
-              {
-                value: METADATA_TAB,
-                label: 'Metadata',
-                id: 'upload-metadata-tab',
-                ariaControls: 'upload-metadata-panel'
-              }
-            ]}
-          />
+        buttons={
+          canReindex && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              disabled={isReindexDisabled}
+              onClick={() => setIsReindexDialogOpen(true)}
+              data-testid="reindex-upload-button">
+              Reindex
+            </Button>
+          )
         }
-      />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+        tabs={[
+          ...RECONCILIATION_OUTCOMES.map(({ route, label }) => ({
+            value: route,
+            label,
+            id: `upload-${route}-tab`,
+            ariaControls: `upload-${route}-panel`
+          })),
+          {
+            value: ERRORS_TAB,
+            label: 'Errors',
+            id: 'upload-errors-tab',
+            ariaControls: 'upload-errors-panel'
+          },
+          {
+            value: METADATA_TAB,
+            label: 'About',
+            id: 'upload-metadata-tab',
+            ariaControls: 'upload-metadata-panel'
+          }
+        ]}
+        activeTab={activeTab}
+        onTabChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          next.set('tab', value);
+          setSearchParams(next);
+        }}>
         {(isOutcomeTab || hasShownOutcome) && (
           <Box
             role="tabpanel"
@@ -142,7 +171,15 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
             )
           }}
         />
-      </Container>
+      </AdminPageLayout>
+      {canReindex && (
+        <ReindexSubmissionUploadDialog
+          open={isReindexDialogOpen}
+          scope={scope}
+          blueprint={blueprintQuery.data ?? null}
+          onClose={() => setIsReindexDialogOpen(false)}
+        />
+      )}
     </>
   );
 };

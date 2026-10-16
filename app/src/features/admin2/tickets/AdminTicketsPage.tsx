@@ -1,10 +1,8 @@
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
-import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import { hashKey, keepPreviousData, QueryKey, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TICKETS_LIST_DEFAULT_SORT } from 'constants/ticket';
@@ -22,13 +20,13 @@ import {
 } from 'hooks/useCoordinatedMutation';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
-import { CreateTicketDialog } from './components/dialog/create/CreateTicketDialog';
-import { EditTicketDialog } from './components/dialog/edit/EditTicketDialog';
-import { ITicketFormValues } from './components/dialog/form/TicketForm';
-import { TicketsContainer } from './list/TicketsContainer';
+import { CreateTicketDialog } from 'features/admin/tickets/components/dialog/create/CreateTicketDialog';
+import { EditTicketDialog } from 'features/admin/tickets/components/dialog/edit/EditTicketDialog';
+import { ITicketFormValues } from 'features/admin/tickets/components/dialog/form/TicketForm';
+import { TicketsContainer } from 'features/admin/tickets/list/TicketsContainer';
 
 /**
- * Admin tickets page with administrative tabs and ticket pagination.
+ * Administrative tickets page: the paginated ticket list in the shared administrative page layout.
  *
  * Creating and editing refresh the server-sorted list once pending list mutations settle. Status toggles update
  * optimistically in place. Each change also refreshes the ticket's other cached copies: its detail pages, the
@@ -36,13 +34,12 @@ import { TicketsContainer } from './list/TicketsContainer';
  *
  * @return {*}
  */
-export const TicketsPage = () => {
+export const AdminTicketsPage = () => {
   const api = useApi();
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
   const queryClient = useQueryClient();
 
-  // NOTE: More tab options will be added as more administrative features are added. For now, only tickets are supported.
   const [activeTab, setActiveTab] = useState<'tickets'>('tickets');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -240,8 +237,8 @@ export const TicketsPage = () => {
 
   return (
     <>
-      <PageHeader
-        label="Administrative"
+      <AdminPageLayout
+        title="Tickets"
         breadcrumbs={
           <Breadcrumbs aria-label="tickets breadcrumb">
             <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
@@ -252,27 +249,19 @@ export const TicketsPage = () => {
             </Typography>
           </Breadcrumbs>
         }
-        tabs={
-          <TabGroup<'tickets'>
-            value={activeTab}
-            onChange={(value) => {
-              setActiveTab(value);
-              grid.handlePaginationChange({ ...grid.paginationModel, page: 0 });
-            }}
-            ariaLabel="administrative tabs"
-            tabs={[
-              {
-                value: 'tickets',
-                label: 'Tickets',
-                id: 'administrative-tickets-tab',
-                ariaControls: 'administrative-tickets-tabpanel'
-              }
-            ]}
-          />
-        }
-      />
-
-      <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+        tabs={[
+          {
+            value: 'tickets',
+            label: 'Tickets',
+            id: 'administrative-tickets-tab',
+            ariaControls: 'administrative-tickets-tabpanel'
+          }
+        ]}
+        activeTab={activeTab}
+        onTabChange={(value) => {
+          setActiveTab(value);
+          grid.handlePaginationChange({ ...grid.paginationModel, page: 0 });
+        }}>
         <QueryErrorDialog error={ticketsQuery.error} label="tickets" />
         <TicketsContainer
           rows={ticketsQuery.data?.tickets ?? []}
@@ -291,7 +280,7 @@ export const TicketsPage = () => {
           }}
           onRowClick={(ticketId) => navigate(`/admin/tickets/${ticketId}`)}
         />
-      </Container>
+      </AdminPageLayout>
 
       <CreateTicketDialog
         open={isCreateDialogOpen}

@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageSection } from 'components/section/PageSection';
@@ -46,7 +47,16 @@ export const SubmissionUploadReviewValidationReconciliationFeatureTypesTable = (
   );
 
   return (
-    <PageSection id="reconciliation-feature-types" label="Feature types">
+    <PageSection
+      id="reconciliation-feature-types"
+      label={
+        <>
+          Feature types{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }>
       <CustomDataGrid
         autoHeight
         rows={featureTypes}

@@ -1,8 +1,7 @@
-import { Alert, Box, Breadcrumbs, Container, Link, Skeleton, Stack, Typography } from '@mui/material';
+import { Alert, Box, Breadcrumbs, Link, Skeleton, Stack, Typography } from '@mui/material';
 import { SecondaryButton } from 'components/button/SecondaryButton';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { useApi } from 'hooks/useApi';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { refreshChangedQueries } from 'utils/query-client';
 import { useState } from 'react';
@@ -39,7 +38,7 @@ export const ContributorDetailPage = () => {
   const handleClose = () => setIsEditing(false);
   return (
     <>
-      <PageHeader
+      <AdminPageLayout
         breadcrumbs={
           <Breadcrumbs aria-label="contributor breadcrumb">
             <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
@@ -56,7 +55,7 @@ export const ContributorDetailPage = () => {
             </Typography>
           </Breadcrumbs>
         }
-        label={contributor ? contributor.client_id : <Skeleton width={240} height={48} />}
+        title={contributor ? contributor.client_id : <Skeleton width={240} height={48} />}
         buttons={
           contributor &&
           !contributor.record_end_date && (
@@ -65,26 +64,17 @@ export const ContributorDetailPage = () => {
             </SecondaryButton>
           )
         }
-        description={contributor?.description}
-        descriptionDialogTitle="Contributor Description"
-        tabs={
-          <TabGroup<ContributorDetailTab>
-            value={activeTab}
-            onChange={setActiveTab}
-            ariaLabel="Contributor detail sections"
-            tabs={[
-              { value: 'users', label: 'Users', id: 'contributor-users-tab', ariaControls: 'contributor-users-panel' },
-              {
-                value: 'metadata',
-                label: 'Metadata',
-                id: 'contributor-metadata-tab',
-                ariaControls: 'contributor-metadata-panel'
-              }
-            ]}
-          />
-        }
-      />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+        tabs={[
+          { value: 'users', label: 'Users', id: 'contributor-users-tab', ariaControls: 'contributor-users-panel' },
+          {
+            value: 'metadata',
+            label: 'About',
+            id: 'contributor-metadata-tab',
+            ariaControls: 'contributor-metadata-panel'
+          }
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}>
         <Stack gap={3}>
           {Boolean(query.error) && (
             <Alert severity="error" action={<SecondaryButton onClick={handleRefresh}>Retry</SecondaryButton>}>
@@ -112,7 +102,7 @@ export const ContributorDetailPage = () => {
             </>
           )}
         </Stack>
-      </Container>
+      </AdminPageLayout>
       {isEditing && contributor && !contributor.record_end_date && (
         <ContributorDialog record={contributor} onClose={handleClose} onSaved={handleRefresh} />
       )}

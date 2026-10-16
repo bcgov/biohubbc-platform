@@ -1,15 +1,15 @@
-import { Box, Container, Paper, Stack } from '@mui/material';
+import { Box, Paper, Stack } from '@mui/material';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { PrimaryButton } from 'components/button/PrimaryButton';
 import { SecondaryButton } from 'components/button/SecondaryButton';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from 'components/header/PageHeader';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { refreshChangedQueries } from 'utils/query-client';
@@ -110,30 +110,41 @@ export const CreateSubmissionPage = () => {
   };
 
   return (
-    <>
-      <PageHeader
-        breadcrumbs={
-          <Breadcrumbs aria-label="new submission breadcrumb">
-            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
-              Submissions
-            </Link>
-            <Typography variant="inherit" color="text.primary" aria-current="page">
-              New Submission
-            </Typography>
-          </Breadcrumbs>
+    <AdminPageLayout
+      breadcrumbs={
+        <Breadcrumbs aria-label="new submission breadcrumb">
+          <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+            Administration
+          </Link>
+          <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+            Submissions
+          </Link>
+          <Typography variant="inherit" color="text.primary" aria-current="page">
+            New Submission
+          </Typography>
+        </Breadcrumbs>
+      }
+      title="New Submission"
+      tabs={[
+        {
+          value: 'details',
+          label: 'Details',
+          id: 'new-submission-details-tab',
+          ariaControls: 'new-submission-details-panel'
         }
-        label="New Submission"
-        buttons={
-          <Stack gap={1} flexDirection="row">
-            <SecondaryButton disabled={isSubmitting} onClick={handleCancel}>
-              Cancel
-            </SecondaryButton>
-            <PrimaryButton loading={isSubmitting} onClick={() => formikRef.current?.submitForm()}>
-              Submit
-            </PrimaryButton>
-          </Stack>
-        }
-      />
+      ]}
+      activeTab="details"
+      onTabChange={() => {}}
+      buttons={
+        <Stack gap={1} flexDirection="row">
+          <SecondaryButton disabled={isSubmitting} onClick={handleCancel}>
+            Cancel
+          </SecondaryButton>
+          <PrimaryButton loading={isSubmitting} onClick={() => formikRef.current?.submitForm()}>
+            Submit
+          </PrimaryButton>
+        </Stack>
+      }>
       <Formik
         innerRef={formikRef}
         initialValues={initialSubmissionValues}
@@ -143,7 +154,11 @@ export const CreateSubmissionPage = () => {
         enableReinitialize
         onSubmit={handleSubmit}>
         {(formikProps) => (
-          <Container component={Paper} maxWidth="xl" sx={{ bgcolor: '#fff', py: 2, mt: 3 }}>
+          <Paper
+            role="tabpanel"
+            id="new-submission-details-panel"
+            aria-labelledby="new-submission-details-tab"
+            sx={{ py: 2, px: 3 }}>
             <Box my={3}>
               <CreateSubmissionForm />
             </Box>
@@ -155,9 +170,9 @@ export const CreateSubmissionPage = () => {
                 Submit
               </PrimaryButton>
             </Stack>
-          </Container>
+          </Paper>
         )}
       </Formik>
-    </>
+    </AdminPageLayout>
   );
 };

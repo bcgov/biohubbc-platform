@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ITIS_REQUEST_TIMEOUT_MS } from '../constants/taxonomy';
 import { getItisTaxonCommonNames, sortTaxonSearchResults } from '../utils/itis-utils';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service.interface';
@@ -64,7 +65,9 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
-    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
+    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url, {
+      timeout: ITIS_REQUEST_TIMEOUT_MS
+    });
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -92,7 +95,9 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
 
-    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
+    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url, {
+      timeout: ITIS_REQUEST_TIMEOUT_MS
+    });
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -113,7 +118,9 @@ export class ItisService {
 
     defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'url', url });
 
-    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponseHierarchy[]>>(url);
+    const response = await itisServiceDependencies.get<ItisSolrResponseBase<ItisSolrSearchResponseHierarchy[]>>(url, {
+      timeout: ITIS_REQUEST_TIMEOUT_MS
+    });
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];

@@ -1,4 +1,3 @@
-import Container from '@mui/material/Container';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -46,24 +45,20 @@ export const SubmissionUploadReviewValidationReconciliationContent = ({
   }, [featureTypesQuery.error, setSnackbar]);
 
   return (
-    <>
-      <SubmissionUploadReviewValidationReconciliationHeader
-        submissionId={scope.submissionId}
-        review={review}
-        label={label}
+    <SubmissionUploadReviewValidationReconciliationHeader
+      submissionId={scope.submissionId}
+      review={review}
+      label={label}>
+      <SubmissionUploadReviewValidationReconciliationFeatureTypesTable
+        featureTypes={featureTypesQuery.data?.feature_types ?? []}
+        rowCount={featureTypesQuery.data?.pagination.total ?? 0}
+        grid={grid}
+        isLoading={featureTypesQuery.isLoading}
+        hasError={featureTypesQuery.isError}
+        onFeatureTypeClick={(featureTypeName) =>
+          navigate(`${location.pathname}/feature-type/${encodeURIComponent(featureTypeName)}`)
+        }
       />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <SubmissionUploadReviewValidationReconciliationFeatureTypesTable
-          featureTypes={featureTypesQuery.data?.feature_types ?? []}
-          rowCount={featureTypesQuery.data?.pagination.total ?? 0}
-          grid={grid}
-          isLoading={featureTypesQuery.isLoading}
-          hasError={featureTypesQuery.isError}
-          onFeatureTypeClick={(featureTypeName) =>
-            navigate(`${location.pathname}/feature-type/${encodeURIComponent(featureTypeName)}`)
-          }
-        />
-      </Container>
-    </>
+    </SubmissionUploadReviewValidationReconciliationHeader>
   );
 };

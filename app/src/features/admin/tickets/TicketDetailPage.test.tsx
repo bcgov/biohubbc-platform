@@ -3,6 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
+import { ReactNode } from 'react';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketDetailPage } from './TicketDetailPage';
@@ -21,17 +22,22 @@ vi.mock('./detail/header/TicketHeader', () => ({
   TicketHeader: ({
     ticket,
     activeTab,
-    onTabChange
+    onTabChange,
+    children
   }: {
     ticket: ITicketExtended;
     activeTab: 'timeline' | 'artifacts';
     onTabChange: (tab: 'timeline' | 'artifacts') => void;
+    children: ReactNode;
   }) => (
-    <div data-testid="ticket-header" data-active-tab={activeTab}>
-      {ticket.ticket_slug}
-      <button onClick={() => onTabChange('timeline')}>Timeline</button>
-      <button onClick={() => onTabChange('artifacts')}>Files</button>
-    </div>
+    <>
+      <div data-testid="ticket-header" data-active-tab={activeTab}>
+        {ticket.ticket_slug}
+        <button onClick={() => onTabChange('timeline')}>Timeline</button>
+        <button onClick={() => onTabChange('artifacts')}>Files</button>
+      </div>
+      {children}
+    </>
   )
 }));
 

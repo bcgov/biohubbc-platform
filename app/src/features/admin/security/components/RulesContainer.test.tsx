@@ -1,14 +1,14 @@
 import { GridColDef } from '@mui/x-data-grid';
 import { fireEvent } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
-import { ISecurityReasonWithFeatureCount } from 'interfaces/useSecurityApi.interface';
+import { ISecurityRuleWithFeatureCount } from 'interfaces/useSecurityApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { IReasonsContainerProps, ReasonsContainer } from './ReasonsContainer';
+import { IRulesContainerProps, RulesContainer } from './RulesContainer';
 
 interface MockDataGridProps {
-  rows: ISecurityReasonWithFeatureCount[];
+  rows: ISecurityRuleWithFeatureCount[];
   columns: GridColDef[];
   localeText?: { noRowsLabel?: string };
 }
@@ -37,13 +37,13 @@ vi.mock('@mui/x-data-grid', () => ({
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
-const mockReasons: ISecurityReasonWithFeatureCount[] = [
+const mockRules: ISecurityRuleWithFeatureCount[] = [
   {
     security_rule_id: 1,
     security_category_id: 2,
     category_name: 'Health',
     name: 'Research',
-    description: 'Research reason',
+    description: 'Research rule',
     is_active: true,
     feature_count: 4
   },
@@ -52,7 +52,7 @@ const mockReasons: ISecurityReasonWithFeatureCount[] = [
     security_category_id: 2,
     category_name: 'Health',
     name: 'Inactive Rule',
-    description: 'Disabled reason',
+    description: 'Disabled rule',
     is_active: false,
     feature_count: 0
   }
@@ -63,22 +63,22 @@ const mockCategoriesResponse = {
   pagination: { total: 1, current_page: 1, last_page: 1, per_page: 100 }
 };
 
-const mockCreateSecurityReason = vi.fn();
-const mockUpdateSecurityReason = vi.fn();
-const mockDeleteSecurityReason = vi.fn();
+const mockCreateSecurityRule = vi.fn();
+const mockUpdateSecurityRule = vi.fn();
+const mockDeleteSecurityRule = vi.fn();
 const mockGetSecurityCategories = vi.fn().mockResolvedValue(mockCategoriesResponse);
 
 const mockUseApi = {
   security: {
     getSecurityCategories: mockGetSecurityCategories,
-    createSecurityReason: mockCreateSecurityReason,
-    updateSecurityReason: mockUpdateSecurityReason,
-    deleteSecurityReason: mockDeleteSecurityReason
+    createSecurityRule: mockCreateSecurityRule,
+    updateSecurityRule: mockUpdateSecurityRule,
+    deleteSecurityRule: mockDeleteSecurityRule
   }
 };
 
-const defaultProps: IReasonsContainerProps = {
-  reasons: mockReasons,
+const defaultProps: IRulesContainerProps = {
+  rules: mockRules,
   rowCount: 1,
   paginationModel: { page: 0, pageSize: 10 },
   setPaginationModel: vi.fn(),
@@ -89,15 +89,15 @@ const defaultProps: IReasonsContainerProps = {
   onSearch: vi.fn()
 };
 
-const renderComponent = (props: Partial<IReasonsContainerProps> = {}) => {
+const renderComponent = (props: Partial<IRulesContainerProps> = {}) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <ReasonsContainer {...defaultProps} {...props} />
+      <RulesContainer {...defaultProps} {...props} />
     </MemoryRouter>
   );
 };
 
-describe('ReasonsContainer', () => {
+describe('RulesContainer', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
     mockGetSecurityCategories.mockResolvedValue(mockCategoriesResponse);
@@ -109,7 +109,7 @@ describe('ReasonsContainer', () => {
   });
 
   it('renders Active and Inactive status chips', () => {
-    const { getByText } = renderComponent({ reasons: mockReasons, rowCount: 2 });
+    const { getByText } = renderComponent({ rules: mockRules, rowCount: 2 });
 
     expect(getByText('Active')).toBeVisible();
     expect(getByText('Inactive')).toBeVisible();
@@ -121,12 +121,12 @@ describe('ReasonsContainer', () => {
     fireEvent.click(getByRole('button', { name: /add/i }));
 
     await waitFor(() => {
-      expect(getByText('Add Reason')).toBeVisible();
+      expect(getByText('Add Rule')).toBeVisible();
     });
   });
 
-  it('calls createSecurityReason API on submit', async () => {
-    mockCreateSecurityReason.mockResolvedValueOnce({});
+  it('calls createSecurityRule API on submit', async () => {
+    mockCreateSecurityRule.mockResolvedValueOnce({});
 
     const mockRefresh = vi.fn();
     const { getByRole, getByLabelText, queryByText } = renderComponent({
@@ -139,8 +139,8 @@ describe('ReasonsContainer', () => {
       expect(getByLabelText('Name *')).toBeVisible();
     });
 
-    fireEvent.change(getByLabelText('Name *'), { target: { value: 'New Reason' } });
-    fireEvent.change(getByLabelText('Description *'), { target: { value: 'A new reason' } });
+    fireEvent.change(getByLabelText('Name *'), { target: { value: 'New Rule' } });
+    fireEvent.change(getByLabelText('Description *'), { target: { value: 'A new rule' } });
 
     fireEvent.mouseDown(getByRole('combobox'));
     fireEvent.click(getByRole('option', { name: 'Health' }));
@@ -148,16 +148,16 @@ describe('ReasonsContainer', () => {
     fireEvent.click(getByRole('button', { name: /create/i }));
 
     await waitFor(() => {
-      expect(mockCreateSecurityReason).toHaveBeenCalledWith({
-        name: 'New Reason',
-        description: 'A new reason',
+      expect(mockCreateSecurityRule).toHaveBeenCalledWith({
+        name: 'New Rule',
+        description: 'A new rule',
         security_category_id: 2,
         is_active: true
       });
     });
 
     await waitFor(() => {
-      expect(queryByText('Add Reason')).toBeNull();
+      expect(queryByText('Add Rule')).toBeNull();
       expect(mockRefresh).toHaveBeenCalled();
     });
   });

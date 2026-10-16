@@ -1,17 +1,29 @@
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
-import { CreateDataRequestPayload, DataRequest, DataRequestFilters, UpdateDataRequest } from '../models/data-request';
+import {
+  CreateDataRequestPayload,
+  DataRequest,
+  DataRequestFeatureType,
+  DataRequestFilters,
+  DataRequestList,
+  DataRequestListFilters,
+  DataRequestListItem,
+  DataRequestRecipient,
+  UpdateDataRequest
+} from '../models/data-request';
 import { CreatePolicyStatementPayload, PolicyEffect } from '../models/policy-statement';
 import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { _generateDataRequestPolicyName, _generateDataRequestTeamName } from '../utils/data-request';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyService } from './access-policy/policy-service';
 import { PolicyStatementService } from './access-policy/policy-statement-service';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
+import { CodeService } from './code-service';
 import { DBService } from './db-service';
 import { ExpressionTreeService } from './expression-tree-service';
 import { TicketService } from './ticket-service';
@@ -33,6 +45,7 @@ export class DataRequestService extends DBService {
   policyStatementService: PolicyStatementService;
   policyExpressionService: PolicyExpressionService;
   featureIngestionRepository: FeatureIngestionRepository;
+  codeService: CodeService;
 
   /**
    * Creates an instance of DataRequestService.
@@ -51,6 +64,7 @@ export class DataRequestService extends DBService {
     this.policyStatementService = new PolicyStatementService(connection);
     this.policyExpressionService = new PolicyExpressionService(connection);
     this.featureIngestionRepository = new FeatureIngestionRepository(connection);
+    this.codeService = new CodeService(connection);
   }
 
   /**
@@ -84,6 +98,160 @@ export class DataRequestService extends DBService {
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
     return this.dataRequestRepository.findDataRequests(filters);
+  }
+
+  /**
+   * Get one page of every data request in the system, with the total number matching the filters.
+   *
+   * @param {DataRequestListFilters} filters - Optional keyword matched against the request reason.
+   * @param {ApiPaginationOptions} pagination - Page, page size and sort.
+   * @return {Promise<DataRequestList>} The page of data requests and the total matching the filters.
+   * @memberof DataRequestService
+   */
+  async getDataRequestList(
+    filters: DataRequestListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<DataRequestList> {
+    const [dataRequests, total] = await Promise.all([
+      this.dataRequestRepository.getDataRequestList(filters, pagination),
+      this.dataRequestRepository.getDataRequestCount(filters)
+    ]);
+
+    return { data_requests: dataRequests, total };
+  }
+
+  /**
+   * Get one data request by ID as the administrative pages show it, with its decision and the name of the user who
+   * submitted it.
+   *
+   * @param {string} dataRequestId - Data request UUID.
+   * @return {Promise<DataRequestListItem>} The data request.
+   * @throws {ApiNotFoundError} If no active data request exists for the ID.
+   * @memberof DataRequestService
+   */
+  async getDataRequestListItem(dataRequestId: string): Promise<DataRequestListItem> {
+    return this.dataRequestRepository.getDataRequestListItem(dataRequestId);
+  }
+
+  /**
+   * Get the recipients of a data request: the members of every team its policy is assigned to, each user once. These
+   * are the users who receive access when the request is approved.
+   *
+   * @param {string} dataRequestId - Data request UUID.
+   * @return {Promise<DataRequestRecipient[]>} The recipients, ordered by name.
+   * @throws {ApiNotFoundError} If no active data request exists for the ID.
+   * @memberof DataRequestService
+   */
+  async getDataRequestRecipients(dataRequestId: string): Promise<DataRequestRecipient[]> {
+    const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
+    const policyTeams = await this.teamPolicyService.getTeamsByPolicyId(dataRequest.policy_id);
+
+    // A user who belongs to several of the teams is one recipient.
+    const recipientsBySystemUserId = new Map<number, DataRequestRecipient>();
+
+    const teamsMembers = await Promise.all(
+      policyTeams.map((policyTeam) => this.teamMemberService.getTeamMembersWithUsers(policyTeam.team_id))
+    );
+
+    for (const teamMembers of teamsMembers) {
+      for (const teamMember of teamMembers) {
+        recipientsBySystemUserId.set(teamMember.system_user_id, {
+          system_user_id: teamMember.system_user_id,
+          user_identifier: teamMember.user_identifier,
+          display_name: teamMember.display_name,
+          email: teamMember.email
+        });
+      }
+    }
+
+    const recipients = Array.from(recipientsBySystemUserId.values());
+
+    return recipients.sort((a, b) =>
+      (a.display_name ?? a.user_identifier).localeCompare(b.display_name ?? b.user_identifier)
+    );
+  }
+
+  /**
+   * Remove a recipient from a data request by ending their membership of every team the request's policy is assigned
+   * to, so they no longer receive access through the request. Removing a user who is not a recipient does nothing.
+   *
+   * @param {string} dataRequestId - Data request UUID.
+   * @param {number} systemUserId - System user ID of the recipient to remove.
+   * @return {Promise<void>}
+   * @throws {ApiNotFoundError} If no active data request exists for the ID.
+   * @memberof DataRequestService
+   */
+  async deleteDataRequestRecipient(dataRequestId: string, systemUserId: number): Promise<void> {
+    const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
+    const policyTeams = await this.teamPolicyService.getTeamsByPolicyId(dataRequest.policy_id);
+
+    await Promise.all(
+      policyTeams.map((policyTeam) =>
+        this.teamMemberService.deleteTeamMemberByUser({
+          team_id: policyTeam.team_id,
+          system_user_id: systemUserId
+        })
+      )
+    );
+  }
+
+  /**
+   * Get the unique feature types a data request asks for, each with the expression that limits it.
+   *
+   * A data request's policy has one allow statement per requested feature type, with the URN
+   * `urn:*:<featureType>:*`, each linked to the request's expression when it has one. A statement whose URN has a
+   * wildcard feature type (`urn:*:*:*`) asks for every active feature type. Statements that deny, or whose value is
+   * not a URN, are not requested feature types. A feature type covered by several statements is returned once, with
+   * the expression of the first.
+   *
+   * @param {string} dataRequestId - Data request UUID.
+   * @return {Promise<DataRequestFeatureType[]>} The requested feature types.
+   * @throws {ApiNotFoundError} If no active data request exists for the ID.
+   * @memberof DataRequestService
+   */
+  async getDataRequestFeatureTypes(dataRequestId: string): Promise<DataRequestFeatureType[]> {
+    const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
+    const policy = await this.policyService.getPolicyWithStatements(dataRequest.policy_id);
+
+    const requestedStatements = policy.statements
+      .map((statement) => {
+        const [scheme, , featureTypeName] = statement.submission_feature_urn.split(':');
+
+        return { statement, scheme, featureTypeName };
+      })
+      .filter(
+        ({ statement, scheme, featureTypeName }) =>
+          statement.effect === PolicyEffect.ALLOW && scheme === 'urn' && Boolean(featureTypeName)
+      );
+
+    // Only a wildcard statement needs the full list of feature types.
+    const hasWildcardFeatureType = requestedStatements.some(({ featureTypeName }) => featureTypeName === '*');
+    const allFeatureTypes = hasWildcardFeatureType ? await this.codeService.getFeatureTypes() : [];
+    const allFeatureTypeNames = allFeatureTypes
+      .map((featureType) => featureType.name)
+      .sort((a, b) => a.localeCompare(b));
+
+    const featureTypes: DataRequestFeatureType[] = [];
+
+    for (const { statement, featureTypeName } of requestedStatements) {
+      const statementFeatureTypeNames = featureTypeName === '*' ? allFeatureTypeNames : [featureTypeName];
+      const policyExpression = policy.expressions.find(
+        (expression) => expression.policy_expression_id === statement.policy_expression_id
+      );
+
+      for (const statementFeatureTypeName of statementFeatureTypeNames) {
+        if (featureTypes.some((featureType) => featureType.feature_type_name === statementFeatureTypeName)) {
+          continue;
+        }
+
+        featureTypes.push({
+          feature_type_name: statementFeatureTypeName,
+          expression: policyExpression?.expression ?? null
+        });
+      }
+    }
+
+    return featureTypes;
   }
 
   /**

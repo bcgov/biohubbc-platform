@@ -11,8 +11,8 @@ import {
 import { render } from 'test-helpers/test-utils';
 import { AdminRouter } from './AdminRouter';
 
-vi.mock('features/admin/policies/ManagePoliciesPage', () => ({
-  ManagePoliciesPage: () => <div data-testid="manage-policies-page">Manage Policies Page</div>
+vi.mock('features/admin2/security/AdminSecurityPage', () => ({
+  AdminSecurityPage: () => <div data-testid="admin-security-page">Security Page</div>
 }));
 
 vi.mock('features/admin/policies/PolicyDetailPage', () => ({
@@ -23,8 +23,8 @@ vi.mock('features/admin/users/contributors/ContributorDetailPage', () => ({
   ContributorDetailPage: () => <div data-testid="contributor-detail-page">Contributor Details</div>
 }));
 
-vi.mock('features/admin/users/ManageUsersPage', () => ({
-  default: () => <div data-testid="manage-users-page">Manage Users Page</div>
+vi.mock('features/admin2/users/AdminUsersPage', () => ({
+  AdminUsersPage: () => <div data-testid="manage-users-page">Manage Users Page</div>
 }));
 
 vi.mock('./submission/SubmissionRouter', () => ({
@@ -51,8 +51,24 @@ vi.mock('features/admin/reviews/SubmissionReviewFeaturePage', () => ({
   SubmissionReviewFeaturePage: () => <div data-testid="submission-review-feature-page">Review Feature</div>
 }));
 
-vi.mock('features/admin/configuration/ConfigurationPage', () => ({
-  ConfigurationPage: () => <div data-testid="configuration-page" />
+vi.mock('features/admin2/security/category/AdminSecurityCategoryPage', () => ({
+  AdminSecurityCategoryPage: () => <div data-testid="admin-security-category-page" />
+}));
+
+vi.mock('features/admin2/data-requests/detail/feature-type/AdminDataRequestFeatureTypePage', () => ({
+  AdminDataRequestFeatureTypePage: () => <div data-testid="data-request-feature-type-page" />
+}));
+
+vi.mock('features/admin2/data-requests/detail/AdminDataRequestPage', () => ({
+  AdminDataRequestPage: () => <div data-testid="data-request-page" />
+}));
+
+vi.mock('features/admin2/data-requests/AdminDataRequestsPage', () => ({
+  AdminDataRequestsPage: () => <div data-testid="data-requests-page" />
+}));
+
+vi.mock('features/admin2/configuration/AdminConfigurationPage', () => ({
+  AdminConfigurationPage: () => <div data-testid="configuration-page" />
 }));
 
 vi.mock('features/admin/configuration/blueprint/BlueprintPage', () => ({
@@ -95,6 +111,30 @@ describe('AdminRouter access guards', () => {
       expect(page.queryByTestId(testId)).toBeNull();
     });
   }
+
+  it.each([
+    ['redirects the policies route to the data requests page', '/admin/policies', 'data-requests-page'],
+    ['renders the data request route', '/admin/data-requests/request-1', 'data-request-page'],
+    [
+      'renders the data request feature type route',
+      '/admin/data-requests/request-1/feature-types/telemetry',
+      'data-request-feature-type-page'
+    ],
+    ['renders the security category route', '/admin/security/categories/3', 'admin-security-category-page']
+  ])('%s for data admin', async (_description, path, testId) => {
+    const authState = getMockAuthState({
+      base: SystemUserAuthState,
+      overrides: {
+        biohubUserWrapper: {
+          roleNames: [SYSTEM_ROLE.DATA_ADMINISTRATOR]
+        }
+      }
+    });
+
+    const { findByTestId } = renderAdminRouter(authState, path);
+
+    expect(await findByTestId(testId)).toBeVisible();
+  });
 
   it('renders tickets route for system admin', async () => {
     const authState = getMockAuthState({ base: SystemAdminAuthState });

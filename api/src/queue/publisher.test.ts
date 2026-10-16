@@ -476,7 +476,7 @@ describe('publisher', () => {
           retryLimit: 3,
           retryDelay: 60,
           retryBackoff: true,
-          expireInSeconds: 60 * 10,
+          expireInSeconds: 60 * 60 * 2,
           singletonKey: testCase.singletonKey
         });
         expect(sendStub.firstCall.args[2].db.executeSql).to.be.a('function');
@@ -543,7 +543,7 @@ describe('publisher', () => {
       expect(options.retryLimit).to.equal(3);
       expect(options.retryDelay).to.equal(60);
       expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
+      expect(options.expireInSeconds).to.equal(60 * 60 * 2); // 2 hours
     });
 
     it('passes db option using caller connection for transactional job insert', async () => {
