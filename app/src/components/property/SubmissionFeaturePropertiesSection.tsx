@@ -77,7 +77,14 @@ export const SubmissionFeaturePropertiesSection = ({
   return (
     <PageSection
       id="submission-feature-properties"
-      label="Properties"
+      label={
+        <>
+          Properties{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }
       headerContent={
         <Stack gap={1} direction="row" alignItems="center">
           <TextField

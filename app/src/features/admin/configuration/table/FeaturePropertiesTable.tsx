@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import SearchTextField from 'components/fields/SearchTextField';
 import { GridColDef } from '@mui/x-data-grid';
@@ -55,7 +56,14 @@ export const FeaturePropertiesTable = ({
     <PageSection
       addButtonSize="small"
       id="properties"
-      label="Properties"
+      label={
+        <>
+          Properties{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }
       addLabel="Create"
       onAdd={onCreate}
       headerContent={

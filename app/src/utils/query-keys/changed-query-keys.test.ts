@@ -14,7 +14,7 @@ describe('changedQueryKeys', () => {
     ['policy', changedQueryKeys.policy],
     ['policy detail', changedQueryKeys.policyListings],
     ['user roles', changedQueryKeys.systemUser],
-    ['security reason', changedQueryKeys.securityReason]
+    ['security rule', changedQueryKeys.securityRule]
   ] as const)(
     'discards permission-sensitive reads after a %s change without dropping search metadata',
     async (_label, keys) => {

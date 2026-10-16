@@ -1,14 +1,13 @@
-import { Box, Breadcrumbs, Button, Container, Link, Skeleton, Typography } from '@mui/material';
+import { Box, Breadcrumbs, Button, Link, Skeleton, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { PageHeader } from 'components/header/PageHeader';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { RECONCILIATION_OUTCOMES } from 'constants/reconciliation';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { SubmissionUploadScope } from 'interfaces/useAdminApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useEffect, useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { hasAtLeastOneValidValue } from 'utils/authUtils';
@@ -79,9 +78,12 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
   }
   return (
     <>
-      <PageHeader
+      <AdminPageLayout
         breadcrumbs={
           <Breadcrumbs aria-label="submission upload breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
             <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
               Submissions
             </Link>
@@ -97,7 +99,7 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
             </Typography>
           </Breadcrumbs>
         }
-        label={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
+        title={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
         description={submission?.description}
         buttons={
           canReindex && (
@@ -112,39 +114,32 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
             </Button>
           )
         }
-        tabs={
-          <TabGroup
-            value={activeTab}
-            onChange={(value) => {
-              const next = new URLSearchParams(searchParams);
-              next.set('tab', value);
-              setSearchParams(next);
-            }}
-            ariaLabel="Submission upload sections"
-            tabs={[
-              ...RECONCILIATION_OUTCOMES.map(({ route, label }) => ({
-                value: route,
-                label,
-                id: `upload-${route}-tab`,
-                ariaControls: `upload-${route}-panel`
-              })),
-              {
-                value: ERRORS_TAB,
-                label: 'Errors',
-                id: 'upload-errors-tab',
-                ariaControls: 'upload-errors-panel'
-              },
-              {
-                value: METADATA_TAB,
-                label: 'Metadata',
-                id: 'upload-metadata-tab',
-                ariaControls: 'upload-metadata-panel'
-              }
-            ]}
-          />
-        }
-      />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+        tabs={[
+          ...RECONCILIATION_OUTCOMES.map(({ route, label }) => ({
+            value: route,
+            label,
+            id: `upload-${route}-tab`,
+            ariaControls: `upload-${route}-panel`
+          })),
+          {
+            value: ERRORS_TAB,
+            label: 'Errors',
+            id: 'upload-errors-tab',
+            ariaControls: 'upload-errors-panel'
+          },
+          {
+            value: METADATA_TAB,
+            label: 'About',
+            id: 'upload-metadata-tab',
+            ariaControls: 'upload-metadata-panel'
+          }
+        ]}
+        activeTab={activeTab}
+        onTabChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          next.set('tab', value);
+          setSearchParams(next);
+        }}>
         {(isOutcomeTab || hasShownOutcome) && (
           <Box
             role="tabpanel"
@@ -176,7 +171,7 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
             )
           }}
         />
-      </Container>
+      </AdminPageLayout>
       {canReindex && (
         <ReindexSubmissionUploadDialog
           open={isReindexDialogOpen}

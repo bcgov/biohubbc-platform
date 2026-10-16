@@ -1,6 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { CreatePolicyStatementPayload, PolicyStatement } from '../../models/policy-statement';
@@ -52,6 +52,26 @@ export class PolicyService extends DBService {
    */
   getPolicy(policyId: string): Promise<Policy> {
     return this.policyRepository.getPolicy(policyId);
+  }
+
+  /**
+   * Get a policy that has not ended, for operations that change a policy. The policy reads also return ended
+   * policies, which must not be changed.
+   *
+   * @private
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<Policy>} The active policy.
+   * @throws {ApiNotFoundError} If the policy does not exist or has ended.
+   * @memberof PolicyService
+   */
+  private async getActivePolicy(policyId: string): Promise<Policy> {
+    const policy = await this.policyRepository.getPolicy(policyId);
+
+    if (policy.record_end_date) {
+      throw new ApiNotFoundError('Policy not found', ['PolicyService->getActivePolicy', { policyId }]);
+    }
+
+    return policy;
   }
 
   /**
@@ -115,7 +135,7 @@ export class PolicyService extends DBService {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
 
-    const currentPolicy = await this.policyRepository.getPolicy(policyId);
+    const currentPolicy = await this.getActivePolicy(policyId);
     // Status updates that keep the same current status are allowed.
     if (currentPolicy.status === policyData.status) {
       return this.policyRepository.updatePolicy(policyId, policyData);
@@ -296,7 +316,7 @@ export class PolicyService extends DBService {
     policyId: string,
     payload: Pick<PolicyExpressionWithExpression, 'name' | 'description' | 'expression'>
   ): Promise<PolicyExpressionWithExpression> {
-    await this.policyRepository.getPolicy(policyId);
+    await this.getActivePolicy(policyId);
 
     const { expression_id } = await this.expressionTreeService.writeExpressionTree(payload.expression);
     await this.assertPolicyExpressionDoesNotExist(policyId, expression_id);
@@ -328,7 +348,7 @@ export class PolicyService extends DBService {
     policyExpressionId: string,
     payload: Pick<PolicyExpressionWithExpression, 'name' | 'description' | 'expression'>
   ): Promise<PolicyExpressionWithExpression> {
-    await this.policyRepository.getPolicy(policyId);
+    await this.getActivePolicy(policyId);
 
     const { expression_id } = await this.expressionTreeService.writeExpressionTree(payload.expression);
     await this.assertPolicyExpressionDoesNotExist(policyId, expression_id, policyExpressionId);
@@ -358,7 +378,7 @@ export class PolicyService extends DBService {
    * @memberof PolicyService
    */
   async deletePolicyExpression(policyId: string, policyExpressionId: string): Promise<void> {
-    await this.policyRepository.getPolicy(policyId);
+    await this.getActivePolicy(policyId);
     const policyExpression = await this.policyExpressionService.getPolicyExpressionById(policyExpressionId);
 
     if (policyExpression.policy_id !== policyId) {

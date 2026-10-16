@@ -2,19 +2,21 @@ import { useApi } from 'hooks/useApi';
 import { IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
 import { ComponentProps } from 'react';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
-import { CreateTicketDialog } from './components/dialog/create/CreateTicketDialog';
-import { EditTicketDialog } from './components/dialog/edit/EditTicketDialog';
+import { CreateTicketDialog } from 'features/admin/tickets/components/dialog/create/CreateTicketDialog';
+import { EditTicketDialog } from 'features/admin/tickets/components/dialog/edit/EditTicketDialog';
 import { MemoryRouter } from 'react-router-dom';
 import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { TicketsPage } from './TicketsPage';
+import { AdminTicketsPage } from './AdminTicketsPage';
 
 vi.mock('../../../hooks/useApi');
 
 const dialogs = vi.hoisted(() => ({ create: vi.fn(), edit: vi.fn() }));
-vi.mock('./components/dialog/create/CreateTicketDialog', () => ({ CreateTicketDialog: dialogs.create }));
-vi.mock('./components/dialog/edit/EditTicketDialog', () => ({ EditTicketDialog: dialogs.edit }));
+vi.mock('features/admin/tickets/components/dialog/create/CreateTicketDialog', () => ({
+  CreateTicketDialog: dialogs.create
+}));
+vi.mock('features/admin/tickets/components/dialog/edit/EditTicketDialog', () => ({ EditTicketDialog: dialogs.edit }));
 
 const mockUseApi = useApi as Mock;
 
@@ -53,7 +55,7 @@ const toggleFirstTicket = async (action: string) => {
   fireEvent.click(await screen.findByTestId(`custom-menu-icon-item-${action}`));
 };
 
-describe('TicketsPage', () => {
+describe('AdminTicketsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dialogs.create.mockReturnValue(null);
@@ -122,7 +124,7 @@ describe('TicketsPage', () => {
         .mockResolvedValue(reconciled);
       render(
         <MemoryRouter>
-          <TicketsPage />
+          <AdminTicketsPage />
         </MemoryRouter>,
         { queryClient }
       );
@@ -177,7 +179,7 @@ describe('TicketsPage', () => {
     });
     render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>,
       { queryClient }
     );
@@ -220,7 +222,7 @@ describe('TicketsPage', () => {
   it('fetches all tickets by default with create_date desc', async () => {
     render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>
     );
 
@@ -235,7 +237,7 @@ describe('TicketsPage', () => {
   it('renders only Tickets in the administrative tabs', async () => {
     const { getByRole, queryByRole } = render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>
     );
 
@@ -251,7 +253,7 @@ describe('TicketsPage', () => {
   it('renders server pagination controls', async () => {
     const { findByText } = render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>
     );
 
@@ -266,7 +268,7 @@ describe('TicketsPage', () => {
 
     const { findByText } = render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>
     );
 
@@ -280,7 +282,7 @@ describe('TicketsPage', () => {
     mockUpdateTicketStatus.mockResolvedValue({ ...sampleTicket, status: 'closed' });
     render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>,
       { queryClient }
     );
@@ -302,7 +304,7 @@ describe('TicketsPage', () => {
     cachedDetails.forEach((key) => queryClient.setQueryData(key, sampleTicket));
     render(
       <MemoryRouter>
-        <TicketsPage />
+        <AdminTicketsPage />
       </MemoryRouter>,
       { queryClient }
     );

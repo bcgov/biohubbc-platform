@@ -92,8 +92,8 @@ describe('ActiveUsersList', () => {
     });
   });
 
-  it('shows the display name as the primary label with the identifier as a secondary caption', async () => {
-    const { getByText } = renderContainer({
+  it('shows the display name and the identifier in their own columns', async () => {
+    const { getByRole } = renderContainer({
       rows: [
         {
           system_user_id: 1,
@@ -111,8 +111,10 @@ describe('ActiveUsersList', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('Bryan, Luke WLRS:EX')).toBeVisible();
-      expect(getByText('lbryan')).toBeVisible();
+      expect(getByRole('columnheader', { name: 'Display Name' })).toBeVisible();
+      expect(getByRole('columnheader', { name: 'IDIR' })).toBeVisible();
+      expect(getByRole('gridcell', { name: 'Bryan, Luke WLRS:EX' })).toBeVisible();
+      expect(getByRole('gridcell', { name: 'lbryan' })).toBeVisible();
     });
   });
 

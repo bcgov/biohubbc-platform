@@ -109,7 +109,7 @@ describe('AdminSubmissionPage', () => {
   it('shows scoped uploads by default and navigates to the clicked upload', async () => {
     renderAt('/admin/submissions/7');
     expect(await screen.findByRole('heading', { name: 'Submission seven' })).toBeVisible();
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Uploads', 'Metadata']);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Uploads', 'About']);
     expect(screen.getByRole('tab', { name: 'Uploads' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('Updated observations')).toBeVisible();
     expect(screen.queryByRole('columnheader', { name: 'Ticket' })).not.toBeInTheDocument();
@@ -231,8 +231,8 @@ describe('AdminSubmissionPage', () => {
         { signal: expect.any(AbortSignal) }
       )
     );
-    fireEvent.click(screen.getByRole('tab', { name: 'Metadata' }));
-    const metadata = within(screen.getByRole('tabpanel', { name: 'Metadata' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'About' }));
+    const metadata = within(screen.getByRole('tabpanel', { name: 'About' }));
     expect(metadata.getByRole('row', { name: 'create_user 42' })).toBeVisible();
     expect(metadata.getByRole('row', { name: 'create_date 2026-09-01T12:00:00Z' })).toBeVisible();
     expect(metadata.getByRole('row', { name: 'contributor_name SIMS' })).toBeVisible();
@@ -247,8 +247,8 @@ describe('AdminSubmissionPage', () => {
 
   it('supports opening the metadata tab directly', async () => {
     renderAt('/admin/submissions/7?tab=metadata');
-    expect(await screen.findByRole('tabpanel', { name: 'Metadata' })).toBeVisible();
-    expect(screen.getByRole('tab', { name: 'Metadata' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('tabpanel', { name: 'About' })).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'About' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('sorts uploads on the server', async () => {

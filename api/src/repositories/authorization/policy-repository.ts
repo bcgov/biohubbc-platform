@@ -51,7 +51,10 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
-   * Get a policy record by ID.
+   * Get a policy record by ID, whether or not it has ended.
+   *
+   * Ended policies are returned with their `record_end_date` so they can be displayed. Do not use this to decide
+   * access: the authorization and security scope queries apply their own end-date predicates.
    *
    * @param {string} policyId - The ID of the policy to retrieve.
    * @return {Promise<Policy>} - The policy record.
@@ -75,7 +78,10 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
-   * Get policies with optional search and pagination.
+   * Get policies with optional search and pagination, including policies that have ended.
+   *
+   * Ended policies are returned with their `record_end_date` so they can be listed. Do not use this to decide access:
+   * the authorization and security scope queries apply their own end-date predicates.
    *
    * @param {PolicyFilters} [filters] - Optional filter set.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
@@ -84,11 +90,12 @@ export class PolicyRepository extends BaseRepository {
    */
   async getPolicies(filters?: PolicyFilters, pagination?: ApiPaginationOptions): Promise<Policy[]> {
     const knex = getKnex();
-    const query = this.applyFilters(knex.table('policy').whereNull('record_end_date'), filters).select([
+    const query = this.applyFilters(knex.table('policy'), filters).select([
       'policy_id',
       'name',
       'description',
-      'status'
+      'status',
+      'record_end_date'
     ]);
 
     if (pagination) {
@@ -100,7 +107,7 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
-   * Get count of policies matching optional filters.
+   * Get count of policies matching optional filters, including policies that have ended.
    *
    * @param {PolicyFilters} [filters] - Optional filter set.
    * @return {Promise<number>}
@@ -108,7 +115,7 @@ export class PolicyRepository extends BaseRepository {
    */
   async getPoliciesCount(filters?: PolicyFilters): Promise<number> {
     const knex = getKnex();
-    const query = this.applyFilters(knex.table('policy').whereNull('record_end_date'), filters)
+    const query = this.applyFilters(knex.table('policy'), filters)
       .select(knex.raw('coalesce(count(*), 0)::integer as count'))
       .first();
 

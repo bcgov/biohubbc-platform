@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
@@ -36,48 +35,45 @@ export const TicketDetailPage = () => {
         isLoadingFallback={<TicketSkeleton />}
         isLoadingFallbackDelay={300}>
         {ticket ? (
-          <>
-            <TicketHeader ticket={ticket} activeTab={activeTab} onTabChange={setActiveTab} />
-            <Container maxWidth="xl" sx={{ py: 4 }}>
-              <ComponentSwitch<TicketDetailTab>
-                switch={activeTab}
-                components={{
-                  timeline: (
-                    <PageSection id="ticket-detail-content" label="Ticket Details">
-                      <Stack
-                        sx={{
-                          p: { xs: 2, md: 3 },
-                          display: 'flex',
-                          flexDirection: 'row',
-                          flexWrap: 'wrap',
-                          gap: 7,
-                          alignItems: 'flex-start'
-                        }}>
-                        <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
-                          <TicketTimeline ticket={ticket} />
-                          {ticket.status === 'open' && (
-                            <TicketComment
-                              comment={comment}
-                              setComment={setComment}
-                              isSaving={isSavingComment}
-                              isUploadingAttachment={isUploadingAttachment}
-                              onAddComment={handleAddComment}
-                              onUploadAttachment={handleUploadAttachment}
-                            />
-                          )}
-                        </Stack>
-
-                        <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
-                          <TicketSidebar />
-                        </Box>
+          <TicketHeader ticket={ticket} activeTab={activeTab} onTabChange={setActiveTab}>
+            <ComponentSwitch<TicketDetailTab>
+              switch={activeTab}
+              components={{
+                timeline: (
+                  <PageSection id="ticket-detail-content" label="Ticket Details">
+                    <Stack
+                      sx={{
+                        p: { xs: 2, md: 3 },
+                        display: 'flex',
+                        flexDirection: 'row',
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                        gap: 7,
+                        alignItems: 'flex-start'
+                      }}>
+                      <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', sm: 0 } }}>
+                        <TicketTimeline ticket={ticket} />
+                        {ticket.status === 'open' && (
+                          <TicketComment
+                            comment={comment}
+                            setComment={setComment}
+                            isSaving={isSavingComment}
+                            isUploadingAttachment={isUploadingAttachment}
+                            onAddComment={handleAddComment}
+                            onUploadAttachment={handleUploadAttachment}
+                          />
+                        )}
                       </Stack>
-                    </PageSection>
-                  ),
-                  artifacts: <TicketArtifacts />
-                }}
-              />
-            </Container>
-          </>
+
+                      <Box sx={{ width: { xs: '100%', sm: 238 }, flex: { xs: '1 1 100%', sm: '0 0 238px' } }}>
+                        <TicketSidebar />
+                      </Box>
+                    </Stack>
+                  </PageSection>
+                ),
+                artifacts: <TicketArtifacts />
+              }}
+            />
+          </TicketHeader>
         ) : null}
       </LoadingGuard>
     </>

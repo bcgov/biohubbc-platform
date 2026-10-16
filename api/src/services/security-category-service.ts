@@ -3,6 +3,7 @@ import { ApiConflictError } from '../errors/api-error';
 import {
   CreateSecurityCategory,
   SecurityCategory,
+  SecurityCategoryDetails,
   SecurityCategoryRecord,
   SecurityCategoryWithRuleCount,
   UpdateSecurityCategory
@@ -84,6 +85,18 @@ export class SecurityCategoryService extends DBService {
    */
   async getSecurityCategory(securityCategoryId: number): Promise<SecurityCategory> {
     return this.securityCategoryRepository.getSecurityCategory(securityCategoryId);
+  }
+
+  /**
+   * Get a single active security category by ID, with when it was created and the name of the user who created it.
+   *
+   * @param {number} securityCategoryId
+   * @return {Promise<SecurityCategoryDetails>}
+   * @throws {ApiNotFoundError} If no active category exists for the ID.
+   * @memberof SecurityCategoryService
+   */
+  async getSecurityCategoryDetails(securityCategoryId: number): Promise<SecurityCategoryDetails> {
+    return this.securityCategoryRepository.getSecurityCategoryDetails(securityCategoryId);
   }
 
   /**

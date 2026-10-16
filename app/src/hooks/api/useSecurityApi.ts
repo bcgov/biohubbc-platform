@@ -1,15 +1,17 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
   ICreateSecurityCategoryRequest,
-  ICreateSecurityReasonRequest,
+  ICreateSecurityRuleRequest,
   IListPersecutionHarmResponse,
   ISecureDataAccessRequestForm,
   ISecurityCategoriesResponse,
   ISecurityCategory,
-  ISecurityReason,
-  ISecurityReasonsResponse,
+  ISecurityCategoryDetails,
+  ISecurityRule,
+  ISecurityRulesResponse,
+  ISecurityRulesSearchParams,
   IUpdateSecurityCategoryRequest,
-  IUpdateSecurityReasonRequest
+  IUpdateSecurityRuleRequest
 } from 'interfaces/useSecurityApi.interface';
 import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
@@ -85,18 +87,34 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Gets paginated security reasons with associated feature counts.
+   * Gets a security category by ID, with when it was created and who created it.
    *
-   * @param {ApiSearchParams} [searchParams]
+   * @param {number} securityCategoryId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {Promise<ISecurityCategoryDetails>}
+   */
+  const getSecurityCategory = async (
+    securityCategoryId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISecurityCategoryDetails> => {
+    const { data } = await axios.get(`/api/administrative/security/categories/${securityCategoryId}`, options);
+
+    return data;
+  };
+
+  /**
+   * Gets paginated security rules with associated feature counts, optionally limited to one security category.
+   *
+   * @param {ISecurityRulesSearchParams} [searchParams]
    * @param {ApiPaginationRequestOptions} [pagination]
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @return {Promise<ISecurityReasonsResponse>}
+   * @return {Promise<ISecurityRulesResponse>}
    */
-  const getSecurityReasons = async (
-    searchParams?: ApiSearchParams,
+  const getSecurityRules = async (
+    searchParams?: ISecurityRulesSearchParams,
     pagination?: ApiPaginationRequestOptions,
     options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<ISecurityReasonsResponse> => {
+  ): Promise<ISecurityRulesResponse> => {
     const params = { ...searchParams, ...pagination };
     const { data } = await axios.get('/api/administrative/security/reasons', { params, ...options });
 
@@ -140,38 +158,38 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Create a new security reason.
+   * Create a new security rule.
    *
-   * @param {ICreateSecurityReasonRequest} body
-   * @return {Promise<ISecurityReason>}
+   * @param {ICreateSecurityRuleRequest} body
+   * @return {Promise<ISecurityRule>}
    */
-  const createSecurityReason = async (body: ICreateSecurityReasonRequest): Promise<ISecurityReason> => {
+  const createSecurityRule = async (body: ICreateSecurityRuleRequest): Promise<ISecurityRule> => {
     const { data } = await axios.post('/api/administrative/security/reasons', body);
     return data;
   };
 
   /**
-   * Update an existing security reason.
+   * Update an existing security rule.
    *
    * @param {number} securityRuleId
-   * @param {IUpdateSecurityReasonRequest} body
-   * @return {Promise<ISecurityReason>}
+   * @param {IUpdateSecurityRuleRequest} body
+   * @return {Promise<ISecurityRule>}
    */
-  const updateSecurityReason = async (
+  const updateSecurityRule = async (
     securityRuleId: number,
-    body: IUpdateSecurityReasonRequest
-  ): Promise<ISecurityReason> => {
+    body: IUpdateSecurityRuleRequest
+  ): Promise<ISecurityRule> => {
     const { data } = await axios.put(`/api/administrative/security/reasons/${securityRuleId}`, body);
     return data;
   };
 
   /**
-   * Delete a security reason.
+   * Delete a security rule.
    *
    * @param {number} securityRuleId
    * @return {Promise<void>}
    */
-  const deleteSecurityReason = async (securityRuleId: number): Promise<void> => {
+  const deleteSecurityRule = async (securityRuleId: number): Promise<void> => {
     await axios.delete(`/api/administrative/security/reasons/${securityRuleId}`);
   };
 
@@ -180,13 +198,14 @@ const useSecurityApi = (axios: AxiosInstance) => {
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
     getSecurityCategories,
-    getSecurityReasons,
+    getSecurityCategory,
+    getSecurityRules,
     createSecurityCategory,
     updateSecurityCategory,
     deleteSecurityCategory,
-    createSecurityReason,
-    updateSecurityReason,
-    deleteSecurityReason
+    createSecurityRule,
+    updateSecurityRule,
+    deleteSecurityRule
   };
 };
 

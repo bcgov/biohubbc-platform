@@ -1,9 +1,9 @@
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
+import { PropsWithChildren } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 interface SubmissionUploadReviewValidationReconciliationHeaderProps {
@@ -13,19 +13,27 @@ interface SubmissionUploadReviewValidationReconciliationHeaderProps {
 }
 
 /**
- * Render outcome navigation and the single Feature types tab.
- * @param {SubmissionUploadReviewValidationReconciliationHeaderProps} props Review ancestry and outcome label.
- * @returns {JSX.Element} Outcome page header.
+ * Render an outcome page in the administrative page layout: outcome navigation and the single Feature types tab,
+ * above the content passed as children.
+ * @param {PropsWithChildren<SubmissionUploadReviewValidationReconciliationHeaderProps>} props Review ancestry and
+ * outcome label.
+ * @returns {JSX.Element} Outcome page header and content.
  */
 export const SubmissionUploadReviewValidationReconciliationHeader = ({
   submissionId,
   review,
-  label
-}: SubmissionUploadReviewValidationReconciliationHeaderProps) => (
-  <PageHeader
-    maxWidth="xl"
+  label,
+  children
+}: PropsWithChildren<SubmissionUploadReviewValidationReconciliationHeaderProps>) => (
+  <AdminPageLayout
     breadcrumbs={
       <Breadcrumbs aria-label="reconciliation breadcrumb">
+        <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+          Administration
+        </Link>
+        <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+          Submissions
+        </Link>
         <Link component={RouterLink} to={`/admin/submissions/${submissionId}`} underline="hover" color="inherit">
           Submission
         </Link>
@@ -44,14 +52,10 @@ export const SubmissionUploadReviewValidationReconciliationHeader = ({
         </Typography>
       </Breadcrumbs>
     }
-    label={<Typography variant="h1">{label}</Typography>}
-    tabs={
-      <TabGroup
-        value="feature-types"
-        onChange={() => {}}
-        ariaLabel="Reconciliation sections"
-        tabs={[{ value: 'feature-types', label: 'Feature types' }]}
-      />
-    }
-  />
+    title={label}
+    tabs={[{ value: 'feature-types', label: 'Feature types' }]}
+    activeTab="feature-types"
+    onTabChange={() => {}}>
+    {children}
+  </AdminPageLayout>
 );

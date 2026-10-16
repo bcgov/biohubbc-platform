@@ -95,6 +95,41 @@ describe('SecurityRuleRepository', () => {
     });
   });
 
+  describe('security category filter', () => {
+    it('limits the listed rules to the security category', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ knex }));
+
+      await repo.getSecurityRulesWithFeatureCount({ security_category_id: 2 });
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"sr"."security_category_id" = $1');
+      expect(bindings).to.eql([2]);
+    });
+
+    it('does not filter the listed rules by category when none is given', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ knex }));
+
+      await repo.getSecurityRulesWithFeatureCount({ search: 'rule' });
+
+      const { bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(bindings).to.eql(['%rule%']);
+    });
+
+    it('limits the rule count to the security category', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 3 }] });
+      const repo = new SecurityRuleRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getSecurityRulesCount({ security_category_id: 2 });
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"security_category_id" = $1');
+      expect(bindings).to.eql([2]);
+      expect(result).to.equal(3);
+    });
+  });
+
   describe('insertSecurityRule', () => {
     it('returns the inserted rule', async () => {
       const mockRow = { security_rule_id: 1, security_category_id: 2, name: 'rule-a', description: 'desc' };
