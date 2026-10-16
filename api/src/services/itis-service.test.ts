@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ITIS_REQUEST_TIMEOUT_MS } from '../constants/taxonomy';
 import { ApiGeneralError } from '../errors/api-error';
 import { ItisService, ItisSolrSearchResponseHierarchy, itisServiceDependencies } from './itis-service';
 
@@ -207,7 +208,7 @@ describe('ItisService', () => {
       const response = await itisService.getHierarchyForTSNs(mockTsns);
 
       expect(getItisSolrTsnHierarchyUrlStub).to.have.been.calledWith(mockTsns);
-      expect(axiosStub).to.have.been.calledWith('url');
+      expect(axiosStub).to.have.been.calledWith('url', { timeout: ITIS_REQUEST_TIMEOUT_MS });
       expect(response).to.eql([
         {
           tsn: mockTsns[0],

@@ -1,3 +1,4 @@
+import { AxiosError } from 'axios';
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
@@ -346,6 +347,179 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     }
   });
 
+  it('records unavailable taxonomy instead of unresolved taxa and returns invalid when ITIS fails', async () => {
+    const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
+
+    sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves(contributor);
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
+      submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
+      submission_id: 1,
+      upload_id: '660e8400-e29b-41d4-a716-446655440000',
+      status: 'indexing',
+      ticket_id: '770e8400-e29b-41d4-a716-446655440000',
+      blueprint_id: 42
+    });
+    const deleteDerivedPropertiesStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deletePropertyRecordsBySubmissionUploadId')
+      .resolves();
+    const deleteRelationshipsStub = sinon
+      .stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'clearUploadPropertyWorkingSetStagingBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'populateResolvedPropertyStagingBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'populateTypedPropertyValueStagingBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordMissingRequiredPropertyErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordPrimitiveValidationErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordCodePropertyResolutionErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    const taxonErrorsStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordTaxonPropertyResolutionErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    const taxonomyUnavailableErrorsStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getUnresolvedTaxonTsnsBySubmissionUploadId')
+      .resolves([180542]);
+    sinon
+      .stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds')
+      .rejects(new AxiosError('timeout of 30000ms exceeded', AxiosError.ECONNABORTED));
+    const resolveTaxonStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'resolveTaxonCandidateTaxonIdsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordArtifactPropertyResolutionErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordDatetimeNormalizationErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'recordSpatialNormalizationErrorsBySubmissionUploadId'
+      )
+      .resolves();
+    const insertStringStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertStringPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertNumberPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertBooleanPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertTimestampPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertGeometryPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertCodePropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertTaxonPropertiesBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactPropertiesBySubmissionUploadId')
+      .resolves();
+    const insertRelationshipsStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertFeatureRelationshipsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'recordReferenceErrorsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeatureIngestionService.prototype, 'updateSubmissionFeatureParentsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'recordUnresolvedParentErrorsBySubmissionUploadId')
+      .resolves();
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
+      .resolves(2);
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountsByCode')
+      .resolves([{ error_code: 'TAXONOMY_SERVICE_UNAVAILABLE', error_count: 2 }]);
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorSummariesBySubmissionUploadId')
+      .resolves([
+        {
+          property_name: 'count',
+          blueprint_feature_type_property_id: 22,
+          error_code: 'TAXONOMY_SERVICE_UNAVAILABLE',
+          error_message: 'Taxonomy service was unavailable to resolve taxon TSN; re-index the upload to retry',
+          count: 2,
+          details: null
+        }
+      ]);
+    const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
+      99,
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+
+    expect(taxonomyUnavailableErrorsStub.calledOnceWith('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
+    expect(taxonErrorsStub.called).to.equal(false);
+    expect(resolveTaxonStub.called).to.equal(false);
+    expect(insertStringStub.called).to.equal(false);
+    expect(insertRelationshipsStub.called).to.equal(false);
+    expect(deleteDerivedPropertiesStub.called).to.equal(false);
+    expect(deleteRelationshipsStub.called).to.equal(false);
+    expect(outcome.status).to.equal('invalid');
+    if (outcome.status === 'invalid') {
+      expect(outcome.errorCount).to.equal(2);
+      expect(outcome.errorCounts).to.eql([{ error_code: 'TAXONOMY_SERVICE_UNAVAILABLE', error_count: 2 }]);
+      expect(outcome.errorSummaries).to.have.length(1);
+    }
+  });
+
   describe('ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId', () => {
     const submissionUploadId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -363,8 +537,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         )
         .resolves();
 
-      await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](submissionUploadId);
+      const isTaxonomyAvailable = await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](
+        submissionUploadId,
+        1
+      );
 
+      expect(isTaxonomyAvailable).to.equal(true);
       expect(getUnresolvedStub.calledOnceWith(submissionUploadId)).to.equal(true);
       expect(ensureStub.calledOnceWith([180542, 180541])).to.equal(true);
       expect(resolveStub.calledOnceWith(submissionUploadId)).to.equal(true);
@@ -385,13 +563,45 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         )
         .resolves();
 
-      await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](submissionUploadId);
+      const isTaxonomyAvailable = await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](
+        submissionUploadId,
+        1
+      );
 
+      expect(isTaxonomyAvailable).to.equal(true);
       expect(ensureStub.notCalled).to.equal(true);
       expect(resolveStub.notCalled).to.equal(true);
     });
 
-    it('rethrows taxonomy hierarchy ensure failures instead of recording unresolved taxon validation errors', async () => {
+    it('reports taxonomy unavailable without resolving candidates when an ITIS request fails', async () => {
+      const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
+
+      sinon
+        .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getUnresolvedTaxonTsnsBySubmissionUploadId')
+        .resolves([180542]);
+      // Real ITIS errors carry circular request objects; the failure must still be handled, not rethrown by logging.
+      const itisError = new AxiosError('timeout of 30000ms exceeded', AxiosError.ECONNABORTED);
+      const request: Record<string, unknown> = {};
+      request.self = request;
+      itisError.request = request;
+      sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').rejects(itisError);
+      const resolveStub = sinon
+        .stub(
+          SubmissionFeaturePropertyIngestionRepository.prototype,
+          'resolveTaxonCandidateTaxonIdsBySubmissionUploadId'
+        )
+        .resolves();
+
+      const isTaxonomyAvailable = await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](
+        submissionUploadId,
+        1
+      );
+
+      expect(isTaxonomyAvailable).to.equal(false);
+      expect(resolveStub.notCalled).to.equal(true);
+    });
+
+    it('rethrows non-ITIS taxonomy hierarchy ensure failures instead of recording validation errors', async () => {
       const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
       const error = new Error('Failed to insert taxon records');
 
@@ -407,7 +617,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         .resolves();
 
       try {
-        await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](submissionUploadId);
+        await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](submissionUploadId, 1);
 
         expect.fail();
       } catch (actualError) {
@@ -433,7 +643,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         .rejects(error);
 
       try {
-        await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](submissionUploadId);
+        await service['ensureTaxonHierarchyForUnresolvedCandidatesBySubmissionUploadId'](submissionUploadId, 1);
 
         expect.fail();
       } catch (actualError) {

@@ -14,6 +14,28 @@ describe('useAdminApi', () => {
     mock.restore();
   });
 
+  it('reads one upload from the submission-scoped admin endpoint', async () => {
+    const upload = { submission_upload_id: 'upload-id', status: 'indexed', decision: 'pending' };
+    mock.onGet('/api/administrative/submission/16/upload/upload-id').reply(200, upload);
+    const signal = new AbortController().signal;
+
+    const result = await useAdminApi(axios).getAdminSubmissionUpload(
+      { submissionId: 16, submissionUploadId: 'upload-id' },
+      { signal }
+    );
+
+    expect(result).toEqual(upload);
+    expect(mock.history.get[0].signal).toBe(signal);
+  });
+
+  it('posts the chosen blueprint to the upload indexing endpoint', async () => {
+    mock.onPost('/api/administrative/submission/16/upload/upload-id/indexing').reply(202);
+
+    await useAdminApi(axios).reindexSubmissionUpload({ submissionId: 16, submissionUploadId: 'upload-id' }, 4);
+
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ blueprintId: 4 });
+  });
+
   it('sends pagination to the upload-scoped error endpoint', async () => {
     const response = { errors: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
     mock.onGet('/api/administrative/submission/16/upload/upload-id/error').reply(200, response);
