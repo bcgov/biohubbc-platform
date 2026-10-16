@@ -48,6 +48,52 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('administrative list of every upload', () => {
+    it('pages active uploads of active submissions by the requested sort with a stable tie-breaker', async () => {
+      const execute = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ knex: execute }));
+
+      const result = await repo.getAdminSubmissionUploadList(
+        {},
+        { page: 3, limit: 10, sort: 'submission_name', order: 'asc' }
+      );
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(result).to.eql([]);
+      expect(execute).to.have.been.calledOnce;
+      expect(query.sql).to.include('"su"."record_end_date" is null and "s"."record_end_date" is null');
+      expect(query.sql).not.to.include('ilike');
+      expect(query.sql).not.to.include('upload_artifact');
+      expect(query.sql).to.include('order by "submission_name" asc, "su"."submission_upload_id" desc');
+      expect(query.bindings).to.eql([10, 20]);
+    });
+
+    it('defaults to newest first and matches the keyword against the submission name', async () => {
+      const execute = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ knex: execute }));
+
+      await repo.getAdminSubmissionUploadList({ keyword: 'moose' }, { page: 1, limit: 25 });
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(query.sql).to.include('"s"."name" ilike ?');
+      expect(query.sql).to.include('order by "create_date" desc, "su"."submission_upload_id" desc');
+      expect(query.bindings[0]).to.equal('%moose%');
+    });
+
+    it('counts only active uploads of active submissions matching the keyword, including zero matches', async () => {
+      const execute = sinon.stub().resolves({ rows: [{ count: 0 }], rowCount: 1 });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ knex: execute }));
+
+      expect(await repo.getAdminSubmissionUploadCount({ keyword: 'moose' })).to.equal(0);
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(execute).to.have.been.calledOnce;
+      expect(query.sql).to.include('"su"."record_end_date" is null and "s"."record_end_date" is null');
+      expect(query.sql).to.include('"s"."name" ilike ?');
+      expect(query.bindings).to.eql(['%moose%']);
+    });
+  });
+
   describe('getSubmissionUpload', () => {
     it('throws an error if no matching record found', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;

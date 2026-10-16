@@ -44,12 +44,12 @@ describe('useUpdateSubmissionUploadReviewStatusMutation', () => {
     );
   });
 
-  it('drops the cached ticket timelines and dashboard lists that show the review status', async () => {
+  it('drops the cached ticket timelines and administrative submission lists that show the review status', async () => {
     const queryClient = createTestQueryClient();
     const shown = [
       ['ticket', 'admin', 'detail', 'ticket-1'],
       ['ticket', 'user', 'detail', 'ticket-1'],
-      ['submission', 'admin-list', 'unreviewed']
+      ['submission', 'admin-list', 'uploads', { filters: { search: '' }, pagination: { page: 1, limit: 10 } }]
     ];
     shown.forEach((key) => queryClient.setQueryData(key, { cached: true }));
     mocks.update.mockResolvedValue(review('completed'));

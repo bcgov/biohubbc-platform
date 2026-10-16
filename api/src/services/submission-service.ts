@@ -3,7 +3,13 @@ import { IDBConnection } from '../database/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { HTTP400, HTTP403 } from '../errors/http-error';
 import { Blueprint } from '../models/blueprint';
-import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
+import {
+  AdminSubmissionListFilters,
+  AdminSubmissionListResponse,
+  SubmissionFeatureForReview,
+  SubmissionFilters,
+  SubmissionSummary
+} from '../models/submission';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import {
   ICreateSubmission,
@@ -16,9 +22,9 @@ import {
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
-  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository
 } from '../repositories/submission-repository';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { BlueprintService } from './blueprint-service';
@@ -328,33 +334,21 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Get all submissions that are pending security review (are unreviewed).
+   * Get one page of every active submission in the system for administrators, with the total matching the filters.
    *
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @param {AdminSubmissionListFilters} filters - Optional keyword matched against the submission name.
+   * @param {ApiPaginationOptions} pagination - Page, page size and sort.
+   * @returns {Promise<AdminSubmissionListResponse>} The page of submissions and its pagination totals.
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
-  }
+  async getAdminSubmissionList(
+    filters: AdminSubmissionListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionListResponse> {
+    const submissions = await this.submissionRepository.getAdminSubmissionList(filters, pagination);
+    const total = await this.submissionRepository.getAdminSubmissionCount(filters);
 
-  /**
-   * Get all submissions that have completed security review (are reviewed).
-   *
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
-   * @memberof SubmissionService
-   */
-  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getReviewedSubmissionsForAdmins();
-  }
-
-  /**
-   * Get all submissions that have completed security review and are published.
-   *
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
-   * @memberof SubmissionService
-   */
-  async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getPublishedSubmissionsForAdmins();
+    return { submissions, pagination: makePaginationResponse(total, pagination) };
   }
 
   /**

@@ -5,6 +5,8 @@ import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
 import {
   AdminSubmissionUpload,
+  AdminSubmissionUploadListFilters,
+  AdminSubmissionUploadListItem,
   CreateSubmissionUploadWithTeam,
   SubmissionUpload,
   SubmissionUploadDecision,
@@ -56,6 +58,80 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, AdminSubmissionUpload);
     return response.rows;
+  }
+
+  /**
+   * Get one page of the active uploads of every active submission, with the submission each belongs to.
+   *
+   * @param {AdminSubmissionUploadListFilters} filters Optional keyword matched against the submission name.
+   * @param {ApiPaginationOptions} pagination Page, page size and a sort column restricted by the endpoint.
+   * @returns {Promise<AdminSubmissionUploadListItem[]>} One page of upload records, with stable ordering.
+   * @memberof SubmissionUploadRepository
+   */
+  async getAdminSubmissionUploadList(
+    filters: AdminSubmissionUploadListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUploadListItem[]> {
+    const knex = getKnex();
+
+    // Every sortable field is a selected output column, which Postgres prefers over same-named input columns.
+    const query = knex('submission_upload as su')
+      .select(
+        'su.submission_upload_id',
+        'su.submission_id',
+        's.name as submission_name',
+        'su.upload_id',
+        'su.status',
+        'su.decision',
+        'su.ticket_id',
+        'su.comment',
+        'su.create_date',
+        'su.create_user',
+        'u.user_identifier as submitted_by_identifier'
+      )
+      .join('submission as s', 's.submission_id', 'su.submission_id')
+      .leftJoin('system_user as u', 'u.system_user_id', 'su.create_user')
+      .whereNull('su.record_end_date')
+      .whereNull('s.record_end_date');
+
+    if (filters.keyword) {
+      query.whereILike('s.name', `%${filters.keyword}%`);
+    }
+
+    query
+      .orderBy(pagination.sort ?? 'create_date', pagination.order ?? 'desc')
+      .orderBy('su.submission_upload_id', 'desc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, AdminSubmissionUploadListItem);
+
+    return response.rows;
+  }
+
+  /**
+   * Count the active uploads of every active submission matching the filters.
+   *
+   * @param {AdminSubmissionUploadListFilters} filters Optional keyword matched against the submission name.
+   * @returns {Promise<number>} Number of matching uploads.
+   * @memberof SubmissionUploadRepository
+   */
+  async getAdminSubmissionUploadCount(filters: AdminSubmissionUploadListFilters): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex('submission_upload as su')
+      .select(knex.raw('count(*)::integer as count'))
+      .join('submission as s', 's.submission_id', 'su.submission_id')
+      .whereNull('su.record_end_date')
+      .whereNull('s.record_end_date');
+
+    if (filters.keyword) {
+      query.whereILike('s.name', `%${filters.keyword}%`);
+    }
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
   }
 
   /**

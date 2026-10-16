@@ -28,6 +28,36 @@ describe('useSubmissionApi', () => {
     });
   });
 
+  describe('getAdminSubmissionList', () => {
+    it('sends the search and pagination to the admin submission list endpoint', async () => {
+      const response = { submissions: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+      mock.onGet('api/administrative/submission').reply(200, response);
+      const pagination = { page: 2, limit: 10, sort: 'name', order: 'asc' as const };
+      const signal = new AbortController().signal;
+      const result = await useSubmissionsApi(axios).getAdminSubmissionList({ search: 'moose' }, pagination, {
+        signal
+      });
+      expect(result).toEqual(response);
+      expect(mock.history.get[0].params).toEqual({ search: 'moose', ...pagination });
+      expect(mock.history.get[0].signal).toBe(signal);
+    });
+  });
+
+  describe('getAdminSubmissionUploadList', () => {
+    it('sends the search and pagination to the admin list of every upload', async () => {
+      const response = { uploads: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+      mock.onGet('api/administrative/submission/upload').reply(200, response);
+      const pagination = { page: 2, limit: 10, sort: 'create_date', order: 'desc' as const };
+      const signal = new AbortController().signal;
+      const result = await useSubmissionsApi(axios).getAdminSubmissionUploadList({ search: 'moose' }, pagination, {
+        signal
+      });
+      expect(result).toEqual(response);
+      expect(mock.history.get[0].params).toEqual({ search: 'moose', ...pagination });
+      expect(mock.history.get[0].signal).toBe(signal);
+    });
+  });
+
   describe('getSubmissionFeatures', () => {
     it('uses the user-scoped submission-feature endpoint', async () => {
       const mockResponse = {

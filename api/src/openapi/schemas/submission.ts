@@ -122,3 +122,32 @@ export const updateSubmissionRequestSchema: OpenAPIV3.SchemaObject = {
     }
   }
 };
+
+/** One active submission as the administrative submissions list shows it. */
+export const AdminSubmissionListItemSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['submission_id', 'uuid', 'name', 'contributor_name', 'submitted_timestamp', 'publish_timestamp'],
+  properties: {
+    submission_id: { type: 'integer', minimum: 1 },
+    uuid: { type: 'string', format: 'uuid' },
+    name: { type: 'string' },
+    contributor_name: { type: 'string' },
+    submitted_timestamp: { type: 'string' },
+    publish_timestamp: { type: 'string', nullable: true }
+  }
+};
+
+/** One page of the administrative submissions list. */
+export const AdminSubmissionPaginatedListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['submissions', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    submissions: {
+      type: 'array',
+      items: AdminSubmissionListItemSchema
+    },
+    pagination: paginationResponseSchema
+  }
+};

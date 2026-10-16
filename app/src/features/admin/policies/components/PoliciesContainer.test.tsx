@@ -54,9 +54,6 @@ const mockUseApi = {
     createPolicy: vi.fn(),
     updatePolicy: vi.fn(),
     deletePolicy: vi.fn()
-  },
-  submissions: {
-    getPublishedSubmissionsForAdmins: vi.fn().mockResolvedValue([])
   }
 };
 

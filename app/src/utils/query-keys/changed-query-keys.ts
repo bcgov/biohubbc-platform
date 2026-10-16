@@ -122,7 +122,7 @@ const securityRule = () => [
 ];
 
 /**
- * A review's status, which ticket timelines and the dashboard's reviewed and unreviewed lists show.
+ * A review's status, which ticket timelines and the administrative submission and upload lists show.
  *
  * @returns The keys to refresh.
  */

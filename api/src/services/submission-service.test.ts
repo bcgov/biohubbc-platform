@@ -6,6 +6,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
 import { Blueprint } from '../models/blueprint';
+import { SubmissionSummary } from '../models/submission';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
@@ -17,7 +18,6 @@ import {
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
-  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository
 } from '../repositories/submission-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -311,171 +311,36 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getUnreviewedSubmissionsForAdmins', () => {
-    it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          create_user: 1,
-          update_user: null,
-          security: SECURITY_APPLIED_STATUS.PENDING,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
-          regions: []
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          create_user: 1,
-          update_user: 1,
-          security: SECURITY_APPLIED_STATUS.PENDING,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
-          regions: []
-        }
-      ];
+  describe('getAdminSubmissionList', () => {
+    it('passes the filters to the page and the count and returns pagination totals', async () => {
+      const submissionService = new SubmissionService(getMockDBConnection());
+      const submission = {
+        submission_id: 1,
+        uuid: '123e4567-e89b-12d3-a456-426614174000',
+        name: 'Moose survey',
+        contributor_name: 'contributor',
+        submitted_timestamp: '2026-10-01',
+        publish_timestamp: null
+      };
+      const list = sinon.stub(SubmissionRepository.prototype, 'getAdminSubmissionList').resolves([submission]);
+      const count = sinon.stub(SubmissionRepository.prototype, 'getAdminSubmissionCount').resolves(21);
+      const filters = { keyword: 'moose' };
+      const pagination = { page: 3, limit: 10, sort: 'name', order: 'asc' as const };
 
-      const mockDBConnection = getMockDBConnection();
+      const result = await submissionService.getAdminSubmissionList(filters, pagination);
 
-      const getUnreviewedSubmissionsForAdminsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getUnreviewedSubmissionsForAdmins')
-        .resolves(mockSubmissionRecords);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getUnreviewedSubmissionsForAdmins();
-
-      expect(getUnreviewedSubmissionsForAdminsStub).to.be.calledOnce;
-      expect(response).to.be.eql(mockSubmissionRecords);
-    });
-  });
-
-  describe('getReviewedSubmissionsForAdmins', () => {
-    it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: null,
-          create_user: 1,
-          update_user: null,
-          security: SECURITY_APPLIED_STATUS.UNSECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
-          regions: []
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: null,
-          create_user: 1,
-          update_user: 1,
-          security: SECURITY_APPLIED_STATUS.SECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
-          regions: []
-        }
-      ];
-
-      const mockDBConnection = getMockDBConnection();
-
-      const getReviewedSubmissionsForAdminsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getReviewedSubmissionsForAdmins')
-        .resolves(mockSubmissionRecords);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getReviewedSubmissionsForAdmins();
-
-      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
-      expect(response).to.be.eql(mockSubmissionRecords);
-    });
-  });
-
-  describe('getPublishedSubmissionsForAdmins', () => {
-    it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          submitted_timestamp: '2023-12-12',
-          contributor_id: 1,
-          system_user_id: 3,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: null,
-          create_user: 1,
-          update_user: null,
-          security: SECURITY_APPLIED_STATUS.UNSECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
-          regions: []
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: null,
-          create_user: 1,
-          update_user: 1,
-          security: SECURITY_APPLIED_STATUS.SECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
-          regions: []
-        }
-      ];
-
-      const mockDBConnection = getMockDBConnection();
-
-      const getPublishedSubmissionsForAdminsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getPublishedSubmissionsForAdmins')
-        .resolves(mockSubmissionRecords);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getPublishedSubmissionsForAdmins();
-
-      expect(getPublishedSubmissionsForAdminsStub).to.be.calledOnce;
-      expect(response).to.be.eql(mockSubmissionRecords);
+      expect(list).to.have.been.calledOnceWithExactly(filters, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(filters);
+      expect(result).to.eql({
+        submissions: [submission],
+        pagination: { total: 21, per_page: 10, current_page: 3, last_page: 3, sort: 'name', order: 'asc' }
+      });
     });
   });
 
   describe('getSubmissionsByUserId', () => {
     it('should return submissions accessible to the given user', async () => {
-      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+      const mockSubmissionRecords: SubmissionSummary[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -489,8 +354,6 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_user: null,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'survey',
           regions: []
         }
       ];
