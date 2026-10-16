@@ -538,6 +538,7 @@
       "value": "MHz"
     }
   ],
+  "property_paragraph": [],
   "property_number": [
     {
       "feature_uuid": "34bb8126-5bac-4213-b76b-2110928aba8b",
@@ -896,6 +897,7 @@
   "counts": {
     "features": 14,
     "property_string": 34,
+    "property_paragraph": 0,
     "property_number": 7,
     "property_boolean": 0,
     "property_timestamp": 6,

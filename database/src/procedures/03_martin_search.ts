@@ -173,6 +173,9 @@ export async function seed(knex: Knex): Promise<void> {
         ps.predicate_string_id                      AS string_id,
         ps.value                                    AS string_value,
         ps.operator::text                           AS string_op,
+        pp.predicate_paragraph_id                   AS paragraph_id,
+        pp.value                                    AS paragraph_value,
+        pp.operator::text                           AS paragraph_op,
         pn.predicate_number_id                      AS number_id,
         pn.value                                    AS number_value,
         pn.operator::text                           AS number_op,
@@ -195,6 +198,7 @@ export async function seed(knex: Knex): Promise<void> {
       INTO v_p
       FROM biohub.predicate p
       LEFT JOIN biohub.predicate_string    ps ON ps.predicate_id = p.predicate_id AND ps.record_end_date IS NULL
+      LEFT JOIN biohub.predicate_paragraph pp ON pp.predicate_id = p.predicate_id AND pp.record_end_date IS NULL
       LEFT JOIN biohub.predicate_number    pn ON pn.predicate_id = p.predicate_id AND pn.record_end_date IS NULL
       LEFT JOIN biohub.predicate_boolean   pb ON pb.predicate_id = p.predicate_id AND pb.record_end_date IS NULL
       LEFT JOIN biohub.predicate_timestamp pt ON pt.predicate_id = p.predicate_id AND pt.record_end_date IS NULL
@@ -294,6 +298,97 @@ export async function seed(knex: Knex): Promise<void> {
               OR (v_p.string_op = 'StartsWith' AND pv.value ILIKE v_p.string_value || '%')
               OR (v_p.string_op = 'EndsWith' AND pv.value ILIKE '%' || v_p.string_value)
               OR (v_p.string_op = 'Exists' AND pv.value IS NOT NULL)
+            )
+            AND biohub.martin_feature_accessible(pv.submission_feature_id, p_system_user_id)
+        );
+      END IF;
+
+      IF v_p.paragraph_id IS NOT NULL THEN
+        IF v_p.paragraph_op = 'NotEquals' THEN
+          RETURN EXISTS (
+            SELECT 1
+            FROM biohub.submission_feature_property_paragraph pv
+            JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
+            JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
+            JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+            WHERE bftp.feature_property_id = v_p.fp_id
+              AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
+              AND esf.record_effective_date <= now()
+              AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
+              AND (
+                (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
+                OR (
+                  esf.feature_type_id <> p_anchor_feature_type_id
+                  AND (
+                    EXISTS (
+                      SELECT 1 FROM biohub.submission_feature_closure cf
+                      WHERE cf.source_submission_feature_id = p_anchor_id
+                        AND cf.target_submission_feature_id = esf.submission_feature_id
+                    )
+                    OR EXISTS (
+                      SELECT 1 FROM biohub.submission_feature_closure cr
+                      WHERE cr.source_submission_feature_id = esf.submission_feature_id
+                        AND cr.target_submission_feature_id = p_anchor_id
+                    )
+                  )
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM biohub.submission_feature_property_paragraph pne
+                WHERE pne.submission_feature_id = pv.submission_feature_id
+                  AND (
+                    (v_p.bftp_id IS NOT NULL AND pne.blueprint_feature_type_property_id = v_p.bftp_id)
+                    OR (
+                      v_p.bftp_id IS NULL
+                      AND EXISTS (
+                        SELECT 1 FROM biohub.blueprint_feature_type_property bftp_ne
+                        WHERE bftp_ne.blueprint_feature_type_property_id = pne.blueprint_feature_type_property_id
+                          AND bftp_ne.feature_property_id = v_p.fp_id
+                      )
+                    )
+                  )
+                  AND pne.value = v_p.paragraph_value
+              )
+              AND biohub.martin_feature_accessible(pv.submission_feature_id, p_system_user_id)
+          );
+        END IF;
+
+        RETURN EXISTS (
+          SELECT 1
+          FROM biohub.submission_feature_property_paragraph pv
+          JOIN biohub.submission_feature esf ON esf.submission_feature_id = pv.submission_feature_id
+          JOIN biohub.feature_type eft ON eft.feature_type_id = esf.feature_type_id AND eft.record_end_date IS NULL
+          JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
+          WHERE bftp.feature_property_id = v_p.fp_id
+            AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
+            AND esf.record_effective_date <= now()
+            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
+            AND (
+              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
+              OR (
+                esf.feature_type_id <> p_anchor_feature_type_id
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM biohub.submission_feature_closure cf
+                    WHERE cf.source_submission_feature_id = p_anchor_id
+                      AND cf.target_submission_feature_id = esf.submission_feature_id
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM biohub.submission_feature_closure cr
+                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
+                      AND cr.target_submission_feature_id = p_anchor_id
+                  )
+                )
+              )
+            )
+            AND (
+              (v_p.paragraph_op = 'Equals' AND pv.value = v_p.paragraph_value)
+              OR (v_p.paragraph_op = 'Like' AND pv.value LIKE v_p.paragraph_value)
+              OR (v_p.paragraph_op IN ('ILike', 'Contains') AND pv.value ILIKE '%' || v_p.paragraph_value || '%')
+              OR (v_p.paragraph_op = 'StartsWith' AND pv.value ILIKE v_p.paragraph_value || '%')
+              OR (v_p.paragraph_op = 'EndsWith' AND pv.value ILIKE '%' || v_p.paragraph_value)
+              OR (v_p.paragraph_op = 'Exists' AND pv.value IS NOT NULL)
             )
             AND biohub.martin_feature_accessible(pv.submission_feature_id, p_system_user_id)
         );

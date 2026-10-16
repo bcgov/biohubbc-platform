@@ -228,7 +228,15 @@ export async function createAssignedFeatureProperty(
 }
 
 /** A `feature_property_type` name whose values are stored in one of the typed property tables. */
-export type TypedPropertyTypeName = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'code' | 'spatial';
+export type TypedPropertyTypeName =
+  | 'string'
+  | 'paragraph'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'taxon'
+  | 'code'
+  | 'spatial';
 
 /**
  * Insert a pending submission feature: it has no effective date, so it is absent from published closure until
@@ -277,6 +285,8 @@ export async function addPropertyValue(
   const statements: Record<TypedPropertyTypeName, string> = {
     string:
       'INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    paragraph:
+      'INSERT INTO submission_feature_property_paragraph (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
     number:
       'INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
     boolean:

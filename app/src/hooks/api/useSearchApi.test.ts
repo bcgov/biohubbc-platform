@@ -223,6 +223,7 @@ describe('useSearchApi', () => {
             relevancy_score: 0.9
           }
         ],
+        paragraph: [],
         number: [
           {
             feature_property_id: 2,
@@ -278,6 +279,7 @@ describe('useSearchApi', () => {
       const mockResponse: SearchPropertyResponse = {
         properties: {
           string: [],
+          paragraph: [],
           number: [],
           boolean: [],
           datetime: [],

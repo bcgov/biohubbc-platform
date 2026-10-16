@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export enum FEATURE_PROPERTY_TYPE {
   STRING = 'string',
+  PARAGRAPH = 'paragraph',
   NUMBER = 'number',
   BOOLEAN = 'boolean',
   SPATIAL = 'spatial',
@@ -13,6 +14,7 @@ export enum FEATURE_PROPERTY_TYPE {
 
 export const FeaturePropertyTypeName = z.enum([
   'string',
+  'paragraph',
   'number',
   'boolean',
   'spatial',
@@ -176,6 +178,7 @@ export const ExpressionPredicatePropertyMetadata = z.object({
   feature_property_type_id: z.number().int().positive(),
   feature_property_type_name: z.union([
     z.literal(FEATURE_PROPERTY_TYPE.STRING),
+    z.literal(FEATURE_PROPERTY_TYPE.PARAGRAPH),
     z.literal(FEATURE_PROPERTY_TYPE.NUMBER),
     z.literal(FEATURE_PROPERTY_TYPE.BOOLEAN),
     z.literal(FEATURE_PROPERTY_TYPE.SPATIAL),

@@ -139,13 +139,22 @@ export interface SearchPropertyResult {
   relevancy_score: number;
 }
 
-export type SearchPropertyType = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'spatial' | 'code';
+export type SearchPropertyType =
+  | 'string'
+  | 'paragraph'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'taxon'
+  | 'spatial'
+  | 'code';
 
 /**
  * Grouped property results organized by value type
  */
 export interface GroupedPropertyResults {
   string: SearchPropertyResult[];
+  paragraph: SearchPropertyResult[];
   number: SearchPropertyResult[];
   boolean: SearchPropertyResult[];
   datetime: SearchPropertyResult[];
