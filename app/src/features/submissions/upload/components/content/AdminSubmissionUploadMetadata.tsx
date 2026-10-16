@@ -19,8 +19,8 @@ interface AdminSubmissionUploadMetadataProps {
 }
 
 /**
- * Display upload identity and the blueprint the upload was created with in the standard metadata grid. An upload's
- * blueprint never changes; the default for future uploads is edited on the submission.
+ * Display upload identity and the blueprint the upload is indexed with in the standard metadata grid. Reindexing the
+ * upload from the page header can change its blueprint; the default for future uploads is edited on the submission.
  *
  * @param {AdminSubmissionUploadMetadataProps} props Submission and upload whose metadata is displayed.
  * @returns {JSX.Element} Metadata page section.
@@ -60,7 +60,7 @@ export const AdminSubmissionUploadMetadata = ({ scope }: AdminSubmissionUploadMe
   ];
 
   return (
-    <PageSection id="submission-upload-metadata" label="Metadata">
+    <PageSection id="submission-upload-metadata" label="About">
       <CustomDataGrid
         autoHeight
         rows={rows}

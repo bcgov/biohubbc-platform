@@ -1,11 +1,11 @@
-import { Breadcrumbs, Container, Link, Typography } from '@mui/material';
+import { Box, Breadcrumbs, Link, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { PageHeader } from 'components/header/PageHeader';
 import { SubmissionUploadReviewFeatureTypePropertiesTable } from 'features/admin/reviews/components/table/SubmissionUploadReviewFeatureTypePropertiesTable';
 import { submissionUploadQueryKeys } from 'features/admin/reviews/submission-upload-query-keys';
 import { useApi } from 'hooks/useApi';
 import { SubmissionUploadScope } from 'interfaces/useAdminApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { Link as RouterLink, Navigate, useLocation } from 'react-router-dom';
 import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
@@ -46,41 +46,55 @@ export const AdminSubmissionUploadFeatureTypePageContent = ({
     return <Navigate to="/page-not-found" replace />;
   }
   return (
-    <>
-      <PageHeader
-        breadcrumbs={
-          <Breadcrumbs aria-label="submission upload feature type breadcrumb">
-            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
-              Submissions
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`/admin/submissions/${scope.submissionId}`}
-              underline="hover"
-              color="inherit">
-              {submission?.name ?? 'Submission'}
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`/admin/submissions/${scope.submissionId}/uploads/${scope.submissionUploadId}${location.search}`}
-              underline="hover"
-              color="inherit">
-              Upload
-            </Link>
-            <Typography variant="inherit" color="text.primary" aria-current="page">
-              {title}
-            </Typography>
-          </Breadcrumbs>
+    <AdminPageLayout
+      breadcrumbs={
+        <Breadcrumbs aria-label="submission upload feature type breadcrumb">
+          <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+            Administration
+          </Link>
+          <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+            Submissions
+          </Link>
+          <Link
+            component={RouterLink}
+            to={`/admin/submissions/${scope.submissionId}`}
+            underline="hover"
+            color="inherit">
+            {submission?.name ?? 'Submission'}
+          </Link>
+          <Link
+            component={RouterLink}
+            to={`/admin/submissions/${scope.submissionId}/uploads/${scope.submissionUploadId}${location.search}`}
+            underline="hover"
+            color="inherit">
+            Upload
+          </Link>
+          <Typography variant="inherit" color="text.primary" aria-current="page">
+            {title}
+          </Typography>
+        </Breadcrumbs>
+      }
+      title={title}
+      tabs={[
+        {
+          value: 'properties',
+          label: 'Properties',
+          id: 'upload-feature-type-properties-tab',
+          ariaControls: 'upload-feature-type-properties-panel'
         }
-        label={title}
-      />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      ]}
+      activeTab="properties"
+      onTabChange={() => {}}>
+      <Box
+        role="tabpanel"
+        id="upload-feature-type-properties-panel"
+        aria-labelledby="upload-feature-type-properties-tab">
         <SubmissionUploadReviewFeatureTypePropertiesTable
           properties={propertiesQuery.data?.properties ?? []}
           isLoading={propertiesQuery.isLoading}
           hasError={propertiesQuery.isError}
         />
-      </Container>
-    </>
+      </Box>
+    </AdminPageLayout>
   );
 };

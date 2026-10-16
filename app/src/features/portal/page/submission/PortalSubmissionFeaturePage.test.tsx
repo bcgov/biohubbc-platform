@@ -121,7 +121,7 @@ describe('PortalSubmissionFeaturePage', () => {
 
     const sectionLabels = getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
 
-    expect(sectionLabels).toEqual(['Properties', 'Map', 'About']);
+    expect(sectionLabels).toEqual(['Properties (2)', 'Map', 'About']);
   });
 
   it('renders feature metadata in the About section', async () => {

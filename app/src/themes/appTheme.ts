@@ -31,6 +31,8 @@ const appTheme = createTheme({
   },
   palette: {
     action: {
+      // Lighter than `background.default`, so a hovered surface never blends into the page behind it.
+      hover: 'rgba(0, 0, 0, 0.02)',
       selectedOpacity: 0.06
     },
     background: {
@@ -43,7 +45,7 @@ const appTheme = createTheme({
       main: '#036',
       contrastText: '#fff'
     },
-    divider: '#f0f0f0'
+    divider: '#ebebeb'
   },
   components: {
     MuiCssBaseline: {
@@ -227,6 +229,13 @@ const appTheme = createTheme({
     MuiButtonBase: {
       defaultProps: {
         disableRipple: true
+      }
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          border: `1px solid ${theme.palette.divider}`
+        })
       }
     },
     MuiCardHeader: {

@@ -12,7 +12,12 @@ const mocks = vi.hoisted(() => ({
   listFeatureTypes: vi.fn(),
   getFeatureTypeProperties: vi.fn(),
   listErrors: vi.fn(),
-  getUploadBlueprint: vi.fn()
+  getUploadBlueprint: vi.fn(),
+  getUpload: vi.fn(),
+  reindexUpload: vi.fn(),
+  getBlueprints: vi.fn(),
+  setSnackbar: vi.fn(),
+  roleNames: [] as string[]
 }));
 vi.mock('hooks/useApi', () => ({
   useApi: () => ({
@@ -21,9 +26,18 @@ vi.mock('hooks/useApi', () => ({
       listSubmissionUploadFeatureTypes: mocks.listFeatureTypes,
       getSubmissionUploadFeatureTypeProperties: mocks.getFeatureTypeProperties,
       listSubmissionFeatureErrors: mocks.listErrors,
-      getSubmissionUploadBlueprint: mocks.getUploadBlueprint
-    }
+      getSubmissionUploadBlueprint: mocks.getUploadBlueprint,
+      getAdminSubmissionUpload: mocks.getUpload,
+      reindexSubmissionUpload: mocks.reindexUpload
+    },
+    blueprints: { getBlueprints: mocks.getBlueprints }
   })
+}));
+vi.mock('hooks/useContext', () => ({
+  useDialogContext: () => ({ setSnackbar: mocks.setSnackbar, setOkDialog: vi.fn() })
+}));
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: () => ({ biohubUserWrapper: { roleNames: mocks.roleNames } })
 }));
 // The map owns its own tile session and is exercised by its own suite; here we only check what it is asked to map.
 vi.mock('features/admin/reviews/components/map/SubmissionUploadMap', async () => {
@@ -59,6 +73,18 @@ const blueprint = {
   parent_blueprint_id: null,
   record_effective_date: '2026-01-01',
   record_end_date: null
+};
+const telemetryBlueprint = { ...blueprint, blueprint_id: 2, name: 'Telemetry', version_number: 2, is_default: false };
+const upload = {
+  submission_upload_id: uploadId,
+  upload_id: 'b5e4b8a4-4c43-4a8e-9e4b-0d4c1f6a9c11',
+  status: 'invalid',
+  decision: 'pending',
+  ticket_id: 'c0a3c6a0-6f0e-4a36-9d8a-5d9a2f0b7e22',
+  comment: null,
+  create_date: '2026-10-01',
+  create_user: 1,
+  submitted_by_identifier: 'jdoe'
 };
 
 /**
@@ -114,6 +140,62 @@ describe('AdminSubmissionUploadPage', () => {
       pagination: { total: 11, current_page: 1, last_page: 2, per_page: 10 }
     });
     mocks.getUploadBlueprint.mockResolvedValue(blueprint);
+    mocks.getUpload.mockResolvedValue(upload);
+    mocks.getBlueprints.mockResolvedValue({ blueprints: [blueprint, telemetryBlueprint] });
+    mocks.roleNames = ['System Administrator'];
+  });
+
+  it('reindexes the upload with a blueprint chosen from the header', async () => {
+    mocks.reindexUpload.mockResolvedValue(undefined);
+    renderAt();
+    const reindexButton = await screen.findByRole('button', { name: 'Reindex' });
+    await waitFor(() => expect(reindexButton).toBeEnabled());
+    fireEvent.click(reindexButton);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Wildlife (Version 1)')).toBeVisible();
+    fireEvent.mouseDown(dialog.getByRole('combobox', { name: 'Search blueprints' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Telemetry (Version 2)' }));
+    mocks.getUpload.mockResolvedValue({ ...upload, status: 'reconciled' });
+    fireEvent.click(dialog.getByRole('button', { name: 'Reindex' }));
+    await waitFor(() => expect(mocks.reindexUpload).toHaveBeenCalledWith(scope, 2));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mocks.setSnackbar).toHaveBeenCalledWith({ open: true, snackbarMessage: 'Reindex started' });
+    expect(mocks.getUpload).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the dialog open and shows the reason when the server refuses to reindex', async () => {
+    mocks.reindexUpload.mockRejectedValue(
+      new Error('Submission upload cannot be re-indexed while its status is indexing')
+    );
+    renderAt();
+    const reindexButton = await screen.findByRole('button', { name: 'Reindex' });
+    await waitFor(() => expect(reindexButton).toBeEnabled());
+    fireEvent.click(reindexButton);
+    const dialog = within(await screen.findByRole('dialog'));
+    fireEvent.click(dialog.getByRole('button', { name: 'Reindex' }));
+    await waitFor(() => expect(mocks.reindexUpload).toHaveBeenCalledWith(scope, 1));
+    await waitFor(() =>
+      expect(mocks.setSnackbar).toHaveBeenCalledWith({
+        open: true,
+        snackbarMessage: 'Submission upload cannot be re-indexed while its status is indexing'
+      })
+    );
+    expect(screen.getByRole('dialog')).toBeVisible();
+  });
+
+  it('disables reindexing once the upload is accepted', async () => {
+    mocks.getUpload.mockResolvedValue({ ...upload, status: 'indexed', decision: 'approved' });
+    renderAt();
+    await waitFor(() => expect(mocks.getUpload).toHaveBeenCalled());
+    expect(await screen.findByRole('button', { name: 'Reindex' })).toBeDisabled();
+  });
+
+  it('hides reindexing from administrators who cannot reindex', async () => {
+    mocks.roleNames = ['Data Administrator'];
+    renderAt();
+    expect(await screen.findByRole('heading', { name: 'Wildlife survey' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Reindex' })).not.toBeInTheDocument();
+    expect(mocks.getUpload).not.toHaveBeenCalled();
   });
 
   it('resolves the upload route with its header, outcome tabs, feature types and map', async () => {
@@ -126,7 +208,7 @@ describe('AdminSubmissionUploadPage', () => {
       'Unchanged',
       'Changed',
       'Errors',
-      'Metadata'
+      'About'
     ]);
     expect(await screen.findByRole('columnheader', { name: 'Feature type' })).toBeVisible();
     const animalRow = screen.getByRole('gridcell', { name: 'Animal' }).closest('[role="row"]') as HTMLElement;
@@ -184,7 +266,7 @@ describe('AdminSubmissionUploadPage', () => {
     expect(screen.getByRole('grid')).toBe(grid);
     await screen.findByRole('gridcell', { name: 'Animal' });
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Metadata' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'About' }));
     expect(await screen.findByRole('gridcell', { name: uploadId })).toBeVisible();
     expect(map).not.toBeVisible();
 
@@ -249,7 +331,7 @@ describe('AdminSubmissionUploadPage', () => {
   it('lists the upload errors on the Errors tab, without loading or mounting an outcome', async () => {
     renderAt(`${path}?tab=errors`);
     expect(await screen.findByRole('tab', { name: 'Errors' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByRole('heading', { name: 'Errors' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /^Errors \(\d+\)$/ })).toBeVisible();
     const errorRow = (await screen.findByRole('gridcell', { name: 'invalid_type' })).closest(
       '[role="row"]'
     ) as HTMLElement;

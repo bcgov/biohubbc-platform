@@ -19,6 +19,7 @@ import { PolicyStatementService } from './access-policy/policy-statement-service
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
+import { CodeService } from './code-service';
 import { DataRequestService } from './data-request-service';
 import { ExpressionTreeService } from './expression-tree-service';
 import { TicketService } from './ticket-service';
@@ -89,6 +90,276 @@ describe('DataRequestService', () => {
         value: 'x'
       }
     ]
+  });
+
+  it('getDataRequestList returns the page of data requests with the total for the same filters', async () => {
+    const dataRequests = [
+      {
+        data_request_id: mockDataRequest.data_request_id,
+        reason: mockDataRequest.reason,
+        status: mockDataRequest.status,
+        create_date: mockDataRequest.create_date,
+        requested_by: 1,
+        requested_by_name: 'Test User',
+        ticket_id: mockDataRequest.ticket_id,
+        policy_id: mockDataRequest.policy_id
+      }
+    ];
+    const filters = { keyword: 'research' };
+    const pagination = { page: 1, limit: 10 };
+
+    const listStub = sinon.stub(DataRequestRepository.prototype, 'getDataRequestList').resolves(dataRequests);
+    const countStub = sinon.stub(DataRequestRepository.prototype, 'getDataRequestCount').resolves(12);
+
+    const service = new DataRequestService(getMockDBConnection());
+    const result = await service.getDataRequestList(filters, pagination);
+
+    expect(listStub).to.have.been.calledOnceWith(filters, pagination);
+    expect(countStub).to.have.been.calledOnceWith(filters);
+    expect(result).to.eql({ data_requests: dataRequests, total: 12 });
+  });
+
+  describe('getDataRequestRecipients', () => {
+    it("returns the members of every team the request's policy is assigned to, each user once, ordered by name", async () => {
+      const robin = {
+        team_member_id: 'tm-1',
+        system_user_id: 1,
+        user_identifier: 'ruser',
+        display_name: 'User, Robin',
+        email: null
+      };
+      const alex = {
+        team_member_id: 'tm-2',
+        system_user_id: 2,
+        user_identifier: 'auser',
+        display_name: null,
+        email: 'alex@example.com'
+      };
+      const robinInSecondTeam = { ...robin, team_member_id: 'tm-3' };
+
+      const getDataRequestStub = sinon
+        .stub(DataRequestRepository.prototype, 'getDataRequestById')
+        .resolves(mockDataRequest);
+      const getTeamsStub = sinon
+        .stub(TeamPolicyService.prototype, 'getTeamsByPolicyId')
+        .resolves([{ team_id: 'team-1' }, { team_id: 'team-2' }] as any);
+      const getMembersStub = sinon.stub(TeamMemberService.prototype, 'getTeamMembersWithUsers');
+      getMembersStub.withArgs('team-1').resolves([robin]);
+      getMembersStub.withArgs('team-2').resolves([robinInSecondTeam, alex]);
+
+      const service = new DataRequestService(getMockDBConnection());
+      const result = await service.getDataRequestRecipients(mockDataRequest.data_request_id);
+
+      expect(getDataRequestStub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
+      expect(getTeamsStub).to.have.been.calledOnceWith(mockDataRequest.policy_id);
+      expect(result).to.eql([
+        { system_user_id: 2, user_identifier: 'auser', display_name: null, email: 'alex@example.com' },
+        { system_user_id: 1, user_identifier: 'ruser', display_name: 'User, Robin', email: null }
+      ]);
+    });
+
+    it('returns no recipients when the policy is assigned to no team', async () => {
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+      sinon.stub(TeamPolicyService.prototype, 'getTeamsByPolicyId').resolves([]);
+      const getMembersStub = sinon.stub(TeamMemberService.prototype, 'getTeamMembersWithUsers');
+
+      const service = new DataRequestService(getMockDBConnection());
+      const result = await service.getDataRequestRecipients(mockDataRequest.data_request_id);
+
+      expect(result).to.eql([]);
+      expect(getMembersStub).not.to.have.been.called;
+    });
+
+    it('does not read recipients when the data request does not exist', async () => {
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').rejects(new Error('Data request not found'));
+      const getTeamsStub = sinon.stub(TeamPolicyService.prototype, 'getTeamsByPolicyId');
+
+      const service = new DataRequestService(getMockDBConnection());
+
+      try {
+        await service.getDataRequestRecipients(mockDataRequest.data_request_id);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Data request not found');
+        expect(getTeamsStub).not.to.have.been.called;
+      }
+    });
+  });
+
+  describe('deleteDataRequestRecipient', () => {
+    it("ends the user's membership of every team the request's policy is assigned to", async () => {
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+      const getTeamsStub = sinon
+        .stub(TeamPolicyService.prototype, 'getTeamsByPolicyId')
+        .resolves([{ team_id: 'team-1' }, { team_id: 'team-2' }] as any);
+      const deleteMemberStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser').resolves();
+
+      const service = new DataRequestService(getMockDBConnection());
+      await service.deleteDataRequestRecipient(mockDataRequest.data_request_id, 42);
+
+      expect(getTeamsStub).to.have.been.calledOnceWith(mockDataRequest.policy_id);
+      expect(deleteMemberStub).to.have.been.calledTwice;
+      expect(deleteMemberStub.firstCall).to.have.been.calledWith({ team_id: 'team-1', system_user_id: 42 });
+      expect(deleteMemberStub.secondCall).to.have.been.calledWith({ team_id: 'team-2', system_user_id: 42 });
+    });
+
+    it('removes nobody when the policy is assigned to no team', async () => {
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+      sinon.stub(TeamPolicyService.prototype, 'getTeamsByPolicyId').resolves([]);
+      const deleteMemberStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser').resolves();
+
+      const service = new DataRequestService(getMockDBConnection());
+      await service.deleteDataRequestRecipient(mockDataRequest.data_request_id, 42);
+
+      expect(deleteMemberStub).not.to.have.been.called;
+    });
+
+    it('removes nobody when the data request does not exist', async () => {
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').rejects(new Error('Data request not found'));
+      const getTeamsStub = sinon.stub(TeamPolicyService.prototype, 'getTeamsByPolicyId');
+      const deleteMemberStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser');
+
+      const service = new DataRequestService(getMockDBConnection());
+
+      try {
+        await service.deleteDataRequestRecipient(mockDataRequest.data_request_id, 42);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Data request not found');
+        expect(getTeamsStub).not.to.have.been.called;
+        expect(deleteMemberStub).not.to.have.been.called;
+      }
+    });
+  });
+
+  describe('getDataRequestFeatureTypes', () => {
+    const buildStatement = (overrides: Record<string, unknown>) => ({
+      policy_statement_id: '11111111-1111-4111-8111-111111111111',
+      policy_id: mockDataRequest.policy_id,
+      effect: PolicyEffect.ALLOW,
+      security_scope_id: '22222222-2222-4222-8222-222222222222',
+      submission_feature_urn: 'urn:*:telemetry:*',
+      policy_expression_id: null,
+      ...overrides
+    });
+
+    it('returns each requested feature type once with its linked expression', async () => {
+      const expression = buildMockExpression();
+      const policy = {
+        ...buildMockPolicy(),
+        statements: [
+          buildStatement({ policy_expression_id: 'policy-expression-1' }),
+          buildStatement({ submission_feature_urn: 'urn:*:observation:*' }),
+          buildStatement({ submission_feature_urn: 'urn:*:telemetry:*' })
+        ],
+        expressions: [{ policy_expression_id: 'policy-expression-1', expression }]
+      } as unknown as PolicyWithStatements;
+
+      const getDataRequestStub = sinon
+        .stub(DataRequestRepository.prototype, 'getDataRequestById')
+        .resolves(mockDataRequest);
+      const getPolicyStub = sinon.stub(PolicyService.prototype, 'getPolicyWithStatements').resolves(policy);
+
+      const service = new DataRequestService(getMockDBConnection());
+      const result = await service.getDataRequestFeatureTypes(mockDataRequest.data_request_id);
+
+      expect(getDataRequestStub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
+      expect(getPolicyStub).to.have.been.calledOnceWith(mockDataRequest.policy_id);
+      expect(result).to.eql([
+        { feature_type_name: 'telemetry', expression },
+        { feature_type_name: 'observation', expression: null }
+      ]);
+    });
+
+    it('ignores deny statements and values that are not URNs', async () => {
+      const policy = {
+        ...buildMockPolicy(),
+        statements: [
+          buildStatement({ effect: PolicyEffect.DENY }),
+          buildStatement({ effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }),
+          buildStatement({ submission_feature_urn: 'not-a-urn' })
+        ],
+        expressions: []
+      } as unknown as PolicyWithStatements;
+
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+      sinon.stub(PolicyService.prototype, 'getPolicyWithStatements').resolves(policy);
+      const getFeatureTypesStub = sinon.stub(CodeService.prototype, 'getFeatureTypes');
+
+      const service = new DataRequestService(getMockDBConnection());
+      const result = await service.getDataRequestFeatureTypes(mockDataRequest.data_request_id);
+
+      expect(result).to.eql([]);
+      expect(getFeatureTypesStub).not.to.have.been.called;
+    });
+
+    it('expands a wildcard feature type to every active feature type', async () => {
+      const expression = buildMockExpression();
+      const policy = {
+        ...buildMockPolicy(),
+        statements: [
+          buildStatement({ submission_feature_urn: 'urn:*:*:*', policy_expression_id: 'policy-expression-1' })
+        ],
+        expressions: [{ policy_expression_id: 'policy-expression-1', expression }]
+      } as unknown as PolicyWithStatements;
+
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+      sinon.stub(PolicyService.prototype, 'getPolicyWithStatements').resolves(policy);
+      sinon.stub(CodeService.prototype, 'getFeatureTypes').resolves([
+        { feature_type_id: 2, name: 'telemetry', display_name: 'Telemetry', description: null },
+        { feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null }
+      ] as any);
+
+      const service = new DataRequestService(getMockDBConnection());
+      const result = await service.getDataRequestFeatureTypes(mockDataRequest.data_request_id);
+
+      expect(result).to.eql([
+        { feature_type_name: 'observation', expression },
+        { feature_type_name: 'telemetry', expression }
+      ]);
+    });
+
+    it('keeps the expression of an earlier statement when a later wildcard covers the same feature type', async () => {
+      const expression = buildMockExpression();
+      const policy = {
+        ...buildMockPolicy(),
+        statements: [
+          buildStatement({ policy_expression_id: 'policy-expression-1' }),
+          buildStatement({ submission_feature_urn: 'urn:*:*:*' })
+        ],
+        expressions: [{ policy_expression_id: 'policy-expression-1', expression }]
+      } as unknown as PolicyWithStatements;
+
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
+      sinon.stub(PolicyService.prototype, 'getPolicyWithStatements').resolves(policy);
+      sinon.stub(CodeService.prototype, 'getFeatureTypes').resolves([
+        { feature_type_id: 2, name: 'telemetry', display_name: 'Telemetry', description: null },
+        { feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null }
+      ] as any);
+
+      const service = new DataRequestService(getMockDBConnection());
+      const result = await service.getDataRequestFeatureTypes(mockDataRequest.data_request_id);
+
+      expect(result).to.eql([
+        { feature_type_name: 'telemetry', expression },
+        { feature_type_name: 'observation', expression: null }
+      ]);
+    });
+
+    it('does not read the policy when the data request does not exist', async () => {
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').rejects(new Error('Data request not found'));
+      const getPolicyStub = sinon.stub(PolicyService.prototype, 'getPolicyWithStatements');
+
+      const service = new DataRequestService(getMockDBConnection());
+
+      try {
+        await service.getDataRequestFeatureTypes(mockDataRequest.data_request_id);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Data request not found');
+        expect(getPolicyStub).not.to.have.been.called;
+      }
+    });
   });
 
   it('findDataRequestById returns repository value', async () => {

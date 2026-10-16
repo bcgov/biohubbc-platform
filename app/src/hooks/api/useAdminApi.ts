@@ -19,7 +19,7 @@ import {
 } from 'interfaces/useAdminApi.interface';
 import { IBlueprint } from 'interfaces/useBlueprintsApi.interface';
 import { ISubmissionFeaturePropertiesResponse, ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface';
-import { ISubmissionFeatureForReviewResponse } from 'interfaces/useSubmissionsApi.interface';
+import { AdminSubmissionUpload, ISubmissionFeatureForReviewResponse } from 'interfaces/useSubmissionsApi.interface';
 import qs from 'qs';
 import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -65,6 +65,37 @@ const useAdminApi = (axios: AxiosInstance) => {
       options
     );
     return data;
+  };
+
+  /**
+   * Load an active submission upload, including its processing status and decision.
+   * @param {SubmissionUploadScope} scope Submission and upload identifiers.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} options Request cancellation.
+   * @returns {Promise<AdminSubmissionUpload>} The upload.
+   */
+  const getAdminSubmissionUpload = async (
+    scope: SubmissionUploadScope,
+    options: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<AdminSubmissionUpload> => {
+    const { data } = await axios.get(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}`,
+      options
+    );
+    return data;
+  };
+
+  /**
+   * Queue a re-index of an unapproved submission upload. The upload returns to `reconciled` until the index job
+   * completes, and is then indexed with the given blueprint.
+   * @param {SubmissionUploadScope} scope Submission and upload identifiers.
+   * @param {number} blueprintId Blueprint to index the upload with; the upload's current blueprint keeps it.
+   * @returns {Promise<void>} Resolves once the re-index is queued.
+   */
+  const reindexSubmissionUpload = async (scope: SubmissionUploadScope, blueprintId: number): Promise<void> => {
+    await axios.post(
+      `/api/administrative/submission/${scope.submissionId}/upload/${scope.submissionUploadId}/indexing`,
+      { blueprintId }
+    );
   };
 
   /**
@@ -558,6 +589,8 @@ const useAdminApi = (axios: AxiosInstance) => {
   return {
     listSubmissionFeatureErrors,
     getSubmissionUploadBlueprint,
+    getAdminSubmissionUpload,
+    reindexSubmissionUpload,
     getSubmissionDefaultBlueprint,
     updateSubmissionDefaultBlueprint,
     getSubmissionUploadFeatureTypeProperties,

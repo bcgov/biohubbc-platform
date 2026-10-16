@@ -11,6 +11,8 @@ const upload = (scope: SubmissionUploadScope) =>
   [QUERY_KEY_ROOT.SUBMISSION_UPLOAD, scope.submissionId, scope.submissionUploadId, 'browse'] as const;
 
 export const adminSubmissionUploadQueryKeys = {
+  all: upload,
+  record: (scope: SubmissionUploadScope) => [...upload(scope), 'record'] as const,
   blueprint: (scope: SubmissionUploadScope) => [...upload(scope), 'blueprint'] as const,
   errors: (scope: SubmissionUploadScope, pagination: ApiPaginationRequestOptions) =>
     [...upload(scope), 'errors', { pagination }] as const

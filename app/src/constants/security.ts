@@ -18,7 +18,7 @@ export const SUBMISSION_UPLOAD_REVIEW_UNSECURED_ICON_CONFIG = {
   color: 'muted'
 } as const;
 
-/** The security categories a reason can be filed under, as the reason dialog lists them. */
+/** The security categories a rule can be filed under, as the rule dialog lists them. */
 export const SECURITY_CATEGORY_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
   page: 1,
   limit: 100,

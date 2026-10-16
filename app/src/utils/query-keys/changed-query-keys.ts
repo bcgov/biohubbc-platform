@@ -110,11 +110,11 @@ const team = () => [[QUERY_KEY_ROOT.TEAM], teamPolicyQueryKeys.lists(), [QUERY_K
 const teamPolicy = () => [teamPolicyQueryKeys.lists(), [QUERY_KEY_ROOT.POLICY], ...access()];
 
 /**
- * Security categories, reasons, review rules and reads whose visibility depends on active security rules.
+ * Security categories, rules, review rules and reads whose visibility depends on active security rules.
  *
  * @returns The keys to refresh.
  */
-const securityReason = () => [
+const securityRule = () => [
   [QUERY_KEY_ROOT.SECURITY],
   [QUERY_KEY_ROOT.SUBMISSION_UPLOAD],
   [QUERY_KEY_ROOT.SUBMISSION_UPLOAD_REVIEW],
@@ -210,7 +210,7 @@ export const changedQueryKeys = {
   dataRequest,
   team,
   teamPolicy,
-  securityReason,
+  securityRule,
   reviewStatus,
   uploadDecision,
   submissionSecurity,

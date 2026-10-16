@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { skipToken, useQuery } from '@tanstack/react-query';
@@ -141,52 +140,48 @@ export const SubmissionUploadReviewValidationPage = (props: SubmissionUploadRevi
         </Box>
       }>
       {review && reconciliationCounts ? (
-        <>
-          <SubmissionUploadReviewHeader
-            submissionId={Number(submissionId)}
-            review={review}
-            tabs={[
-              {
-                value: FEATURES_TAB,
-                label: 'Features',
-                id: 'review-features-tab',
-                ariaControls: 'review-features-panel'
-              },
-              { value: ERRORS_TAB, label: 'Errors', id: 'review-errors-tab', ariaControls: 'review-errors-panel' }
-            ]}
-            activeTab={activeTab}
-            onTabChange={(tab) => {
-              const next = new URLSearchParams(searchParams);
-              next.set('tab', tab);
-              setSearchParams(next);
-            }}
-            onStatusActionClick={handleStatusActionClick}
-          />
-          <Container maxWidth="xl" sx={{ py: 4 }}>
-            {(isFeaturesTab || hasShownFeatures) && (
-              <Box
-                role="tabpanel"
-                id="review-features-panel"
-                aria-labelledby="review-features-tab"
-                hidden={!isFeaturesTab}>
-                <Stack spacing={4}>
-                  <SubmissionUploadReconciliationTable
-                    counts={reconciliationCounts}
-                    onOutcomeClick={(route) => navigate(route)}
-                  />
-                  <PageSection id="review-map" label="Map">
-                    <SubmissionUploadMap submissionId={Number(submissionId)} submissionUploadId={submissionUploadId} />
-                  </PageSection>
-                </Stack>
-              </Box>
-            )}
-            {!isFeaturesTab && (
-              <Box role="tabpanel" id="review-errors-panel" aria-labelledby="review-errors-tab">
-                <AdminSubmissionUploadErrors scope={scope} />
-              </Box>
-            )}
-          </Container>
-        </>
+        <SubmissionUploadReviewHeader
+          submissionId={Number(submissionId)}
+          review={review}
+          tabs={[
+            {
+              value: FEATURES_TAB,
+              label: 'Features',
+              id: 'review-features-tab',
+              ariaControls: 'review-features-panel'
+            },
+            { value: ERRORS_TAB, label: 'Errors', id: 'review-errors-tab', ariaControls: 'review-errors-panel' }
+          ]}
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            const next = new URLSearchParams(searchParams);
+            next.set('tab', tab);
+            setSearchParams(next);
+          }}
+          onStatusActionClick={handleStatusActionClick}>
+          {(isFeaturesTab || hasShownFeatures) && (
+            <Box
+              role="tabpanel"
+              id="review-features-panel"
+              aria-labelledby="review-features-tab"
+              hidden={!isFeaturesTab}>
+              <Stack spacing={4}>
+                <SubmissionUploadReconciliationTable
+                  counts={reconciliationCounts}
+                  onOutcomeClick={(route) => navigate(route)}
+                />
+                <PageSection id="review-map" label="Map">
+                  <SubmissionUploadMap submissionId={Number(submissionId)} submissionUploadId={submissionUploadId} />
+                </PageSection>
+              </Stack>
+            </Box>
+          )}
+          {!isFeaturesTab && (
+            <Box role="tabpanel" id="review-errors-panel" aria-labelledby="review-errors-tab">
+              <AdminSubmissionUploadErrors scope={scope} />
+            </Box>
+          )}
+        </SubmissionUploadReviewHeader>
       ) : null}
     </LoadingGuard>
   );

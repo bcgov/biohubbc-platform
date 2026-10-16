@@ -114,7 +114,7 @@ describe('TicketArtifacts', () => {
   it('renders paginated ticket artifact rows in the artifacts section grid', async () => {
     render(<TicketArtifacts />);
 
-    expect(screen.getByRole('heading', { name: 'Files' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: /^Files \(\d+\)$/ })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Upload' })).toBeVisible();
     expect(screen.getByText('Ticket Artifact ID')).toBeVisible();
     expect(screen.getByText('Artifact Key')).toBeVisible();

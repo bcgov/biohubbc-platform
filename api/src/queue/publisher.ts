@@ -499,12 +499,18 @@ export const publishProcessDownloadVersionExportJob = async (
   }
 };
 
-/** Shared retry and timeout policy for reconciliation and indexing pipeline stages. */
+/**
+ * Shared retry and timeout policy for reconciliation and indexing pipeline stages.
+ *
+ * Each stage runs in one transaction that can take a long time for large uploads. pg-boss retries an expired job
+ * without stopping its handler, so an expiry shorter than the stage leaves the original attempt running and its
+ * retries queued behind the upload row lock.
+ */
 const FEATURE_PIPELINE_STAGE_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
   retryBackoff: true,
-  expireInSeconds: 60 * 10
+  expireInSeconds: 60 * 60 * 2 // 2 hours
 };
 
 /**

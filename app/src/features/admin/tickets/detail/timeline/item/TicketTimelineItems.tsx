@@ -2,7 +2,6 @@ import Icon from '@mdi/react';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import {
   ITicketArtifact,
@@ -24,8 +23,7 @@ interface ITicketTimelineItemsProps {
   onArtifactLinkClick: (artifact: ITicketArtifact) => Promise<void>;
   onEditComment: (ticketCommentId: string) => void;
   onDeleteComment: (ticketCommentId: string) => void;
-  onViewPolicy: (dataRequestId: string, policyId: string, initialValues?: Partial<IPolicyFormValues>) => void;
-  onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
+  onViewRequest: (dataRequestId: string) => void;
   onConfirmDataRequestStatusUpdate: (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => void;
   onConfirmResetToReviewed: (dataRequestId: string, policyId: string, currentStatus: PolicyStatus) => void;
   canViewSubmissionUploadStatusHistory: boolean;
@@ -55,8 +53,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
     onArtifactLinkClick,
     onEditComment,
     onDeleteComment,
-    onViewPolicy,
-    onViewFinalizedPolicy,
+    onViewRequest,
     onConfirmDataRequestStatusUpdate,
     onConfirmResetToReviewed,
     canViewSubmissionUploadStatusHistory,
@@ -127,8 +124,7 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
                 }) ?? ''
               }
               isUpdating={updatingDataRequestId === item.data_request.data_request_id}
-              onViewPolicy={onViewPolicy}
-              onViewFinalizedPolicy={onViewFinalizedPolicy}
+              onViewRequest={onViewRequest}
               onApprove={(dataRequestId) =>
                 onConfirmDataRequestStatusUpdate(dataRequestId, item.data_request.policy_id, PolicyStatus.APPROVED)
               }

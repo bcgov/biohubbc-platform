@@ -5,14 +5,14 @@ import { SECURITY_CATEGORY_OPTIONS_PAGINATION } from 'constants/security';
 import { useApi } from 'hooks/useApi';
 import { useEffect, useMemo } from 'react';
 import { securityQueryKeys } from 'utils/query-keys/security-query-keys';
-import { AddReasonForm, AddReasonFormYupSchema, IAddReasonFormValues } from './AddReasonForm';
+import { AddRuleForm, AddRuleFormYupSchema, IAddRuleFormValues } from './AddRuleForm';
 
-export { AddReasonFormInitialValues } from './AddReasonForm';
+export { AddRuleFormInitialValues } from './AddRuleForm';
 
 /**
- * Props for the ReasonDialog component.
+ * Props for the RuleDialog component.
  */
-export interface IReasonDialogProps {
+export interface IRuleDialogProps {
   /** Whether the dialog is open */
   open: boolean;
   /** Whether a save operation is in progress */
@@ -21,25 +21,25 @@ export interface IReasonDialogProps {
   dialogTitle: string;
   /** Label for the save button */
   dialogSaveButtonLabel: string;
-  /** Initial Formik values for the reason form */
-  initialValues: IAddReasonFormValues;
+  /** Initial Formik values for the rule form */
+  initialValues: IAddRuleFormValues;
   /** Callback when category options fail to load */
   onLoadError: (title: string, text: string, error: unknown) => void;
   /** Callback when the dialog is cancelled */
   onCancel: () => void;
   /** Callback when the form is submitted successfully */
-  onSave: (values: IAddReasonFormValues) => void;
+  onSave: (values: IAddRuleFormValues) => void;
 }
 
 /**
- * Dialog for creating or editing a security reason.
+ * Dialog for creating or editing a security rule.
  *
- * Loads active security categories when opened and wraps AddReasonForm in EditDialog.
+ * Loads active security categories when opened and wraps AddRuleForm in EditDialog.
  *
- * @param {IReasonDialogProps} props
+ * @param {IRuleDialogProps} props
  * @returns {React.ReactElement}
  */
-export const ReasonDialog = (props: IReasonDialogProps) => {
+export const RuleDialog = (props: IRuleDialogProps) => {
   const { open, isLoading, dialogTitle, dialogSaveButtonLabel, initialValues, onLoadError, onCancel, onSave } = props;
   const biohubApi = useApi();
 
@@ -67,15 +67,15 @@ export const ReasonDialog = (props: IReasonDialogProps) => {
   );
 
   return (
-    <EditDialog<IAddReasonFormValues>
+    <EditDialog<IAddRuleFormValues>
       open={open}
       isLoading={isLoading}
       dialogTitle={dialogTitle}
       dialogSaveButtonLabel={dialogSaveButtonLabel}
       component={{
-        element: <AddReasonForm categoryOptions={categoryOptions} />,
+        element: <AddRuleForm categoryOptions={categoryOptions} />,
         initialValues,
-        validationSchema: AddReasonFormYupSchema
+        validationSchema: AddRuleFormYupSchema
       }}
       onCancel={onCancel}
       onSave={onSave}

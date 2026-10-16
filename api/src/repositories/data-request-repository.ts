@@ -2,7 +2,16 @@ import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { CreateDataRequest, DataRequest, DataRequestFilters, UpdateDataRequest } from '../models/data-request';
+import { CountResult } from '../models/count';
+import {
+  CreateDataRequest,
+  DataRequest,
+  DataRequestFilters,
+  DataRequestListFilters,
+  DataRequestListItem,
+  UpdateDataRequest
+} from '../models/data-request';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -40,6 +49,119 @@ export class DataRequestRepository extends BaseRepository {
     this.applyFilters(queryBuilder, filters);
     const response = await this.connection.knex(queryBuilder, DataRequest);
     return response.rows;
+  }
+
+  /**
+   * Get one page of every active data request in the system, with its decision (the status of its policy) and the
+   * name of the user who submitted it.
+   *
+   * @param {DataRequestListFilters} filters - Optional keyword matched against the request reason.
+   * @param {ApiPaginationOptions} pagination - Page, page size and sort.
+   * @return {Promise<DataRequestListItem[]>} The page of data requests.
+   * @memberof DataRequestRepository
+   */
+  async getDataRequestList(
+    filters: DataRequestListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<DataRequestListItem[]> {
+    const knex = getKnex();
+
+    const query = knex('data_request as dr')
+      .select(
+        'dr.data_request_id',
+        'dr.reason',
+        'p.status as status',
+        'dr.create_date as create_date',
+        'dr.requested_by',
+        knex.raw('COALESCE(su.display_name, su.user_identifier) AS requested_by_name'),
+        'dr.ticket_id',
+        'dr.policy_id'
+      )
+      .join('policy as p', 'p.policy_id', 'dr.policy_id')
+      .leftJoin('system_user as su', 'su.system_user_id', 'dr.requested_by')
+      .whereNull('dr.record_end_date')
+      .whereNull('p.record_end_date');
+
+    if (filters.keyword) {
+      query.whereILike('dr.reason', `%${filters.keyword}%`);
+    }
+
+    this.applyPagination(query, pagination);
+
+    const response = await this.connection.knex(query, DataRequestListItem);
+
+    return response.rows;
+  }
+
+  /**
+   * Get one active data request by ID, with its decision (the status of its policy) and the name of the user who
+   * submitted it.
+   *
+   * @param {string} dataRequestId - Data request UUID.
+   * @return {Promise<DataRequestListItem>} The data request.
+   * @throws {ApiNotFoundError} If no active data request exists for the ID.
+   * @memberof DataRequestRepository
+   */
+  async getDataRequestListItem(dataRequestId: string): Promise<DataRequestListItem> {
+    const knex = getKnex();
+
+    const query = knex('data_request as dr')
+      .select(
+        'dr.data_request_id',
+        'dr.reason',
+        'p.status as status',
+        'dr.create_date as create_date',
+        'dr.requested_by',
+        knex.raw('COALESCE(su.display_name, su.user_identifier) AS requested_by_name'),
+        'dr.ticket_id',
+        'dr.policy_id'
+      )
+      .join('policy as p', 'p.policy_id', 'dr.policy_id')
+      .leftJoin('system_user as su', 'su.system_user_id', 'dr.requested_by')
+      .where('dr.data_request_id', dataRequestId)
+      .whereNull('dr.record_end_date')
+      .whereNull('p.record_end_date');
+
+    const response = await this.connection.knex(query, DataRequestListItem);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Data request not found', [
+        'DataRequestRepository->getDataRequestListItem',
+        { dataRequestId }
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get the total number of active data requests in the system matching the filters.
+   *
+   * @param {DataRequestListFilters} filters - Optional keyword matched against the request reason.
+   * @return {Promise<number>} The number of matching data requests.
+   * @throws {ApiExecuteSQLError} If the count query returns an unexpected row count.
+   * @memberof DataRequestRepository
+   */
+  async getDataRequestCount(filters: DataRequestListFilters): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex('data_request as dr')
+      .select(knex.raw('count(*)::integer as count'))
+      .join('policy as p', 'p.policy_id', 'dr.policy_id')
+      .whereNull('dr.record_end_date')
+      .whereNull('p.record_end_date');
+
+    if (filters.keyword) {
+      query.whereILike('dr.reason', `%${filters.keyword}%`);
+    }
+
+    const response = await this.connection.knex(query, CountResult);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get data requests count');
+    }
+
+    return response.rows[0].count;
   }
 
   /**

@@ -2,15 +2,19 @@ import { SubmissionUploadReviewValidationFeatureTypePage } from 'features/admin/
 import { SubmissionUploadReviewValidationReconciliationPage } from 'features/admin/reviews/SubmissionUploadReviewValidationReconciliationPage';
 import { BlueprintFeatureTypePage } from 'features/admin/configuration/blueprint/feature/BlueprintFeatureTypePage';
 import { BlueprintPage } from 'features/admin/configuration/blueprint/BlueprintPage';
-import { ConfigurationPage } from 'features/admin/configuration/ConfigurationPage';
+import { AdminConfigurationPage } from 'features/admin2/configuration/AdminConfigurationPage';
+import { AdminDataRequestsPage } from 'features/admin2/data-requests/AdminDataRequestsPage';
+import { AdminDataRequestPage } from 'features/admin2/data-requests/detail/AdminDataRequestPage';
+import { AdminDataRequestFeatureTypePage } from 'features/admin2/data-requests/detail/feature-type/AdminDataRequestFeatureTypePage';
+import { AdminSecurityPage } from 'features/admin2/security/AdminSecurityPage';
+import { AdminSecurityCategoryPage } from 'features/admin2/security/category/AdminSecurityCategoryPage';
+import { AdminUsersPage } from 'features/admin2/users/AdminUsersPage';
+import { AdminPage } from 'features/admin2/AdminPage';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AdminPolicyContextProvider } from 'contexts/policyContext';
-import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
 import { PolicyDetailPage } from 'features/admin/policies/PolicyDetailPage';
 import { SubmissionUploadReviewPage } from 'features/admin/reviews/SubmissionUploadReviewPage';
 import { SubmissionReviewFeaturePage } from 'features/admin/reviews/SubmissionReviewFeaturePage';
-import { ManageSecurityPage } from 'features/admin/security/ManageSecurityPage';
-import ManageUsersPage from 'features/admin/users/ManageUsersPage';
 import { ContributorDetailPage } from 'features/admin/users/contributors/ContributorDetailPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
@@ -28,8 +32,22 @@ import { TicketsRouter } from './ticket/TicketsRouter';
 export const AdminRouter = () => {
   return (
     <Routes>
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/admin/submissions" replace />} />
+      {/* Administration landing route */}
+      <Route
+        path="/"
+        element={
+          <BaseLayout>
+            <PageTitle title="Administration" description="Browse administrative sections" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
 
       {/* Submissions route  */}
       <Route
@@ -138,29 +156,15 @@ export const AdminRouter = () => {
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
-                <ManageUsersPage />
+                <AdminUsersPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>
         }
       />
 
-      {/* Manage Policies route */}
-      <Route
-        path="policies"
-        element={
-          <BaseLayout>
-            <PageTitle title="Manage Policies" description="Manage access policies" />
-            <AuthenticatedRouteGuard>
-              <SystemRoleGuard
-                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
-                fallback={<Navigate to="/forbidden" replace />}>
-                <ManagePoliciesPage />
-              </SystemRoleGuard>
-            </AuthenticatedRouteGuard>
-          </BaseLayout>
-        }
-      />
+      {/* Policies are managed on the data requests page */}
+      <Route path="policies" element={<Navigate to="/admin/data-requests?tab=policies" replace />} />
 
       {/* Policy detail route */}
       <Route
@@ -186,12 +190,80 @@ export const AdminRouter = () => {
         path="security"
         element={
           <BaseLayout>
-            <PageTitle title="Manage Security" description="Manage security categories and reasons" />
+            <PageTitle title="Manage Security" description="Manage security categories and rules" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
                 fallback={<Navigate to="/forbidden" replace />}>
-                <ManageSecurityPage />
+                <AdminSecurityPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Security category route */}
+      <Route
+        path="security/categories/:securityCategoryId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Security Category" description="Manage the rules of a security category" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminSecurityCategoryPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Data requests route */}
+      <Route
+        path="data-requests"
+        element={
+          <BaseLayout>
+            <PageTitle title="Data Requests" description="Manage the policies that represent data requests" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminDataRequestsPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Data request detail route */}
+      <Route
+        path="data-requests/:dataRequestId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Data Request" description="View a data request and the policy that represents it" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminDataRequestPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Data request feature type route */}
+      <Route
+        path="data-requests/:dataRequestId/feature-types/:featureType"
+        element={
+          <BaseLayout>
+            <PageTitle title="Data Request Features" description="View the features a data request asks for" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminDataRequestFeatureTypePage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>
@@ -224,7 +296,7 @@ export const AdminRouter = () => {
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
-                <ConfigurationPage />
+                <AdminConfigurationPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

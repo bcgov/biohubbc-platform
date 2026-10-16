@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { keepPreviousDataWithin } from 'utils/query-client';
 import { GridColDef } from '@mui/x-data-grid';
 import { useQuery } from '@tanstack/react-query';
@@ -48,7 +49,16 @@ export const PolicyTeams = ({ policyId }: PolicyTeamsProps) => {
   );
 
   return (
-    <PageSection id="policy-teams" label="Teams">
+    <PageSection
+      id="policy-teams"
+      label={
+        <>
+          Teams{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({teamsQuery.data?.pagination.total ?? 0})
+          </Typography>
+        </>
+      }>
       <ServerPaginatedDataGrid<ITeamPolicyDetails>
         dataTestId="policy-teams-table"
         rows={teamsQuery.data?.teams ?? []}

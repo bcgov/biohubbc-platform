@@ -1,6 +1,7 @@
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
+import { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { act, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -14,27 +15,32 @@ vi.mock('./components/SubmissionUploadReviewHeader', () => ({
     tabs,
     activeTab,
     onTabChange,
-    onStatusActionClick
+    onStatusActionClick,
+    children
   }: {
     review: { name: string };
     tabs: { value: string; label: string }[];
     activeTab: string;
     onTabChange: (tab: string) => void;
     onStatusActionClick: () => void;
+    children: ReactNode;
   }) => (
-    <div data-testid="review-header">
-      {review.name}
-      {tabs.map((tab) => (
-        <button
-          key={tab.value}
-          role="tab"
-          aria-selected={tab.value === activeTab}
-          onClick={() => onTabChange(tab.value)}>
-          {tab.label}
-        </button>
-      ))}
-      <button onClick={onStatusActionClick}>Change status</button>
-    </div>
+    <>
+      <div data-testid="review-header">
+        {review.name}
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            role="tab"
+            aria-selected={tab.value === activeTab}
+            onClick={() => onTabChange(tab.value)}>
+            {tab.label}
+          </button>
+        ))}
+        <button onClick={onStatusActionClick}>Change status</button>
+      </div>
+      {children}
+    </>
   )
 }));
 // The errors grid is exercised with the upload page; here we only care that the tab shows it for the reviewed upload.

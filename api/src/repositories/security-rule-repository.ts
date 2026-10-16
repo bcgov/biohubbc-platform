@@ -6,9 +6,9 @@ import {
   CreateSecurityRule,
   SecurityRule,
   SecurityRuleAndCategory,
+  SecurityRuleFilters,
   SecurityRuleWithExpressions,
   SecurityRuleWithFeatureCount,
-  SecuritySearchFilters,
   UpdateSecurityRule
 } from '../models/security-rule';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -92,13 +92,13 @@ export class SecurityRuleRepository extends BaseRepository {
    * Get paginated security rules with a count of associated active submission features.
    * Only active (non-soft-deleted) applications are counted.
    *
-   * @param {SecuritySearchFilters} [filters]
+   * @param {SecurityRuleFilters} [filters] Optional name search and security category to limit the rules to.
    * @param {ApiPaginationOptions} [pagination]
    * @return {Promise<SecurityRuleWithFeatureCount[]>}
    * @memberof SecurityRuleRepository
    */
   async getSecurityRulesWithFeatureCount(
-    filters?: SecuritySearchFilters,
+    filters?: SecurityRuleFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SecurityRuleWithFeatureCount[]> {
     const knex = getKnex();
@@ -134,6 +134,10 @@ export class SecurityRuleRepository extends BaseRepository {
       query.whereILike('sr.name', `%${filters.search}%`);
     }
 
+    if (filters?.security_category_id) {
+      query.where('sr.security_category_id', filters.security_category_id);
+    }
+
     if (pagination) {
       this.applyPagination(query, pagination);
     }
@@ -145,12 +149,12 @@ export class SecurityRuleRepository extends BaseRepository {
   /**
    * Get total count of active security rules matching optional filters.
    *
-   * @param {SecuritySearchFilters} [filters]
+   * @param {SecurityRuleFilters} [filters] Optional name search and security category to limit the rules to.
    * @return {Promise<number>}
    * @throws {ApiExecuteSQLError} If the count query returns an unexpected row count.
    * @memberof SecurityRuleRepository
    */
-  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
+  async getSecurityRulesCount(filters?: SecurityRuleFilters): Promise<number> {
     const knex = getKnex();
 
     const query = knex
@@ -160,6 +164,10 @@ export class SecurityRuleRepository extends BaseRepository {
 
     if (filters?.search) {
       query.whereILike('name', `%${filters.search}%`);
+    }
+
+    if (filters?.security_category_id) {
+      query.where('security_category_id', filters.security_category_id);
     }
 
     const response = await this.connection.knex(query, CountResult);
