@@ -286,6 +286,20 @@ export class SubmissionFeaturePropertyRepository extends BaseRepository {
         UNION ALL
 
         SELECT
+          'paragraph:' || p.submission_feature_property_paragraph_id::text AS id,
+          fp.display_name AS property,
+          to_jsonb(p.value) AS value,
+          bftp.sort
+        FROM submission_feature_property_paragraph p
+        JOIN active_feature sf ON sf.submission_feature_id = p.submission_feature_id
+        JOIN blueprint_feature_type_property bftp
+          ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
+        JOIN feature_property fp
+          ON fp.feature_property_id = bftp.feature_property_id
+
+        UNION ALL
+
+        SELECT
           'number:' || p.submission_feature_property_number_id::text AS id,
           fp.display_name AS property,
           to_jsonb(p.value::text) AS value,

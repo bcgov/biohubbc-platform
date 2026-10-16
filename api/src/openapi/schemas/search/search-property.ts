@@ -35,7 +35,7 @@ const propertyResultSchema: OpenAPIV3.SchemaObject = {
     property_display_name: { type: 'string' },
     feature_property_type: {
       type: 'string',
-      enum: ['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']
+      enum: ['string', 'paragraph', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']
     },
     operators: {
       type: 'array',
@@ -50,9 +50,10 @@ const propertyResultSchema: OpenAPIV3.SchemaObject = {
  */
 const groupedPropertiesSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code'],
+  required: ['string', 'paragraph', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code'],
   properties: {
     string: { type: 'array', items: propertyResultSchema },
+    paragraph: { type: 'array', items: propertyResultSchema },
     number: { type: 'array', items: propertyResultSchema },
     boolean: { type: 'array', items: propertyResultSchema },
     datetime: { type: 'array', items: propertyResultSchema },

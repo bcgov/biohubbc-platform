@@ -151,6 +151,7 @@ export interface SnapshotAnchor {
 export interface SnapshotCounts {
   features: number;
   property_string: number;
+  property_paragraph: number;
   property_number: number;
   property_boolean: number;
   property_timestamp: number;
@@ -170,6 +171,7 @@ export interface SnapshotFixture {
   submission: SnapshotSubmission;
   features: SnapshotFeature[];
   property_string: SnapshotScalarProperty[];
+  property_paragraph: SnapshotScalarProperty[];
   property_number: SnapshotScalarProperty[];
   property_boolean: SnapshotScalarProperty[];
   property_timestamp: SnapshotTimestampProperty[];
@@ -202,6 +204,7 @@ export async function dumpSubmission(connection: IDBConnection, submissionId: nu
   const features = await dumpFeatures(connection, submissionId);
 
   const propertyString = await dumpScalarProperty(connection, submissionId, 'submission_feature_property_string');
+  const propertyParagraph = await dumpScalarProperty(connection, submissionId, 'submission_feature_property_paragraph');
   const propertyNumber = await dumpScalarProperty(connection, submissionId, 'submission_feature_property_number');
   const propertyBoolean = await dumpScalarProperty(connection, submissionId, 'submission_feature_property_boolean');
   const propertyTimestamp = await dumpTimestampProperty(connection, submissionId);
@@ -223,6 +226,7 @@ export async function dumpSubmission(connection: IDBConnection, submissionId: nu
   const counts: SnapshotCounts = {
     features: features.length,
     property_string: propertyString.length,
+    property_paragraph: propertyParagraph.length,
     property_number: propertyNumber.length,
     property_boolean: propertyBoolean.length,
     property_timestamp: propertyTimestamp.length,
@@ -243,6 +247,7 @@ export async function dumpSubmission(connection: IDBConnection, submissionId: nu
     submission,
     features,
     property_string: propertyString,
+    property_paragraph: propertyParagraph,
     property_number: propertyNumber,
     property_boolean: propertyBoolean,
     property_timestamp: propertyTimestamp,
@@ -309,16 +314,17 @@ async function dumpFeatures(connection: IDBConnection, submissionId: number): Pr
   return response.rows;
 }
 
-/** The names of the three scalar property tables sharing a single `value` column. */
+/** The names of the four scalar property tables sharing a single `value` column. */
 type ScalarPropertyTable =
   | 'submission_feature_property_string'
+  | 'submission_feature_property_paragraph'
   | 'submission_feature_property_number'
   | 'submission_feature_property_boolean';
 
 /**
- * Read a scalar property table (string/number/boolean), keyed by the owning feature's uuid.
+ * Read a scalar property table (string/paragraph/number/boolean), keyed by the owning feature's uuid.
  *
- * The three scalar tables are structurally identical (one `value` column), so they share one read.
+ * The four scalar tables are structurally identical (one `value` column), so they share one read.
  * The table name is interpolated as a constant from the closed `ScalarPropertyTable` union — it is
  * never user input — so this cannot be a SQL-injection vector.
  *

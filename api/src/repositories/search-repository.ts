@@ -19,7 +19,7 @@ export class SearchRepository extends BaseRepository {
   /**
    * Builds a query to find features matching a search term.
    *
-   * Matches the keyword against three corpora — free-text string properties, codeset code
+   * Matches the keyword against four corpora — free-text string and paragraph properties, codeset code
    * labels/descriptions, and taxon names/codes — and emits one row per matched feature. Only
    * feature types in {@link LANDING_PAGE_FEATURE_TYPES} are eligible. The displayed `label`
    * is the matched value itself, so the dropdown row always reflects *why* the feature
@@ -43,6 +43,11 @@ export class SearchRepository extends BaseRepository {
 
     // String arm — match the free-text value.
     const stringMatches = knex('submission_feature_property_string as p')
+      .select('p.submission_feature_id', knex.raw('p.value::text as matched_value'))
+      .whereILike('p.value', pattern);
+
+    // Paragraph arm — match the long free-text value.
+    const paragraphMatches = knex('submission_feature_property_paragraph as p')
       .select('p.submission_feature_id', knex.raw('p.value::text as matched_value'))
       .whereILike('p.value', pattern);
 
@@ -74,7 +79,7 @@ export class SearchRepository extends BaseRepository {
           .orWhereRaw('CAST(t.itis_tsn AS TEXT) ILIKE ?', [pattern]);
       });
 
-    const matches = stringMatches.unionAll([codeMatches, taxonMatches]);
+    const matches = stringMatches.unionAll([paragraphMatches, codeMatches, taxonMatches]);
 
     return knex
       .from(matches.as('matches'))
@@ -105,9 +110,16 @@ export class SearchRepository extends BaseRepository {
         this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureCurrent('sf')));
       })
       .leftJoin('submission_feature_property_string as sfps', 'sfps.submission_feature_id', 'sf.submission_feature_id')
+      .leftJoin(
+        'submission_feature_property_paragraph as sfpp',
+        'sfpp.submission_feature_id',
+        'sf.submission_feature_id'
+      )
       .whereNull('s.record_end_date')
       .where((qb) => {
-        qb.whereILike('s.name', `%${keyword}%`).orWhereILike('sfps.value', `%${keyword}%`);
+        qb.whereILike('s.name', `%${keyword}%`)
+          .orWhereILike('sfps.value', `%${keyword}%`)
+          .orWhereILike('sfpp.value', `%${keyword}%`);
       })
       .select('s.submission_id', 's.name', 's.description')
       .distinct();
@@ -269,6 +281,10 @@ export class SearchRepository extends BaseRepository {
       WITH matching_ids AS (
         SELECT submission_feature_id
           FROM submission_feature_property_string
+         WHERE value ILIKE ${pattern}
+        UNION ALL
+        SELECT submission_feature_id
+          FROM submission_feature_property_paragraph
          WHERE value ILIKE ${pattern}
         UNION ALL
         SELECT p.submission_feature_id

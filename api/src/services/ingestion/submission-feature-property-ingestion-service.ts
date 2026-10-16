@@ -327,6 +327,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(
           submissionUploadId
         ),
+        this.submissionFeaturePropertyIngestionRepository.insertParagraphPropertiesBySubmissionUploadId(
+          submissionUploadId
+        ),
         this.submissionFeaturePropertyIngestionRepository.insertNumberPropertiesBySubmissionUploadId(
           submissionUploadId
         ),

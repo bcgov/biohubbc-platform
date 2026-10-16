@@ -31,7 +31,15 @@ export const EXPRESSION_PREDICATE_OPERATORS = [
 
 export type ExpressionPredicateOperator = (typeof EXPRESSION_PREDICATE_OPERATORS)[number];
 
-export type ExpressionPropertyType = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'spatial' | 'code';
+export type ExpressionPropertyType =
+  | 'string'
+  | 'paragraph'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'taxon'
+  | 'spatial'
+  | 'code';
 
 export interface ExpressionTreeExpression {
   type: 'expression';
