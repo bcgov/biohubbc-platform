@@ -1,6 +1,5 @@
 import { Button, Stack, Typography } from '@mui/material';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { TicketTimelineItem } from '../layout/TicketTimelineItem';
@@ -9,8 +8,7 @@ interface ITicketTimelineDataRequestItemProps {
   dataRequest: DataRequestResponse;
   dateLabel: string;
   isUpdating: boolean;
-  onViewPolicy: (dataRequestId: string, policyId: string, initialValues?: Partial<IPolicyFormValues>) => void;
-  onViewFinalizedPolicy: (dataRequestId: string, policyId: string) => void;
+  onViewRequest: (dataRequestId: string) => void;
   onApprove: (dataRequestId: string) => void;
   onDeny: (dataRequestId: string) => void;
   onResetToReviewed: (dataRequestId: string) => void;
@@ -23,16 +21,7 @@ interface ITicketTimelineDataRequestItemProps {
  * @return {*}
  */
 export const TicketTimelineDataRequestItem = (props: ITicketTimelineDataRequestItemProps) => {
-  const {
-    dataRequest,
-    dateLabel,
-    isUpdating,
-    onViewPolicy,
-    onViewFinalizedPolicy,
-    onApprove,
-    onDeny,
-    onResetToReviewed
-  } = props;
+  const { dataRequest, dateLabel, isUpdating, onViewRequest, onApprove, onDeny, onResetToReviewed } = props;
   const requestStatus = dataRequest.status;
   const finalizedLabel = `${requestStatus.charAt(0).toUpperCase()}${requestStatus.slice(1)}`;
   const finalizedButtonColor = requestStatus === PolicyStatus.APPROVED ? 'success' : 'error';
@@ -42,9 +31,9 @@ export const TicketTimelineDataRequestItem = (props: ITicketTimelineDataRequestI
         size="small"
         color="primary"
         variant="outlined"
-        onClick={() => onViewFinalizedPolicy(dataRequest.data_request_id, dataRequest.policy_id)}
+        onClick={() => onViewRequest(dataRequest.data_request_id)}
         disabled={isUpdating}>
-        View Policy
+        View Request
       </Button>
       <Button
         size="small"
@@ -71,9 +60,9 @@ export const TicketTimelineDataRequestItem = (props: ITicketTimelineDataRequestI
                   size="small"
                   color="primary"
                   variant="contained"
-                  onClick={() => onViewFinalizedPolicy(dataRequest.data_request_id, dataRequest.policy_id)}
+                  onClick={() => onViewRequest(dataRequest.data_request_id)}
                   disabled={isUpdating}>
-                  Review Policy
+                  Review Request
                 </Button>
               ),
               [PolicyStatus.REVIEWED]: (
@@ -82,9 +71,9 @@ export const TicketTimelineDataRequestItem = (props: ITicketTimelineDataRequestI
                     size="small"
                     color="primary"
                     variant="outlined"
-                    onClick={() => onViewPolicy(dataRequest.data_request_id, dataRequest.policy_id)}
+                    onClick={() => onViewRequest(dataRequest.data_request_id)}
                     disabled={isUpdating}>
-                    View Policy
+                    View Request
                   </Button>
                   <Button
                     size="small"

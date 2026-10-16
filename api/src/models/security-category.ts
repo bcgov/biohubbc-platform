@@ -32,6 +32,16 @@ export const SecurityCategory = z.object({
 
 export type SecurityCategory = z.infer<typeof SecurityCategory>;
 
+export const SecurityCategoryDetails = z.object({
+  security_category_id: z.number(),
+  name: z.string(),
+  description: z.string().nullable(),
+  create_date: z.string(),
+  created_by_name: z.string().nullable()
+});
+
+export type SecurityCategoryDetails = z.infer<typeof SecurityCategoryDetails>;
+
 export interface CreateSecurityCategory {
   name: string;
   description: string;

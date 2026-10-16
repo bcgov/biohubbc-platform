@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
@@ -94,6 +94,27 @@ describe('PolicyService', () => {
   });
 
   describe('updatePolicy', () => {
+    it('does not change the status or access cache of a policy that has ended', async () => {
+      sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
+        policy_id: '1',
+        name: 'P',
+        description: null,
+        status: 'reviewed',
+        record_end_date: '2026-01-01T00:00:00.000Z'
+      });
+      const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy');
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies');
+
+      try {
+        await policyService.updatePolicy('1', { status: 'approved' });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect(updateStub).not.to.have.been.called;
+        expect(getTeamPoliciesStub).not.to.have.been.called;
+      }
+    });
+
     it('should call repository.updatePolicy and return updated policy', async () => {
       const updatedPolicy: Policy = {
         policy_id: '1',

@@ -8,12 +8,12 @@ import { useFormikContext } from 'formik';
 import yup from 'utils/YupSchema';
 
 /**
- * Form values for creating or editing a security reason.
+ * Form values for creating or editing a security rule.
  */
-export interface IAddReasonFormValues {
-  /** Reason name */
+export interface IAddRuleFormValues {
+  /** Rule name */
   name: string;
-  /** Reason description */
+  /** Rule description */
   description: string;
   /** Selected security category ID */
   security_category_id: number | undefined;
@@ -22,9 +22,9 @@ export interface IAddReasonFormValues {
 }
 
 /**
- * Default initial values for a new security reason form.
+ * Default initial values for a new security rule form.
  */
-export const AddReasonFormInitialValues: IAddReasonFormValues = {
+export const AddRuleFormInitialValues: IAddRuleFormValues = {
   name: '',
   description: '',
   security_category_id: undefined,
@@ -32,31 +32,31 @@ export const AddReasonFormInitialValues: IAddReasonFormValues = {
 };
 
 /**
- * Yup validation schema for the security reason form.
+ * Yup validation schema for the security rule form.
  */
-export const AddReasonFormYupSchema = yup.object().shape({
+export const AddRuleFormYupSchema = yup.object().shape({
   name: yup.string().required('Name is required').max(100, 'Name must be 100 characters or less'),
   description: yup.string().required('Description is required').max(500, 'Description must be 500 characters or less'),
   security_category_id: yup.number().required('Category is required'),
   is_active: yup.boolean()
 });
 
-interface IAddReasonFormProps {
+interface IAddRuleFormProps {
   /** Active security categories available for selection */
   categoryOptions: ICustomAutocompleteOption<number>[];
 }
 
 /**
- * Form component for creating or editing a security reason.
+ * Form component for creating or editing a security rule.
  *
  * Must be used within a Formik context (wrapped by EditDialog or similar).
  *
- * @param {IAddReasonFormProps} props
+ * @param {IAddRuleFormProps} props
  * @returns {React.ReactElement}
  */
-export const AddReasonForm = (props: IAddReasonFormProps) => {
+export const AddRuleForm = (props: IAddRuleFormProps) => {
   const { categoryOptions } = props;
-  const { values, setFieldValue } = useFormikContext<IAddReasonFormValues>();
+  const { values, setFieldValue } = useFormikContext<IAddRuleFormValues>();
 
   return (
     <Stack gap={2} sx={{ pt: 1, minWidth: { xs: 300, sm: 520 } }}>

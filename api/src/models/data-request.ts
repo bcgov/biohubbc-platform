@@ -24,6 +24,41 @@ export const DataRequestFilters = z.object({
 });
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
 
+export const DataRequestListItem = z.object({
+  data_request_id: z.string().uuid(),
+  reason: z.string(),
+  status: PolicyStatus,
+  create_date: z.string(),
+  requested_by: z.number(),
+  requested_by_name: z.string().nullable(),
+  ticket_id: z.string().uuid(),
+  policy_id: z.string().uuid()
+});
+export type DataRequestListItem = z.infer<typeof DataRequestListItem>;
+
+export interface DataRequestListFilters {
+  keyword?: string;
+}
+
+export interface DataRequestList {
+  data_requests: DataRequestListItem[];
+  total: number;
+}
+
+/** One recipient of a data request: a member of a team its policy is assigned to. */
+export interface DataRequestRecipient {
+  system_user_id: number;
+  user_identifier: string;
+  display_name: string | null;
+  email: string | null;
+}
+
+/** One feature type a data request asks for, with the expression that limits it, or null when it asks for all. */
+export interface DataRequestFeatureType {
+  feature_type_name: string;
+  expression: ExpressionTree | null;
+}
+
 export const CreateDataRequest = z.object({
   requested_by: z.number().int(),
   reason: z.string(),

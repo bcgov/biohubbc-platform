@@ -138,10 +138,10 @@ describe('Blueprint composition page', () => {
     const page = renderPage('1', tab);
     expect(await page.findByText('Type description')).toBeVisible();
     expect(page.getByRole('tab', { name: 'Feature Types' })).toHaveAttribute('aria-selected', 'true');
-    expect(page.getAllByRole('tab').map((item) => item.textContent)).toEqual(['Feature Types', 'Metadata']);
-    fireEvent.click(page.getByRole('tab', { name: 'Metadata' }));
-    expect(await page.findByRole('heading', { name: 'Metadata' })).toBeVisible();
-    expect(page.getByRole('tab', { name: 'Metadata' })).toHaveAttribute('aria-selected', 'true');
+    expect(page.getAllByRole('tab').map((item) => item.textContent)).toEqual(['Feature Types', 'About']);
+    fireEvent.click(page.getByRole('tab', { name: 'About' }));
+    expect(await page.findByRole('heading', { name: 'About' })).toBeVisible();
+    expect(page.getByRole('tab', { name: 'About' })).toHaveAttribute('aria-selected', 'true');
     const panel = within(page.getByRole('tabpanel'));
     expect(panel.getByRole('row', { name: 'ID 1' })).toBeVisible();
     expect(panel.getByRole('row', { name: 'Version 2' })).toBeVisible();
@@ -235,7 +235,7 @@ describe('Blueprint composition page', () => {
     fireEvent.click(page.getByRole('button', { name: 'close' }));
     await waitFor(() => expect(page.queryByText('Blueprint published')).not.toBeInTheDocument());
     expect(page.queryByTestId('blueprint-types-add-button')).not.toBeInTheDocument();
-    fireEvent.click(page.getByRole('tab', { name: 'Metadata' }));
+    fireEvent.click(page.getByRole('tab', { name: 'About' }));
     expect(page.getByRole('row', { name: 'Effective date 2000-01-01' })).toBeVisible();
   });
 

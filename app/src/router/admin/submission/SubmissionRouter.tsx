@@ -1,6 +1,6 @@
 import { AdminSubmissionUploadFeatureTypePage } from 'features/submissions/upload/AdminSubmissionUploadFeatureTypePage';
 import { AdminSubmissionUploadPage } from 'features/submissions/upload/AdminSubmissionUploadPage';
-import DashboardPage from 'features/admin/dashboard/DashboardPage';
+import { AdminSubmissionsPage } from 'features/admin2/submissions/AdminSubmissionsPage';
 import { AdminSubmissionPage } from 'features/submissions/AdminSubmissionPage';
 import { CreateSubmissionPage } from 'features/submissions/create/CreateSubmissionPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
@@ -18,7 +18,7 @@ export const SubmissionsRouter = () => {
         element={
           <>
             <PageTitle title="Submissions" description="Browse submitted submissions" />
-            <DashboardPage />
+            <AdminSubmissionsPage />
           </>
         }
       />

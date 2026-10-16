@@ -124,7 +124,7 @@ export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
       width: 150,
       sortable: false,
       valueGetter: (_value, row) =>
-        row.last_used_at ? getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, row.last_used_at) : '—'
+        row.last_used_at ? getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, row.last_used_at) : null
     },
     {
       field: 'actions',

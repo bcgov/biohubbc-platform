@@ -208,7 +208,7 @@ describe('AdminSubmissionUploadPage', () => {
       'Unchanged',
       'Changed',
       'Errors',
-      'Metadata'
+      'About'
     ]);
     expect(await screen.findByRole('columnheader', { name: 'Feature type' })).toBeVisible();
     const animalRow = screen.getByRole('gridcell', { name: 'Animal' }).closest('[role="row"]') as HTMLElement;
@@ -266,7 +266,7 @@ describe('AdminSubmissionUploadPage', () => {
     expect(screen.getByRole('grid')).toBe(grid);
     await screen.findByRole('gridcell', { name: 'Animal' });
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Metadata' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'About' }));
     expect(await screen.findByRole('gridcell', { name: uploadId })).toBeVisible();
     expect(map).not.toBeVisible();
 
@@ -331,7 +331,7 @@ describe('AdminSubmissionUploadPage', () => {
   it('lists the upload errors on the Errors tab, without loading or mounting an outcome', async () => {
     renderAt(`${path}?tab=errors`);
     expect(await screen.findByRole('tab', { name: 'Errors' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByRole('heading', { name: 'Errors' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /^Errors \(\d+\)$/ })).toBeVisible();
     const errorRow = (await screen.findByRole('gridcell', { name: 'invalid_type' })).closest(
       '[role="row"]'
     ) as HTMLElement;

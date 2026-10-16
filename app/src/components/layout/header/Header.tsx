@@ -171,64 +171,14 @@ const Header = () => {
                     Portal
                   </MenuItem>
                 </AuthGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <MenuItem
-                    component={RouterLink}
-                    to="/admin/submissions"
-                    id="menu_dashboard_sm"
-                    onClick={hideMobileMenu}
-                    data-testid="collapsed_submissions-header-item">
-                    Submissions
-                  </MenuItem>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <MenuItem
-                    component={RouterLink}
-                    to="/admin/tickets"
-                    id="menu_admin_tickets_sm"
-                    onClick={hideMobileMenu}
-                    data-testid="collapsed_admin-tickets-header-item">
-                    Tickets
-                  </MenuItem>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <MenuItem
-                    id="menu_admin_users_sm"
-                    component={RouterLink}
-                    to="/admin/users"
-                    onClick={hideMobileMenu}
-                    data-testid="collapsed_manage-users-header-item">
-                    Manage Users
-                  </MenuItem>
-                </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
                   <MenuItem
-                    id="menu_admin_policies_sm"
                     component={RouterLink}
-                    to="/admin/policies"
+                    to="/admin"
+                    id="menu_admin_sm"
                     onClick={hideMobileMenu}
-                    data-testid="collapsed_policies-header-item">
-                    Policies
-                  </MenuItem>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
-                  <MenuItem
-                    id="menu_admin_security_sm"
-                    component={RouterLink}
-                    to="/admin/security"
-                    onClick={hideMobileMenu}
-                    data-testid="collapsed_security-header-item">
-                    Security
-                  </MenuItem>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <MenuItem
-                    component={RouterLink}
-                    to="/admin/configuration"
-                    id="menu_admin_configuration_sm"
-                    onClick={hideMobileMenu}
-                    data-testid="collapsed_configuration-header-item">
-                    Configuration
+                    data-testid="collapsed_admin-header-item">
+                    Admin
                   </MenuItem>
                 </SystemRoleGuard>
                 <MenuItem
@@ -295,37 +245,9 @@ const Header = () => {
                     Portal
                   </RouterLink>
                 </AuthGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/submissions" id="menu_dashboard" data-testid="submissions-header-item">
-                    Submissions
-                  </RouterLink>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/tickets" id="menu_admin_tickets" data-testid="admin-tickets-header-item">
-                    Tickets
-                  </RouterLink>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/users" id="menu_admin_users" data-testid="manage-users-header-item">
-                    Manage Users
-                  </RouterLink>
-                </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
-                  <RouterLink to="/admin/policies" id="menu_admin_policies" data-testid="policies-header-item">
-                    Policies
-                  </RouterLink>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
-                  <RouterLink to="/admin/security" id="menu_admin_security" data-testid="security-header-item">
-                    Security
-                  </RouterLink>
-                </SystemRoleGuard>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink
-                    to="/admin/configuration"
-                    id="menu_admin_configuration"
-                    data-testid="configuration-header-item">
-                    Configuration
+                  <RouterLink to="/admin" id="menu_admin" data-testid="admin-header-item">
+                    Admin
                   </RouterLink>
                 </SystemRoleGuard>
                 <Button

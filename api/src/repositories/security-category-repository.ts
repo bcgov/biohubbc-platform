@@ -4,6 +4,7 @@ import { CountResult } from '../models/count';
 import {
   CreateSecurityCategory,
   SecurityCategory,
+  SecurityCategoryDetails,
   SecurityCategoryRecord,
   SecurityCategoryWithRuleCount,
   UpdateSecurityCategory
@@ -120,6 +121,42 @@ export class SecurityCategoryRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to insert security category', [
         'SecurityCategoryRepository->insertSecurityCategory',
         'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active security category by ID, with when it was created and the name of the user who created it.
+   *
+   * @param {number} securityCategoryId - The ID of the category to retrieve.
+   * @return {Promise<SecurityCategoryDetails>}
+   * @throws {ApiNotFoundError} If no active category exists for the ID.
+   * @memberof SecurityCategoryRepository
+   */
+  async getSecurityCategoryDetails(securityCategoryId: number): Promise<SecurityCategoryDetails> {
+    const knex = getKnex();
+
+    const query = knex
+      .from('security_category as sc')
+      .leftJoin('system_user as su', 'su.system_user_id', 'sc.create_user')
+      .select(
+        'sc.security_category_id',
+        'sc.name',
+        'sc.description',
+        'sc.create_date',
+        knex.raw('COALESCE(su.display_name, su.user_identifier) AS created_by_name')
+      )
+      .whereNull('sc.record_end_date')
+      .where('sc.security_category_id', securityCategoryId);
+
+    const response = await this.connection.knex(query, SecurityCategoryDetails);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Security category not found', [
+        'SecurityCategoryRepository->getSecurityCategoryDetails',
+        { securityCategoryId }
       ]);
     }
 

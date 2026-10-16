@@ -2,7 +2,6 @@ import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } fro
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-import Container from '@mui/material/Container';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -12,6 +11,8 @@ import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDat
 import { EditDialog } from 'components/dialog/EditDialog';
 import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import { POLICY_STATUS_COLORS, POLICY_STATUS_LABELS } from 'constants/policy';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
@@ -20,6 +21,7 @@ import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IServerPaginationProps } from 'types/pagination';
+import { getFormattedDate } from 'utils/Utils';
 import yup from 'utils/YupSchema';
 import { CreatePolicyForm } from './CreatePolicyForm';
 import { EditPolicyDialog } from './EditPolicyDialog';
@@ -237,36 +239,29 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
     {
       field: 'name',
       headerName: 'Name',
-      flex: 1,
-      minWidth: 150
+      flex: 1
     },
     {
-      field: 'description',
-      headerName: 'Description',
-      flex: 1,
-      minWidth: 200,
-      valueGetter: (value) => value || '-'
-    },
-    {
-      field: 'statements',
-      headerName: 'Statements',
-      flex: 2,
-      minWidth: 300,
+      field: 'status',
+      headerName: 'Status',
+      flex: 0.5,
       sortable: false,
       renderCell: (params) => (
-        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" height="100%">
-          {params.row.statements.length === 0 && '-'}
-          {params.row.statements.map((statement) => (
-            <Chip
-              key={statement.policy_statement_id}
-              size="small"
-              label={`${statement.effect}: ${statement.submission_feature_urn}`}
-              color={statement.effect === 'allow' ? 'success' : 'error'}
-              variant="outlined"
-            />
-          ))}
-        </Box>
+        <Chip
+          label={POLICY_STATUS_LABELS[params.row.status]}
+          size="small"
+          color={POLICY_STATUS_COLORS[params.row.status]}
+          sx={{ fontWeight: 700 }}
+        />
       )
+    },
+    {
+      field: 'record_end_date',
+      headerName: 'End Date',
+      flex: 0.5,
+      sortable: false,
+      valueFormatter: (value: string | null | undefined) =>
+        value ? getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, value) : null
     },
     {
       field: 'actions',
@@ -304,53 +299,51 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
 
   return (
     <>
-      <Container maxWidth="xl">
-        <PageSection
-          id="policies"
-          label={
-            <>
-              Active Policies{' '}
-              <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
-                ({rowCount})
-              </Typography>
-            </>
-          }
-          onAdd={() => setOpenAddPolicyDialog(true)}
-          headerContent={
-            <Stack gap={1} direction="row" alignItems="center">
-              <TextField
-                size="small"
-                placeholder="Search by policy name"
-                value={props.searchTerm}
-                onChange={(e) => props.onSearch(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Icon path={mdiMagnify} size={0.875} />
-                      </InputAdornment>
-                    )
-                  }
-                }}
-                sx={{ width: 250 }}
-              />
-            </Stack>
-          }>
-          <ServerPaginatedDataGrid<IPolicy>
-            dataTestId="active-policies-table"
-            rows={policies}
-            columns={columns}
-            getRowId={(row) => row.policy_id}
-            noRowsMessage="No Policies"
-            rowCount={rowCount}
-            paginationModel={paginationModel}
-            setPaginationModel={setPaginationModel}
-            sortModel={sortModel}
-            setSortModel={setSortModel}
-            onRowClick={(row) => navigate(`/admin/policy/${row.policy_id}`)}
-          />
-        </PageSection>
-      </Container>
+      <PageSection
+        id="policies"
+        label={
+          <>
+            Active Policies{' '}
+            <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+              ({rowCount})
+            </Typography>
+          </>
+        }
+        onAdd={() => setOpenAddPolicyDialog(true)}
+        headerContent={
+          <Stack gap={1} direction="row" alignItems="center">
+            <TextField
+              size="small"
+              placeholder="Search by policy name"
+              value={props.searchTerm}
+              onChange={(e) => props.onSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Icon path={mdiMagnify} size={0.875} />
+                    </InputAdornment>
+                  )
+                }
+              }}
+              sx={{ width: 250 }}
+            />
+          </Stack>
+        }>
+        <ServerPaginatedDataGrid<IPolicy>
+          dataTestId="active-policies-table"
+          rows={policies}
+          columns={columns}
+          getRowId={(row) => row.policy_id}
+          noRowsMessage="No Policies"
+          rowCount={rowCount}
+          paginationModel={paginationModel}
+          setPaginationModel={setPaginationModel}
+          sortModel={sortModel}
+          setSortModel={setSortModel}
+          onRowClick={(row) => navigate(`/admin/policy/${row.policy_id}`)}
+        />
+      </PageSection>
 
       <EditDialog
         isLoading={isLoading}

@@ -1,10 +1,9 @@
 import { reconcileAfterMutations } from 'hooks/useCoordinatedMutation';
 import { useQueryClient } from '@tanstack/react-query';
-import { IPolicyFormValues } from 'features/admin/policies/components/PolicyForm.interface';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTicketTimelineConfirmationDialog } from '../useTicketTimelineConfirmationDialog';
@@ -12,7 +11,7 @@ import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 
 /**
- * Data-request status and policy dialog handlers for the ticket timeline.
+ * Data-request status and navigation handlers for the ticket timeline.
  *
  * @returns Timeline data-request action state and handlers.
  */
@@ -24,11 +23,6 @@ export const useTicketTimelineDataRequestActions = () => {
   const queryClient = useQueryClient();
   const { ticketId, ticketQueryKey } = useTicketContext();
   const [updatingDataRequestId, setUpdatingDataRequestId] = useState<string | null>(null);
-  const [isEditPolicyDialogOpen, setIsEditPolicyDialogOpen] = useState(false);
-  const [selectedPolicy, setSelectedPolicy] = useState<IPolicy | null>(null);
-  const [selectedDataRequestId, setSelectedDataRequestId] = useState<string | null>(null);
-  const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
-  const [isSavingPolicy, setIsSavingPolicy] = useState(false);
 
   /**
    * Persist a data-request policy status transition and refresh the ticket.
@@ -135,132 +129,22 @@ export const useTicketTimelineDataRequestActions = () => {
   };
 
   /**
-   * Open the editable policy dialog for a data request.
+   * Open the administrative page of a data request.
    *
-   * Data-request items call this for review and view-policy actions that should allow editing. Optional initial values
-   * are merged into the fetched policy so requested data requests can enter the dialog as reviewed.
+   * Data-request items call this so users can review what was requested and its policy, which is reached from the
+   * data request's page.
    *
-   * @param {string} dataRequestId Identifier of the data request whose policy is being edited.
-   * @param {string} policyId Identifier of the policy to fetch.
-   * @param {Partial<IPolicyFormValues>} [initialValues] Optional form value overrides.
-   * @returns {Promise<void>} Resolves after the policy has loaded or an error has been shown.
-   */
-  const handleOpenPolicyDialog = async (
-    dataRequestId: string,
-    policyId: string,
-    initialValues?: Partial<IPolicyFormValues>
-  ) => {
-    try {
-      setIsLoadingPolicy(true);
-      const policy = await api.policies.getPolicy(policyId);
-      setSelectedPolicy({
-        ...policy,
-        name: initialValues?.name ?? policy.name,
-        description: initialValues?.description ?? policy.description,
-        status: initialValues?.status ?? policy.status
-      });
-      setSelectedDataRequestId(dataRequestId);
-      setIsEditPolicyDialogOpen(true);
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsLoadingPolicy(false);
-    }
-  };
-
-  /**
-   * Open the read-only finalized policy detail page for a data request.
-   *
-   * Finalized data-request items call this when users need to inspect approved or denied policy details without editing
-   * the policy body.
-   *
-   * @param {string} _dataRequestId Identifier of the data request whose policy is being viewed.
-   * @param {string} policyId Identifier of the policy to fetch.
+   * @param {string} dataRequestId Identifier of the data request to view.
    * @returns {void}
    */
-  const handleOpenPolicyDetailPage = (_dataRequestId: string, policyId: string) => {
-    navigate(`/admin/policy/${policyId}`);
-  };
-
-  /**
-   * Close the editable policy dialog and clear selected policy state.
-   *
-   * The dialog remains open while a save is active so an in-flight policy mutation cannot finish against cleared local
-   * selection state.
-   *
-   * @returns {void}
-   */
-  const handleClosePolicyDialog = () => {
-    if (isSavingPolicy) {
-      return;
-    }
-
-    setIsEditPolicyDialogOpen(false);
-    setSelectedPolicy(null);
-    setSelectedDataRequestId(null);
-  };
-
-  /**
-   * Save edited policy details from the policy dialog.
-   *
-   * The edit dialog calls this with form values. The handler persists policy metadata, preserves existing statements,
-   * refreshes the ticket and related policy queries, and closes the dialog on success.
-   *
-   * @param {IPolicyFormValues} values Current policy form values.
-   * @returns {Promise<void>} Resolves after the save attempt has completed.
-   */
-  const handleSavePolicy = async (values: IPolicyFormValues) => {
-    if (!selectedPolicy || !selectedDataRequestId) {
-      return;
-    }
-
-    try {
-      setIsSavingPolicy(true);
-
-      await api.policies.updatePolicy(selectedPolicy.policy_id, {
-        name: values.name,
-        description: values.description || undefined,
-        status: values.status
-      });
-
-      await queryClient.cancelQueries({ queryKey: ticketQueryKey, exact: true });
-      await reconcileAfterMutations(queryClient, ticketQueryKey, ticketQueryKey);
-      void refreshChangedQueries(queryClient, changedQueryKeys.dataRequest(ticketId), ticketQueryKey);
-
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: 'Updated policy'
-      });
-
-      setIsEditPolicyDialogOpen(false);
-      setSelectedPolicy(null);
-      setSelectedDataRequestId(null);
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsSavingPolicy(false);
-    }
+  const handleOpenDataRequestPage = (dataRequestId: string) => {
+    navigate(`/admin/data-requests/${dataRequestId}`);
   };
 
   return {
     updatingDataRequestId,
-    isEditPolicyDialogOpen,
-    selectedPolicy,
-    isLoadingPolicy,
-    isSavingPolicy,
     handleConfirmDataRequestStatusUpdate,
     handleConfirmResetToReviewed,
-    handleOpenPolicyDialog,
-    handleOpenPolicyDetailPage,
-    handleClosePolicyDialog,
-    handleSavePolicy
+    handleOpenDataRequestPage
   };
 };

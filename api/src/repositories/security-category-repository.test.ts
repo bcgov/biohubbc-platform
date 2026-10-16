@@ -72,6 +72,42 @@ describe('SecurityCategoryRepository', () => {
     });
   });
 
+  describe('getSecurityCategoryDetails', () => {
+    it('returns the active category with its creation details', async () => {
+      const mockRow = {
+        security_category_id: 1,
+        name: 'Health',
+        description: 'Health category',
+        create_date: '2026-01-02',
+        created_by_name: 'Test User'
+      };
+      const knex = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] });
+
+      const repo = new SecurityCategoryRepository(getMockDBConnection({ knex }));
+      const result = await repo.getSecurityCategoryDetails(1);
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"sc"."record_end_date" is null');
+      expect(bindings).to.eql([1]);
+      expect(result).to.eql(mockRow);
+    });
+
+    it('throws ApiNotFoundError if not found', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => ({ rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>)
+      });
+
+      const repo = new SecurityCategoryRepository(mockDBConnection);
+
+      try {
+        await repo.getSecurityCategoryDetails(999);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiGeneralError).message).to.equal('Security category not found');
+      }
+    });
+  });
+
   describe('updateSecurityCategory', () => {
     it('resolves without error on success', async () => {
       const mockDBConnection = getMockDBConnection({

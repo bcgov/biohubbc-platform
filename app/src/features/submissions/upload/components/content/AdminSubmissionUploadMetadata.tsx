@@ -60,7 +60,7 @@ export const AdminSubmissionUploadMetadata = ({ scope }: AdminSubmissionUploadMe
   ];
 
   return (
-    <PageSection id="submission-upload-metadata" label="Metadata">
+    <PageSection id="submission-upload-metadata" label="About">
       <CustomDataGrid
         autoHeight
         rows={rows}

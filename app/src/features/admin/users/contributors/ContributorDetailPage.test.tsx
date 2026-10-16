@@ -37,8 +37,8 @@ it('loads contributor details and scopes relationship management to the route id
   expect(screen.getByRole('link', { name: 'Contributors' })).toHaveAttribute('href', '/admin/users?tab=contributors');
   expect(screen.getByRole('tab', { name: 'Users' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.queryByText('Contributor ID: 7')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('tab', { name: 'Metadata' }));
-  const metadata = within(screen.getByRole('tabpanel', { name: 'Metadata' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'About' }));
+  const metadata = within(screen.getByRole('tabpanel', { name: 'About' }));
   expect(metadata.getByRole('heading', { name: 'About' })).toBeVisible();
   expect(metadata.getByRole('row', { name: 'contributor_id 7' })).toBeVisible();
   expect(metadata.getByRole('row', { name: 'client_id SIMS' })).toBeVisible();
