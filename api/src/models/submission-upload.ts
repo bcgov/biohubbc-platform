@@ -63,6 +63,23 @@ export interface AdminSubmissionUploadsResponse {
   pagination: ApiPaginationResults;
 }
 
+/** Filters of the administrative list of every submission's uploads. */
+export interface AdminSubmissionUploadListFilters {
+  keyword?: string;
+}
+
+/** Active upload fields shown in the administrative list of every upload, with the submission each belongs to. */
+export const AdminSubmissionUploadListItem = AdminSubmissionUpload.extend({
+  submission_id: z.number(),
+  submission_name: z.string()
+});
+export type AdminSubmissionUploadListItem = z.infer<typeof AdminSubmissionUploadListItem>;
+
+export interface AdminSubmissionUploadListResponse {
+  uploads: AdminSubmissionUploadListItem[];
+  pagination: ApiPaginationResults;
+}
+
 /**
  * Payload for creating a new SubmissionUpload
  */

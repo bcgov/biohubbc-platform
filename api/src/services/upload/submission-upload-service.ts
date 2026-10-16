@@ -5,6 +5,8 @@ import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { Blueprint } from '../../models/blueprint';
 import {
   AdminSubmissionUpload,
+  AdminSubmissionUploadListFilters,
+  AdminSubmissionUploadListResponse,
   AdminSubmissionUploadsResponse,
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -97,6 +99,24 @@ export class SubmissionUploadService extends DBService {
   ): Promise<AdminSubmissionUploadsResponse> {
     const uploads = await this.submissionUploadRepository.listAdminSubmissionUploads(submissionId, pagination);
     const total = await this.submissionUploadRepository.countAdminSubmissionUploads(submissionId);
+
+    return { uploads, pagination: makePaginationResponse(total, pagination) };
+  }
+
+  /**
+   * Retrieve a bounded page of the active uploads of every active submission for the administrative submissions page.
+   *
+   * @param {AdminSubmissionUploadListFilters} filters Optional keyword matched against the submission name.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<AdminSubmissionUploadListResponse>} Uploads and pagination totals, including empty pages.
+   * @memberof SubmissionUploadService
+   */
+  async getAdminSubmissionUploadList(
+    filters: AdminSubmissionUploadListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUploadListResponse> {
+    const uploads = await this.submissionUploadRepository.getAdminSubmissionUploadList(filters, pagination);
+    const total = await this.submissionUploadRepository.getAdminSubmissionUploadCount(filters);
 
     return { uploads, pagination: makePaginationResponse(total, pagination) };
   }

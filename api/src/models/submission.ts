@@ -1,8 +1,30 @@
 import { z } from 'zod';
 import type { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
+import { ApiPaginationResults } from '../zod-schema/pagination';
 
 export interface SubmissionFilters {
   search?: string;
+}
+
+/** Filters of the administrative list of every submission. */
+export interface AdminSubmissionListFilters {
+  keyword?: string;
+}
+
+/** One active submission as the administrative submissions list shows it. */
+export const AdminSubmissionListItem = z.object({
+  submission_id: z.number(),
+  uuid: z.string(),
+  name: z.string(),
+  contributor_name: z.string(),
+  submitted_timestamp: z.string(),
+  publish_timestamp: z.string().nullable()
+});
+export type AdminSubmissionListItem = z.infer<typeof AdminSubmissionListItem>;
+
+export interface AdminSubmissionListResponse {
+  submissions: AdminSubmissionListItem[];
+  pagination: ApiPaginationResults;
 }
 
 export interface SubmissionSummary {

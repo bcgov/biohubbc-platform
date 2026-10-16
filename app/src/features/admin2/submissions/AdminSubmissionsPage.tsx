@@ -5,22 +5,21 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { PrimaryButton } from 'components/button/PrimaryButton';
-import PublishedSubmissionsTable from 'features/admin/dashboard/components/PublishedSubmissionsTable';
-import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
-import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { AdminPageLayout } from 'layouts/AdminPageLayout';
-import { useState } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { AdminSubmissionsSubmissionsContent } from './content/AdminSubmissionsSubmissionsContent';
+import { AdminSubmissionsUploadsContent } from './content/AdminSubmissionsUploadsContent';
 
 /**
- * Administrative submissions page: submissions by review state, one tab per state, with only the selected list
- * mounted.
+ * Administrative submissions page: every submission in the system, and every upload across those submissions,
+ * through URL-addressable tabs. Only the selected tab's table is mounted, so only it loads.
  *
- * @returns {JSX.Element} Submission lists and creation controls.
+ * @returns {JSX.Element} Submissions tabs, the selected table and submission creation controls.
  */
 export const AdminSubmissionsPage = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'pending' | 'complete' | 'published'>('pending');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'uploads' ? 'uploads' : 'submissions';
 
   return (
     <AdminPageLayout
@@ -44,30 +43,22 @@ export const AdminSubmissionsPage = () => {
       }
       tabs={[
         {
-          value: 'pending',
-          label: 'Pending Review',
-          id: 'submission-pending-tab',
-          ariaControls: 'submission-tabpanel'
+          value: 'submissions',
+          label: 'Submissions',
+          id: 'submissions-submissions',
+          ariaControls: 'submissions-panel'
         },
-        {
-          value: 'complete',
-          label: 'Completed',
-          id: 'submission-complete-tab',
-          ariaControls: 'submission-tabpanel'
-        },
-        {
-          value: 'published',
-          label: 'Published',
-          id: 'submission-published-tab',
-          ariaControls: 'submission-tabpanel'
-        }
+        { value: 'uploads', label: 'Uploads', id: 'submissions-uploads', ariaControls: 'submissions-panel' }
       ]}
       activeTab={activeTab}
-      onTabChange={setActiveTab}>
-      <Box id="submission-tabpanel" role="tabpanel" aria-labelledby={`submission-${activeTab}-tab`}>
-        {activeTab === 'pending' && <UnreviewedSubmissionsTable />}
-        {activeTab === 'complete' && <ReviewedSubmissionsTable />}
-        {activeTab === 'published' && <PublishedSubmissionsTable />}
+      onTabChange={(value) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab', value);
+        setSearchParams(next);
+      }}>
+      <Box id="submissions-panel" role="tabpanel" aria-labelledby={`submissions-${activeTab}`}>
+        {activeTab === 'submissions' && <AdminSubmissionsSubmissionsContent />}
+        {activeTab === 'uploads' && <AdminSubmissionsUploadsContent />}
       </Box>
     </AdminPageLayout>
   );
