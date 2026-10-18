@@ -1,14 +1,19 @@
 # Default values for biohub-platform chart
 # This is a YAML-formatted file.
 
+# Disabled by default; static environment files enable the suspended CronJob.
+# Pass child-chart settings under biohub-platform-cronjobs.
+cronjobs:
+  enabled: false
+
 # Global configuration
 global:
   environment:
-    licensePlate: "a0ec71"
-    name: "" # Environment name (dev, test, prod)
-    id: "" # Environment id (PR, deploy)
-    changeId: "" # Change id (PR number)
-    ts: "" # Timestamp of the deployment
+    licensePlate: 'a0ec71'
+    name: '' # Environment name (dev, test, prod)
+    id: '' # Environment id (PR, deploy)
+    changeId: '' # Change id (PR number)
+    ts: '' # Timestamp of the deployment
 
   martin:
     # Key id for the RS256 tile token key pair. THE api SIGNS WITH IT AND THE GATEWAY VERIFIES
@@ -19,7 +24,7 @@ global:
     # It is also the FILE NAME inside the martin-token-public secret (`<keyId>.pem`); the gateway
     # refuses to boot if no such file is mounted. Rotation: publish the new public key, roll the
     # gateway, then change this one value. See infrastructure/martin/README.md.
-    keyId: "2026-07"
+    keyId: '2026-07'
 
 # Component configuration, passed through to the individual charts. Each key also carries the
 # `enabled` flag its Chart.yaml dependency condition reads.
@@ -29,11 +34,11 @@ global:
 app:
   enabled: true
   environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
+    licensePlate: 'a0ec71'
+    name: ''
+    id: ''
+    changeId: ''
+    ts: ''
   # Add any app-specific overrides here
 
 # Off by default: the biohub-platform-db image is built only by deploy.yml, for PR previews.
@@ -42,53 +47,53 @@ app:
 database:
   enabled: false
   environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
+    licensePlate: 'a0ec71'
+    name: ''
+    id: ''
+    changeId: ''
+    ts: ''
   app:
     name: biohub-platform-db
-    nodeEnv: ""
+    nodeEnv: ''
     timezone: America/Vancouver
-    postgresAdmin: ""
-    postgresAdminPassword: ""
-    postgresUser: ""
-    postgresUserPassword: ""
-    postgresUserApi: ""
-    postgresUserApiPassword: ""
-    postgresDb: ""
+    postgresAdmin: ''
+    postgresAdminPassword: ''
+    postgresUser: ''
+    postgresUserPassword: ''
+    postgresUserApi: ''
+    postgresUserApiPassword: ''
+    postgresDb: ''
     pgData: /var/lib/postgresql/data/17
   # Add any database-specific overrides here
 
 database-setup:
   enabled: true
   environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
+    licensePlate: 'a0ec71'
+    name: ''
+    id: ''
+    changeId: ''
+    ts: ''
   # Add any database-setup-specific overrides here
 
 api:
   enabled: true
   environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
+    licensePlate: 'a0ec71'
+    name: ''
+    id: ''
+    changeId: ''
+    ts: ''
   # Add any api-specific overrides here
 
 queue:
   enabled: true
   environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
+    licensePlate: 'a0ec71'
+    name: ''
+    id: ''
+    changeId: ''
+    ts: ''
   # Add any queue-specific overrides here
 
 # Drives the `martin.enabled` dependency condition only. Martin's own settings are routed by CHART
@@ -101,11 +106,11 @@ martin:
 # `biohub-platform-martin:`. The `martin:` key above only drives the `martin.enabled` condition.
 biohub-platform-martin:
   environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
+    licensePlate: 'a0ec71'
+    name: ''
+    id: ''
+    changeId: ''
+    ts: ''
 
 # Values passed to biohub-platform-queue subchart
 # Queue tuning overrides (optional)

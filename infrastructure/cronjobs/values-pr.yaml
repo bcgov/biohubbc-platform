@@ -1,0 +1,4 @@
+# Preview deployments do not create a scheduled refresh job.
+cronjob:
+  enabled: false
+  suspend: true
