@@ -1,4 +1,4 @@
-import { Container, Paper, Stack, Typography } from '@mui/material';
+import { Container, Divider, Paper, Stack, Typography } from '@mui/material';
 import { useCodesQuery } from 'hooks/useCodesQuery';
 import { useMemo } from 'react';
 import { SearchContainer } from './container/SearchContainer';
@@ -20,20 +20,25 @@ export const SearchPage = () => {
   const isLoading = !codesQuery.isFetched;
 
   return (
-    <Container maxWidth="md" sx={{ py: 10 }}>
-      <Paper
-        elevation={1}
-        variant="elevation"
-        sx={{
-          p: 4,
-          position: 'relative'
-        }}>
-        <Stack gap={3}>
-          <Typography variant="h2">Search Biodiversity Data</Typography>
-          <SearchContainer links={featureTypeLinks} isLoading={isLoading} />
-        </Stack>
-      </Paper>
-      <FeaturedDownloadsSection />
-    </Container>
+    <>
+      <Container maxWidth="md" sx={{ pt: 10 }}>
+        <Paper
+          elevation={1}
+          variant="elevation"
+          sx={{
+            p: 4,
+            position: 'relative'
+          }}>
+          <Stack gap={3}>
+            <Typography variant="h2">Search Biodiversity Data</Typography>
+            <SearchContainer links={featureTypeLinks} isLoading={isLoading} />
+          </Stack>
+        </Paper>
+      </Container>
+      <Divider sx={{ borderColor: '#003366', borderWidth: 1, my: 2 }} />
+      <Container maxWidth="md" sx={{ pb: 10, borderColor: '#003366', borderStyle: 'solid', borderWidth: 1 }}>
+        <FeaturedDownloadsSection />
+      </Container>
+    </>
   );
 };
