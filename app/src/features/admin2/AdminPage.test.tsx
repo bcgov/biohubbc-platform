@@ -29,6 +29,8 @@ describe('AdminPage', () => {
     const { getByRole } = renderContainer();
 
     expect(getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/admin/tickets');
+    expect(getByRole('link', { name: 'Boards' })).toHaveAttribute('href', '/admin/boards');
+    expect(getByRole('link', { name: 'Tags' })).toHaveAttribute('href', '/admin/tags');
     expect(getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/admin/users');
     expect(getByRole('link', { name: 'Submissions' })).toHaveAttribute('href', '/admin/submissions');
     expect(getByRole('link', { name: 'Security' })).toHaveAttribute('href', '/admin/security');

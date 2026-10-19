@@ -1,4 +1,5 @@
 import { useApi } from 'hooks/useApi';
+import { ITagSummary } from 'interfaces/useTagsApi.interface';
 import { IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
 import { ComponentProps } from 'react';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
@@ -32,8 +33,11 @@ const sampleTicket = {
   team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   create_date: '2026-03-01T00:00:00.000Z',
   priority: 'medium' as const,
-  status: 'open' as const
+  status: 'open' as const,
+  tags: [] as ITagSummary[]
 };
+const urgentTag: ITagSummary = { tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' };
+const mockGetTags = vi.fn();
 
 const apiMock = {
   tickets: {
@@ -41,6 +45,9 @@ const apiMock = {
     createTicket: mockCreateTicket,
     updateTicketStatus: mockUpdateTicketStatus,
     updateTicket: mockUpdateTicket
+  },
+  tags: {
+    getTags: mockGetTags
   }
 };
 
@@ -61,6 +68,7 @@ describe('AdminTicketsPage', () => {
     dialogs.create.mockReturnValue(null);
     dialogs.edit.mockReturnValue(null);
     mockUseApi.mockImplementation(() => apiMock);
+    mockGetTags.mockResolvedValue({ tags: [{ ...urgentTag, description: null, create_date: '2026-03-01' }] });
 
     mockGetTickets.mockResolvedValue({
       tickets: [sampleTicket],
@@ -232,6 +240,29 @@ describe('AdminTicketsPage', () => {
         { signal: expect.any(AbortSignal) }
       );
     });
+  });
+
+  it('filters the list by the picked tags, sending their ids as tag_ids', async () => {
+    mockGetTickets.mockResolvedValue({
+      tickets: [{ ...sampleTicket, tags: [urgentTag] }],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+    render(
+      <MemoryRouter>
+        <AdminTicketsPage />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Urgent')).toBeVisible();
+
+    fireEvent.mouseDown(screen.getByPlaceholderText('Filter by tag'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Urgent' }));
+
+    await waitFor(() =>
+      expect(mockGetTickets).toHaveBeenLastCalledWith(
+        { search: '', page: 1, limit: 10, sort: 'create_date', order: 'desc', tag_ids: ['tag-1'] },
+        { signal: expect.any(AbortSignal) }
+      )
+    );
   });
 
   it('renders only Tickets in the administrative tabs', async () => {

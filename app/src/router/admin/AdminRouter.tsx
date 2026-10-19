@@ -7,6 +7,7 @@ import { AdminDataRequestsPage } from 'features/admin2/data-requests/AdminDataRe
 import { AdminDataRequestPage } from 'features/admin2/data-requests/detail/AdminDataRequestPage';
 import { AdminDataRequestFeatureTypePage } from 'features/admin2/data-requests/detail/feature-type/AdminDataRequestFeatureTypePage';
 import { AdminSecurityPage } from 'features/admin2/security/AdminSecurityPage';
+import { AdminTagsPage } from 'features/admin2/tags/AdminTagsPage';
 import { AdminSecurityCategoryPage } from 'features/admin2/security/category/AdminSecurityCategoryPage';
 import { AdminUsersPage } from 'features/admin2/users/AdminUsersPage';
 import { AdminPage } from 'features/admin2/AdminPage';
@@ -21,6 +22,7 @@ import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
+import { BoardsRouter } from './board/BoardsRouter';
 import { SubmissionsRouter } from './submission/SubmissionRouter';
 import { TicketsRouter } from './ticket/TicketsRouter';
 
@@ -281,6 +283,40 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <TicketsRouter />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Boards route */}
+      <Route
+        path="boards/*"
+        element={
+          <BaseLayout>
+            <PageTitle title="Boards" description="Manage ticket boards" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <BoardsRouter />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Tags route */}
+      <Route
+        path="tags"
+        element={
+          <BaseLayout>
+            <PageTitle title="Tags" description="Manage ticket tags" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminTagsPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

@@ -8,8 +8,16 @@ import { hashKey, keepPreviousData, QueryKey, useQuery, useQueryClient } from '@
 import { TICKETS_LIST_DEFAULT_SORT } from 'constants/ticket';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
+import { useTagsQuery } from 'hooks/useTagsQuery';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
-import { IGetTicketsResponse, ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { ITagSummary } from 'interfaces/useTagsApi.interface';
+import {
+  IGetAdminTicketsResponse,
+  ITicket,
+  ITicketsQueryParams,
+  IUpdateTicketRequest,
+  TicketStatus
+} from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
 import { refreshChangedQueries } from 'utils/query-client';
 import {
@@ -26,7 +34,7 @@ import { ITicketFormValues } from 'features/admin/tickets/components/dialog/form
 import { TicketsContainer } from 'features/admin/tickets/list/TicketsContainer';
 
 /**
- * Administrative tickets page: the paginated ticket list in the shared administrative page layout.
+ * Administrative tickets page: the paginated ticket list in the shared administrative page layout, filterable by tag.
  *
  * Creating and editing refresh the server-sorted list once pending list mutations settle. Status toggles update
  * optimistically in place. Each change also refreshes the ticket's other cached copies: its detail pages, the
@@ -44,9 +52,14 @@ export const AdminTicketsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<ITicket | undefined>();
+  const [tagFilter, setTagFilter] = useState<ITagSummary[]>([]);
 
+  const tagsQuery = useTagsQuery();
   const grid = useServerPaginatedGridState({ defaultSort: TICKETS_LIST_DEFAULT_SORT });
-  const listParams = { search: grid.debouncedSearchTerm, ...grid.apiPagination };
+  const listParams: ITicketsQueryParams = { search: grid.debouncedSearchTerm, ...grid.apiPagination };
+  if (tagFilter.length) {
+    listParams.tag_ids = tagFilter.map((tag) => tag.tag_id);
+  }
   const ticketsQueryKey = ticketQueryKeys.list('admin', listParams);
   const ticketsQuery = useQuery({
     queryKey: ticketsQueryKey,
@@ -104,7 +117,7 @@ export const AdminTicketsPage = () => {
         holdReload(queryClient, ticketQueryKeys.lists('admin'), ticketQueryKeys.lists('admin'), false);
       }
       await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
-      const response = queryClient.setQueryData<IGetTicketsResponse>(
+      const response = queryClient.setQueryData<IGetAdminTicketsResponse>(
         listKey,
         (current) =>
           current && {
@@ -120,13 +133,13 @@ export const AdminTicketsPage = () => {
     onSuccess: async (updatedTicket, { ticket, nextStatus, listKey }, context) => {
       await cancelQueryForOptimisticUpdate(queryClient, listKey, ticketQueryKeys.lists('admin'));
       const currentRow = queryClient
-        .getQueryData<IGetTicketsResponse>(listKey)
+        .getQueryData<IGetAdminTicketsResponse>(listKey)
         ?.tickets.find((row) => row.ticket_id === ticket.ticket_id);
       if (currentRow !== context.optimisticRow) {
         holdReload(queryClient, ticketQueryKeys.lists('admin'), listKey);
       }
       // Preserve newer optimistic rows. Overlapping changes reconcile from the server after the group settles.
-      queryClient.setQueryData<IGetTicketsResponse>(
+      queryClient.setQueryData<IGetAdminTicketsResponse>(
         listKey,
         (current) =>
           current && {
@@ -156,7 +169,7 @@ export const AdminTicketsPage = () => {
     // Rows toggle independently, so the rollback touches only this toggle's row, and every failure is reported here.
     onError: (error, { ticket, listKey }, context) => {
       showApiErrorSnackbar(error);
-      queryClient.setQueryData<IGetTicketsResponse>(
+      queryClient.setQueryData<IGetAdminTicketsResponse>(
         listKey,
         (current) =>
           current && {
@@ -230,6 +243,17 @@ export const AdminTicketsPage = () => {
     [ticketsQueryKey, toggleStatus]
   );
 
+  /**
+   * Filters the list to tickets with any of the picked tags, from the first page.
+   *
+   * @param {ITagSummary[]} tags The picked tags; none lists every ticket.
+   * @returns {void}
+   */
+  const handleTagFilterChange = (tags: ITagSummary[]) => {
+    setTagFilter(tags);
+    grid.handlePaginationChange({ ...grid.paginationModel, page: 0 });
+  };
+
   const handleEditTicket = useCallback((ticket: ITicket) => {
     setSelectedTicket(ticket);
     setIsEditDialogOpen(true);
@@ -279,6 +303,9 @@ export const AdminTicketsPage = () => {
             onDeleteTicket: handleDeleteTicket
           }}
           onRowClick={(ticketId) => navigate(`/admin/tickets/${ticketId}`)}
+          tagOptions={tagsQuery.data?.tags ?? []}
+          tagFilter={tagFilter}
+          onTagFilterChange={handleTagFilterChange}
         />
       </AdminPageLayout>
 

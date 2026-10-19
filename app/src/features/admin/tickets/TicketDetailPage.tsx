@@ -13,14 +13,17 @@ import { TicketSkeleton } from './detail/skeleton/TicketSkeleton';
 import { TicketTimeline } from './detail/timeline/TicketTimeline';
 import { useTicketComment } from './hooks/useTicketComment';
 import { useTicketQuery } from './hooks/useTicketQuery';
+import { useTicketTagsQuery } from './hooks/useTicketTagsQuery';
 
 /**
- * Admin ticket detail page for viewing timeline activity and changing ticket status.
+ * Admin ticket detail page for viewing timeline activity and changing ticket status. The ticket's tag history, which
+ * only administrators see, is loaded here and merged into the shared timeline.
  *
  * @returns {JSX.Element}
  */
 export const TicketDetailPage = () => {
   const ticketQuery = useTicketQuery();
+  const ticketTagsQuery = useTicketTagsQuery();
   const { comment, setComment, isSavingComment, isUploadingAttachment, handleAddComment, handleUploadAttachment } =
     useTicketComment();
   const ticket = ticketQuery.data;
@@ -51,7 +54,7 @@ export const TicketDetailPage = () => {
                         alignItems: 'flex-start'
                       }}>
                       <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', sm: 0 } }}>
-                        <TicketTimeline ticket={ticket} />
+                        <TicketTimeline ticket={ticket} tagEvents={ticketTagsQuery.data?.events} />
                         {ticket.status === 'open' && (
                           <TicketComment
                             comment={comment}

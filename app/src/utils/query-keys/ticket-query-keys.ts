@@ -65,7 +65,22 @@ const artifacts = (ticketId: string, params: IGetTicketArtifactsQueryParams) =>
   [...artifactsAll(ticketId), params] as const;
 
 /**
+ * Key prefix of every ticket's tags and tag history.
+ *
+ * @returns The ticket tags key prefix.
+ */
+const tagsAll = () => [QUERY_KEY_ROOT.TICKET, 'tags'] as const;
+
+/**
+ * Key of one ticket's tags and tag history; tags are read through the administrative endpoints only.
+ *
+ * @param {string} ticketId The ticket.
+ * @returns The ticket tags key.
+ */
+const tags = (ticketId: string) => [...tagsAll(), ticketId] as const;
+
+/**
  * Query keys for tickets, ordered from broad to narrow so that each prefix names the set of queries a
  * change invalidates.
  */
-export const ticketQueryKeys = { all, lists, list, details, detail, artifactsAll, artifacts };
+export const ticketQueryKeys = { all, lists, list, details, detail, artifactsAll, artifacts, tagsAll, tags };

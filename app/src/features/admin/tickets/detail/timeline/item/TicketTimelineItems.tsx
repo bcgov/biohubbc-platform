@@ -3,6 +3,7 @@ import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomT
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { ITicketTagEvent } from 'interfaces/useTagsApi.interface';
 import {
   ITicketArtifact,
   ICreateSubmissionUploadReviewRequest,
@@ -11,14 +12,24 @@ import {
   TicketSubmissionUploadResponse
 } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
-import { CommentEvent, DataRequestEvent, StatusEvent, TimelineEvent, UploadEvent } from '../TicketTimeline.interface';
+import {
+  CommentEvent,
+  DataRequestEvent,
+  StatusEvent,
+  TagEvent,
+  TimelineEvent,
+  UploadEvent
+} from '../TicketTimeline.interface';
 import { TicketTimelineCommentItem } from './comment/TicketTimelineCommentItem';
 import { TicketTimelineDataRequestItem } from './data-request/TicketTimelineDataRequestItem';
 import { TicketTimelineStatusItem } from './status/TicketTimelineStatusItem';
+import { TicketTimelineTagItem } from './tag/TicketTimelineTagItem';
 import { TicketUploadTimelineItem } from './TicketUploadTimelineItem';
 
 interface ITicketTimelineItemsProps {
   ticket: ITicketExtended;
+  /** Administrative tag history, merged into the timeline by date; omitted on the portal. */
+  tagEvents?: ITicketTagEvent[];
   updatingDataRequestId: string | null;
   onArtifactLinkClick: (artifact: ITicketArtifact) => Promise<void>;
   onEditComment: (ticketCommentId: string) => void;
@@ -49,6 +60,7 @@ interface ITicketTimelineItemsProps {
 export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
   const {
     ticket,
+    tagEvents = [],
     updatingDataRequestId,
     onArtifactLinkClick,
     onEditComment,
@@ -97,6 +109,14 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
         id: `${upload.submission_id}-${upload.submission_upload_id}`,
         create_date: upload.create_date,
         upload
+      })
+    ),
+    ...tagEvents.map(
+      (tagEvent): TagEvent => ({
+        kind: 'tag',
+        id: `${tagEvent.ticket_tag_id}-${tagEvent.action}`,
+        create_date: tagEvent.event_date,
+        tag_event: tagEvent
       })
     )
   ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime());
@@ -174,6 +194,23 @@ export const TicketTimelineItems = (props: ITicketTimelineItemsProps) => {
               onArtifactLinkClick={onArtifactLinkClick}
               onEdit={onEditComment}
               onDelete={onDeleteComment}
+              dateLabel={
+                getRelativeTimeLabel(item.create_date, {
+                  maxRelativeDays: 30,
+                  absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
+                }) ?? ''
+              }
+            />
+          )
+        };
+
+      case 'tag':
+        return {
+          id: item.id,
+          icon: <Icon path={TICKET_TIMELINE_ICONS.tag} size={0.75} />,
+          children: (
+            <TicketTimelineTagItem
+              tagEvent={item.tag_event}
               dateLabel={
                 getRelativeTimeLabel(item.create_date, {
                   maxRelativeDays: 30,

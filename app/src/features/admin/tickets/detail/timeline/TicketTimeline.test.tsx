@@ -4,6 +4,7 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useConfigContext, useDialogContext, useTicketContext } from 'hooks/useContext';
+import { ITicketTagEvent } from 'interfaces/useTagsApi.interface';
 import { ITicketArtifact, ITicketExtended, TicketSubmissionUploadResponse } from 'interfaces/useTicketsApi.interface';
 import { MemoryRouter } from 'react-router-dom';
 import { createTestQueryClient } from 'test-helpers/query-client';
@@ -387,5 +388,39 @@ describe('TicketTimeline', () => {
     await user.click(screen.getByText('Ingested'));
 
     expect(getSubmissionUploadProcessingStatusHistory).not.toHaveBeenCalled();
+  });
+  it('merges the tag events it is given into the timeline by date', () => {
+    const ticket = makeTicket();
+    queryClient.setQueryData(ticketQueryKey, ticket);
+    const tagEvent: ITicketTagEvent = {
+      ticket_tag_id: '88888888-8888-4888-8888-888888888888',
+      tag_id: '99999999-9999-4999-8999-999999999999',
+      tag_name: 'Urgent',
+      tag_color: '#D8292F',
+      action: 'removed',
+      user_identifier: 'sarah@example.com',
+      event_date: '2026-02-24T00:00:00.000Z'
+    };
+
+    render(
+      <MemoryRouter>
+        <TicketTimeline ticket={ticket} tagEvents={[tagEvent]} />
+      </MemoryRouter>,
+      { queryClient }
+    );
+
+    const tagChip = screen.getByText('Urgent');
+    expect(tagChip).toBeVisible();
+    expect(screen.getByText('removed by sarah@example.com')).toBeVisible();
+    // The tag was removed before the comment was posted, so it is listed first.
+    expect(tagChip.compareDocumentPosition(screen.getByText('Original comment'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('shows no tag events when none are given, as on the portal', () => {
+    renderTicketTimeline(makeTicket(), queryClient);
+
+    expect(screen.queryByText(/added by|removed by/)).not.toBeInTheDocument();
   });
 });

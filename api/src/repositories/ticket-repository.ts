@@ -2,9 +2,17 @@ import { Knex } from 'knex';
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { CreateTicketPayload, Ticket, TicketFilters, TicketSlug, UpdateTicketRequest } from '../models/ticket';
+import {
+  CreateTicketPayload,
+  Ticket,
+  TicketFilters,
+  TicketSlug,
+  TicketWithTags,
+  UpdateTicketRequest
+} from '../models/ticket';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
+import { activeTicketTagsJson } from './sql-fragments';
 
 const TICKET_COLUMNS = [
   'ticket_id',
@@ -41,6 +49,25 @@ export class TicketRepository extends BaseRepository {
       query = query.andWhere((builder) => {
         builder.whereILike('subject', search).orWhereILike('ticket_slug', search).orWhereILike('description', search);
       });
+    }
+
+    if (filters?.tag_ids !== undefined) {
+      // Any match: the ticket has at least one active link to an active tag in the filter.
+      const knex = getKnex();
+      const tagIds = filters.tag_ids;
+
+      query =
+        tagIds.length === 0
+          ? query.whereRaw('false')
+          : query.whereExists(
+              knex('ticket_tag')
+                .select(knex.raw('1'))
+                .join('tag', 'tag.tag_id', 'ticket_tag.tag_id')
+                .whereRaw('ticket_tag.ticket_id = ticket.ticket_id')
+                .whereIn('ticket_tag.tag_id', tagIds)
+                .whereNull('ticket_tag.record_end_date')
+                .whereNull('tag.record_end_date')
+            );
     }
 
     return query;
@@ -173,6 +200,28 @@ export class TicketRepository extends BaseRepository {
     query = this.applyPagination(query, pagination);
 
     const response = await this.connection.knex(query, Ticket);
+
+    return response.rows;
+  }
+
+  /**
+   * List active tickets with their active admin-only tags, with optional filters.
+   *
+   * @param {TicketFilters} [filters] - Optional list filters.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @returns {Promise<TicketWithTags[]>} Matching tickets with tags.
+   * @memberof TicketRepository
+   */
+  async getTicketsWithTags(filters?: TicketFilters, pagination?: ApiPaginationOptions): Promise<TicketWithTags[]> {
+    const knex = getKnex();
+    let query = knex
+      .table('ticket')
+      .select([...TICKET_COLUMNS, knex.raw(`${activeTicketTagsJson('ticket.ticket_id')} AS tags`)])
+      .whereNull('record_end_date');
+    query = this.applyFilters(query, filters);
+    query = this.applyPagination(query, pagination);
+
+    const response = await this.connection.knex(query, TicketWithTags);
 
     return response.rows;
   }
