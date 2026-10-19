@@ -20,6 +20,7 @@ import {
   SubmissionUploadDecisionHistoryRow,
   SubmissionUploadDecisionRow
 } from '../../models/submission-upload-decision';
+import { TicketSubmissionUploadScope } from '../../models/tag-rule';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -434,6 +435,25 @@ export class SubmissionUploadRepository extends BaseRepository {
     query = this.applyPagination(query, pagination);
 
     const response = await this.connection.knex(query, SubmissionUpload);
+
+    return response.rows;
+  }
+
+  /**
+   * Get the submission and upload ids of a ticket's active submission uploads.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<TicketSubmissionUploadScope[]>} Active upload scopes of the ticket.
+   * @memberof SubmissionUploadRepository
+   */
+  async getActiveSubmissionUploadScopesByTicketId(ticketId: string): Promise<TicketSubmissionUploadScope[]> {
+    const knex = getKnex();
+    const query = knex('submission_upload')
+      .select('submission_id', 'submission_upload_id')
+      .where('ticket_id', ticketId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, TicketSubmissionUploadScope);
 
     return response.rows;
   }

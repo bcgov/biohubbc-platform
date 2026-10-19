@@ -71,6 +71,10 @@ vi.mock('features/admin2/configuration/AdminConfigurationPage', () => ({
   AdminConfigurationPage: () => <div data-testid="configuration-page" />
 }));
 
+vi.mock('./tag-rule/TagRulesRouter', () => ({
+  TagRulesRouter: () => <div data-testid="tag-rules-router" />
+}));
+
 vi.mock('features/admin/configuration/blueprint/BlueprintPage', () => ({
   BlueprintPage: () => <div data-testid="blueprint-page" />
 }));
@@ -92,7 +96,9 @@ describe('AdminRouter access guards', () => {
   for (const [path, testId] of [
     ['/admin/configuration', 'configuration-page'],
     ['/admin/configuration/blueprints/1', 'blueprint-page'],
-    ['/admin/tickets/boards/board-1', 'tickets-router']
+    ['/admin/tickets/boards/board-1', 'tickets-router'],
+    ['/admin/tag-rules', 'tag-rules-router'],
+    ['/admin/tag-rules/new', 'tag-rules-router']
   ]) {
     it(`allows system administrators at ${path}`, async () => {
       const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);

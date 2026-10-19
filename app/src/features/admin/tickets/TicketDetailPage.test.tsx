@@ -294,6 +294,7 @@ describe('TicketDetailPage', () => {
       tag_color: '#D8292F',
       action: 'added',
       user_identifier: 'Sarah',
+      tag_rule_name: null,
       event_date: '2026-02-24T06:00:00.000Z'
     };
     mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket));

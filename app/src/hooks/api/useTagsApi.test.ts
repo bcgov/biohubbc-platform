@@ -13,7 +13,7 @@ const tag: ITag = {
   create_date: '2026-10-01T00:00:00.000Z'
 };
 const ticketTags: ITicketTagsResponse = {
-  tags: [{ tag_id: tagId, name: 'Urgent', color: '#D8292F' }],
+  tags: [{ tag_id: tagId, name: 'Urgent', color: '#D8292F', tag_rule_id: null, tag_rule_name: null }],
   events: [
     {
       ticket_tag_id: '33333333-3333-4333-8333-333333333333',
@@ -22,6 +22,7 @@ const ticketTags: ITicketTagsResponse = {
       tag_color: '#D8292F',
       action: 'added',
       user_identifier: 'sarah',
+      tag_rule_name: null,
       event_date: '2026-10-02T00:00:00.000Z'
     }
   ]

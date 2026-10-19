@@ -9,9 +9,9 @@ import { TAG_SEARCH_LIMIT } from 'constants/tag';
 import { useApi } from 'hooks/useApi';
 import useDebouncedValue from 'hooks/useDebouncedValue';
 import { ITagSummary, ITagsQueryParams } from 'interfaces/useTagsApi.interface';
-import { SyntheticEvent, useState } from 'react';
+import { Fragment, ReactNode, SyntheticEvent, useState } from 'react';
 import { tagQueryKeys } from 'utils/query-keys/tag-query-keys';
-import { TagChip } from './TagChip';
+import { ITagChipProps, TagChip } from './TagChip';
 
 export interface ITagAutocompleteProps {
   id: string;
@@ -24,6 +24,8 @@ export interface ITagAutocompleteProps {
   disabled?: boolean;
   size?: 'small' | 'medium';
   sx?: SxProps<Theme>;
+  /** Renders a picked tag's chip, given the chip props the autocomplete supplies; defaults to a `TagChip`. */
+  renderTagChip?: (tag: ITagSummary, chipProps: Omit<ITagChipProps, 'tag'>) => ReactNode;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface ITagAutocompleteProps {
  * @returns {JSX.Element} The tag multi-select.
  */
 export const TagAutocomplete = (props: ITagAutocompleteProps) => {
-  const { id, label, placeholder, value, onChange, disabled, size, sx } = props;
+  const { id, label, placeholder, value, onChange, disabled, size, sx, renderTagChip } = props;
   const api = useApi();
 
   const [inputValue, setInputValue] = useState('');
@@ -91,8 +93,12 @@ export const TagAutocomplete = (props: ITagAutocompleteProps) => {
       onChange={(_event, tags) => onChange(tags)}
       renderValue={(tags, getItemProps) =>
         tags.map((tag, index) => {
-          const { key, ...itemProps } = getItemProps({ index });
-          return <TagChip {...itemProps} key={key} tag={tag} />;
+          const { key, ...chipProps } = getItemProps({ index });
+          return (
+            <Fragment key={key}>
+              {renderTagChip ? renderTagChip(tag, chipProps) : <TagChip {...chipProps} tag={tag} />}
+            </Fragment>
+          );
         })
       }
       renderOption={(optionProps, option, { selected }) => {

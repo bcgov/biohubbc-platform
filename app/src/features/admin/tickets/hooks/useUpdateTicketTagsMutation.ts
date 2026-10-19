@@ -6,7 +6,7 @@ import {
   holdReloadIfConcurrent,
   useCoordinatedMutation
 } from 'hooks/useCoordinatedMutation';
-import { ITagSummary, ITicketTagsResponse } from 'interfaces/useTagsApi.interface';
+import { ITagSummary, ITicketTag, ITicketTagsResponse } from 'interfaces/useTagsApi.interface';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
@@ -39,7 +39,22 @@ export const useUpdateTicketTagsMutation = () => {
       holdReloadIfConcurrent(queryClient, tagsQueryKey, tagsQueryKey);
       await cancelQueryForOptimisticUpdate(queryClient, tagsQueryKey, tagsQueryKey);
       const previous = queryClient.getQueryData<ITicketTagsResponse>(tagsQueryKey);
-      queryClient.setQueryData<ITicketTagsResponse>(tagsQueryKey, (current) => current && { ...current, tags });
+      const previousTagsById = new Map(previous?.tags.map((ticketTag) => [ticketTag.tag_id, ticketTag]));
+      // A kept tag keeps its rule attribution; a newly picked tag is added by hand.
+      const nextTags = tags.map(
+        (tag): ITicketTag =>
+          previousTagsById.get(tag.tag_id) ?? {
+            tag_id: tag.tag_id,
+            name: tag.name,
+            color: tag.color,
+            tag_rule_id: null,
+            tag_rule_name: null
+          }
+      );
+      queryClient.setQueryData<ITicketTagsResponse>(
+        tagsQueryKey,
+        (current) => current && { ...current, tags: nextTags }
+      );
       return { previous };
     },
     onSuccess: async (saved) => {

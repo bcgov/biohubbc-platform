@@ -24,6 +24,7 @@ import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
+import { useTagRulesApi } from './api/useTagRulesApi';
 import { useTagsApi } from './api/useTagsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
@@ -81,6 +82,8 @@ export const useApi = () => {
 
   const tags = useTagsApi(apiAxios);
 
+  const tagRules = useTagRulesApi(apiAxios);
+
   const boards = useBoardsApi(apiAxios);
 
   const dataRequest = useDataRequestApi(apiAxios);
@@ -125,6 +128,7 @@ export const useApi = () => {
     teamPolicies,
     tickets,
     tags,
+    tagRules,
     boards,
     dataRequest,
     apiKeys,

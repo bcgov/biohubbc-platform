@@ -6,17 +6,23 @@ import { SubmissionFeaturePropertyIngestionService } from '../../services/ingest
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-import { publishComputeSubmissionFeatureClosureJob, publishSubmissionUploadSecurityJob } from '../publisher';
+import {
+  publishComputeSubmissionFeatureClosureJob,
+  publishEvaluateTicketTagRulesJob,
+  publishSubmissionUploadSecurityJob
+} from '../publisher';
 import { withConnection } from '../with-connection';
 
 export interface IndexSubmissionFeaturesJobDependencies {
   publishComputeSubmissionFeatureClosureJob: typeof publishComputeSubmissionFeatureClosureJob;
   publishSubmissionUploadSecurityJob: typeof publishSubmissionUploadSecurityJob;
+  publishEvaluateTicketTagRulesJob: typeof publishEvaluateTicketTagRulesJob;
 }
 
 export const indexSubmissionFeaturesJobDependencies: IndexSubmissionFeaturesJobDependencies = {
   publishComputeSubmissionFeatureClosureJob,
-  publishSubmissionUploadSecurityJob
+  publishSubmissionUploadSecurityJob,
+  publishEvaluateTicketTagRulesJob
 };
 
 /**
@@ -112,13 +118,15 @@ async function executeIndexSubmissionFeaturesIngestion(
  *
  * Outcome handling:
  * - `invalid`: mark upload `invalid` and log validation counts
- * - otherwise: mark upload `indexed` and queue the closure recompute and automatic security screening
+ * - otherwise: mark upload `indexed` and queue the closure recompute, automatic security screening, and tag rule
+ *   evaluation for the upload's ticket
  *
  * This is the stage-commit step after heavy indexing work has finished.
  *
  * @param {IDBConnection} connection Active database connection.
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
+ * @param {string} ticketId The upload's ticket, whose tag rules are evaluated once indexing succeeds.
  * @param {string} jobId Job identifier.
  * @param {SubmissionFeaturePropertyValidationOutcome} outcome Indexing outcome.
  * @returns {Promise<void>}
@@ -127,6 +135,7 @@ async function finalizeIndexSubmissionFeaturesStage(
   connection: IDBConnection,
   submissionId: number,
   submissionUploadId: string,
+  ticketId: string,
   jobId: string,
   outcome: SubmissionFeaturePropertyValidationOutcome
 ): Promise<void> {
@@ -166,6 +175,10 @@ async function finalizeIndexSubmissionFeaturesStage(
     submissionUploadId
   });
 
+  // Tag rules match the upload's own indexed features, like screening, so evaluation depends on indexing alone and
+  // runs independently of screening. Reindexing reaches this point again; rules never re-add a removed tag.
+  await indexSubmissionFeaturesJobDependencies.publishEvaluateTicketTagRulesJob(connection, { ticketId });
+
   defaultLog.info({
     label: 'finalizeIndexSubmissionFeaturesStage',
     message: 'Index submission features job completed successfully',
@@ -201,7 +214,14 @@ async function runIndexSubmissionFeaturesStage(submissionUploadId: string, jobId
 
     const submissionId = upload.submission_id;
     const outcome = await executeIndexSubmissionFeaturesIngestion(connection, submissionId, submissionUploadId);
-    await finalizeIndexSubmissionFeaturesStage(connection, submissionId, submissionUploadId, jobId, outcome);
+    await finalizeIndexSubmissionFeaturesStage(
+      connection,
+      submissionId,
+      submissionUploadId,
+      upload.ticket_id,
+      jobId,
+      outcome
+    );
   });
 }
 

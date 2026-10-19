@@ -5,6 +5,7 @@ import { Tag, TagFilters, TagRequest } from '../models/tag';
 import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
 import { BoardTagRepository } from '../repositories/board-tag-repository';
 import { TagRepository } from '../repositories/tag-repository';
+import { TagRuleRepository } from '../repositories/tag-rule-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { getUnique } from '../utils/unique';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -18,6 +19,7 @@ export class TagService extends DBService {
   ticketTagRepository: TicketTagRepository;
   boardTagRepository: BoardTagRepository;
   boardSwimlaneTagRepository: BoardSwimlaneTagRepository;
+  tagRuleRepository: TagRuleRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -25,6 +27,7 @@ export class TagService extends DBService {
     this.ticketTagRepository = new TicketTagRepository(connection);
     this.boardTagRepository = new BoardTagRepository(connection);
     this.boardSwimlaneTagRepository = new BoardSwimlaneTagRepository(connection);
+    this.tagRuleRepository = new TagRuleRepository(connection);
   }
 
   /**
@@ -82,7 +85,7 @@ export class TagService extends DBService {
   }
 
   /**
-   * Soft delete a tag and every active link to it from tickets, boards, and board swimlanes.
+   * Soft delete a tag, its tag rules, and every active link to it from tickets, boards, and board swimlanes.
    *
    * @param {string} tagId - Tag UUID.
    * @returns {Promise<void>}
@@ -96,6 +99,7 @@ export class TagService extends DBService {
     await this.boardSwimlaneTagRepository.deleteBoardSwimlaneTagsByTagId(tagId);
     await this.boardTagRepository.deleteBoardTagsByTagId(tagId);
     await this.ticketTagRepository.deleteTicketTagsByTagId(tagId);
+    await this.tagRuleRepository.deleteTagRulesByTagId(tagId);
     await this.tagRepository.deleteTag(tagId);
   }
 

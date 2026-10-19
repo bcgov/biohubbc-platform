@@ -9,7 +9,10 @@ vi.mock('hooks/useApi', () => ({
 }));
 
 const TICKET_ID = '11111111-1111-1111-1111-111111111111';
-const ticketTags = { tags: [{ tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' }], events: [] };
+const ticketTags = {
+  tags: [{ tag_id: 'tag-1', name: 'Urgent', color: '#D8292F', tag_rule_id: null, tag_rule_name: null }],
+  events: []
+};
 
 /**
  * Renders the ticket tags query inside a ticket route and the given context provider.

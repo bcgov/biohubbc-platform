@@ -214,6 +214,14 @@ const ticketTags = () => [ticketQueryKeys.lists('admin')];
 const tag = () => [tagQueryKeys.all(), ticketQueryKeys.tagsAll(), ticketQueryKeys.lists('admin'), boardQueryKeys.all()];
 
 /**
+ * A tag rule's creation, change or removal: the tag rule list and details, and, because deleting a rule may remove the
+ * tags it applied, every ticket's tags with the administrative ticket lists that show them.
+ *
+ * @returns The keys to refresh.
+ */
+const tagRule = () => [tagQueryKeys.rules(), ticketQueryKeys.tagsAll(), ...ticketTags()];
+
+/**
  * A board's details, tags or removal: the board list and detail, and the board's tag and ticket lists, which its tags
  * decide.
  *
@@ -247,5 +255,6 @@ export const changedQueryKeys = {
   downloadExport,
   ticketTags,
   tag,
+  tagRule,
   board
 };
