@@ -16,14 +16,15 @@ import {
  */
 export const useTagsApi = (axios: AxiosInstance) => {
   /**
-   * Get every tag, ordered by name, optionally filtered by a name search.
+   * Get one page of tags, ordered by name unless a sort is given, optionally filtered by a name search or a board.
+   * The server returns its default page size when no page is given.
    *
-   * @param {ITagsQueryParams} [params] Optional name search.
+   * @param {ITagsQueryParams} params Name search, board, page and sort.
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @return {*} {Promise<IGetTagsResponse>}
+   * @return {*} {Promise<IGetTagsResponse>} The page of tags with server pagination totals.
    */
   const getTags = async (
-    params?: ITagsQueryParams,
+    params: ITagsQueryParams,
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<IGetTagsResponse> => {
     const { data } = await axios.get<IGetTagsResponse>('/api/administrative/tags', { params, ...options });

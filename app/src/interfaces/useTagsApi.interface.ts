@@ -1,3 +1,5 @@
+import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
+
 /** A tag as shown on tickets, boards and swimlanes: enough to render its chip. */
 export interface ITagSummary {
   tag_id: string;
@@ -28,12 +30,15 @@ export interface ITicketTagEvent {
   event_date: string;
 }
 
-export interface ITagsQueryParams {
+export interface ITagsQueryParams extends Partial<ApiPaginationRequestOptions> {
   search?: string;
+  /** Only the tags on this board. */
+  board_id?: string;
 }
 
 export interface IGetTagsResponse {
   tags: ITag[];
+  pagination: ApiPaginationResponseParams;
 }
 
 /** A tag's complete editable fields, sent when creating a tag or replacing an existing one. */

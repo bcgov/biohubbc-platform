@@ -2,11 +2,14 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
+import { BoardFilters } from '../../../models/board';
 import { BoardDetailSchema, BoardListResponseSchema, BoardRequestSchema } from '../../../openapi/schemas/board';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { BoardService } from '../../../services/board-service';
 import { getLogger } from '../../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/boards');
 
@@ -18,9 +21,19 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'List active ticket boards with their tags and swimlane count.',
+  description: 'List active ticket boards with their tags and swimlane count, optionally filtered by name.',
   tags: ['boards'],
   security: [{ Bearer: [] }],
+  parameters: [
+    {
+      in: 'query',
+      name: 'search',
+      required: false,
+      schema: { type: 'string' },
+      description: 'Optional case-insensitive search on board name.'
+    },
+    ...paginationRequestQueryParamSchema
+  ],
   responses: {
     200: {
       description: 'Boards retrieved successfully',
@@ -67,11 +80,17 @@ export function getBoards(): RequestHandler {
       await connection.open();
 
       const boardService = new BoardService(connection);
-      const boards = await boardService.getBoards();
+      const filters: BoardFilters = { search: req.query.search as string | undefined };
+      const pagination = makePaginationOptionsFromRequest(req);
+
+      const [boards, count] = await Promise.all([
+        boardService.getBoards(filters, pagination),
+        boardService.getBoardsCount(filters)
+      ]);
 
       await connection.commit();
 
-      return res.status(200).json({ boards });
+      return res.status(200).json({ boards, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'getBoards', message: 'error', error });
       await connection.rollback();

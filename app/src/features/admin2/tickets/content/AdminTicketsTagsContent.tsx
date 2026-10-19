@@ -1,45 +1,39 @@
-import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
+import { TagDialog } from 'features/admin2/tags/dialog/TagDialog';
+import { ITagFormValues } from 'features/admin2/tags/form/TagForm';
+import { AdminTagsTable } from 'features/admin2/tags/table/AdminTagsTable';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDebouncedValue from 'hooks/useDebouncedValue';
-import { ITag } from 'interfaces/useTagsApi.interface';
-import { AdminPageLayout } from 'layouts/AdminPageLayout';
+import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
+import { ITag, ITagsQueryParams } from 'interfaces/useTagsApi.interface';
 import { useCallback, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { tagQueryKeys } from 'utils/query-keys/tag-query-keys';
-import { TagDialog } from './dialog/TagDialog';
-import { ITagFormValues } from './form/TagForm';
-import { AdminTagsTable } from './table/AdminTagsTable';
 
 /**
- * Administrative tags page: the searchable list of ticket tags, with create, edit and delete.
+ * Tags tab of the administrative tickets page: the searchable, server-paginated list of ticket tags, with create,
+ * edit and delete.
  *
  * A save keeps its dialog open and shows the server's error, such as a duplicate name, in the dialog. Deleting a tag
- * removes it from every ticket, board and swimlane, so its confirmation says so; tag changes refresh everything that
- * shows tags.
+ * removes it from every ticket and board, so its confirmation says so; tag changes refresh everything that shows tags.
  *
- * @returns {JSX.Element} The tags page.
+ * @returns {JSX.Element} The tags table and its dialogs.
  */
-export const AdminTagsPage = () => {
+export const AdminTicketsTagsContent = () => {
   const api = useApi();
   const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
 
-  const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<ITag | undefined>();
 
-  const debouncedSearchTerm = useDebouncedValue(searchTerm);
-  const listParams = { search: debouncedSearchTerm || undefined };
+  const grid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
+  const listParams: ITagsQueryParams = { search: grid.debouncedSearchTerm, ...grid.apiPagination };
   const tagsQuery = useQuery({
     queryKey: tagQueryKeys.list(listParams),
     queryFn: ({ signal }) => api.tags.getTags(listParams, { signal }),
@@ -97,7 +91,7 @@ export const AdminTagsPage = () => {
   }, []);
 
   /**
-   * Asks for confirmation before deleting a tag, which also removes it from every ticket, board and swimlane.
+   * Asks for confirmation before deleting a tag, which also removes it from every ticket and board.
    *
    * @param {ITag} tag The tag to delete.
    * @returns {void}
@@ -111,8 +105,8 @@ export const AdminTagsPage = () => {
         dialogTitle: 'Delete tag?',
         dialogContent: (
           <Typography component="div" color="textSecondary">
-            Deleting tag <strong>{tag.name}</strong> removes it from all tickets, boards and swimlanes. This cannot be
-            undone. Are you sure you want to proceed?
+            Deleting tag <strong>{tag.name}</strong> removes it from all tickets and boards. This cannot be undone. Are
+            you sure you want to proceed?
           </Typography>
         ),
         yesButtonLabel: 'Delete Tag',
@@ -129,56 +123,42 @@ export const AdminTagsPage = () => {
     [deleteTag, dialogContext]
   );
 
-  const tags = tagsQuery.data?.tags ?? [];
+  const rowCount = tagsQuery.data?.pagination.total ?? 0;
 
   return (
     <>
-      <AdminPageLayout
-        title="Tags"
-        breadcrumbs={
-          <Breadcrumbs aria-label="tags breadcrumb">
-            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
-              Administration
-            </Link>
-            <Typography variant="inherit" color="text.primary" aria-current="page">
-              Tags
+      <QueryErrorDialog error={tagsQuery.error} label="tags" />
+      <PageSection
+        id="tags"
+        label={
+          <>
+            Tags{' '}
+            <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
+              ({rowCount})
             </Typography>
-          </Breadcrumbs>
+          </>
         }
-        tabs={[{ value: 'tags', label: 'Tags', id: 'tags-tab', ariaControls: 'tags-panel' }]}
-        activeTab="tags"
-        onTabChange={() => {}}>
-        <Box id="tags-panel" role="tabpanel" aria-labelledby="tags-tab">
-          <QueryErrorDialog error={tagsQuery.error} label="tags" />
-          <PageSection
-            id="tags"
-            label={
-              <>
-                Tags{' '}
-                <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-                  ({tags.length})
-                </Typography>
-              </>
-            }
-            onAdd={() => setIsDialogOpen(true)}
-            addLabel="New Tag"
-            headerContent={
-              <SearchTextField
-                size="small"
-                placeholder="Search by tag name"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-            }>
-            <AdminTagsTable
-              tags={tags}
-              isLoading={tagsQuery.isPending}
-              onEditTag={handleEditTag}
-              onDeleteTag={handleDeleteTag}
-            />
-          </PageSection>
-        </Box>
-      </AdminPageLayout>
+        onAdd={() => setIsDialogOpen(true)}
+        addLabel="New Tag"
+        headerContent={
+          <SearchTextField
+            size="small"
+            placeholder="Search by tag name"
+            value={grid.searchTerm}
+            onChange={(event) => grid.handleSearch(event.target.value)}
+          />
+        }>
+        <AdminTagsTable
+          tags={tagsQuery.data?.tags ?? []}
+          rowCount={rowCount}
+          paginationModel={grid.paginationModel}
+          setPaginationModel={grid.handlePaginationChange}
+          sortModel={grid.sortModel}
+          setSortModel={grid.handleSortChange}
+          onEditTag={handleEditTag}
+          onDeleteTag={handleDeleteTag}
+        />
+      </PageSection>
 
       <TagDialog
         open={isDialogOpen}

@@ -1,6 +1,8 @@
+import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { Tag, TagFilters, TagId, TagRequest } from '../models/tag';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 const TAG_COLUMNS = ['tag_id', 'name', 'description', 'color', 'create_date'] as const;
@@ -10,25 +12,71 @@ const TAG_COLUMNS = ['tag_id', 'name', 'description', 'color', 'create_date'] as
  */
 export class TagRepository extends BaseRepository {
   /**
-   * List active tags ordered by case-insensitive name.
+   * Apply tag list filters to a query over `tag`.
    *
-   * @param {TagFilters} [filters] - Optional filters; `search` matches the tag name case-insensitively.
+   * @param {Knex.QueryBuilder} query - Query over the tag table.
+   * @param {TagFilters} [filters] - `search` matches the name case-insensitively; `board_id` keeps the board's tags.
+   * @returns {Knex.QueryBuilder} The filtered query.
+   * @memberof TagRepository
+   */
+  applyFilters(query: Knex.QueryBuilder, filters?: TagFilters): Knex.QueryBuilder {
+    if (filters?.search) {
+      query = query.whereILike('tag.name', `%${filters.search}%`);
+    }
+
+    if (filters?.board_id) {
+      const knex = getKnex();
+
+      query = query.whereExists(
+        knex('board_tag')
+          .select(knex.raw('1'))
+          .whereRaw('board_tag.tag_id = tag.tag_id')
+          .where('board_tag.board_id', filters.board_id)
+          .whereNull('board_tag.record_end_date')
+      );
+    }
+
+    return query;
+  }
+
+  /**
+   * List active tags, ordered by case-insensitive name unless a sort is given.
+   *
+   * @param {TagFilters} [filters] - Optional filters.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting.
    * @returns {Promise<Tag[]>} Matching active tags.
    * @memberof TagRepository
    */
-  async getTags(filters?: TagFilters): Promise<Tag[]> {
+  async getTags(filters?: TagFilters, pagination?: ApiPaginationOptions): Promise<Tag[]> {
     const knex = getKnex();
-    let query = knex('tag').select(TAG_COLUMNS).whereNull('record_end_date');
+    let query = knex('tag').select(TAG_COLUMNS).whereNull('tag.record_end_date');
+    query = this.applyFilters(query, filters);
+    query = this.applyPagination(query, pagination);
 
-    if (filters?.search) {
-      query = query.whereILike('name', `%${filters.search}%`);
+    if (!pagination?.sort) {
+      query = query.orderByRaw('lower(tag.name) ASC, tag.tag_id ASC');
     }
-
-    query = query.orderByRaw('lower(name) ASC, tag_id ASC');
 
     const response = await this.connection.knex(query, Tag);
 
     return response.rows;
+  }
+
+  /**
+   * Count active tags matching the filters.
+   *
+   * @param {TagFilters} [filters] - Optional filters.
+   * @returns {Promise<number>} Number of matching tags.
+   * @memberof TagRepository
+   */
+  async getTagsCount(filters?: TagFilters): Promise<number> {
+    const knex = getKnex();
+    let query = knex('tag').select(knex.raw('count(*)::integer as count')).whereNull('tag.record_end_date');
+    query = this.applyFilters(query, filters);
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
   }
 
   /**

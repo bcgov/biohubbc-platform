@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import {
   BoardDetail,
+  BoardFilters,
   BoardRequest,
   BoardSummary,
   BoardTicketFilters,
@@ -12,6 +13,7 @@ import { TicketWithTags } from '../models/ticket';
 import { BoardRepository } from '../repositories/board-repository';
 import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
 import { BoardTagRepository } from '../repositories/board-tag-repository';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BoardSwimlaneService } from './board-swimlane-service';
 import { DBService } from './db-service';
 import { TagService } from './tag-service';
@@ -38,11 +40,24 @@ export class BoardService extends DBService {
   /**
    * List active boards with their tags and swimlane count.
    *
-   * @returns {Promise<BoardSummary[]>} Active boards ordered by name.
+   * @param {BoardFilters} [filters] - Optional filters; `search` matches the board name.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting.
+   * @returns {Promise<BoardSummary[]>} Active boards, ordered by name unless a sort is given.
    * @memberof BoardService
    */
-  async getBoards(): Promise<BoardSummary[]> {
-    return this.boardRepository.getBoards();
+  async getBoards(filters?: BoardFilters, pagination?: ApiPaginationOptions): Promise<BoardSummary[]> {
+    return this.boardRepository.getBoards(filters, pagination);
+  }
+
+  /**
+   * Count active boards matching the filters.
+   *
+   * @param {BoardFilters} [filters] - Optional filters.
+   * @returns {Promise<number>} Number of matching boards.
+   * @memberof BoardService
+   */
+  async getBoardsCount(filters?: BoardFilters): Promise<number> {
+    return this.boardRepository.getBoardsCount(filters);
   }
 
   /**
@@ -79,8 +94,7 @@ export class BoardService extends DBService {
 
     const createdBoard = await this.boardRepository.insertBoard({
       name: board.name,
-      description: board.description,
-      color: board.color
+      description: board.description
     });
 
     await this.boardTagRepository.insertBoardTags(createdBoard.board_id, board.tagIds);
@@ -108,8 +122,7 @@ export class BoardService extends DBService {
 
     const updatedBoard = await this.boardRepository.updateBoard(boardId, {
       name: board.name,
-      description: board.description,
-      color: board.color
+      description: board.description
     });
 
     // Lanes may only use the board's tags, so lane links to removed board tags are ended first.

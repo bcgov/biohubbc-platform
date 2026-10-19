@@ -6,7 +6,6 @@ export const Board = z.object({
   board_id: z.string().uuid(),
   name: z.string(),
   description: z.string().nullable(),
-  color: z.string(),
   create_date: z.string()
 });
 export type Board = z.infer<typeof Board>;
@@ -67,6 +66,10 @@ export interface BoardTickets {
   hidden_ticket_count: number;
 }
 
+export interface BoardFilters {
+  search?: string;
+}
+
 export interface BoardTicketFilters {
   include_closed: boolean;
 }
@@ -77,7 +80,6 @@ export interface BoardTicketFilters {
 export interface BoardPayload {
   name: string;
   description: string | null;
-  color: string;
 }
 
 /**
@@ -96,7 +98,6 @@ export interface BoardSwimlanePayload {
 export interface BoardRequest {
   name: string;
   description: string | null;
-  color: string;
   tagIds: string[];
 }
 

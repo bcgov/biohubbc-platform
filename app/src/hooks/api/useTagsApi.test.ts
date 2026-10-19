@@ -38,11 +38,15 @@ describe('useTagsApi', () => {
     mock.restore();
   });
 
-  it('getTags reads the administrative tags with the name search', async () => {
-    const response: IGetTagsResponse = { tags: [tag] };
-    mock.onGet('/api/administrative/tags', { params: { search: 'urg' } }).reply(200, response);
+  it('getTags reads one page of the administrative tags with the name search and board', async () => {
+    const params = { search: 'urg', board_id: tagId, page: 1, limit: 50 };
+    const response: IGetTagsResponse = {
+      tags: [tag],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 50 }
+    };
+    mock.onGet('/api/administrative/tags', { params }).reply(200, response);
 
-    const result = await useTagsApi(axios).getTags({ search: 'urg' });
+    const result = await useTagsApi(axios).getTags(params);
 
     expect(result).toEqual(response);
   });

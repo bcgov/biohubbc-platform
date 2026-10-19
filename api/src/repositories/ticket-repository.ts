@@ -70,6 +70,23 @@ export class TicketRepository extends BaseRepository {
             );
     }
 
+    if (filters?.board_id) {
+      // Board membership: the ticket has an active link to an active tag that is one of the board's active tags.
+      const knex = getKnex();
+
+      query = query.whereExists(
+        knex('ticket_tag')
+          .select(knex.raw('1'))
+          .join('tag', 'tag.tag_id', 'ticket_tag.tag_id')
+          .join('board_tag', 'board_tag.tag_id', 'ticket_tag.tag_id')
+          .whereRaw('ticket_tag.ticket_id = ticket.ticket_id')
+          .where('board_tag.board_id', filters.board_id)
+          .whereNull('ticket_tag.record_end_date')
+          .whereNull('tag.record_end_date')
+          .whereNull('board_tag.record_end_date')
+      );
+    }
+
     return query;
   }
 

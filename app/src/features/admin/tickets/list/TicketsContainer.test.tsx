@@ -51,7 +51,6 @@ describe('TicketsContainer', () => {
           onDeleteTicket: vi.fn()
         }}
         onRowClick={vi.fn()}
-        tagOptions={[urgentTag]}
         tagFilter={[]}
         onTagFilterChange={vi.fn()}
       />

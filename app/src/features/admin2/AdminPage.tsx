@@ -4,9 +4,7 @@ import {
   mdiCubeOutline,
   mdiHandBackRightOutline,
   mdiLockOutline,
-  mdiTagMultipleOutline,
-  mdiTicketOutline,
-  mdiViewColumnOutline
+  mdiTicketOutline
 } from '@mdi/js';
 import Icon from '@mdi/react';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -21,8 +19,6 @@ import { Link as RouterLink } from 'react-router-dom';
 
 const ADMIN_SECTIONS = [
   { label: 'Tickets', icon: mdiTicketOutline, to: '/admin/tickets', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN] },
-  { label: 'Boards', icon: mdiViewColumnOutline, to: '/admin/boards', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN] },
-  { label: 'Tags', icon: mdiTagMultipleOutline, to: '/admin/tags', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN] },
   { label: 'Users', icon: mdiAccountOutline, to: '/admin/users', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN] },
   {
     label: 'Security',

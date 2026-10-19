@@ -58,17 +58,24 @@ describe('paths/administrative/tags', () => {
     return connection;
   };
 
-  it('getTags passes the search filter and wraps the result', async () => {
+  it('getTags passes the search and board filters with pagination and wraps the page', async () => {
     mockConnection();
     const getTagsStub = sinon.stub(TagService.prototype, 'getTags').resolves([mockTag]);
+    const countStub = sinon.stub(TagService.prototype, 'getTagsCount').resolves(11);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { search: 'fi' };
+    const boardId = '44444444-4444-4444-4444-444444444444';
+    mockReq.query = { search: 'fi', board_id: boardId, page: '2', limit: '10' };
 
     await getTags()(mockReq, mockRes, mockNext);
 
-    sinon.assert.calledOnceWithExactly(getTagsStub, { search: 'fi' });
+    const filters = { search: 'fi', board_id: boardId };
+    sinon.assert.calledOnceWithExactly(getTagsStub, filters, { page: 2, limit: 10, sort: undefined, order: undefined });
+    sinon.assert.calledOnceWithExactly(countStub, filters);
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql({ tags: [mockTag] });
+    expect(mockRes.jsonValue).to.eql({
+      tags: [mockTag],
+      pagination: { total: 11, per_page: 10, current_page: 2, last_page: 2, sort: undefined, order: undefined }
+    });
   });
 
   it('createTag returns 201 with the created tag', async () => {

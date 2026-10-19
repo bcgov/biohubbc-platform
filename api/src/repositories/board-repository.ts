@@ -1,49 +1,84 @@
+import { Knex } from 'knex';
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { Board, BoardPayload, BoardSummary, BoardTicket, BoardTicketFilters } from '../models/board';
+import { Board, BoardFilters, BoardPayload, BoardSummary, BoardTicket, BoardTicketFilters } from '../models/board';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { activeBoardTagsJson, activeTicketTagsJson } from './sql-fragments';
 
-const BOARD_COLUMNS = ['board_id', 'name', 'description', 'color', 'create_date'] as const;
+const BOARD_COLUMNS = ['board_id', 'name', 'description', 'create_date'] as const;
 
 /**
  * Repository for board table operations, including computed board ticket membership.
  */
 export class BoardRepository extends BaseRepository {
   /**
-   * List active boards with their active tags and active swimlane count, ordered by case-insensitive name.
+   * Apply board list filters to a query over `board`.
    *
+   * @param {Knex.QueryBuilder} query - Query over the board table.
+   * @param {BoardFilters} [filters] - `search` matches the name case-insensitively.
+   * @returns {Knex.QueryBuilder} The filtered query.
+   * @memberof BoardRepository
+   */
+  applyFilters(query: Knex.QueryBuilder, filters?: BoardFilters): Knex.QueryBuilder {
+    if (filters?.search) {
+      query = query.whereILike('board.name', `%${filters.search}%`);
+    }
+
+    return query;
+  }
+
+  /**
+   * List active boards with their active tags and active swimlane count, ordered by case-insensitive name unless a
+   * sort is given.
+   *
+   * @param {BoardFilters} [filters] - Optional filters.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting.
    * @returns {Promise<BoardSummary[]>} Active boards.
    * @memberof BoardRepository
    */
-  async getBoards(): Promise<BoardSummary[]> {
-    const sqlStatement = SQL`
-      SELECT
-        b.board_id,
-        b.name,
-        b.description,
-        b.color,
-        b.create_date,
-      `
-      .append(activeBoardTagsJson('b.board_id'))
-      .append(
-        SQL` AS tags,
-        (
+  async getBoards(filters?: BoardFilters, pagination?: ApiPaginationOptions): Promise<BoardSummary[]> {
+    const knex = getKnex();
+    let query = knex('board')
+      .select([
+        ...BOARD_COLUMNS.map((column) => `board.${column}`),
+        knex.raw(`${activeBoardTagsJson('board.board_id')} AS tags`),
+        knex.raw(`(
           SELECT count(*)::integer
           FROM board_swimlane bs
-          WHERE bs.board_id = b.board_id
+          WHERE bs.board_id = board.board_id
             AND bs.record_end_date IS NULL
-        ) AS swimlane_count
-      FROM board b
-      WHERE b.record_end_date IS NULL
-      ORDER BY lower(b.name) ASC, b.board_id ASC;
-    `
-      );
+        ) AS swimlane_count`)
+      ])
+      .whereNull('board.record_end_date');
+    query = this.applyFilters(query, filters);
+    query = this.applyPagination(query, pagination);
 
-    const response = await this.connection.sql(sqlStatement, BoardSummary);
+    if (!pagination?.sort) {
+      query = query.orderByRaw('lower(board.name) ASC, board.board_id ASC');
+    }
+
+    const response = await this.connection.knex(query, BoardSummary);
 
     return response.rows;
+  }
+
+  /**
+   * Count active boards matching the filters.
+   *
+   * @param {BoardFilters} [filters] - Optional filters.
+   * @returns {Promise<number>} Number of matching boards.
+   * @memberof BoardRepository
+   */
+  async getBoardsCount(filters?: BoardFilters): Promise<number> {
+    const knex = getKnex();
+    let query = knex('board').select(knex.raw('count(*)::integer as count')).whereNull('board.record_end_date');
+    query = this.applyFilters(query, filters);
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
   }
 
   /**
@@ -99,8 +134,7 @@ export class BoardRepository extends BaseRepository {
     const query = knex('board')
       .insert({
         name: board.name,
-        description: board.description,
-        color: board.color
+        description: board.description
       })
       .returning(BOARD_COLUMNS);
 
@@ -130,8 +164,7 @@ export class BoardRepository extends BaseRepository {
     const query = knex('board')
       .update({
         name: board.name,
-        description: board.description,
-        color: board.color
+        description: board.description
       })
       .where('board_id', boardId)
       .whereNull('record_end_date')

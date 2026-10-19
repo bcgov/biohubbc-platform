@@ -74,7 +74,7 @@ POST.apiDoc = {
 };
 
 GET.apiDoc = {
-  description: 'List tickets with their tags, optionally filtered by team, status, search text, or tags',
+  description: 'List tickets with their tags, optionally filtered by team, status, search text, tags, or board',
   tags: ['tickets'],
   security: [
     {
@@ -119,6 +119,13 @@ GET.apiDoc = {
         items: { type: 'string', format: 'uuid' }
       },
       description: 'Optional tag filter (repeat the parameter). Returns tickets with any of the given tags.'
+    },
+    {
+      in: 'query',
+      name: 'board_id',
+      required: false,
+      schema: { type: 'string', format: 'uuid' },
+      description: "Optional board filter. Returns tickets with any of the board's tags."
     },
     ...paginationRequestQueryParamSchema
   ],
@@ -175,7 +182,8 @@ export function getTickets(): RequestHandler {
         team_ids: teamId ? [teamId] : undefined,
         status,
         search,
-        tag_ids: tagIds
+        tag_ids: tagIds,
+        board_id: req.query.board_id as string | undefined
       };
 
       const [tickets, count] = await Promise.all([

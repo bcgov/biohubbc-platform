@@ -1,5 +1,5 @@
 import { QUERY_KEY_ROOT } from 'constants/query-keys';
-import { IBoardTicketsQueryParams } from 'interfaces/useBoardsApi.interface';
+import { IBoardsQueryParams } from 'interfaces/useBoardsApi.interface';
 
 /**
  * Key prefix of every board query.
@@ -9,14 +9,15 @@ import { IBoardTicketsQueryParams } from 'interfaces/useBoardsApi.interface';
 const all = () => [QUERY_KEY_ROOT.BOARD] as const;
 
 /**
- * Key of the board list.
+ * Key of one page of the board list.
  *
+ * @param {IBoardsQueryParams} params The name search, page and sort sent.
  * @returns The board list key.
  */
-const list = () => [...all(), 'list'] as const;
+const list = (params: IBoardsQueryParams) => [...all(), 'list', params] as const;
 
 /**
- * Key of one board's detail: its tags and every swimlane.
+ * Key of one board's detail: the board and its tags.
  *
  * @param {string} boardId The board.
  * @returns The board detail key.
@@ -24,31 +25,7 @@ const list = () => [...all(), 'list'] as const;
 const detail = (boardId: string) => [...all(), 'detail', boardId] as const;
 
 /**
- * Key prefix of every board's tickets.
- *
- * @returns The board tickets key prefix.
- */
-const ticketsAll = () => [...all(), 'tickets'] as const;
-
-/**
- * Key prefix of one board's tickets, with or without closed tickets.
- *
- * @param {string} boardId The board.
- * @returns The board's tickets key prefix.
- */
-const ticketsForBoard = (boardId: string) => [...ticketsAll(), boardId] as const;
-
-/**
- * Key of one board's tickets grouped by swimlane.
- *
- * @param {string} boardId The board.
- * @param {IBoardTicketsQueryParams} params Whether closed tickets are included.
- * @returns The board tickets key.
- */
-const tickets = (boardId: string, params: IBoardTicketsQueryParams) => [...ticketsForBoard(boardId), params] as const;
-
-/**
  * Query keys for boards, ordered from broad to narrow so that each prefix names the set of queries a change
  * invalidates.
  */
-export const boardQueryKeys = { all, list, detail, ticketsAll, ticketsForBoard, tickets };
+export const boardQueryKeys = { all, list, detail };

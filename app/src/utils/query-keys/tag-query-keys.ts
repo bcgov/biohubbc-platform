@@ -11,7 +11,7 @@ const all = () => [QUERY_KEY_ROOT.TAG] as const;
 /**
  * Key of one tag list.
  *
- * @param {ITagsQueryParams} params The name search sent.
+ * @param {ITagsQueryParams} params The name search, board, page and sort sent.
  * @returns The tag list key.
  */
 const list = (params: ITagsQueryParams) => [...all(), 'list', params] as const;

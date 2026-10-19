@@ -4,7 +4,7 @@ import { ITag } from 'interfaces/useTagsApi.interface';
 import { MemoryRouter } from 'react-router-dom';
 import { act, fireEvent, render, screen, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { AdminTagsPage } from './AdminTagsPage';
+import { AdminTicketsTagsContent } from './AdminTicketsTagsContent';
 
 vi.mock('hooks/useApi', () => ({ useApi: vi.fn() }));
 vi.mock('hooks/useContext', () => ({ useDialogContext: vi.fn() }));
@@ -17,7 +17,7 @@ const tag: ITag = {
   create_date: '2026-10-01T00:00:00.000Z'
 };
 
-describe('AdminTagsPage', () => {
+describe('AdminTicketsTagsContent', () => {
   const getTags = vi.fn();
   const createTag = vi.fn();
   const deleteTag = vi.fn();
@@ -26,33 +26,49 @@ describe('AdminTagsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    getTags.mockResolvedValue({ tags: [tag] });
+    getTags.mockResolvedValue({
+      tags: [tag],
+      pagination: { total: 26, current_page: 1, last_page: 3, per_page: 10 }
+    });
     (useApi as Mock).mockReturnValue({ tags: { getTags, createTag, deleteTag } });
     (useDialogContext as Mock).mockReturnValue({ setYesNoDialog, setSnackbar });
   });
 
   /**
-   * Renders the tags page.
+   * Renders the tags tab.
    *
    * @returns The RTL render result.
    */
-  const renderPage = () =>
+  const renderContent = () =>
     render(
       <MemoryRouter>
-        <AdminTagsPage />
+        <AdminTicketsTagsContent />
       </MemoryRouter>
     );
 
-  it('lists each tag with its description', async () => {
-    renderPage();
+  it('lists one page of tags with the server total, and searches by name from the first page', async () => {
+    renderContent();
 
-    expect(await screen.findByText('Urgent')).toBeVisible();
-    expect(screen.getByText('Needs attention today')).toBeVisible();
+    expect(await screen.findByText('Needs attention today')).toBeVisible();
+    expect(screen.getByText('(26)')).toBeVisible();
+    expect(getTags).toHaveBeenCalledWith(
+      { search: '', page: 1, limit: 10, sort: 'name', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search by tag name'), { target: { value: 'urg' } });
+
+    await waitFor(() =>
+      expect(getTags).toHaveBeenLastCalledWith(
+        { search: 'urg', page: 1, limit: 10, sort: 'name', order: 'asc' },
+        { signal: expect.any(AbortSignal) }
+      )
+    );
   });
 
   it('warns that deleting a tag removes it from every ticket and board, and deletes it once confirmed', async () => {
     deleteTag.mockResolvedValue(undefined);
-    renderPage();
+    renderContent();
     await screen.findByText('Urgent');
 
     fireEvent.click(screen.getByTestId('custom-menu-icon-Actions'));
@@ -60,7 +76,7 @@ describe('AdminTagsPage', () => {
 
     const confirmation = setYesNoDialog.mock.lastCall![0];
     render(confirmation.dialogContent);
-    expect(screen.getByText(/removes it from all tickets, boards and swimlanes/)).toBeVisible();
+    expect(screen.getByText(/removes it from all tickets and boards/)).toBeVisible();
     expect(deleteTag).not.toHaveBeenCalled();
 
     act(() => confirmation.onYes());
@@ -70,7 +86,7 @@ describe('AdminTagsPage', () => {
 
   it('keeps the create dialog open with the server error when the name is taken', async () => {
     createTag.mockRejectedValue(new Error('A tag with this name already exists'));
-    renderPage();
+    renderContent();
     await screen.findByText('Urgent');
 
     fireEvent.click(screen.getByTestId('tags-add-button'));

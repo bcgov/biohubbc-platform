@@ -79,7 +79,6 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
     const board = await boardService.createBoard({
       name: `Board-${runId}`,
       description: null,
-      color: '#112233',
       tagIds
     });
     return board.board_id;
@@ -287,7 +286,6 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       const board = await boardService.updateBoard(boardId, {
         name: `Board-${runId}`,
         description: null,
-        color: '#112233',
         tagIds: [b, c]
       });
       const lane = await boardSwimlaneService.updateBoardSwimlane(boardId, laneId, {
@@ -317,7 +315,6 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       const otherBoard = await boardService.createBoard({
         name: `Other-${runId}`,
         description: null,
-        color: '#000000',
         tagIds: [b]
       });
       const otherBoardTagId = otherBoard.tags[0].board_tag_id;
@@ -344,7 +341,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       const a = await createTag('A');
       const boardId = await createBoard([a]);
       const laneId = await createSwimlane(boardId, 'Lane', [a]);
-      const boardRequest = { name: `Board-${runId}`, description: null, color: '#112233' };
+      const boardRequest = { name: `Board-${runId}`, description: null };
 
       await boardService.updateBoard(boardId, { ...boardRequest, tagIds: [] });
       const board = await boardService.updateBoard(boardId, { ...boardRequest, tagIds: [a] });
@@ -420,7 +417,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       }
 
       try {
-        await boardService.createBoard({ name: `BOARD-${runId}`, description: null, color: '#000000', tagIds: [] });
+        await boardService.createBoard({ name: `BOARD-${runId}`, description: null, tagIds: [] });
         expect.fail('Expected conflict');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiConflictError);
@@ -477,7 +474,6 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       const otherBoard = await boardService.createBoard({
         name: `Other-${runId}`,
         description: null,
-        color: '#000000',
         tagIds: []
       });
       const foreignLane = await createSwimlane(otherBoard.board_id, 'Foreign', []);
@@ -503,6 +499,22 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
   });
 
   describe('admin ticket list', () => {
+    it('board_id filter returns only tickets with any of the board tags', async () => {
+      const [a, b, c] = await Promise.all(['A', 'B', 'C'].map((name) => createTag(name)));
+      const boardId = await createBoard([a, b]);
+      const withA = await createTicket('board-a', [a]);
+      const withB = await createTicket('board-b', [b, c]);
+      await createTicket('board-c', [c]);
+      await createTicket('board-none', []);
+      const search = `tagboard-${runId}`;
+
+      const filtered = await ticketService.getTicketsWithTags({ search, board_id: boardId });
+      const filteredCount = await ticketService.getTicketsCount({ search, board_id: boardId });
+
+      expect(filtered.map((ticket) => ticket.ticket_id)).to.have.members([withA, withB]);
+      expect(filteredCount).to.equal(2);
+    });
+
     it('tag_ids filter returns only tickets with any of the tags', async () => {
       const [a, b, c] = await Promise.all(['A', 'B', 'C'].map((name) => createTag(name)));
       const withA = await createTicket('with-a', [a]);
@@ -537,6 +549,34 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       });
 
       expect(filtered.map((ticket) => ticket.ticket_id)).to.eql([first]);
+    });
+  });
+
+  describe('tag and board lists', () => {
+    it('board_id filter returns only the board tags, with pagination and count', async () => {
+      const [a, b] = await Promise.all(['A', 'B', 'C'].map((name) => createTag(name)));
+      const boardId = await createBoard([a, b]);
+
+      const firstPage = await tagService.getTags({ board_id: boardId }, { page: 1, limit: 1 });
+      const secondPage = await tagService.getTags({ board_id: boardId }, { page: 2, limit: 1 });
+      const count = await tagService.getTagsCount({ board_id: boardId });
+
+      expect([...firstPage, ...secondPage].map((tag) => tag.tag_id)).to.have.members([a, b]);
+      expect(firstPage).to.have.length(1);
+      expect(count).to.equal(2);
+      expect(await tagService.getTagsCount({ board_id: boardId, search: `C-${runId}` })).to.equal(0);
+      expect(await tagService.getTagsCount({ search: `C-${runId}` })).to.equal(1);
+    });
+
+    it('lists boards by search with pagination and count', async () => {
+      await createBoard([]);
+      await boardService.createBoard({ name: `Other-${runId}`, description: null, tagIds: [] });
+
+      const boards = await boardService.getBoards({ search: runId }, { page: 1, limit: 1 });
+      const count = await boardService.getBoardsCount({ search: runId });
+
+      expect(boards).to.have.length(1);
+      expect(count).to.equal(2);
     });
   });
 

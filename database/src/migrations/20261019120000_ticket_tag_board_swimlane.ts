@@ -103,15 +103,13 @@ export async function up(knex: Knex): Promise<void> {
       board_id uuid DEFAULT gen_random_uuid() NOT NULL,
       name varchar(100) NOT NULL,
       description varchar(500) NULL,
-      color varchar(7) NOT NULL,
       record_end_date timestamptz(6),
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
-      CONSTRAINT board_pk PRIMARY KEY (board_id),
-      CONSTRAINT board_color_chk CHECK (color ~ '^#[0-9A-Fa-f]{6}$')
+      CONSTRAINT board_pk PRIMARY KEY (board_id)
     );
 
     CREATE UNIQUE INDEX board_nuk1
@@ -122,7 +120,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN board.board_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN board.name IS 'Display name of the board. Unique (case-insensitive) among active boards.';
     COMMENT ON COLUMN board.description IS 'Optional description of the board.';
-    COMMENT ON COLUMN board.color IS 'Display color as a hex string (#RRGGBB).';
     COMMENT ON COLUMN board.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN board.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN board.create_user IS 'The id of the user who created the record.';

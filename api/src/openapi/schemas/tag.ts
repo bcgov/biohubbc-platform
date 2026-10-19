@@ -1,4 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { paginationResponseSchema } from './pagination';
 
 export const TagColorSchema: OpenAPIV3.SchemaObject = {
   type: 'string',
@@ -33,9 +34,10 @@ export const TagSummarySchema: OpenAPIV3.SchemaObject = {
 export const TagListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['tags'],
+  required: ['tags', 'pagination'],
   properties: {
-    tags: { type: 'array', items: TagSchema }
+    tags: { type: 'array', items: TagSchema },
+    pagination: paginationResponseSchema
   }
 };
 

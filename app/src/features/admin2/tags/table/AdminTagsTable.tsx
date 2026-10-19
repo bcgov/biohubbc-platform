@@ -3,37 +3,41 @@ import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { TagChip } from 'components/tags/TagChip';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ITag } from 'interfaces/useTagsApi.interface';
 import { useMemo } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
 import { getRelativeTimeLabel } from 'utils/date';
 
-interface IAdminTagsTableProps {
+interface IAdminTagsTableProps extends IServerPaginationProps {
+  /** The current page of tags. */
   tags: ITag[];
-  isLoading: boolean;
-  onEditTag: (tag: ITag) => void;
-  onDeleteTag: (tag: ITag) => void;
+  /** Edits a tag; the actions column is shown only with edit and delete handlers. */
+  onEditTag?: (tag: ITag) => void;
+  /** Deletes a tag; the actions column is shown only with edit and delete handlers. */
+  onDeleteTag?: (tag: ITag) => void;
 }
 
 /**
- * Table of tags: each tag's chip, description and created date, with edit and delete actions.
+ * Server-paginated table of tags: each tag's chip, description and created date, sortable by name and created date,
+ * with edit and delete actions when handlers are given.
  *
- * @param {IAdminTagsTableProps} props The tags and their row actions.
+ * @param {IAdminTagsTableProps} props The page of tags, the grid's pagination and sort, and the optional row actions.
  * @returns {JSX.Element} The tags table.
  */
 export const AdminTagsTable = (props: IAdminTagsTableProps) => {
-  const { tags, isLoading, onEditTag, onDeleteTag } = props;
+  const { tags, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel, onEditTag, onDeleteTag } =
+    props;
 
-  const columns: GridColDef<ITag>[] = useMemo(
-    () => [
+  const columns: GridColDef<ITag>[] = useMemo(() => {
+    const tagColumns: GridColDef<ITag>[] = [
       {
         field: 'name',
         headerName: 'Tag',
         minWidth: 200,
         flex: 1,
-        sortable: false,
         renderCell: (params) => <TagChip tag={params.row} />
       },
       {
@@ -53,13 +57,20 @@ export const AdminTagsTable = (props: IAdminTagsTableProps) => {
         headerName: 'Created',
         minWidth: 140,
         flex: 0.8,
-        sortable: false,
         renderCell: (params) => (
           <Typography variant="body2" noWrap title={params.row.create_date}>
             {getRelativeTimeLabel(params.row.create_date)}
           </Typography>
         )
-      },
+      }
+    ];
+
+    if (!onEditTag || !onDeleteTag) {
+      return tagColumns;
+    }
+
+    return [
+      ...tagColumns,
       {
         field: 'actions',
         headerName: 'Actions',
@@ -89,22 +100,21 @@ export const AdminTagsTable = (props: IAdminTagsTableProps) => {
           </Box>
         )
       }
-    ],
-    [onDeleteTag, onEditTag]
-  );
+    ];
+  }, [onDeleteTag, onEditTag]);
 
   return (
-    <CustomDataGrid<ITag>
-      data-testid="tags-table"
-      autoHeight
+    <ServerPaginatedDataGrid<ITag>
+      dataTestId="tags-table"
       rows={tags}
       columns={columns}
       getRowId={(row) => row.tag_id}
-      loading={isLoading}
       noRowsMessage="No tags"
-      rowSelection={false}
-      pageSizeOptions={[25, 50, 100]}
-      initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+      rowCount={rowCount}
+      paginationModel={paginationModel}
+      setPaginationModel={setPaginationModel}
+      sortModel={sortModel}
+      setSortModel={setSortModel}
     />
   );
 };

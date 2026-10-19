@@ -15,6 +15,10 @@ export interface TicketFilters {
    * Admin-only filter: tickets with any of these active tags.
    */
   tag_ids?: string[];
+  /**
+   * Admin-only filter: tickets on this board (any of its active board tags).
+   */
+  board_id?: string;
 }
 
 export const TicketPriority = z.enum(['low', 'medium', 'high', 'critical']);

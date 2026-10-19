@@ -36,7 +36,6 @@ const mockBoardDetail: BoardDetail = {
   board_id: boardId,
   name: 'Fisheries',
   description: null,
-  color: '#123456',
   create_date: '2026-10-19T00:00:00.000Z',
   tags: [],
   swimlanes: []
@@ -74,22 +73,33 @@ describe('paths/administrative/boards', () => {
     return connection;
   };
 
-  it('getBoards wraps the board list', async () => {
+  it('getBoards passes the search filter with default pagination and wraps the page', async () => {
     mockConnection();
-    sinon.stub(BoardService.prototype, 'getBoards').resolves([]);
+    const getBoardsStub = sinon.stub(BoardService.prototype, 'getBoards').resolves([]);
+    const countStub = sinon.stub(BoardService.prototype, 'getBoardsCount').resolves(0);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { search: 'fish' };
 
     await getBoards()(mockReq, mockRes, mockNext);
 
+    sinon.assert.calledOnceWithExactly(
+      getBoardsStub,
+      { search: 'fish' },
+      { page: 1, limit: 25, sort: undefined, order: undefined }
+    );
+    sinon.assert.calledOnceWithExactly(countStub, { search: 'fish' });
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql({ boards: [] });
+    expect(mockRes.jsonValue).to.eql({
+      boards: [],
+      pagination: { total: 0, per_page: 25, current_page: 1, last_page: 1, sort: undefined, order: undefined }
+    });
   });
 
   it('createBoard returns 201 with the created board', async () => {
     mockConnection();
     const createStub = sinon.stub(BoardService.prototype, 'createBoard').resolves(mockBoardDetail);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { name: 'Fisheries', description: null, color: '#123456', tagIds: [] };
+    mockReq.body = { name: 'Fisheries', description: null, tagIds: [] };
 
     await createBoard()(mockReq, mockRes, mockNext);
 
@@ -103,7 +113,7 @@ describe('paths/administrative/boards', () => {
     const updateStub = sinon.stub(BoardService.prototype, 'updateBoard').resolves(mockBoardDetail);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { boardId };
-    mockReq.body = { name: 'Fisheries', description: null, color: '#123456', tagIds: [] };
+    mockReq.body = { name: 'Fisheries', description: null, tagIds: [] };
 
     await updateBoard()(mockReq, mockRes, mockNext);
 

@@ -7,6 +7,7 @@ import { BoardTagRepository } from '../repositories/board-tag-repository';
 import { TagRepository } from '../repositories/tag-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { getUnique } from '../utils/unique';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 /**
@@ -29,12 +30,24 @@ export class TagService extends DBService {
   /**
    * List active tags.
    *
-   * @param {TagFilters} [filters] - Optional filters; `search` matches the tag name.
-   * @returns {Promise<Tag[]>} Active tags ordered by name.
+   * @param {TagFilters} [filters] - Optional filters: `search` matches the tag name; `board_id` keeps a board's tags.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting.
+   * @returns {Promise<Tag[]>} Active tags, ordered by name unless a sort is given.
    * @memberof TagService
    */
-  async getTags(filters?: TagFilters): Promise<Tag[]> {
-    return this.tagRepository.getTags(filters);
+  async getTags(filters?: TagFilters, pagination?: ApiPaginationOptions): Promise<Tag[]> {
+    return this.tagRepository.getTags(filters, pagination);
+  }
+
+  /**
+   * Count active tags matching the filters.
+   *
+   * @param {TagFilters} [filters] - Optional filters.
+   * @returns {Promise<number>} Number of matching tags.
+   * @memberof TagService
+   */
+  async getTagsCount(filters?: TagFilters): Promise<number> {
+    return this.tagRepository.getTagsCount(filters);
   }
 
   /**

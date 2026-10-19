@@ -1,16 +1,16 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { paginationResponseSchema } from './pagination';
 import { TagColorSchema, TagIdsRequestPropertySchema } from './tag';
 import { TicketWithTagsSchema } from './ticket';
 
 export const BoardSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['board_id', 'name', 'description', 'color', 'create_date'],
+  required: ['board_id', 'name', 'description', 'create_date'],
   properties: {
     board_id: { type: 'string', format: 'uuid' },
     name: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 500, nullable: true },
-    color: TagColorSchema,
     create_date: { type: 'string', format: 'date-time' }
   }
 };
@@ -46,7 +46,7 @@ export const BoardSwimlaneSchema: OpenAPIV3.SchemaObject = {
 export const BoardListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['boards'],
+  required: ['boards', 'pagination'],
   properties: {
     boards: {
       type: 'array',
@@ -60,7 +60,8 @@ export const BoardListResponseSchema: OpenAPIV3.SchemaObject = {
           swimlane_count: { type: 'integer', minimum: 0 }
         }
       }
-    }
+    },
+    pagination: paginationResponseSchema
   }
 };
 
@@ -82,11 +83,10 @@ export const BoardDetailSchema: OpenAPIV3.SchemaObject = {
 export const BoardRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'description', 'color', 'tagIds'],
+  required: ['name', 'description', 'tagIds'],
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 100 },
     description: { type: 'string', maxLength: 500, nullable: true },
-    color: TagColorSchema,
     tagIds: TagIdsRequestPropertySchema
   }
 };

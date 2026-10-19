@@ -14,8 +14,6 @@ interface ITicketsContainerProps extends IServerPaginationProps {
   onRowClick: (ticketId: string) => void;
   onAddTicket: () => void;
   rowActions: ITicketListRowActions;
-  /** Every tag, offered by the tag filter. */
-  tagOptions: ITagSummary[];
   /** Tags the list is filtered by; a ticket with any of them is listed. */
   tagFilter: ITagSummary[];
   onTagFilterChange: (tags: ITagSummary[]) => void;
@@ -46,7 +44,7 @@ const TICKET_TAGS_COLUMNS: GridColDef<ITicketWithTags>[] = [
  * @return {*}
  */
 export const TicketsContainer = (props: ITicketsContainerProps) => {
-  const { onAddTicket, rowActions, tagOptions, tagFilter, onTagFilterChange, ...ticketListProps } = props;
+  const { onAddTicket, rowActions, tagFilter, onTagFilterChange, ...ticketListProps } = props;
 
   return (
     <TicketsListSection<ITicketWithTags>
@@ -62,7 +60,6 @@ export const TicketsContainer = (props: ITicketsContainerProps) => {
           id="tickets-tag-filter"
           size="small"
           placeholder={tagFilter.length ? undefined : 'Filter by tag'}
-          options={tagOptions}
           value={tagFilter}
           onChange={onTagFilterChange}
           sx={{ minWidth: 250, maxWidth: 400 }}

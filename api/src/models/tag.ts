@@ -34,6 +34,10 @@ export type TagId = z.infer<typeof TagId>;
 
 export interface TagFilters {
   search?: string;
+  /**
+   * Only tags linked to this board.
+   */
+  board_id?: string;
 }
 
 /**

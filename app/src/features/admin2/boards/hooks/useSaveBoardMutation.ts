@@ -14,8 +14,7 @@ export interface SaveBoardVariables {
 
 /**
  * Creates a board, or updates one replacing its tags, from the board dialog's values. The saved board is written to
- * its cached detail, and every other board query refreshes: the list shows the board's tags, and its tickets depend
- * on them.
+ * its cached detail, and the queries its tags decide refresh: the board list, and the board's tag and ticket lists.
  *
  * Callers close their dialog with `mutate`'s own `onSuccess` and show `error` in the dialog.
  *
@@ -30,7 +29,6 @@ export const useSaveBoardMutation = () => {
       const payload: IBoardRequest = {
         name: values.name.trim(),
         description: values.description?.trim() || null,
-        color: values.color,
         tagIds: values.tags.map((tag) => tag.tag_id)
       };
 

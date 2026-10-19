@@ -19,7 +19,6 @@ const mockBoard: Board = {
   board_id: boardId,
   name: 'Fisheries',
   description: null,
-  color: '#123456',
   create_date: '2026-10-19T00:00:00.000Z'
 };
 
@@ -109,7 +108,7 @@ describe('BoardService', () => {
       const insertStub = sinon.stub(BoardRepository.prototype, 'insertBoard');
 
       try {
-        await service.createBoard({ name: 'FISHERIES', description: null, color: '#000000', tagIds: [] });
+        await service.createBoard({ name: 'FISHERIES', description: null, tagIds: [] });
         expect.fail('Expected conflict');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiConflictError);
@@ -132,7 +131,6 @@ describe('BoardService', () => {
       const result = await service.createBoard({
         name: 'Fisheries',
         description: null,
-        color: '#000000',
         tagIds: ['a']
       });
 
@@ -159,7 +157,6 @@ describe('BoardService', () => {
       await service.updateBoard(boardId, {
         name: 'Fisheries',
         description: null,
-        color: '#000000',
         tagIds: ['b', 'c']
       });
 
