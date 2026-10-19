@@ -23,12 +23,11 @@ DO $$ BEGIN
    (SELECT * FROM bcgw.wld_telemetry_all WHERE secured='N' EXCEPT ALL SELECT * FROM bcgw.wld_telemetry_public)
  ), 'public telemetry is the unsecured subset';
 END $$;
--- Refresh one export after a base-table change. Its sibling snapshot stays unchanged.
-SAVEPOINT independent_refresh;
+-- All exports reflect base-table changes immediately.
+SAVEPOINT live_views;
 UPDATE biohub.submission_feature_property_number SET value=23 WHERE submission_feature_id=1 AND feature_type_property_id=108;
-REFRESH MATERIALIZED VIEW bcgw.wld_observations_public;
 DO $$ BEGIN
  ASSERT (SELECT count FROM bcgw.wld_observations_public WHERE feature_id=1)='23';
- ASSERT (SELECT count FROM bcgw.wld_observations_all WHERE feature_id=1)='2';
+ ASSERT (SELECT count FROM bcgw.wld_observations_all WHERE feature_id=1)='23';
 END $$;
-ROLLBACK TO SAVEPOINT independent_refresh;
+ROLLBACK TO SAVEPOINT live_views;

@@ -5,12 +5,12 @@
 The three migrations own their mappings, SQL generation and domain SQL:
 
 - Infrastructure creates `bcgw`, the private `bcgw_internal` schema, and the reader role. Default reader grants apply only to `bcgw`.
-- Observations defines `bcgw_internal.observation_export_rows` once, then four materialized exports filtered by `has_sample_site` and `is_secured`.
-- Telemetry defines `bcgw_internal.telemetry_export_rows` once, then two materialized exports filtered by `is_secured`.
+- Observations defines `bcgw_internal.observation_export_rows` once, then four ordinary export views filtered by `has_sample_site` and `is_secured`.
+- Telemetry defines `bcgw_internal.telemetry_export_rows` once, then two ordinary export views filtered by `is_secured`.
 
 Each domain migration starts with feature-type and property mappings. Fixed property IDs, label columns (string or code), and numeric projections are generated locally from those mappings. Relationship selection, geometry/timestamp fallbacks, taxonomy and security remain explicit SQL. Migration-local export mappings define the ordered column contract, comments and filters, and also drive rollback order. Domain mappings and projection builders remain migration-local. Generic SQL quoting helpers are shared through `src/utils/migrations.ts`.
 
-The internal sources are ordinary views. Each materialized export refreshes from current base data independently; there is no snapshot refresh ordering requirement. Refreshing multiple exports in one transaction provides a common transaction timestamp. Future definition changes belong in new migrations. Rollback drops exports before source views, then removes the schemas and reader role without cascading over unexpected objects.
+The internal sources and all six exports are ordinary views. Every query reads current base data; no refresh is required. Future definition changes belong in new migrations. Rollback drops exports before source views, then removes the schemas and reader role without cascading over unexpected objects.
 
 ## Running checks
 
@@ -35,19 +35,19 @@ The normal suite needs no Git history:
 | `contract.json` | Expected ordered columns, types and comments for each export family |
 | `assertions.sql` | Domain behavior: security, taxonomy, relationships, geometry and cutoff boundaries |
 | `property-assertions.sql` | Metadata, multivalued properties, partial timestamps and closure membership changes |
-| `structure-assertions.sql` | Export partitions, public subsets and refresh independence |
+| `structure-assertions.sql` | Export partitions, public subsets and immediate visibility |
 | `scale.sql` | Optional 2,000 observations and 1,000 telemetry fixes |
 | `verify.cjs` | Migration discovery/execution, contract and access checks, rollback/replay, optional plans |
 | `legacy/` | Optional frozen historical oracle, JSON fixtures and conversion adapter |
 
-The suite checks six materialized exports, two private ordinary sources, reader access
+The suite checks six ordinary export views, two private ordinary sources, reader access
 only to exports, one row per feature, exact column contracts, JSON independence,
 setup/rollback/replay and preservation of the unrelated GeoJSON helper.
 
 `--plans` captures EXPLAIN ANALYZE/BUFFERS from definitions read through PostgreSQL's
-`pg_matviews` catalog. It does not parse migration source text. Plans are written to
+`pg_views` catalog. It does not parse migration source text. Plans are written to
 `BCGW_PLAN_OUTPUT` or the temporary directory. Synthetic fixture timings are regression
-signals, not production refresh guarantees.
+signals, not production query guarantees.
 
 `--legacy` additionally requires Git commit `aaa21bb8f945843783f85184d5ece8e476618bc2`.
 It verifies frozen query hashes and compares single-valued exports in both directions
@@ -70,12 +70,9 @@ multirow contract differs from the current one-row-per-feature contract.
 
 Property names are resolved against active metadata each time the source query runs.
 Retiring or renaming an optional property such as `life_stage` leaves that export column
-NULL after refresh; it does not remove a physical SQL column or invalidate the query.
-Until refresh, a materialized export still contains its previous values. Regression
-checks cover both retirement and renaming.
+NULL on the next query; it does not remove a physical SQL column or invalidate the query.
+Regression checks cover both retirement and renaming without a refresh.
 
 These mappings are migration-time configuration. New metadata properties do not
 add export columns automatically. Runtime-configurable output would require a separate
-export contract/query layer, or a representation such as one row per property. Replacing
-materialized views with ordinary views would change freshness and query cost, while
-retaining this fixed column contract.
+export contract/query layer, or a representation such as one row per property. Ordinary views compute results on each query while retaining this fixed column contract.

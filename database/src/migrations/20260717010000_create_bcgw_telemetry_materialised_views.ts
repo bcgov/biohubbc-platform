@@ -62,7 +62,7 @@ const exportViews = {
   wld_telemetry_all: 'true'
 };
 
-/** Define the domain query once; each export remains independently refreshable. */
+/** Define the domain query once; each export reads current base data. */
 export async function up(knex: Knex): Promise<void> {
   const featureTypeNames = Object.values(featureTypes).map(quoteLiteral).join(', ');
   const entries = Object.entries(properties);
@@ -322,7 +322,7 @@ export async function up(knex: Knex): Promise<void> {
       )
       .join('\n');
     await knex.raw(`--sql
-      CREATE MATERIALIZED VIEW ${view} AS
+      CREATE VIEW ${view} AS
         SELECT ${projection}
         FROM bcgw_internal.telemetry_export_rows
         WHERE ${filter};
@@ -331,10 +331,10 @@ export async function up(knex: Knex): Promise<void> {
   }
 }
 
-/** Drop snapshots before their source view. */
+/** Drop exports before their source view. */
 export async function down(knex: Knex): Promise<void> {
   for (const name of Object.keys(exportViews).reverse()) {
-    await knex.raw(`DROP MATERIALIZED VIEW IF EXISTS bcgw.${quoteIdentifier(name)};`);
+    await knex.raw(`DROP VIEW IF EXISTS bcgw.${quoteIdentifier(name)};`);
   }
   await knex.raw('DROP VIEW IF EXISTS bcgw_internal.telemetry_export_rows;');
 }

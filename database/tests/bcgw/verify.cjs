@@ -93,7 +93,8 @@ async function capture(migration, direction) {
     END $$;\n`;
   }
   sql += `DO $$ BEGIN
-    ASSERT (SELECT count(*) FROM pg_matviews WHERE schemaname='bcgw')=6;
+    ASSERT (SELECT count(*) FROM pg_views WHERE schemaname='bcgw')=6;
+    ASSERT NOT EXISTS (SELECT FROM pg_matviews WHERE schemaname='bcgw');
     ASSERT (SELECT count(*) FROM pg_views WHERE schemaname='bcgw_internal')=2;
     ASSERT has_schema_privilege(${literal(role)}, 'bcgw', 'USAGE');
     ASSERT NOT has_schema_privilege(${literal(role)}, 'bcgw_internal', 'USAGE');
@@ -104,9 +105,9 @@ async function capture(migration, direction) {
   if (process.argv.includes('--plans')) {
     sql += `CREATE TEMP TABLE query_plans (view_name text, plan jsonb);
       DO $$ DECLARE v record; plan json; BEGIN
-        FOR v IN SELECT matviewname, definition FROM pg_matviews WHERE schemaname='bcgw' ORDER BY matviewname LOOP
+        FOR v IN SELECT viewname, definition FROM pg_views WHERE schemaname='bcgw' ORDER BY viewname LOOP
           EXECUTE 'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ' || v.definition INTO plan;
-          INSERT INTO query_plans VALUES (v.matviewname, plan);
+          INSERT INTO query_plans VALUES (v.viewname, plan);
         END LOOP;
       END $$;
       SELECT json_agg(query_plans) FROM query_plans;\n`;
@@ -116,8 +117,7 @@ async function capture(migration, direction) {
   for (const view of views) sql += `CREATE TABLE baseline.typed_${view.name} AS TABLE bcgw.${view.name};\n`;
   sql += "UPDATE biohub.submission_feature SET data = '{}';\n";
   for (const view of views) {
-    sql += `REFRESH MATERIALIZED VIEW bcgw.${view.name};
-      DO $$ BEGIN ASSERT NOT EXISTS (
+    sql += `DO $$ BEGIN ASSERT NOT EXISTS (
         (SELECT * FROM baseline.typed_${view.name} EXCEPT ALL SELECT * FROM bcgw.${view.name}) UNION ALL
         (SELECT * FROM bcgw.${view.name} EXCEPT ALL SELECT * FROM baseline.typed_${view.name})
       ), 'JSON must not affect results'; END $$;\n`;
@@ -150,7 +150,7 @@ async function capture(migration, direction) {
       console.log(`Full EXPLAIN ANALYZE/BUFFERS plans: ${destination}`);
     }
     console.log(
-      `PASS: typed properties; export partitions; independent refresh; private source views; columns/types/comments/grants; setup/rollback/replay${
+      `PASS: typed properties; export partitions; immediate visibility; private source views; columns/types/comments/grants; setup/rollback/replay${
         legacy ? '; historical comparisons' : ''
       }.`
     );
