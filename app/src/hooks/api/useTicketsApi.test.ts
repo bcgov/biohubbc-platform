@@ -8,6 +8,7 @@ import {
   ICreateTicketSystemUser,
   ICreateTicketUploadRequest,
   ICreateTicketUploadResponse,
+  IGetAdminTicketsResponse,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ISubmissionUploadProcessingStatusHistoryItem,
@@ -71,6 +72,21 @@ describe('useTicketsApi', () => {
     const result = await useTicketsApi(axios).getTicketsForAdmin({ status: 'open', page: 1, limit: 10 });
 
     expect(result).toEqual(response);
+  });
+
+  it('getTicketsForAdmin sends tag_ids as repeated query keys', async () => {
+    const response: IGetAdminTicketsResponse = {
+      tickets: [],
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+    };
+
+    mock.onGet('/api/administrative/tickets').reply(200, response);
+
+    await useTicketsApi(axios).getTicketsForAdmin({ search: 'moose', tag_ids: ['tag-a', 'tag-b'] });
+
+    expect(axios.getUri(mock.history.get[0])).toBe(
+      '/api/administrative/tickets?search=moose&tag_ids=tag-a&tag_ids=tag-b'
+    );
   });
 
   it('getTicket returns ticket with statuses', async () => {

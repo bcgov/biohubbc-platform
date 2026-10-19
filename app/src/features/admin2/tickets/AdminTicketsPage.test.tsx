@@ -1,10 +1,12 @@
 import { useApi } from 'hooks/useApi';
+import { IBoardSummary } from 'interfaces/useBoardsApi.interface';
+import { ITagSummary } from 'interfaces/useTagsApi.interface';
 import { IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
 import { ComponentProps } from 'react';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
 import { CreateTicketDialog } from 'features/admin/tickets/components/dialog/create/CreateTicketDialog';
 import { EditTicketDialog } from 'features/admin/tickets/components/dialog/edit/EditTicketDialog';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, fireEvent, render, screen, waitFor, within } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -32,7 +34,18 @@ const sampleTicket = {
   team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   create_date: '2026-03-01T00:00:00.000Z',
   priority: 'medium' as const,
-  status: 'open' as const
+  status: 'open' as const,
+  tags: [] as ITagSummary[]
+};
+const urgentTag: ITagSummary = { tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' };
+const mockGetTags = vi.fn();
+const mockGetBoards = vi.fn();
+const triageBoard: IBoardSummary = {
+  board_id: 'board-1',
+  name: 'Triage',
+  description: 'Tickets that need a first look',
+  create_date: '2026-03-01T00:00:00.000Z',
+  tags: [{ board_tag_id: 'board-tag-1', ...urgentTag }]
 };
 
 const apiMock = {
@@ -41,8 +54,35 @@ const apiMock = {
     createTicket: mockCreateTicket,
     updateTicketStatus: mockUpdateTicketStatus,
     updateTicket: mockUpdateTicket
+  },
+  tags: {
+    getTags: mockGetTags
+  },
+  boards: {
+    getBoards: mockGetBoards
   }
 };
+
+const BoardRoute = () => {
+  const { boardId } = useParams();
+  return <div data-testid="board-page">{boardId}</div>;
+};
+
+/**
+ * Renders the tickets page at a path, beside the board route its boards open.
+ *
+ * @param {string} path The path to open, such as `/admin/tickets?tab=boards`.
+ * @returns The RTL render result.
+ */
+const renderTicketsPageAt = (path: string) =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/admin/tickets" element={<AdminTicketsPage />} />
+        <Route path="/admin/tickets/boards/:boardId" element={<BoardRoute />} />
+      </Routes>
+    </MemoryRouter>
+  );
 
 /**
  * Opens the first row's actions menu and picks a status action.
@@ -61,6 +101,14 @@ describe('AdminTicketsPage', () => {
     dialogs.create.mockReturnValue(null);
     dialogs.edit.mockReturnValue(null);
     mockUseApi.mockImplementation(() => apiMock);
+    mockGetTags.mockResolvedValue({
+      tags: [{ ...urgentTag, description: 'Needs attention today', create_date: '2026-03-01' }],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+    mockGetBoards.mockResolvedValue({
+      boards: [triageBoard],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
 
     mockGetTickets.mockResolvedValue({
       tickets: [sampleTicket],
@@ -234,20 +282,69 @@ describe('AdminTicketsPage', () => {
     });
   });
 
-  it('renders only Tickets in the administrative tabs', async () => {
-    const { getByRole, queryByRole } = render(
+  it('filters the list by the picked tags, sending their ids as tag_ids', async () => {
+    mockGetTickets.mockResolvedValue({
+      tickets: [{ ...sampleTicket, tags: [urgentTag] }],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+    render(
       <MemoryRouter>
         <AdminTicketsPage />
       </MemoryRouter>
     );
+    expect(await screen.findByText('Urgent')).toBeVisible();
 
-    await waitFor(() => {
-      expect(mockGetTickets).toHaveBeenCalledTimes(1);
-    });
+    fireEvent.mouseDown(screen.getByPlaceholderText('Filter by tag'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Urgent' }));
 
-    expect(getByRole('tab', { name: 'Tickets' })).toBeVisible();
-    expect(queryByRole('tab', { name: 'Uploads' })).toBeNull();
-    expect(queryByRole('tab', { name: 'Requests' })).toBeNull();
+    await waitFor(() =>
+      expect(mockGetTickets).toHaveBeenLastCalledWith(
+        { search: '', page: 1, limit: 10, sort: 'create_date', order: 'desc', tag_ids: ['tag-1'] },
+        { signal: expect.any(AbortSignal) }
+      )
+    );
+  });
+
+  it('opens on the Tickets tab beside the Boards and Tags tabs, loading neither boards nor tag lists', async () => {
+    const { getByRole, getAllByRole, findByText } = renderTicketsPageAt('/admin/tickets');
+
+    expect(await findByText('Sample ticket')).toBeVisible();
+    expect(getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Tickets', 'Boards', 'Tags']);
+    expect(getByRole('tab', { name: 'Tickets' })).toHaveAttribute('aria-selected', 'true');
+    expect(mockGetBoards).not.toHaveBeenCalled();
+    // Only the tag filter searches tags.
+    expect(mockGetTags).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows one page of boards on the Boards tab and opens a board from its row', async () => {
+    const { getByRole, findByText, findByTestId, getByText } = renderTicketsPageAt('/admin/tickets');
+    await findByText('Sample ticket');
+
+    fireEvent.click(getByRole('tab', { name: 'Boards' }));
+
+    expect(await findByText('Triage')).toBeVisible();
+    expect(getByText('Tickets that need a first look')).toBeVisible();
+    expect(getByText('Urgent')).toBeVisible();
+    expect(mockGetBoards).toHaveBeenCalledWith(
+      { search: '', page: 1, limit: 10, sort: 'name', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
+
+    fireEvent.click(getByText('Triage'));
+
+    expect(await findByTestId('board-page')).toHaveTextContent('board-1');
+  });
+
+  it('shows one page of tags on the Tags tab', async () => {
+    const { findByText, getByText } = renderTicketsPageAt('/admin/tickets?tab=tags');
+
+    expect(await findByText('Needs attention today')).toBeVisible();
+    expect(getByText('Urgent')).toBeVisible();
+    expect(mockGetTags).toHaveBeenCalledWith(
+      { search: '', page: 1, limit: 10, sort: 'name', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
+    expect(mockGetTickets).not.toHaveBeenCalled();
   });
 
   it('renders server pagination controls', async () => {

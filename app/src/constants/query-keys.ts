@@ -6,6 +6,7 @@
  */
 export const QUERY_KEY_ROOT = {
   API_KEY: 'api-key',
+  BOARD: 'board',
   CODE: 'code',
   DOWNLOAD: 'download',
   GALLERY: 'gallery',
@@ -15,6 +16,7 @@ export const QUERY_KEY_ROOT = {
   SUBMISSION: 'submission',
   SUBMISSION_UPLOAD: 'submission-upload',
   SUBMISSION_UPLOAD_REVIEW: 'submission-upload-review',
+  TAG: 'tag',
   TEAM: 'team',
   TEAM_POLICY: 'team-policy',
   TICKET: 'ticket',

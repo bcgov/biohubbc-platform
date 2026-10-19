@@ -359,3 +359,97 @@ export function featureReferencePropertyValueJson(alias: string): string {
     'label', ${alias}.urn
   )`;
 }
+
+/**
+ * JSON array of a ticket's active tags, as `[{ tag_id, name, color }]` ordered by case-insensitive name.
+ * Returns `[]` when the ticket has no active tags. Both the link and the tag must be active.
+ *
+ * @param ticketIdExpr Trusted SQL expression for the ticket identifier (e.g. 't.ticket_id').
+ * @returns SQL scalar subquery with zero placeholders.
+ */
+export function activeTicketTagsJson(ticketIdExpr: string): string {
+  return `
+    COALESCE(
+      (
+        SELECT json_agg(
+          json_build_object('tag_id', tag_summary.tag_id, 'name', tag_summary.name, 'color', tag_summary.color)
+          ORDER BY lower(tag_summary.name), tag_summary.tag_id
+        )
+        FROM ticket_tag tag_link
+        JOIN tag tag_summary
+          ON tag_summary.tag_id = tag_link.tag_id
+          AND tag_summary.record_end_date IS NULL
+        WHERE tag_link.ticket_id = ${ticketIdExpr}
+          AND tag_link.record_end_date IS NULL
+      ),
+      '[]'::json
+    )
+  `;
+}
+
+/**
+ * JSON array of a board's active tags, as `[{ board_tag_id, tag_id, name, color }]` ordered by case-insensitive
+ * name. Returns `[]` when the board has no active tags.
+ *
+ * @param boardIdExpr Trusted SQL expression for the board identifier (e.g. 'b.board_id').
+ * @returns SQL scalar subquery with zero placeholders.
+ */
+export function activeBoardTagsJson(boardIdExpr: string): string {
+  return `
+    COALESCE(
+      (
+        SELECT json_agg(
+          json_build_object(
+            'board_tag_id', board_tag_link.board_tag_id,
+            'tag_id', tag_summary.tag_id,
+            'name', tag_summary.name,
+            'color', tag_summary.color
+          )
+          ORDER BY lower(tag_summary.name), tag_summary.tag_id
+        )
+        FROM board_tag board_tag_link
+        JOIN tag tag_summary
+          ON tag_summary.tag_id = board_tag_link.tag_id
+          AND tag_summary.record_end_date IS NULL
+        WHERE board_tag_link.board_id = ${boardIdExpr}
+          AND board_tag_link.record_end_date IS NULL
+      ),
+      '[]'::json
+    )
+  `;
+}
+
+/**
+ * JSON array of a board swimlane's active board tags, as `[{ board_tag_id, tag_id, name, color }]` ordered by
+ * case-insensitive name. Returns `[]` when the swimlane has no active board tags.
+ *
+ * @param boardSwimlaneIdExpr Trusted SQL expression for the swimlane identifier (e.g. 'bs.board_swimlane_id').
+ * @returns SQL scalar subquery with zero placeholders.
+ */
+export function activeBoardSwimlaneTagsJson(boardSwimlaneIdExpr: string): string {
+  return `
+    COALESCE(
+      (
+        SELECT json_agg(
+          json_build_object(
+            'board_tag_id', board_tag_link.board_tag_id,
+            'tag_id', tag_summary.tag_id,
+            'name', tag_summary.name,
+            'color', tag_summary.color
+          )
+          ORDER BY lower(tag_summary.name), tag_summary.tag_id
+        )
+        FROM board_swimlane_tag swimlane_tag_link
+        JOIN board_tag board_tag_link
+          ON board_tag_link.board_tag_id = swimlane_tag_link.board_tag_id
+          AND board_tag_link.record_end_date IS NULL
+        JOIN tag tag_summary
+          ON tag_summary.tag_id = board_tag_link.tag_id
+          AND tag_summary.record_end_date IS NULL
+        WHERE swimlane_tag_link.board_swimlane_id = ${boardSwimlaneIdExpr}
+          AND swimlane_tag_link.record_end_date IS NULL
+      ),
+      '[]'::json
+    )
+  `;
+}

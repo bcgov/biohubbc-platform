@@ -8,6 +8,8 @@ import { ticketQueryKeys } from './ticket-query-keys';
 import { userQueryKeys } from './user-query-keys';
 import { downloadQueryKeys } from './download-query-keys';
 import { policyQueryKeys } from './policy-query-keys';
+import { boardQueryKeys } from './board-query-keys';
+import { tagQueryKeys } from './tag-query-keys';
 
 /**
  * A ticket's detail through either scope's endpoints: what a change to its timeline, assignees, references or data
@@ -196,6 +198,30 @@ const downloadExport = (downloadId: string, downloadVersionId: string) => [
 ];
 
 /**
+ * A ticket's tags, which the administrative ticket lists show as chips and which decide the boards whose ticket lists
+ * include the ticket.
+ *
+ * @returns The keys to refresh.
+ */
+const ticketTags = () => [ticketQueryKeys.lists('admin')];
+
+/**
+ * A tag's name, color or removal: the tag lists and pickers, every ticket's tags and tag history, the administrative
+ * ticket lists' chips, and the boards, whose tags show it.
+ *
+ * @returns The keys to refresh.
+ */
+const tag = () => [tagQueryKeys.all(), ticketQueryKeys.tagsAll(), ticketQueryKeys.lists('admin'), boardQueryKeys.all()];
+
+/**
+ * A board's details, tags or removal: the board list and detail, and the board's tag and ticket lists, which its tags
+ * decide.
+ *
+ * @returns The keys to refresh.
+ */
+const board = () => [boardQueryKeys.all(), tagQueryKeys.all(), ticketQueryKeys.lists('admin')];
+
+/**
  * The cached queries each kind of change makes out of date, beyond the query the change is written to. Pass them to
  * `refreshChangedQueries`; this module is the one place that records which pages show which data.
  */
@@ -218,5 +244,8 @@ export const changedQueryKeys = {
   systemUser,
   teamMembership,
   download,
-  downloadExport
+  downloadExport,
+  ticketTags,
+  tag,
+  board
 };
