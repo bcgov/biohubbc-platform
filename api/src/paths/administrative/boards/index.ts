@@ -96,7 +96,7 @@ export function getBoards(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }
@@ -124,7 +124,7 @@ export function createBoard(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

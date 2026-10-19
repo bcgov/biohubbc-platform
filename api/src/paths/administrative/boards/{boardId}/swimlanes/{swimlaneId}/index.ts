@@ -110,7 +110,7 @@ export function updateBoardSwimlane(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }
@@ -138,7 +138,7 @@ export function deleteBoardSwimlane(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

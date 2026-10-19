@@ -92,7 +92,7 @@ export function updateTag(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }
@@ -120,7 +120,7 @@ export function deleteTag(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

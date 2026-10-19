@@ -97,7 +97,7 @@ export function getTicketTags(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }
@@ -125,7 +125,7 @@ export function replaceTicketTags(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

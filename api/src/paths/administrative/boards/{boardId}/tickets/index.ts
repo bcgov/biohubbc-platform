@@ -71,7 +71,7 @@ export function getBoardTickets(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }

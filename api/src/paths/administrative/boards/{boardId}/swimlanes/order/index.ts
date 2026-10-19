@@ -70,7 +70,7 @@ export function reorderBoardSwimlanes(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }
