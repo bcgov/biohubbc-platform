@@ -1,20 +1,14 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import {
-  TagRule,
-  TagRuleEvaluation,
-  TagRuleId,
-  TagRulePayload,
-  TagRuleSummary,
-  TicketSubmissionUploadScope
-} from '../models/tag-rule';
+import { TagRule, TagRuleEvaluation, TagRuleId, TagRulePayload, TicketSubmissionUploadScope } from '../models/tag-rule';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import {
   orWhereDataRequestReferencesExpression,
   orWhereSubmissionUploadMatchesExpression
 } from './tag-rule-expression-sql';
 
-const TAG_RULE_RETURNING_COLUMNS = [
+const TAG_RULE_COLUMNS = [
   'tag_rule_id',
   'tag_id',
   'name',
@@ -25,51 +19,74 @@ const TAG_RULE_RETURNING_COLUMNS = [
 ] as const;
 
 // Qualified for queries that join the tag table, which shares several column names.
-const TAG_RULE_COLUMNS = TAG_RULE_RETURNING_COLUMNS.map((column) => `tag_rule.${column}`);
+const QUALIFIED_TAG_RULE_COLUMNS = TAG_RULE_COLUMNS.map((column) => `tag_rule.${column}`);
 
 /**
  * Repository for tag_rule table operations, including rule matching against a ticket.
  */
 export class TagRuleRepository extends BaseRepository {
   /**
-   * List active tag rules with their tag, ordered by case-insensitive name.
+   * List a tag's active rules, ordered by case-insensitive name unless a sort is given.
    *
-   * @returns {Promise<TagRuleSummary[]>} Active tag rules.
+   * @param {string} tagId - Tag UUID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting.
+   * @returns {Promise<TagRule[]>} The tag's active rules.
    * @memberof TagRuleRepository
    */
-  async getTagRules(): Promise<TagRuleSummary[]> {
+  async getTagRules(tagId: string, pagination?: ApiPaginationOptions): Promise<TagRule[]> {
     const knex = getKnex();
-    const query = knex('tag_rule')
-      .select([...TAG_RULE_COLUMNS, 'tag.name as tag_name', 'tag.color as tag_color'])
-      .join('tag', 'tag.tag_id', 'tag_rule.tag_id')
-      .whereNull('tag_rule.record_end_date')
-      .orderByRaw('lower(tag_rule.name) ASC, tag_rule.tag_rule_id ASC');
+    let query = knex('tag_rule').select(TAG_RULE_COLUMNS).where('tag_id', tagId).whereNull('record_end_date');
+    query = this.applyPagination(query, pagination);
 
-    const response = await this.connection.knex(query, TagRuleSummary);
+    if (!pagination?.sort) {
+      query = query.orderByRaw('lower(name) ASC, tag_rule_id ASC');
+    }
+
+    const response = await this.connection.knex(query, TagRule);
 
     return response.rows;
   }
 
   /**
-   * Get a single active tag rule with its tag.
+   * Count a tag's active rules.
    *
-   * @param {string} tagRuleId - Tag rule UUID.
-   * @returns {Promise<TagRuleSummary>} Matching tag rule.
-   * @throws {ApiNotFoundError} If no matching active tag rule exists.
+   * @param {string} tagId - Tag UUID.
+   * @returns {Promise<number>} Number of the tag's active rules.
    * @memberof TagRuleRepository
    */
-  async getTagRuleById(tagRuleId: string): Promise<TagRuleSummary> {
+  async getTagRulesCount(tagId: string): Promise<number> {
     const knex = getKnex();
     const query = knex('tag_rule')
-      .select([...TAG_RULE_COLUMNS, 'tag.name as tag_name', 'tag.color as tag_color'])
-      .join('tag', 'tag.tag_id', 'tag_rule.tag_id')
-      .where('tag_rule.tag_rule_id', tagRuleId)
-      .whereNull('tag_rule.record_end_date');
+      .select(knex.raw('count(*)::integer as count'))
+      .where('tag_id', tagId)
+      .whereNull('record_end_date');
 
-    const response = await this.connection.knex(query, TagRuleSummary);
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Get a single active rule of a tag.
+   *
+   * @param {string} tagId - Tag UUID the rule must belong to.
+   * @param {string} tagRuleId - Tag rule UUID.
+   * @returns {Promise<TagRule>} Matching tag rule.
+   * @throws {ApiNotFoundError} If the tag has no such active rule.
+   * @memberof TagRuleRepository
+   */
+  async getTagRuleById(tagId: string, tagRuleId: string): Promise<TagRule> {
+    const knex = getKnex();
+    const query = knex('tag_rule')
+      .select(TAG_RULE_COLUMNS)
+      .where('tag_rule_id', tagRuleId)
+      .where('tag_id', tagId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, TagRule);
 
     if (response.rowCount !== 1) {
-      throw new ApiNotFoundError('Tag rule not found', ['TagRuleRepository->getTagRuleById', { tagRuleId }]);
+      throw new ApiNotFoundError('Tag rule not found', ['TagRuleRepository->getTagRuleById', { tagId, tagRuleId }]);
     }
 
     return response.rows[0];
@@ -103,7 +120,7 @@ export class TagRuleRepository extends BaseRepository {
   async getEnabledTagRules(): Promise<TagRule[]> {
     const knex = getKnex();
     const query = knex('tag_rule')
-      .select(TAG_RULE_COLUMNS)
+      .select(QUALIFIED_TAG_RULE_COLUMNS)
       .join('tag', 'tag.tag_id', 'tag_rule.tag_id')
       .where('tag_rule.is_enabled', true)
       .whereNull('tag_rule.record_end_date')
@@ -155,24 +172,24 @@ export class TagRuleRepository extends BaseRepository {
   }
 
   /**
-   * Insert a tag rule.
+   * Insert an enabled rule for a tag.
    *
+   * @param {string} tagId - Tag UUID.
    * @param {TagRulePayload} tagRule - Tag rule payload.
    * @returns {Promise<TagRule>} Created tag rule.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof TagRuleRepository
    */
-  async insertTagRule(tagRule: TagRulePayload): Promise<TagRule> {
+  async insertTagRule(tagId: string, tagRule: TagRulePayload): Promise<TagRule> {
     const knex = getKnex();
     const query = knex('tag_rule')
       .insert({
-        tag_id: tagRule.tag_id,
+        tag_id: tagId,
         name: tagRule.name,
         description: tagRule.description,
-        is_enabled: tagRule.is_enabled,
         expression_id: tagRule.expression_id
       })
-      .returning(TAG_RULE_RETURNING_COLUMNS);
+      .returning(TAG_RULE_COLUMNS);
 
     const response = await this.connection.knex(query, TagRule);
 
@@ -187,33 +204,61 @@ export class TagRuleRepository extends BaseRepository {
   }
 
   /**
-   * Update an active tag rule.
+   * Update an active rule of a tag.
    *
+   * @param {string} tagId - Tag UUID the rule must belong to.
    * @param {string} tagRuleId - Tag rule UUID.
    * @param {TagRulePayload} tagRule - Tag rule payload.
+   * @returns {Promise<void>}
+   * @throws {ApiExecuteSQLError} If the update does not affect exactly one row.
+   * @memberof TagRuleRepository
+   */
+  async updateTagRule(tagId: string, tagRuleId: string, tagRule: TagRulePayload): Promise<void> {
+    const knex = getKnex();
+    const query = knex('tag_rule')
+      .update({
+        name: tagRule.name,
+        description: tagRule.description,
+        expression_id: tagRule.expression_id
+      })
+      .where('tag_rule_id', tagRuleId)
+      .where('tag_id', tagId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update tag rule', [
+        'TagRuleRepository->updateTagRule',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+  }
+
+  /**
+   * Enable or disable an active rule of a tag.
+   *
+   * @param {string} tagId - Tag UUID the rule must belong to.
+   * @param {string} tagRuleId - Tag rule UUID.
+   * @param {boolean} isEnabled - Whether the rule is evaluated.
    * @returns {Promise<TagRule>} Updated tag rule.
    * @throws {ApiExecuteSQLError} If the update does not affect exactly one row.
    * @memberof TagRuleRepository
    */
-  async updateTagRule(tagRuleId: string, tagRule: TagRulePayload): Promise<TagRule> {
+  async updateTagRuleEnabled(tagId: string, tagRuleId: string, isEnabled: boolean): Promise<TagRule> {
     const knex = getKnex();
     const query = knex('tag_rule')
-      .update({
-        tag_id: tagRule.tag_id,
-        name: tagRule.name,
-        description: tagRule.description,
-        is_enabled: tagRule.is_enabled,
-        expression_id: tagRule.expression_id
-      })
+      .update({ is_enabled: isEnabled })
       .where('tag_rule_id', tagRuleId)
+      .where('tag_id', tagId)
       .whereNull('record_end_date')
-      .returning(TAG_RULE_RETURNING_COLUMNS);
+      .returning(TAG_RULE_COLUMNS);
 
     const response = await this.connection.knex(query, TagRule);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update tag rule', [
-        'TagRuleRepository->updateTagRule',
+        'TagRuleRepository->updateTagRuleEnabled',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
@@ -222,18 +267,20 @@ export class TagRuleRepository extends BaseRepository {
   }
 
   /**
-   * Soft delete an active tag rule.
+   * Soft delete an active rule of a tag.
    *
+   * @param {string} tagId - Tag UUID the rule must belong to.
    * @param {string} tagRuleId - Tag rule UUID.
    * @returns {Promise<void>}
    * @throws {ApiExecuteSQLError} If the delete does not affect exactly one row.
    * @memberof TagRuleRepository
    */
-  async deleteTagRule(tagRuleId: string): Promise<void> {
+  async deleteTagRule(tagId: string, tagRuleId: string): Promise<void> {
     const knex = getKnex();
     const query = knex('tag_rule')
       .update({ record_end_date: knex.fn.now() })
       .where('tag_rule_id', tagRuleId)
+      .where('tag_id', tagId)
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query);

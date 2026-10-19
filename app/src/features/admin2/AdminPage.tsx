@@ -4,7 +4,6 @@ import {
   mdiCubeOutline,
   mdiHandBackRightOutline,
   mdiLockOutline,
-  mdiTagArrowRightOutline,
   mdiTicketOutline
 } from '@mdi/js';
 import Icon from '@mdi/react';
@@ -20,12 +19,6 @@ import { Link as RouterLink } from 'react-router-dom';
 
 const ADMIN_SECTIONS = [
   { label: 'Tickets', icon: mdiTicketOutline, to: '/admin/tickets', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN] },
-  {
-    label: 'Tag Rules',
-    icon: mdiTagArrowRightOutline,
-    to: '/admin/tag-rules',
-    validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN]
-  },
   { label: 'Users', icon: mdiAccountOutline, to: '/admin/users', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN] },
   {
     label: 'Security',

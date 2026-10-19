@@ -2,6 +2,7 @@ import { EditDialog } from 'components/dialog/EditDialog';
 import { TAG_DEFAULT_COLOR } from 'constants/tag';
 import { ITag } from 'interfaces/useTagsApi.interface';
 import { ITagFormValues, TagForm } from '../form/TagForm';
+import { getTagColorDigits } from '../form/tag-color';
 import { TagYupSchema } from '../form/TagYupSchema';
 
 interface ITagDialogProps {
@@ -18,7 +19,7 @@ interface ITagDialogProps {
 const CreateTagFormInitialValues: ITagFormValues = {
   name: '',
   description: null,
-  color: TAG_DEFAULT_COLOR
+  color: getTagColorDigits(TAG_DEFAULT_COLOR)
 };
 
 /**
@@ -30,7 +31,7 @@ const CreateTagFormInitialValues: ITagFormValues = {
 export const TagDialog = (props: ITagDialogProps) => {
   const { open, tag, isLoading, dialogError, onCancel, onSave } = props;
   const initialValues: ITagFormValues = tag
-    ? { name: tag.name, description: tag.description, color: tag.color }
+    ? { name: tag.name, description: tag.description, color: getTagColorDigits(tag.color) }
     : CreateTagFormInitialValues;
 
   return (

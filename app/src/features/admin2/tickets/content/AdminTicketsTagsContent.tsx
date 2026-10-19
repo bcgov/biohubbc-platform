@@ -4,6 +4,7 @@ import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
 import { TagDialog } from 'features/admin2/tags/dialog/TagDialog';
+import { getTagColor } from 'features/admin2/tags/form/tag-color';
 import { ITagFormValues } from 'features/admin2/tags/form/TagForm';
 import { AdminTagsTable } from 'features/admin2/tags/table/AdminTagsTable';
 import { useApi } from 'hooks/useApi';
@@ -11,13 +12,14 @@ import { useDialogContext } from 'hooks/useContext';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { ITag, ITagsQueryParams } from 'interfaces/useTagsApi.interface';
 import { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import { tagQueryKeys } from 'utils/query-keys/tag-query-keys';
 
 /**
  * Tags tab of the administrative tickets page: the searchable, server-paginated list of ticket tags, with create,
- * edit and delete.
+ * edit and delete. Each tag opens its own page, which lists the rules that apply it.
  *
  * A save keeps its dialog open and shows the server's error, such as a duplicate name, in the dialog. Deleting a tag
  * removes it from every ticket and board, so its confirmation says so; tag changes refresh everything that shows tags.
@@ -26,6 +28,7 @@ import { tagQueryKeys } from 'utils/query-keys/tag-query-keys';
  */
 export const AdminTicketsTagsContent = () => {
   const api = useApi();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const dialogContext = useDialogContext();
 
@@ -56,7 +59,7 @@ export const AdminTicketsTagsContent = () => {
       const payload = {
         name: values.name.trim(),
         description: values.description?.trim() || null,
-        color: values.color
+        color: getTagColor(values.color)
       };
 
       if (tag) {
@@ -157,6 +160,7 @@ export const AdminTicketsTagsContent = () => {
           setSortModel={grid.handleSortChange}
           onEditTag={handleEditTag}
           onDeleteTag={handleDeleteTag}
+          onOpenTag={(tag) => navigate(`/admin/tickets/tags/${tag.tag_id}`)}
         />
       </PageSection>
 

@@ -33,6 +33,19 @@ export const useTagsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get one tag.
+   *
+   * @param {string} tagId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {*} {Promise<ITag>}
+   */
+  const getTag = async (tagId: string, options?: Pick<AxiosRequestConfig, 'signal'>): Promise<ITag> => {
+    const { data } = await axios.get<ITag>(`/api/administrative/tags/${tagId}`, options);
+
+    return data;
+  };
+
+  /**
    * Create a tag. Tag names are unique, ignoring case.
    *
    * @param {ITagRequest} payload
@@ -101,6 +114,7 @@ export const useTagsApi = (axios: AxiosInstance) => {
 
   return {
     getTags,
+    getTag,
     createTag,
     updateTag,
     deleteTag,

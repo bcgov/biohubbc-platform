@@ -18,18 +18,29 @@ interface IAdminTagsTableProps extends IServerPaginationProps {
   onEditTag?: (tag: ITag) => void;
   /** Deletes a tag; the actions column is shown only with edit and delete handlers. */
   onDeleteTag?: (tag: ITag) => void;
+  /** Opens a tag's page when its row is clicked. */
+  onOpenTag?: (tag: ITag) => void;
 }
 
 /**
  * Server-paginated table of tags: each tag's chip, description and created date, sortable by name and created date,
- * with edit and delete actions when handlers are given.
+ * with edit and delete actions and a row click that opens the tag when handlers are given.
  *
  * @param {IAdminTagsTableProps} props The page of tags, the grid's pagination and sort, and the optional row actions.
  * @returns {JSX.Element} The tags table.
  */
 export const AdminTagsTable = (props: IAdminTagsTableProps) => {
-  const { tags, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel, onEditTag, onDeleteTag } =
-    props;
+  const {
+    tags,
+    rowCount,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    onEditTag,
+    onDeleteTag,
+    onOpenTag
+  } = props;
 
   const columns: GridColDef<ITag>[] = useMemo(() => {
     const tagColumns: GridColDef<ITag>[] = [
@@ -115,6 +126,7 @@ export const AdminTagsTable = (props: IAdminTagsTableProps) => {
       setPaginationModel={setPaginationModel}
       sortModel={sortModel}
       setSortModel={setSortModel}
+      onRowClick={onOpenTag}
     />
   );
 };

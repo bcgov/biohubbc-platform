@@ -1,8 +1,8 @@
 /** Color a new tag starts with. */
 export const TAG_DEFAULT_COLOR = '#1A5A96';
 
-/** `#RRGGBB`, the only color format tags store. */
-export const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+/** Six hex digits, `RRGGBB`: a tag color as the tag form's color field holds it, without the leading `#`. */
+export const HEX_COLOR_DIGITS_PATTERN = /^[0-9A-Fa-f]{6}$/;
 
 /** Text color for a tag chip on a light background. */
 export const TAG_TEXT_COLOR_DARK = '#000000';

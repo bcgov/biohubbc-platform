@@ -71,10 +71,6 @@ vi.mock('features/admin2/configuration/AdminConfigurationPage', () => ({
   AdminConfigurationPage: () => <div data-testid="configuration-page" />
 }));
 
-vi.mock('./tag-rule/TagRulesRouter', () => ({
-  TagRulesRouter: () => <div data-testid="tag-rules-router" />
-}));
-
 vi.mock('features/admin/configuration/blueprint/BlueprintPage', () => ({
   BlueprintPage: () => <div data-testid="blueprint-page" />
 }));
@@ -97,8 +93,7 @@ describe('AdminRouter access guards', () => {
     ['/admin/configuration', 'configuration-page'],
     ['/admin/configuration/blueprints/1', 'blueprint-page'],
     ['/admin/tickets/boards/board-1', 'tickets-router'],
-    ['/admin/tag-rules', 'tag-rules-router'],
-    ['/admin/tag-rules/new', 'tag-rules-router']
+    ['/admin/tickets/tags/tag-1', 'tickets-router']
   ]) {
     it(`allows system administrators at ${path}`, async () => {
       const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);
@@ -119,8 +114,8 @@ describe('AdminRouter access guards', () => {
     });
   }
 
-  it.each(['/admin/boards', '/admin/boards/board-1', '/admin/tags'])(
-    'no longer routes %s, which moved to tabs of the tickets page',
+  it.each(['/admin/boards', '/admin/boards/board-1', '/admin/tags', '/admin/tag-rules', '/admin/tag-rules/new'])(
+    'no longer routes %s, which moved to the tickets page',
     async (path) => {
       const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);
       expect(await page.findByTestId('not-found-page')).toBeVisible();

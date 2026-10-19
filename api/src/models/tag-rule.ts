@@ -14,40 +14,27 @@ export const TagRule = z.object({
 export type TagRule = z.infer<typeof TagRule>;
 
 /**
- * Tag rule list row with the display fields of its tag.
- */
-export const TagRuleSummary = TagRule.extend({
-  tag_name: z.string(),
-  tag_color: z.string()
-});
-export type TagRuleSummary = z.infer<typeof TagRuleSummary>;
-
-/**
  * Tag rule with its expression read back as an API-shaped tree, for editing.
  */
-export interface TagRuleDetail extends TagRuleSummary {
+export interface TagRuleDetail extends TagRule {
   expression: ExpressionTree;
 }
 
 /**
- * Create or update tag rule request.
+ * Create or update tag rule request. The rule's tag comes from the route.
  */
 export interface TagRuleRequest {
-  tagId: string;
   name: string;
   description: string | null;
-  isEnabled: boolean;
   expression: ExpressionTree;
 }
 
 /**
- * Tag rule columns written on insert and update.
+ * Tag rule columns written on insert and update, with the rule's expression stored as an expression id.
  */
 export interface TagRulePayload {
-  tag_id: string;
   name: string;
   description: string | null;
-  is_enabled: boolean;
   expression_id: string;
 }
 

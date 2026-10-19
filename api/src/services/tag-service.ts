@@ -43,6 +43,18 @@ export class TagService extends DBService {
   }
 
   /**
+   * Get an active tag.
+   *
+   * @param {string} tagId - Tag UUID.
+   * @returns {Promise<Tag>} The tag.
+   * @throws {ApiNotFoundError} If the tag does not exist or is deleted.
+   * @memberof TagService
+   */
+  async getTag(tagId: string): Promise<Tag> {
+    return this.tagRepository.getTagById(tagId);
+  }
+
+  /**
    * Count active tags matching the filters.
    *
    * @param {TagFilters} [filters] - Optional filters.

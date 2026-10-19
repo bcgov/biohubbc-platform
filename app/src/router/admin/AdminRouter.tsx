@@ -22,7 +22,6 @@ import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { SubmissionsRouter } from './submission/SubmissionRouter';
-import { TagRulesRouter } from './tag-rule/TagRulesRouter';
 import { TicketsRouter } from './ticket/TicketsRouter';
 
 /**
@@ -282,23 +281,6 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <TicketsRouter />
-              </SystemRoleGuard>
-            </AuthenticatedRouteGuard>
-          </BaseLayout>
-        }
-      />
-
-      {/* Tag rules route */}
-      <Route
-        path="tag-rules/*"
-        element={
-          <BaseLayout>
-            <PageTitle title="Tag Rules" description="Manage the rules that tag tickets automatically" />
-            <AuthenticatedRouteGuard>
-              <SystemRoleGuard
-                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                fallback={<Navigate to="/forbidden" replace />}>
-                <TagRulesRouter />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

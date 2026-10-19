@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { ExpressionTree } from '../../models/expression-tree';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { DataRequestService } from '../../services/data-request-service';
@@ -78,11 +79,9 @@ describe('Tag rule evaluation (integration)', function () {
   }
 
   async function createRule(tagId: string, expression: ExpressionTree): Promise<string> {
-    const tagRule = await tagRuleService.createTagRule({
-      tagId,
+    const tagRule = await tagRuleService.createTagRule(tagId, {
       name: `Rule-${randomUUID()}`,
       description: null,
-      isEnabled: true,
       expression
     });
     return tagRule.tag_rule_id;
@@ -208,14 +207,7 @@ describe('Tag rule evaluation (integration)', function () {
       await addFeature('elk');
       const tagId = await createTag('Disabled');
       const tagRuleId = await createRule(tagId, equalsExpression('elk'));
-      const tagRule = await tagRuleService.getTagRule(tagRuleId);
-      await tagRuleService.updateTagRule(tagRuleId, {
-        tagId,
-        name: tagRule.name,
-        description: null,
-        isEnabled: false,
-        expression: tagRule.expression
-      });
+      await tagRuleService.updateTagRuleEnabled(tagId, tagRuleId, false);
 
       expect(await evaluate(ticketId)).to.eql([]);
     });
@@ -226,9 +218,30 @@ describe('Tag rule evaluation (integration)', function () {
       const tagRuleId = await createRule(tagId, equalsExpression('elk'));
       expect(await evaluate(ticketId)).to.eql([tagId]);
 
-      await tagRuleService.deleteTagRule(tagRuleId, true);
+      await tagRuleService.deleteTagRule(tagId, tagRuleId, true);
 
       expect((await ticketTagService.getTicketTags(ticketId)).tags).to.eql([]);
+    });
+
+    it("lists only the tag's rules, a page at a time, and scopes rule access to the tag", async () => {
+      const tagId = await createTag('Listed');
+      const otherTagId = await createTag('Other');
+      const first = await createRule(tagId, equalsExpression('elk'));
+      const second = await createRule(tagId, equalsExpression('deer'));
+      await createRule(otherTagId, equalsExpression('moose'));
+
+      const firstPage = await tagRuleService.getTagRules(tagId, { page: 1, limit: 1 });
+      const secondPage = await tagRuleService.getTagRules(tagId, { page: 2, limit: 1 });
+
+      expect([...firstPage, ...secondPage].map((tagRule) => tagRule.tag_rule_id)).to.have.members([first, second]);
+      expect(await tagRuleService.getTagRulesCount(tagId)).to.equal(2);
+
+      try {
+        await tagRuleService.getTagRule(otherTagId, first);
+        expect.fail('Expected not found');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
     });
 
     it('deleting a tag deletes its rules', async () => {
@@ -237,7 +250,7 @@ describe('Tag rule evaluation (integration)', function () {
 
       await tagService.deleteTag(tagId);
 
-      const tagRules = await tagRuleService.getTagRules();
+      const tagRules = await tagRuleService.getTagRules(tagId);
       expect(tagRules.map((tagRule) => tagRule.tag_rule_id)).to.not.include(tagRuleId);
     });
   });

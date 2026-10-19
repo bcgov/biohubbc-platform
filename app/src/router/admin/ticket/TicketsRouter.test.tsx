@@ -21,6 +21,13 @@ vi.mock('features/admin2/boards/detail/AdminBoardPage', () => ({
   }
 }));
 
+vi.mock('features/admin2/tags/detail/AdminTagPage', () => ({
+  AdminTagPage: () => {
+    const { tagId } = useParams();
+    return <div data-testid="tag-page">{tagId}</div>;
+  }
+}));
+
 vi.mock('features/admin/tickets/TicketDetailPage', () => ({
   TicketDetailPage: () => {
     const { ticketId } = useParams();
@@ -58,11 +65,19 @@ describe('TicketsRouter', () => {
     expect(page.queryByTestId('ticket-detail-page')).not.toBeInTheDocument();
   });
 
+  it('renders the tag page at a tag route rather than reading "tags" as a ticket id', async () => {
+    const page = renderTicketsRouter('/admin/tickets/tags/tag-1');
+
+    expect(await page.findByTestId('tag-page')).toHaveTextContent('tag-1');
+    expect(page.queryByTestId('ticket-detail-page')).not.toBeInTheDocument();
+  });
+
   it('still renders the ticket detail page at a ticket route', async () => {
     const page = renderTicketsRouter('/admin/tickets/ticket-1');
 
     expect(await page.findByTestId('ticket-detail-page')).toHaveTextContent('ticket-1');
     expect(page.queryByTestId('board-page')).not.toBeInTheDocument();
+    expect(page.queryByTestId('tag-page')).not.toBeInTheDocument();
   });
 
   it('no longer routes a board settings page', async () => {

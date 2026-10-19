@@ -1,14 +1,14 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { TagRuleDetailSchema, TagRuleRequestSchema } from '../../../../openapi/schemas/tag-rule';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { TagRuleService } from '../../../../services/tag-rule-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../../../../constants/roles';
+import { getDBConnection } from '../../../../../../database/db';
+import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
+import { TagRuleDetailSchema, TagRuleRequestSchema } from '../../../../../../openapi/schemas/tag-rule';
+import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
+import { TagRuleService } from '../../../../../../services/tag-rule-service';
+import { getLogger } from '../../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/tag-rules/{tagRuleId}');
+const defaultLog = getLogger('paths/administrative/tags/{tagId}/rules/{tagRuleId}');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
@@ -18,10 +18,17 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get a tag rule with its expression.',
+  description: 'Get a rule of a tag with its expression.',
   tags: ['tags'],
   security: [{ Bearer: [] }],
   parameters: [
+    {
+      in: 'path',
+      name: 'tagId',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+      description: 'Tag UUID.'
+    },
     {
       in: 'path',
       name: 'tagRuleId',
@@ -48,10 +55,17 @@ export const PUT: Operation = [
 
 PUT.apiDoc = {
   description:
-    'Update a tag rule. Enabled rules are re-evaluated against every active ticket in the background; disabling a rule leaves its tags in place.',
+    "Update a tag rule's name, description and expression. Changes apply to tickets evaluated afterwards; tags already applied are unaffected.",
   tags: ['tags'],
   security: [{ Bearer: [] }],
   parameters: [
+    {
+      in: 'path',
+      name: 'tagId',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+      description: 'Tag UUID.'
+    },
     {
       in: 'path',
       name: 'tagRuleId',
@@ -87,6 +101,13 @@ DELETE.apiDoc = {
   parameters: [
     {
       in: 'path',
+      name: 'tagId',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+      description: 'Tag UUID.'
+    },
+    {
+      in: 'path',
       name: 'tagRuleId',
       required: true,
       schema: { type: 'string', format: 'uuid' },
@@ -107,7 +128,7 @@ DELETE.apiDoc = {
 };
 
 /**
- * Get a tag rule.
+ * Get a rule of a tag.
  *
  * @returns {RequestHandler}
  */
@@ -119,7 +140,7 @@ export function getTagRule(): RequestHandler {
       await connection.open();
 
       const tagRuleService = new TagRuleService(connection);
-      const tagRule = await tagRuleService.getTagRule(req.params.tagRuleId);
+      const tagRule = await tagRuleService.getTagRule(req.params.tagId, req.params.tagRuleId);
 
       await connection.commit();
 
@@ -135,7 +156,7 @@ export function getTagRule(): RequestHandler {
 }
 
 /**
- * Update a tag rule.
+ * Update a rule of a tag.
  *
  * @returns {RequestHandler}
  */
@@ -147,7 +168,7 @@ export function updateTagRule(): RequestHandler {
       await connection.open();
 
       const tagRuleService = new TagRuleService(connection);
-      const tagRule = await tagRuleService.updateTagRule(req.params.tagRuleId, req.body);
+      const tagRule = await tagRuleService.updateTagRule(req.params.tagId, req.params.tagRuleId, req.body);
 
       await connection.commit();
 
@@ -163,7 +184,7 @@ export function updateTagRule(): RequestHandler {
 }
 
 /**
- * Delete a tag rule.
+ * Delete a rule of a tag.
  *
  * @returns {RequestHandler}
  */
@@ -176,7 +197,7 @@ export function deleteTagRule(): RequestHandler {
 
       const tagRuleService = new TagRuleService(connection);
       const removeTags = String(req.query.remove_tags) === 'true';
-      await tagRuleService.deleteTagRule(req.params.tagRuleId, removeTags);
+      await tagRuleService.deleteTagRule(req.params.tagId, req.params.tagRuleId, removeTags);
 
       await connection.commit();
 

@@ -214,12 +214,23 @@ const ticketTags = () => [ticketQueryKeys.lists('admin')];
 const tag = () => [tagQueryKeys.all(), ticketQueryKeys.tagsAll(), ticketQueryKeys.lists('admin'), boardQueryKeys.all()];
 
 /**
- * A tag rule's creation, change or removal: the tag rule list and details, and, because deleting a rule may remove the
- * tags it applied, every ticket's tags with the administrative ticket lists that show them.
+ * A tag rule's creation or enabled state: its tag's rule list and details. Rules do not apply to existing tickets, so
+ * no ticket changes.
  *
+ * @param {string} tagId The tag the rule applies.
  * @returns The keys to refresh.
  */
-const tagRule = () => [tagQueryKeys.rules(), ticketQueryKeys.tagsAll(), ...ticketTags()];
+const tagRule = (tagId: string) => [tagQueryKeys.rules(tagId)];
+
+/**
+ * A tag rule's edit or removal, which changes the tags it applied: its tag's rule list and details, every ticket's
+ * tags and tag history, which name the rule that applied a tag, and, because deleting a rule may remove the tags it
+ * applied, the administrative ticket lists that show them.
+ *
+ * @param {string} tagId The tag the rule applies.
+ * @returns The keys to refresh.
+ */
+const tagRuleApplied = (tagId: string) => [...tagRule(tagId), ticketQueryKeys.tagsAll(), ...ticketTags()];
 
 /**
  * A board's details, tags or removal: the board list and detail, and the board's tag and ticket lists, which its tags
@@ -256,5 +267,6 @@ export const changedQueryKeys = {
   ticketTags,
   tag,
   tagRule,
+  tagRuleApplied,
   board
 };

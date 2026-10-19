@@ -1,14 +1,15 @@
 import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
-import { TagRuleDetail, TagRulePayload, TagRuleRequest, TagRuleSummary } from '../models/tag-rule';
+import { TagRule, TagRuleDetail, TagRulePayload, TagRuleRequest } from '../models/tag-rule';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { ExpressionTreeService } from './expression-tree-service';
 import { TagService } from './tag-service';
 
 /**
- * Service for admin-only tag rule management.
+ * Service for admin-only tag rule management. Every rule belongs to one tag, and every operation is scoped to it.
  */
 export class TagRuleService extends DBService {
   tagRuleRepository: TagRuleRepository;
@@ -25,90 +26,126 @@ export class TagRuleService extends DBService {
   }
 
   /**
-   * List active tag rules.
+   * List a tag's active rules.
    *
-   * @returns {Promise<TagRuleSummary[]>} Active tag rules ordered by name.
+   * @param {string} tagId - Tag UUID.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination and sorting.
+   * @returns {Promise<TagRule[]>} The tag's rules, ordered by name unless a sort is given.
    * @memberof TagRuleService
    */
-  async getTagRules(): Promise<TagRuleSummary[]> {
-    return this.tagRuleRepository.getTagRules();
+  async getTagRules(tagId: string, pagination?: ApiPaginationOptions): Promise<TagRule[]> {
+    return this.tagRuleRepository.getTagRules(tagId, pagination);
   }
 
   /**
-   * Get a tag rule with its expression, for editing.
+   * Count a tag's active rules.
    *
-   * @param {string} tagRuleId - Tag rule UUID.
-   * @returns {Promise<TagRuleDetail>} Tag rule with its expression tree.
-   * @throws {ApiNotFoundError} If the rule does not exist or is deleted.
+   * @param {string} tagId - Tag UUID.
+   * @returns {Promise<number>} Number of the tag's rules.
    * @memberof TagRuleService
    */
-  async getTagRule(tagRuleId: string): Promise<TagRuleDetail> {
-    const tagRule = await this.tagRuleRepository.getTagRuleById(tagRuleId);
+  async getTagRulesCount(tagId: string): Promise<number> {
+    return this.tagRuleRepository.getTagRulesCount(tagId);
+  }
+
+  /**
+   * Get a rule of a tag with its expression, for editing.
+   *
+   * @param {string} tagId - Tag UUID the rule belongs to.
+   * @param {string} tagRuleId - Tag rule UUID.
+   * @returns {Promise<TagRuleDetail>} Tag rule with its expression tree.
+   * @throws {ApiNotFoundError} If the tag has no such active rule.
+   * @memberof TagRuleService
+   */
+  async getTagRule(tagId: string, tagRuleId: string): Promise<TagRuleDetail> {
+    const tagRule = await this.tagRuleRepository.getTagRuleById(tagId, tagRuleId);
     const expression = await this.expressionTreeService.readExpressionTree(tagRule.expression_id);
 
     return { ...tagRule, expression };
   }
 
   /**
-   * Create a tag rule. It applies to tickets evaluated after it is created; existing tickets are not re-evaluated.
+   * Create an enabled rule for a tag. It applies to tickets evaluated after it is created; existing tickets are not
+   * re-evaluated.
    *
+   * @param {string} tagId - Tag UUID.
    * @param {TagRuleRequest} tagRule - Tag rule payload.
    * @returns {Promise<TagRuleDetail>} Created tag rule.
    * @throws {ApiConflictError} If an active rule already has the same name (case-insensitive).
    * @throws {HTTP400} If the tag is unknown or deleted, or the expression is invalid.
    * @memberof TagRuleService
    */
-  async createTagRule(tagRule: TagRuleRequest): Promise<TagRuleDetail> {
+  async createTagRule(tagId: string, tagRule: TagRuleRequest): Promise<TagRuleDetail> {
+    await this.tagService.assertActiveTagIds([tagId]);
     await this.assertTagRuleNameAvailable(tagRule.name);
 
     const payload = await this.getTagRulePayload(tagRule);
-    const created = await this.tagRuleRepository.insertTagRule(payload);
+    const created = await this.tagRuleRepository.insertTagRule(tagId, payload);
 
-    return this.getTagRule(created.tag_rule_id);
+    return this.getTagRule(tagId, created.tag_rule_id);
   }
 
   /**
-   * Update a tag rule. Changes apply to tickets evaluated afterwards; tags already applied are unaffected.
+   * Update a rule's name, description and expression. Changes apply to tickets evaluated afterwards; tags already
+   * applied are unaffected.
    *
+   * @param {string} tagId - Tag UUID the rule belongs to.
    * @param {string} tagRuleId - Tag rule UUID.
    * @param {TagRuleRequest} tagRule - Tag rule payload.
    * @returns {Promise<TagRuleDetail>} Updated tag rule.
-   * @throws {ApiNotFoundError} If the rule does not exist or is deleted.
+   * @throws {ApiNotFoundError} If the tag has no such active rule.
    * @throws {ApiConflictError} If another active rule already has the new name (case-insensitive).
-   * @throws {HTTP400} If the tag is unknown or deleted, or the expression is invalid.
+   * @throws {HTTP400} If the expression is invalid.
    * @memberof TagRuleService
    */
-  async updateTagRule(tagRuleId: string, tagRule: TagRuleRequest): Promise<TagRuleDetail> {
-    await this.tagRuleRepository.getTagRuleById(tagRuleId);
+  async updateTagRule(tagId: string, tagRuleId: string, tagRule: TagRuleRequest): Promise<TagRuleDetail> {
+    await this.tagRuleRepository.getTagRuleById(tagId, tagRuleId);
     await this.assertTagRuleNameAvailable(tagRule.name, tagRuleId);
 
     const payload = await this.getTagRulePayload(tagRule);
-    await this.tagRuleRepository.updateTagRule(tagRuleId, payload);
+    await this.tagRuleRepository.updateTagRule(tagId, tagRuleId, payload);
 
-    return this.getTagRule(tagRuleId);
+    return this.getTagRule(tagId, tagRuleId);
   }
 
   /**
-   * Soft delete a tag rule, optionally removing the tags it applied.
+   * Enable or disable a rule. Disabled rules are not evaluated; tags already applied are unaffected.
    *
+   * @param {string} tagId - Tag UUID the rule belongs to.
+   * @param {string} tagRuleId - Tag rule UUID.
+   * @param {boolean} isEnabled - Whether the rule is evaluated.
+   * @returns {Promise<TagRule>} Updated tag rule.
+   * @throws {ApiNotFoundError} If the tag has no such active rule.
+   * @memberof TagRuleService
+   */
+  async updateTagRuleEnabled(tagId: string, tagRuleId: string, isEnabled: boolean): Promise<TagRule> {
+    await this.tagRuleRepository.getTagRuleById(tagId, tagRuleId);
+
+    return this.tagRuleRepository.updateTagRuleEnabled(tagId, tagRuleId, isEnabled);
+  }
+
+  /**
+   * Soft delete a rule, optionally removing the tags it applied.
+   *
+   * @param {string} tagId - Tag UUID the rule belongs to.
    * @param {string} tagRuleId - Tag rule UUID.
    * @param {boolean} removeTags - Whether to remove the rule's active tags from tickets.
    * @returns {Promise<void>}
-   * @throws {ApiNotFoundError} If the rule does not exist or is deleted.
+   * @throws {ApiNotFoundError} If the tag has no such active rule.
    * @memberof TagRuleService
    */
-  async deleteTagRule(tagRuleId: string, removeTags: boolean): Promise<void> {
-    await this.tagRuleRepository.getTagRuleById(tagRuleId);
+  async deleteTagRule(tagId: string, tagRuleId: string, removeTags: boolean): Promise<void> {
+    await this.tagRuleRepository.getTagRuleById(tagId, tagRuleId);
 
     if (removeTags) {
       await this.ticketTagRepository.deleteTicketTagsByTagRuleId(tagRuleId);
     }
 
-    await this.tagRuleRepository.deleteTagRule(tagRuleId);
+    await this.tagRuleRepository.deleteTagRule(tagId, tagRuleId);
   }
 
   /**
-   * Validate a tag rule request and resolve its expression into a stored expression id.
+   * Resolve a tag rule request's expression into a stored expression id.
    *
    * @private
    * @param {TagRuleRequest} tagRule - Tag rule request.
@@ -116,15 +153,11 @@ export class TagRuleService extends DBService {
    * @memberof TagRuleService
    */
   private async getTagRulePayload(tagRule: TagRuleRequest): Promise<TagRulePayload> {
-    await this.tagService.assertActiveTagIds([tagRule.tagId]);
-
     const expression = await this.expressionTreeService.writeExpressionTree(tagRule.expression);
 
     return {
-      tag_id: tagRule.tagId,
       name: tagRule.name,
       description: tagRule.description,
-      is_enabled: tagRule.isEnabled,
       expression_id: expression.expression_id
     };
   }

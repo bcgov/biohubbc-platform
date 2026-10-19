@@ -52,6 +52,14 @@ describe('useTagsApi', () => {
     expect(result).toEqual(response);
   });
 
+  it('getTag reads one tag', async () => {
+    mock.onGet(`/api/administrative/tags/${tagId}`).reply(200, tag);
+
+    const result = await useTagsApi(axios).getTag(tagId);
+
+    expect(result).toEqual(tag);
+  });
+
   it('createTag posts the tag', async () => {
     const payload = { name: 'Urgent', description: null, color: '#D8292F' };
     mock.onPost('/api/administrative/tags', payload).reply(201, tag);
