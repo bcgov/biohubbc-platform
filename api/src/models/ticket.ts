@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DataRequest } from './data-request';
 import { TicketSubmissionUpload } from './submission-upload';
+import { TagSummary } from './tag';
 import { TicketComment } from './ticket-comment';
 import { TicketReference } from './ticket-reference';
 import { TicketStatus as TicketStatusRecord } from './ticket-status';
@@ -10,6 +11,14 @@ export interface TicketFilters {
   team_ids?: string[];
   status?: TicketStatus;
   search?: string;
+  /**
+   * Admin-only filter: tickets with any of these active tags.
+   */
+  tag_ids?: string[];
+  /**
+   * Admin-only filter: tickets on this board (any of its active board tags).
+   */
+  board_id?: string;
 }
 
 export const TicketPriority = z.enum(['low', 'medium', 'high', 'critical']);
@@ -29,6 +38,14 @@ export const Ticket = z.object({
   status: TicketStatus
 });
 export type Ticket = z.infer<typeof Ticket>;
+
+/**
+ * Ticket with its active admin-only tags. Never returned by portal endpoints.
+ */
+export const TicketWithTags = Ticket.extend({
+  tags: z.array(TagSummary)
+});
+export type TicketWithTags = z.infer<typeof TicketWithTags>;
 
 export const TicketSlug = Ticket.pick({ ticket_slug: true });
 export type TicketSlug = z.infer<typeof TicketSlug>;

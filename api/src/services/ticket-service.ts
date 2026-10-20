@@ -3,9 +3,17 @@ import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
 import { PolicyStatus } from '../models/policy';
 import { Team } from '../models/team';
-import { CreateTicketRequest, Ticket, TicketFilters, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
+import {
+  CreateTicketRequest,
+  Ticket,
+  TicketFilters,
+  TicketWithHistory,
+  TicketWithTags,
+  UpdateTicketRequest
+} from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
 import { TicketRepository } from '../repositories/ticket-repository';
+import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
@@ -25,6 +33,7 @@ export class TicketService extends DBService {
   dataRequestService: DataRequestService;
   ticketSystemUserService: TicketSystemUserService;
   submissionUploadService: SubmissionUploadService;
+  ticketTagRepository: TicketTagRepository;
 
   /**
    * Creates an instance of TicketService.
@@ -42,6 +51,7 @@ export class TicketService extends DBService {
     this.dataRequestService = new DataRequestService(connection);
     this.ticketSystemUserService = new TicketSystemUserService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
+    this.ticketTagRepository = new TicketTagRepository(connection);
   }
 
   /**
@@ -167,6 +177,18 @@ export class TicketService extends DBService {
   }
 
   /**
+   * List tickets with their admin-only tags, with optional filters. Administrative callers only.
+   *
+   * @param {TicketFilters} [filters] - Optional ticket list filters, including `tag_ids` (any match).
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @returns {Promise<TicketWithTags[]>} Matching tickets with tags.
+   * @memberof TicketService
+   */
+  async getTicketsWithTags(filters?: TicketFilters, pagination?: ApiPaginationOptions): Promise<TicketWithTags[]> {
+    return this.ticketRepository.getTicketsWithTags(filters, pagination);
+  }
+
+  /**
    * Count tickets with optional filters.
    *
    * @param {TicketFilters} [filters] - Optional ticket list filters.
@@ -235,7 +257,7 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Soft delete an active ticket.
+   * Soft delete an active ticket, its linked data requests, and its tag links.
    *
    * @param {string} ticketId - Ticket UUID.
    * @returns {Promise<void>}
@@ -250,6 +272,7 @@ export class TicketService extends DBService {
       dataRequests.map((dataRequest) => this.dataRequestService.deleteDataRequest(dataRequest.data_request_id))
     );
 
+    await this.ticketTagRepository.deleteTicketTagsByTicketId(ticketId);
     await this.ticketRepository.deleteTicket(ticketId);
   }
 

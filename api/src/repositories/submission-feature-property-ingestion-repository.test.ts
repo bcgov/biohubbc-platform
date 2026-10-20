@@ -554,6 +554,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('MULTIPLE_VALUES_NOT_ALLOWED');
       expect(sqlText).to.include('TYPE_MISMATCH');
+      expect(sqlText).to.include('STRING_TOO_LONG');
       expect(sqlText).to.include('UNSUPPORTED_PROPERTY_TYPE');
       // `feature` must be in BOTH the string-type rule (single-line IN list) and the supported-type
       // allowlist (multi-line NOT IN list). Normalise whitespace so the multi-line list can be

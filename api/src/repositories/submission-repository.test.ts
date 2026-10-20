@@ -15,15 +15,58 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
-  SubmissionRecord,
   SubmissionRecordPublishedForPublic,
-  SubmissionRecordWithSecurity,
   SubmissionRepository
 } from './submission-repository';
 
 chai.use(sinonChai);
 
 describe('SubmissionRepository', () => {
+  describe('administrative submission list', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('pages active submissions by the requested sort with a stable tie-breaker', async () => {
+      const execute = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const repo = new SubmissionRepository(getMockDBConnection({ knex: execute }));
+
+      const result = await repo.getAdminSubmissionList({}, { page: 3, limit: 10, sort: 'name', order: 'asc' });
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(result).to.eql([]);
+      expect(execute).to.have.been.calledOnce;
+      expect(query.sql).to.include('"s"."record_end_date" is null');
+      expect(query.sql).not.to.include('ilike');
+      expect(query.sql).to.include('order by "name" asc, "s"."submission_id" desc');
+      expect(query.bindings).to.eql([10, 20]);
+    });
+
+    it('defaults to newest submitted first and matches the keyword against the submission name', async () => {
+      const execute = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const repo = new SubmissionRepository(getMockDBConnection({ knex: execute }));
+
+      await repo.getAdminSubmissionList({ keyword: 'moose' }, { page: 1, limit: 25 });
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(query.sql).to.include('"s"."record_end_date" is null and "s"."name" ilike ?');
+      expect(query.sql).to.include('order by "submitted_timestamp" desc, "s"."submission_id" desc');
+      expect(query.bindings[0]).to.equal('%moose%');
+    });
+
+    it('counts only active submissions matching the keyword, including zero matches', async () => {
+      const execute = sinon.stub().resolves({ rows: [{ count: 0 }], rowCount: 1 });
+      const repo = new SubmissionRepository(getMockDBConnection({ knex: execute }));
+
+      expect(await repo.getAdminSubmissionCount({ keyword: 'moose' })).to.equal(0);
+      const query = execute.firstCall.args[0].toSQL();
+
+      expect(execute).to.have.been.calledOnce;
+      expect(query.sql).to.include('"s"."record_end_date" is null and "s"."name" ilike ?');
+      expect(query.bindings).to.eql(['%moose%']);
+    });
+  });
+
   describe('insertSubmissionRecord', () => {
     afterEach(() => {
       sinon.restore();
@@ -422,254 +465,6 @@ describe('SubmissionRepository', () => {
       } catch (actualError) {
         expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to get or insert submission record');
       }
-    });
-  });
-
-  describe('getUnreviewedSubmissionsForAdmins', () => {
-    beforeEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          security_review_timestamp: null,
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          security_review_timestamp: null,
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1
-        }
-      ];
-
-      const mockResponse = { rowCount: 2, rows: mockSubmissionRecords } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getUnreviewedSubmissionsForAdmins();
-
-      expect(response).to.eql(mockSubmissionRecords);
-    });
-  });
-
-  describe('getReviewedSubmissionsForAdmins', () => {
-    beforeEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: null,
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: null,
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1
-        }
-      ];
-
-      const mockResponse = { rowCount: 2, rows: mockSubmissionRecords } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getReviewedSubmissionsForAdmins();
-
-      expect(response).to.eql(mockSubmissionRecords);
-    });
-  });
-
-  describe('getPublishedSubmissionsForAdmins', () => {
-    beforeEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1
-        }
-      ];
-
-      const mockResponse = { rowCount: 2, rows: mockSubmissionRecords } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getPublishedSubmissionsForAdmins();
-
-      expect(response).to.eql(mockSubmissionRecords);
-    });
-  });
-  describe('getReviewedSubmissionsWithSecurity', () => {
-    beforeEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockSubmissionRecords: SubmissionRecordWithSecurity[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          security: SECURITY_APPLIED_STATUS.SECURED
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1
-        },
-        {
-          submission_id: 3,
-          uuid: '999-456-123',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          comment: 'comment',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1,
-          security: SECURITY_APPLIED_STATUS.UNSECURED
-        }
-      ];
-
-      const mockResponse = { rowCount: 2, rows: mockSubmissionRecords } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getReviewedSubmissionsForAdmins();
-
-      expect(response).to.eql(mockSubmissionRecords);
     });
   });
 

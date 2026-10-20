@@ -4,6 +4,7 @@ import { changedQueryKeys } from './changed-query-keys';
 import { downloadQueryKeys } from './download-query-keys';
 import { searchQueryKeys } from './search-query-keys';
 import { submissionQueryKeys } from './submission-query-keys';
+import { tagQueryKeys } from './tag-query-keys';
 import { ticketQueryKeys } from './ticket-query-keys';
 
 describe('changedQueryKeys', () => {
@@ -58,6 +59,33 @@ describe('changedQueryKeys', () => {
     for (const key of reads) {
       expect(client.getQueryData(key)).toBeUndefined();
     }
+    client.clear();
+  });
+
+  it("refreshes only the changed tag's rules after a rule is created or enabled, and ticket tags after an edit or delete", async () => {
+    const client = createTestQueryClient();
+    const page = { page: 1, limit: 10 };
+    const changedRules = tagQueryKeys.ruleList('tag-1', page);
+    const changedRule = tagQueryKeys.ruleDetail('tag-1', 'rule-1');
+    const otherRules = tagQueryKeys.ruleList('tag-2', page);
+    const ticketTags = ticketQueryKeys.tags('ticket-1');
+    const reads = [changedRules, changedRule, otherRules, ticketTags];
+    const seed = () => reads.forEach((key) => client.setQueryData(key, 'old'));
+
+    seed();
+    await refreshChangedQueries(client, changedQueryKeys.tagRule('tag-1'));
+
+    expect(client.getQueryData(changedRules)).toBeUndefined();
+    expect(client.getQueryData(changedRule)).toBeUndefined();
+    expect(client.getQueryData(otherRules)).toBe('old');
+    expect(client.getQueryData(ticketTags)).toBe('old');
+
+    seed();
+    await refreshChangedQueries(client, changedQueryKeys.tagRuleApplied('tag-1'));
+
+    expect(client.getQueryData(changedRules)).toBeUndefined();
+    expect(client.getQueryData(otherRules)).toBe('old');
+    expect(client.getQueryData(ticketTags)).toBeUndefined();
     client.clear();
   });
 });

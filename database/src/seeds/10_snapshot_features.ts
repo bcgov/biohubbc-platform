@@ -107,6 +107,7 @@ interface SnapshotAnchor {
 interface SnapshotCounts {
   features: number;
   property_string: number;
+  property_paragraph: number;
   property_number: number;
   property_boolean: number;
   property_timestamp: number;
@@ -125,6 +126,7 @@ interface SnapshotFixture {
   submission: SnapshotSubmission;
   features: SnapshotFeature[];
   property_string: SnapshotScalarProperty[];
+  property_paragraph: SnapshotScalarProperty[];
   property_number: SnapshotScalarProperty[];
   property_boolean: SnapshotScalarProperty[];
   property_timestamp: SnapshotTimestampProperty[];
@@ -279,6 +281,7 @@ async function resolveSeedContext(knex: Knex, fixture: SnapshotFixture): Promise
   const propertyKeys = new Set(
     [
       ...fixture.property_string,
+      ...fixture.property_paragraph,
       ...fixture.property_number,
       ...fixture.property_boolean,
       ...fixture.property_timestamp,
@@ -567,6 +570,7 @@ async function insertProperties(
   context: SeedContext
 ): Promise<void> {
   await insertScalarProperty(knex, 'submission_feature_property_string', fixture.property_string, idMap, context);
+  await insertScalarProperty(knex, 'submission_feature_property_paragraph', fixture.property_paragraph, idMap, context);
   await insertScalarProperty(knex, 'submission_feature_property_number', fixture.property_number, idMap, context);
   await insertScalarProperty(knex, 'submission_feature_property_boolean', fixture.property_boolean, idMap, context);
 
@@ -822,12 +826,14 @@ export function remapAnchorRows(
  */
 const COUNT_QUERIES: { table: keyof SnapshotCounts; sql: string }[] = [
   { table: 'features', sql: 'SELECT count(*)::int AS count FROM submission_feature WHERE submission_id = ?' },
-  ...(['string', 'number', 'boolean', 'timestamp', 'code', 'taxon', 'geometry', 'feature'] as const).map((suffix) => ({
-    table: `property_${suffix}` as keyof SnapshotCounts,
-    sql: `SELECT count(*)::int AS count FROM submission_feature_property_${suffix} p
+  ...(['string', 'paragraph', 'number', 'boolean', 'timestamp', 'code', 'taxon', 'geometry', 'feature'] as const).map(
+    (suffix) => ({
+      table: `property_${suffix}` as keyof SnapshotCounts,
+      sql: `SELECT count(*)::int AS count FROM submission_feature_property_${suffix} p
           JOIN submission_feature sf ON sf.submission_feature_id = p.submission_feature_id
           WHERE sf.submission_id = ?`
-  })),
+    })
+  ),
   {
     table: 'closure',
     sql: `SELECT count(*)::int AS count FROM submission_feature_closure c

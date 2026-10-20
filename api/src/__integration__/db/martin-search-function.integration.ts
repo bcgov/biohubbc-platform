@@ -27,6 +27,7 @@ import { buildExpressionTreeFeatureIdsSubquery } from '../../repositories/expres
 import { ExpressionTreeNormalizationService } from '../../services/expression-tree-normalization-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
+import { createAssignedFeatureProperty } from '../helpers/test-feature-property-helpers';
 import { addTeamMember, createTeam, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -589,6 +590,13 @@ describe('Tile search function (integration)', function () {
       `);
     };
 
+    const setParagraphValue = async (featureId: number, property: PropertyIds, value: string): Promise<void> => {
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_property_paragraph (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
+      `);
+    };
+
     const setTimestampValue = async (featureId: number, property: PropertyIds, isoDate: string): Promise<void> => {
       await connection.sql(SQL`
         INSERT INTO submission_feature_property_timestamp (
@@ -746,6 +754,37 @@ describe('Tile search function (integration)', function () {
         await expectParity(tree('AND', [predicate(stringProperty, 'StartsWith', 'wood')]), all, [caribou]);
         await expectParity(tree('AND', [predicate(stringProperty, 'EndsWith', 'bou')]), all, [caribou]);
         await expectParity(tree('AND', [predicate(stringProperty, 'NotEquals', 'Moose')]), all, [caribou]);
+      });
+
+      it('paragraph operators', async () => {
+        const { featurePropertyId, assignments } = await createAssignedFeatureProperty(connection, 'paragraph', [
+          FEATURE_TYPE
+        ]);
+        const paragraphProperty: PropertyIds = {
+          feature_property_id: featurePropertyId,
+          blueprint_feature_type_property_id: assignments[FEATURE_TYPE]
+        };
+
+        // The caribou notes exceed the 250-character string limit; the moose notes stay within the predicate value
+        // limit so equality can target them.
+        const caribouNotes = `Woodland Caribou ${'tracked along the ridge. '.repeat(15)}near the lake`;
+        const mooseNotes = 'Moose browsing in the willow flats at dusk';
+
+        const caribou = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+        const moose = await createFeatureWithPoint(TEST_LNG + 0.0005, TEST_LAT);
+        const bare = await createFeatureWithPoint(TEST_LNG, TEST_LAT + 0.0005);
+
+        await setParagraphValue(caribou, paragraphProperty, caribouNotes);
+        await setParagraphValue(moose, paragraphProperty, mooseNotes);
+
+        const all = [caribou, moose, bare];
+
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'Equals', mooseNotes)]), all, [moose]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'Contains', 'ridge')]), all, [caribou]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'StartsWith', 'wood')]), all, [caribou]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'EndsWith', 'dusk')]), all, [moose]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'NotEquals', mooseNotes)]), all, [caribou]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'Exists')]), all, [caribou, moose]);
       });
 
       it('timestamp operators', async function () {

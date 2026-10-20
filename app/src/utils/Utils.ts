@@ -445,17 +445,6 @@ export const getUserLabel = (user: { display_name?: string | null; user_identifi
 };
 
 /**
- * same implementation as Object.keys but with correct typings for interable
- *
- * @template Obj
- * @param {Obj} obj - object to iterate through
- * @returns {(keyof Obj)[]} array of object keys with correct typings ie: not string[]
- */
-export const objectKeys = <Obj extends Record<any, any>>(obj: Obj): (keyof Obj)[] => {
-  return Object.keys(obj) as (keyof Obj)[];
-};
-
-/**
  * This will grab the first element from an array or return null if nothing is found
  *
  * @param arr array to check

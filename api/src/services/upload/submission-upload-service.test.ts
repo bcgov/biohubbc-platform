@@ -90,6 +90,24 @@ describe('SubmissionUploadService', () => {
     });
   });
 
+  describe('getAdminSubmissionUploadList', () => {
+    it('passes the filters to the page and the count and preserves totals beyond the last page', async () => {
+      const list = sinon.stub(SubmissionUploadRepository.prototype, 'getAdminSubmissionUploadList').resolves([]);
+      const count = sinon.stub(SubmissionUploadRepository.prototype, 'getAdminSubmissionUploadCount').resolves(11);
+      const filters = { keyword: 'moose' };
+      const pagination = { page: 3, limit: 10, sort: 'create_date', order: 'desc' as const };
+
+      const result = await service.getAdminSubmissionUploadList(filters, pagination);
+
+      expect(list).to.have.been.calledOnceWithExactly(filters, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(filters);
+      expect(result).to.eql({
+        uploads: [],
+        pagination: { total: 11, per_page: 10, current_page: 3, last_page: 2, sort: 'create_date', order: 'desc' }
+      });
+    });
+  });
+
   describe('getSubmissionUpload', () => {
     it('should return a single submission_upload record', async () => {
       const fakeSubmissionUpload: SubmissionUpload = {

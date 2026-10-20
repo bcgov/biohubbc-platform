@@ -2,6 +2,7 @@ import { OpenAPIV3 } from 'openapi-types';
 import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../models/submission-upload';
 import { DataRequestResponseSchema } from './data-request';
 import { paginationResponseSchema } from './pagination';
+import { TagSummarySchema } from './tag';
 import { TicketSystemUserWithUserSchema } from './ticket-system-user';
 import { SubmissionUploadReviewResponseSchema } from './upload';
 
@@ -317,6 +318,30 @@ export const TicketListResponseSchema: OpenAPIV3.SchemaObject = {
     tickets: {
       type: 'array',
       items: TicketSchema
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
+ * Admin-only ticket row: the ticket fields plus its active tags. Never returned by portal endpoints.
+ */
+export const TicketWithTagsSchema: OpenAPIV3.SchemaObject = {
+  ...TicketSchema,
+  required: [...(TicketSchema.required ?? []), 'tags'],
+  properties: {
+    ...TicketSchema.properties,
+    tags: { type: 'array', items: TagSummarySchema }
+  }
+};
+
+export const AdminTicketListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['tickets', 'pagination'],
+  properties: {
+    tickets: {
+      type: 'array',
+      items: TicketWithTagsSchema
     },
     pagination: paginationResponseSchema
   }

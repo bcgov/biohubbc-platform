@@ -22,11 +22,18 @@ import { TeamService } from './access-policy/team-service';
 import { CodeService } from './code-service';
 import { DataRequestService } from './data-request-service';
 import { ExpressionTreeService } from './expression-tree-service';
+import { TagRuleEvaluationService } from './tag-rule-evaluation-service';
 import { TicketService } from './ticket-service';
 
 chai.use(sinonChai);
 
 describe('DataRequestService', () => {
+  beforeEach(() => {
+    sinon
+      .stub(TagRuleEvaluationService.dependencies, 'publishEvaluateTicketTagRulesJob')
+      .resolves({ status: 'published', jobId: 'job-id' });
+  });
+
   afterEach(() => {
     sinon.restore();
   });

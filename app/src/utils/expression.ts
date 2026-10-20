@@ -392,7 +392,8 @@ export const getUsedExpressionBuilderPropertyKeys = (expression: BuilderExpressi
 /**
  * Chooses the initial operator for a property after it is selected.
  *
- * String filters are normally used as text search predicates, so prefer a contains-like operator over exact equality.
+ * String and paragraph filters are normally used as text search predicates, so prefer a contains-like operator over
+ * exact equality.
  * Other property types keep exact equality when available. When neither preferred operator exists, fall back to the
  * first non-Exists operator so the user can start entering a value immediately.
  * If the property only supports `Exists`, use `Exists` and omit the draft value.
@@ -404,7 +405,9 @@ export const getDefaultOperatorForExpressionBuilderProperty = (
   property: ExpressionBuilderProperty
 ): ExpressionPredicateOperator | null => {
   const preferredOperators: ExpressionPredicateOperator[] =
-    property.predicate_type === 'string' ? ['Contains', 'ILike', 'Equals'] : ['Equals'];
+    property.predicate_type === 'string' || property.predicate_type === 'paragraph'
+      ? ['Contains', 'ILike', 'Equals']
+      : ['Equals'];
 
   for (const operator of preferredOperators) {
     if (property.operators.includes(operator)) {
@@ -448,6 +451,7 @@ export const createPredicateDraft = (property: ExpressionBuilderProperty): Build
 export const getDefaultValueForPredicateType = (type: ExpressionPropertyType): unknown => {
   switch (type) {
     case 'string':
+    case 'paragraph':
       return '';
     case 'number':
     case 'taxon':

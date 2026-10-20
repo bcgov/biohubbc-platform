@@ -16,13 +16,14 @@ import { ITicketTimelineProps } from './TicketTimeline.interface';
  *
  * Shared by the admin ticket page and the portal ticket page. The upload processing history comes
  * from an admin-only endpoint, so the status row is expandable only for system administrators;
- * every other viewer sees the current status alone.
+ * every other viewer sees the current status alone. Tag history is administrative too: the timeline
+ * shows the tag events its page passes in, and loads none itself.
  *
  * @param {ITicketTimelineProps} props
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { ticket } = props;
+  const { ticket, tagEvents } = props;
   const {
     selectedComment,
     isEditCommentDialogOpen,
@@ -57,6 +58,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     <>
       <TicketTimelineItems
         ticket={ticket}
+        tagEvents={tagEvents}
         updatingDataRequestId={updatingDataRequestId}
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}

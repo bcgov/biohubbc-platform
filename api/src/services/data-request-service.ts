@@ -26,6 +26,7 @@ import { TeamService } from './access-policy/team-service';
 import { CodeService } from './code-service';
 import { DBService } from './db-service';
 import { ExpressionTreeService } from './expression-tree-service';
+import { TagRuleEvaluationService } from './tag-rule-evaluation-service';
 import { TicketService } from './ticket-service';
 
 /**
@@ -382,6 +383,9 @@ export class DataRequestService extends DBService {
       ticket_id: ticketId,
       policy_id: policy.policy_id
     });
+
+    // Everything a data request's tag rules can match on is known once it is linked to the ticket.
+    await TagRuleEvaluationService.dependencies.publishEvaluateTicketTagRulesJob(this.connection, { ticketId });
 
     return this.getDataRequestById(dataRequest.data_request_id);
   }

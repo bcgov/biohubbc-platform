@@ -58,7 +58,6 @@ vi.mock('features/admin/reviews/components/map/SubmissionUploadMap', async () =>
     }
   };
 });
-vi.mock('features/admin/dashboard/DashboardPage', () => ({ default: () => null }));
 vi.mock('features/submissions/create/CreateSubmissionPage', () => ({ CreateSubmissionPage: () => null }));
 
 const uploadId = '14cac655-eb06-450a-bee9-d05bd97ecc9b';

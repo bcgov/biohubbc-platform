@@ -44,6 +44,7 @@ describe('searchProperties', () => {
 
   const mockResultsEmpty: GroupedPropertyResults = {
     string: [],
+    paragraph: [],
     number: [],
     boolean: [],
     datetime: [],

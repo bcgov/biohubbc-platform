@@ -17,6 +17,16 @@ export const OperatorsByPropertyType = {
     'Contains',
     'Exists'
   ],
+  [FEATURE_PROPERTY_TYPE.PARAGRAPH]: [
+    'Equals',
+    'NotEquals',
+    'Like',
+    'ILike',
+    'StartsWith',
+    'EndsWith',
+    'Contains',
+    'Exists'
+  ],
   [FEATURE_PROPERTY_TYPE.NUMBER]: [
     'Equals',
     'NotEquals',

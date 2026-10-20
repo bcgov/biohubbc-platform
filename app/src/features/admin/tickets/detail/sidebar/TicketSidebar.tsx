@@ -14,6 +14,7 @@ import { useUpdateTicketSystemUserStatusMutation } from '../../hooks/useUpdateTi
 import { TicketSidebarSystemUsers } from './TicketSidebarSystemUsers';
 import { TicketSidebarDataRequests } from './TicketSidebarDataRequests';
 import { TicketSidebarReferences } from './TicketSidebarReferences';
+import { TicketSidebarTags } from './TicketSidebarTags';
 import { TicketSidebarTeam } from './TicketSidebarTeam';
 import { TicketSidebarUploads } from './TicketSidebarUploads';
 
@@ -77,6 +78,7 @@ export const TicketSidebar = () => {
 
   return (
     <Stack spacing={5}>
+      <TicketSidebarTags />
       <TicketSidebarSystemUsers
         ticketSystemUsers={ticket.ticket_system_users}
         onOpenDialog={() => setIsTicketSystemUserDialogOpen(true)}

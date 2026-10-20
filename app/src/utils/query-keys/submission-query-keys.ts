@@ -13,19 +13,31 @@ const userList = (filters: SubmissionFilters, pagination: ApiPaginationRequestOp
   [QUERY_KEY_ROOT.SUBMISSION, 'user-list', { filters, pagination }] as const;
 
 /**
- * Key prefix of the submission lists on the administrators' dashboard.
+ * Key prefix of the submission and upload lists on the administrative submissions page.
  *
- * @returns The admin dashboard lists key prefix.
+ * @returns The admin lists key prefix.
  */
 const adminLists = () => [QUERY_KEY_ROOT.SUBMISSION, 'admin-list'] as const;
 
 /**
- * Key of the submissions administrators see on their dashboard in one review state.
+ * Key of one page of every submission on the administrative submissions page.
  *
- * @param {'unreviewed' | 'reviewed' | 'published'} reviewState The dashboard list.
- * @returns The admin dashboard list key.
+ * @param {SubmissionFilters} filters The search sent.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The admin submissions key.
  */
-const adminList = (reviewState: 'unreviewed' | 'reviewed' | 'published') => [...adminLists(), reviewState] as const;
+const adminSubmissionList = (filters: SubmissionFilters, pagination: ApiPaginationRequestOptions) =>
+  [...adminLists(), 'submissions', { filters, pagination }] as const;
+
+/**
+ * Key of one page of every submission's uploads on the administrative submissions page.
+ *
+ * @param {SubmissionFilters} filters The search sent.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The admin uploads key.
+ */
+const adminSubmissionUploadList = (filters: SubmissionFilters, pagination: ApiPaginationRequestOptions) =>
+  [...adminLists(), 'uploads', { filters, pagination }] as const;
 
 /**
  * Key prefix of everything cached for one submission.
@@ -120,7 +132,8 @@ const featureProperties = (
 export const submissionQueryKeys = {
   userList,
   adminLists,
-  adminList,
+  adminSubmissionList,
+  adminSubmissionUploadList,
   submission,
   record,
   defaultBlueprint,

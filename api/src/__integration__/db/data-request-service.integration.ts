@@ -32,6 +32,7 @@ import { SecurityScopeService } from '../../services/access-policy/security-scop
 import { TeamPolicyService } from '../../services/access-policy/team-policy-service';
 import { DataRequestService } from '../../services/data-request-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
+import { TagRuleEvaluationService } from '../../services/tag-rule-evaluation-service';
 import { TicketService } from '../../services/ticket-service';
 
 /**
@@ -70,6 +71,10 @@ describe('DataRequestService (integration)', function () {
   });
 
   beforeEach(async () => {
+    // pg-boss is not running in the `make test-db` environment; tag rule evaluation is queued, not run, here.
+    sinon
+      .stub(TagRuleEvaluationService.dependencies, 'publishEvaluateTicketTagRulesJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
     connection = getAPIUserDBConnection();
     await connection.open();
     service = new DataRequestService(connection);
