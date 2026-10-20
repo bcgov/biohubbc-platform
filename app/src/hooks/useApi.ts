@@ -4,6 +4,7 @@ import useAdminApi from './api/useAdminApi';
 import { useApiKeysApi } from './api/useApiKeysApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import { useBoardsApi } from './api/useBoardsApi';
 import { useBlueprintFeatureTypesApi } from './api/useBlueprintFeatureTypesApi';
 import { useBlueprintFeatureTypePropertiesApi } from './api/useBlueprintFeatureTypePropertiesApi';
 import { useBlueprintsApi } from './api/useBlueprintsApi';
@@ -23,6 +24,8 @@ import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
+import { useTagRulesApi } from './api/useTagRulesApi';
+import { useTagsApi } from './api/useTagsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
@@ -77,6 +80,12 @@ export const useApi = () => {
 
   const tickets = useTicketsApi(apiAxios);
 
+  const tags = useTagsApi(apiAxios);
+
+  const tagRules = useTagRulesApi(apiAxios);
+
+  const boards = useBoardsApi(apiAxios);
+
   const dataRequest = useDataRequestApi(apiAxios);
 
   const apiKeys = useApiKeysApi(apiAxios);
@@ -118,6 +127,9 @@ export const useApi = () => {
     gallery,
     teamPolicies,
     tickets,
+    tags,
+    tagRules,
+    boards,
     dataRequest,
     apiKeys,
     objectStorage

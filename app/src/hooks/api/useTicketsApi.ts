@@ -9,6 +9,7 @@ import {
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketArtifactsQueryParams,
+  IGetAdminTicketsResponse,
   IGetTicketArtifactsResponse,
   IGetTicketsResponse,
   ISubmissionUploadDecisionResponse,
@@ -38,19 +39,21 @@ import qs from 'qs';
  */
 export const useTicketsApi = (axios: AxiosInstance) => {
   /**
-   * Get tickets using optional filters and pagination options.
+   * Get tickets, with their tags, using optional filters and pagination options.
+   *
+   * `tag_ids` is sent as repeated keys (`tag_ids=a&tag_ids=b`), the form the endpoint parses as an array.
    *
    * @param {ITicketsQueryParams} [params]
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @return {*} {Promise<IGetTicketsResponse>}
+   * @return {*} {Promise<IGetAdminTicketsResponse>}
    */
   const getTicketsForAdmin = async (
     params?: ITicketsQueryParams,
     options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<IGetTicketsResponse> => {
+  ): Promise<IGetAdminTicketsResponse> => {
     const { data } = await axios.get('/api/administrative/tickets', {
       params,
-      paramsSerializer: (params) => qs.stringify(params),
+      paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' }),
       ...options
     });
 

@@ -656,6 +656,21 @@ export class SearchFeatureRepository extends BaseRepository {
               fp.name,
               bftp.sort,
               bftp.allow_multiple,
+              p.submission_feature_property_paragraph_id AS ordinal,
+              to_jsonb(p.value) AS value
+            FROM submission_feature_property_paragraph p
+            JOIN blueprint_feature_type_property bftp
+              ON bftp.blueprint_feature_type_property_id = p.blueprint_feature_type_property_id
+            JOIN feature_property fp
+              ON fp.feature_property_id = bftp.feature_property_id
+            WHERE p.submission_feature_id = authorized_features.submission_feature_id
+
+            UNION ALL
+
+            SELECT
+              fp.name,
+              bftp.sort,
+              bftp.allow_multiple,
               p.submission_feature_property_number_id AS ordinal,
               to_jsonb(p.value) AS value
             FROM submission_feature_property_number p

@@ -32,6 +32,7 @@ import { SecurityScopeService } from '../../services/access-policy/security-scop
 import { TeamPolicyService } from '../../services/access-policy/team-policy-service';
 import { DataRequestService } from '../../services/data-request-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
+import { TagRuleEvaluationService } from '../../services/tag-rule-evaluation-service';
 import { addTeamMember, createPolicy, createPolicyStatement, createTeam } from '../helpers/test-rbac-helpers';
 import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 
@@ -61,6 +62,10 @@ describe('Policy status orchestration (integration)', function () {
   });
 
   beforeEach(async () => {
+    // pg-boss is not running in the `make test-db` environment; tag rule evaluation is queued, not run, here.
+    sinon
+      .stub(TagRuleEvaluationService.dependencies, 'publishEvaluateTicketTagRulesJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
     // `connection.open()` begins the implicit transaction; afterEach's
     // `connection.rollback()` discards every write made during the test.
     connection = getAPIUserDBConnection();

@@ -76,6 +76,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         WHERE sfps.submission_feature_id = uf.submission_feature_id
         RETURNING 1
       ),
+      delete_paragraph AS (
+        DELETE FROM submission_feature_property_paragraph sfpp
+        USING upload_features uf
+        WHERE sfpp.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
       delete_number AS (
         DELETE FROM submission_feature_property_number sfpn
         USING upload_features uf
@@ -1058,6 +1064,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * This phase captures:
    * - array cardinality violations when `allow_multiple = false`
    * - JSON primitive type mismatches by logical property type
+   * - string values longer than the 250-character `submission_feature_property_string.value` column, which
+   *   would otherwise fail the string insert; longer text belongs in a `paragraph` property
    * - unsupported logical property types
    *
    * Errors are grouped and upserted into `submission_feature_error`, incrementing
@@ -1102,7 +1110,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.submission_upload_id = ${submissionUploadId}::uuid
           AND (
           (
-            v.property_type_name IN ('string', 'datetime', 'code', 'artifact_key', 'feature')
+            v.property_type_name IN ('string', 'paragraph', 'datetime', 'code', 'artifact_key', 'feature')
             AND jsonb_typeof(v.logical_value) <> 'string'
           )
           OR (
@@ -1126,6 +1134,19 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           )
           )
       ),
+      string_length_errors AS (
+        SELECT
+          v.submission_upload_id,
+          v.property_name,
+          v.blueprint_feature_type_property_id,
+          'STRING_TOO_LONG'::text AS error_code,
+          'String value exceeds 250 characters; use a paragraph property for longer text'::text AS error_message
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND v.property_type_name = 'string'
+          AND jsonb_typeof(v.logical_value) = 'string'
+          AND char_length(v.logical_value #>> '{}') > 250
+      ),
       unsupported_type_errors AS (
         SELECT
           m.submission_upload_id,
@@ -1138,6 +1159,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND m.submission_upload_id = ${submissionUploadId}::uuid
           AND m.property_type_name NOT IN (
             'string',
+            'paragraph',
             'number',
             'boolean',
             'datetime',
@@ -1160,6 +1182,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           SELECT * FROM cardinality_errors
           UNION ALL
           SELECT * FROM type_errors
+          UNION ALL
+          SELECT * FROM string_length_errors
           UNION ALL
           SELECT * FROM unsupported_type_errors
         ) AS aggregated
@@ -1971,6 +1995,36 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
         AND v.property_type_name = 'string'
+        AND jsonb_typeof(v.logical_value) = 'string';
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Insert valid paragraph properties into `submission_feature_property_paragraph`.
+   *
+   * Values are sourced from typed staging where logical type is `paragraph` and
+   * JSON transport type is string, then extracted as text via `#>> '{}'`.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>} Resolves after the scoped repository operation completes.
+   * @memberof SubmissionFeaturePropertyIngestionRepository
+   */
+  async insertParagraphPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO submission_feature_property_paragraph (
+        submission_feature_id,
+        blueprint_feature_type_property_id,
+        value
+      )
+      SELECT
+        v.submission_feature_id,
+        v.blueprint_feature_type_property_id,
+        v.logical_value #>> '{}'
+      FROM submission_upload_staging_typed_property_value v
+      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND v.property_type_name = 'paragraph'
         AND jsonb_typeof(v.logical_value) = 'string';
     `;
 

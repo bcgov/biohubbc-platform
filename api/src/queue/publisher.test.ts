@@ -14,6 +14,7 @@ import {
   publishComputeScopeAnchorsJob,
   publishComputeSubmissionFeatureClosureJob,
   publisherDependencies,
+  publishEvaluateTicketTagRulesJob,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
   publishProcessDownloadJob,
@@ -1106,6 +1107,58 @@ describe('publisher', () => {
         expect.fail('expected publisher to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
+    });
+  });
+
+  describe('publishEvaluateTicketTagRulesJob', () => {
+    it('publishes a delayed per-ticket singleton job inside the caller transaction', async () => {
+      const clock = sinon.useFakeTimers(new Date('2026-10-20T12:00:00.000Z'));
+      try {
+        const mockConnection = getMockDBConnection();
+        const sendStub = sinon.stub().resolves('tag-rules-job-id');
+        const createQueueStub = sinon.stub().resolves();
+        const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+        sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+        const result = await publishEvaluateTicketTagRulesJob(mockConnection, { ticketId: 'ticket-1' });
+
+        expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.EVALUATE_TICKET_TAG_RULES);
+        expect(sendStub.firstCall.args[0]).to.equal(JobQueues.EVALUATE_TICKET_TAG_RULES);
+        expect(sendStub.firstCall.args[1]).to.deep.equal({ ticketId: 'ticket-1' });
+
+        const options = sendStub.firstCall.args[2];
+        expect(options.singletonKey).to.equal('ticket-tag-rules-ticket-1');
+        expect(options.startAfter).to.deep.equal(new Date('2026-10-20T12:00:10.000Z'));
+        expect(options.db).to.have.property('executeSql');
+        expect(result).to.eql({ status: 'published', jobId: 'tag-rules-job-id' });
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('returns duplicate when a job is already queued for the ticket', async () => {
+      const mockBoss: MockPgBoss = { send: sinon.stub().resolves(null), createQueue: sinon.stub().resolves() };
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const result = await publishEvaluateTicketTagRulesJob(getMockDBConnection(), { ticketId: 'ticket-1' });
+
+      expect(result.status).to.equal('duplicate');
+    });
+
+    it('rethrows pg-boss errors so the caller transaction rolls back', async () => {
+      const mockBoss: MockPgBoss = {
+        send: sinon.stub().rejects(new Error('boom')),
+        createQueue: sinon.stub().resolves()
+      };
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      try {
+        await publishEvaluateTicketTagRulesJob(getMockDBConnection(), { ticketId: 'ticket-1' });
+        expect.fail('Expected error');
+      } catch (error) {
+        expect((error as Error).message).to.equal('boom');
       }
     });
   });

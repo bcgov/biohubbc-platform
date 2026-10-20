@@ -2,6 +2,7 @@ import { DialogContextProvider } from 'contexts/dialogContext';
 import { fireEvent, screen } from '@testing-library/react';
 import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { ITicketTagEvent } from 'interfaces/useTagsApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { ReactNode } from 'react';
 import { render } from 'test-helpers/test-utils';
@@ -9,9 +10,14 @@ import { Mock } from 'vitest';
 import { TicketDetailPage } from './TicketDetailPage';
 import { useTicketComment } from './hooks/useTicketComment';
 import { useTicketQuery } from './hooks/useTicketQuery';
+import { useTicketTagsQuery } from './hooks/useTicketTagsQuery';
 
 vi.mock('./hooks/useTicketQuery', () => ({
   useTicketQuery: vi.fn()
+}));
+
+vi.mock('./hooks/useTicketTagsQuery', () => ({
+  useTicketTagsQuery: vi.fn()
 }));
 
 vi.mock('./hooks/useTicketComment', () => ({
@@ -46,10 +52,11 @@ vi.mock('./detail/artifacts/TicketArtifacts', () => ({
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
-  TicketTimeline: ({ ticket }: { ticket: ITicketExtended }) => (
+  TicketTimeline: ({ ticket, tagEvents }: { ticket: ITicketExtended; tagEvents?: ITicketTagEvent[] }) => (
     <div
       data-testid="ticket-timeline"
       data-ticket-id={ticket.ticket_id}
+      data-tag-events={JSON.stringify(tagEvents ?? null)}
       data-events={JSON.stringify(
         [...ticket.statuses, ...ticket.comments, ...ticket.data_requests].sort(
           (a, b) => new Date(a.create_date ?? '').getTime() - new Date(b.create_date ?? '').getTime()
@@ -95,6 +102,7 @@ vi.mock('features/portal/detail/content/PortalTicketDetailPageContent', () => ({
 beforeEach(() => {
   // Prevent delayed setTimeout callbacks from firing after Vitest tears down the test environment.
   vi.useFakeTimers();
+  mockUseTicketTagsQuery.mockReturnValue({ data: undefined, isFetching: false });
 });
 
 describe.each([
@@ -163,6 +171,7 @@ afterEach(() => {
 
 const mockUseTicketQuery = useTicketQuery as Mock;
 const mockUseTicketComment = useTicketComment as Mock;
+const mockUseTicketTagsQuery = useTicketTagsQuery as Mock;
 
 const baseTicket: ITicketExtended = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -275,6 +284,26 @@ describe('TicketDetailPage', () => {
     expect(events).toHaveLength(
       baseTicket.statuses.length + baseTicket.comments.length + baseTicket.data_requests.length
     );
+  });
+
+  it("passes the ticket's tag history to the timeline", () => {
+    const tagEvent: ITicketTagEvent = {
+      ticket_tag_id: 'ticket-tag-1',
+      tag_id: 'tag-1',
+      tag_name: 'Urgent',
+      tag_color: '#D8292F',
+      action: 'added',
+      user_identifier: 'Sarah',
+      tag_rule_name: null,
+      event_date: '2026-02-24T06:00:00.000Z'
+    };
+    mockUseTicketQuery.mockReturnValue(makeTicketQuery(baseTicket));
+    mockUseTicketTagsQuery.mockReturnValue({ data: { tags: [], events: [tagEvent] }, isFetching: false });
+    render(<TicketDetailPage />);
+
+    expect(JSON.parse(screen.getByTestId('ticket-timeline').getAttribute('data-tag-events') ?? 'null')).toEqual([
+      tagEvent
+    ]);
   });
 
   it('keeps the loaded timeline mounted during background refreshes', () => {

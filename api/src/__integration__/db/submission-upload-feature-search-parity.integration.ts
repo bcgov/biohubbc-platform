@@ -24,7 +24,7 @@ import { createTestSubmission } from '../helpers/test-submission-helpers';
 /** Ids the parity expressions refer to. */
 interface ParityFixture {
   properties: Record<
-    'region' | 'area' | 'species' | 'active' | 'count' | 'seen' | 'location' | 'colour' | 'taxon' | 'habitat',
+    'region' | 'area' | 'species' | 'active' | 'count' | 'seen' | 'location' | 'colour' | 'notes' | 'taxon' | 'habitat',
     number
   >;
   taxa: { familyTsn: number; genusTsn: number; speciesTsn: number };
@@ -43,6 +43,14 @@ const REGION_POLYGON = {
     ]
   ]
 };
+
+/**
+ * Paragraph values. The wetland and forest notes exceed the 250-character string limit; the short note stays within
+ * the predicate value limit so equality can target it.
+ */
+const WETLAND_NOTES = `Observed near the wetland edge. ${'Long field notes. '.repeat(20)}End of wetland notes`;
+const FOREST_NOTES = `Observed in mature forest. ${'Long field notes. '.repeat(20)}End of forest notes`;
+const SHORT_NOTES = 'Observed near the wetland edge, briefly.';
 
 /**
  * Build a GeoJSON point.
@@ -67,6 +75,15 @@ const PARITY_CASES: Record<string, (fixture: ParityFixture) => ExpressionTree> =
   'string Like': ({ properties }) => allOf(predicate(properties.region, 'Like', 'n%')),
   'string ILike': ({ properties }) => allOf(predicate(properties.region, 'ILike', 'NORTH')),
   'string Exists': ({ properties }) => allOf(predicate(properties.colour, 'Exists')),
+  'paragraph Equals': ({ properties }) => allOf(predicate(properties.notes, 'Equals', SHORT_NOTES)),
+  'paragraph NotEquals, feature-level over multiple values': ({ properties }) =>
+    allOf(predicate(properties.notes, 'NotEquals', SHORT_NOTES)),
+  'paragraph Contains': ({ properties }) => allOf(predicate(properties.notes, 'Contains', 'forest')),
+  'paragraph StartsWith': ({ properties }) => allOf(predicate(properties.notes, 'StartsWith', 'observed near')),
+  'paragraph EndsWith': ({ properties }) => allOf(predicate(properties.notes, 'EndsWith', 'forest notes')),
+  'paragraph Like': ({ properties }) => allOf(predicate(properties.notes, 'Like', 'Observed in%')),
+  'paragraph ILike': ({ properties }) => allOf(predicate(properties.notes, 'ILike', 'WETLAND EDGE')),
+  'paragraph Exists': ({ properties }) => allOf(predicate(properties.notes, 'Exists')),
   'number Equals': ({ properties }) => allOf(predicate(properties.count, 'Equals', 7)),
   'number NotEquals': ({ properties }) => allOf(predicate(properties.count, 'NotEquals', 77)),
   'number GreaterThan': ({ properties }) => allOf(predicate(properties.count, 'GreaterThan', 10)),
@@ -158,8 +175,8 @@ describe('Submission upload expression evaluation parity with published evaluati
    *   stratum (region east; its feature type is ended) > deployment (elk, inactive) > point (12, inside)
    *   deployment (owl, active) > point (3, 10:00 on 2024-05-01, inside), point (7, 2024-05-02, outside)
    *   site (forest; refers to the owl deployment)
-   *     site (wetland) > observation (species taxon, counts 77 and 100, red and blue)
-   *     observation (genus taxon, count 100, blue)
+   *     site (wetland) > observation (species taxon, counts 77 and 100, red and blue, wetland and forest notes)
+   *     observation (genus taxon, count 100, blue, short notes)
    *   animal (species taxon) > capture (77), with the animal and capture also referencing each other
    *
    * @returns {Promise<ParityFixture>} Ids the parity expressions refer to.
@@ -178,6 +195,7 @@ describe('Submission upload expression evaluation parity with published evaluati
     const seen = await createAssignedFeatureProperty(connection, 'datetime', ['telemetry']);
     const location = await createAssignedFeatureProperty(connection, 'spatial', ['telemetry']);
     const colour = await createAssignedFeatureProperty(connection, 'string', ['species_observation']);
+    const notes = await createAssignedFeatureProperty(connection, 'paragraph', ['species_observation']);
     const taxon = await createAssignedFeatureProperty(connection, 'taxon', ['species_observation', 'animal']);
     const habitat = await createAssignedFeatureProperty(connection, 'code', ['sample_site']);
 
@@ -252,6 +270,27 @@ describe('Submission upload expression evaluation parity with published evaluati
     await addPropertyValue(connection, 'string', speciesObservationId, colour.assignments.species_observation, 'red');
     await addPropertyValue(connection, 'string', speciesObservationId, colour.assignments.species_observation, 'blue');
     await addPropertyValue(connection, 'string', genusObservationId, colour.assignments.species_observation, 'blue');
+    await addPropertyValue(
+      connection,
+      'paragraph',
+      speciesObservationId,
+      notes.assignments.species_observation,
+      WETLAND_NOTES
+    );
+    await addPropertyValue(
+      connection,
+      'paragraph',
+      speciesObservationId,
+      notes.assignments.species_observation,
+      FOREST_NOTES
+    );
+    await addPropertyValue(
+      connection,
+      'paragraph',
+      genusObservationId,
+      notes.assignments.species_observation,
+      SHORT_NOTES
+    );
     await addPropertyValue(connection, 'number', speciesObservationId, count.assignments.species_observation, 77);
     await addPropertyValue(connection, 'number', speciesObservationId, count.assignments.species_observation, 100);
     await addPropertyValue(connection, 'number', genusObservationId, count.assignments.species_observation, 100);
@@ -299,6 +338,7 @@ describe('Submission upload expression evaluation parity with published evaluati
         seen: seen.featurePropertyId,
         location: location.featurePropertyId,
         colour: colour.featurePropertyId,
+        notes: notes.featurePropertyId,
         taxon: taxon.featurePropertyId,
         habitat: habitat.featurePropertyId
       },

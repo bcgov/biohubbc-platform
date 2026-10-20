@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
-import { Ticket } from '../../../models/ticket';
+import { Ticket, TicketWithTags } from '../../../models/ticket';
 import { TicketService } from '../../../services/ticket-service';
 import { createTicket, getTickets } from './index';
 
@@ -19,6 +19,11 @@ describe('paths/administrative/tickets', () => {
     create_date: '2026-02-25T00:00:00.000Z',
     priority: 'medium',
     status: 'open'
+  };
+
+  const mockTicketWithTags: TicketWithTags = {
+    ...mockTicket,
+    tags: [{ tag_id: '33333333-3333-3333-3333-333333333333', name: 'Fish', color: '#1E90FF' }]
   };
 
   afterEach(() => {
@@ -50,31 +55,41 @@ describe('paths/administrative/tickets', () => {
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
+    const listStub = sinon.stub(TicketService.prototype, 'getTicketsWithTags').resolves([mockTicketWithTags]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(21);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { team_id: mockTicket.team_id, status: 'open', search: 'ticket', page: '2', limit: '10' };
+    mockReq.query = {
+      team_id: mockTicket.team_id,
+      status: 'open',
+      search: 'ticket',
+      tag_ids: ['33333333-3333-3333-3333-333333333333'],
+      board_id: '44444444-4444-4444-4444-444444444444',
+      page: '2',
+      limit: '10'
+    };
 
     await getTickets()(mockReq, mockRes, mockNext);
 
-    expect(listStub).to.have.been.calledWith(
-      { team_id: mockTicket.team_id, status: 'open', search: 'ticket' },
-      {
-        page: 2,
-        limit: 10,
-        sort: undefined,
-        order: undefined
-      }
-    );
-    expect(countStub).to.have.been.calledWith({
-      team_id: mockTicket.team_id,
+    // Filter names must match TicketFilters end to end (team_id query -> team_ids filter).
+    const expectedFilters = {
+      team_ids: [mockTicket.team_id],
       status: 'open',
-      search: 'ticket'
+      search: 'ticket',
+      tag_ids: ['33333333-3333-3333-3333-333333333333'],
+      board_id: '44444444-4444-4444-4444-444444444444'
+    };
+
+    expect(listStub).to.have.been.calledWith(expectedFilters, {
+      page: 2,
+      limit: 10,
+      sort: undefined,
+      order: undefined
     });
+    expect(countStub).to.have.been.calledWith(expectedFilters);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
-      tickets: [mockTicket],
+      tickets: [mockTicketWithTags],
       pagination: {
         total: 21,
         per_page: 10,
@@ -93,12 +108,18 @@ describe('paths/administrative/tickets', () => {
       release: sinon.stub()
     });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
+    const listStub = sinon.stub(TicketService.prototype, 'getTicketsWithTags').resolves([mockTicketWithTags]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '10' };
-    const noFilters = { team_id: undefined, status: undefined, search: undefined };
+    const noFilters = {
+      team_ids: undefined,
+      status: undefined,
+      search: undefined,
+      tag_ids: undefined,
+      board_id: undefined
+    };
 
     await getTickets()(mockReq, mockRes, mockNext);
 
@@ -111,7 +132,7 @@ describe('paths/administrative/tickets', () => {
     expect(countStub).to.have.been.calledWith(noFilters);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
-      tickets: [mockTicket],
+      tickets: [mockTicketWithTags],
       pagination: {
         total: 1,
         per_page: 10,

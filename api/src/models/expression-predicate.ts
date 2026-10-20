@@ -53,6 +53,7 @@ export type PredicatePropertyTypeName = Exclude<FEATURE_PROPERTY_TYPE, FEATURE_P
  */
 export type InternalTypedPredicate =
   | { type: 'string'; operator: PredicateOperator; value?: string }
+  | { type: 'paragraph'; operator: PredicateOperator; value?: string }
   | { type: 'number'; operator: PredicateOperator; value?: number }
   | { type: 'boolean'; operator: PredicateOperator; value?: boolean }
   | {

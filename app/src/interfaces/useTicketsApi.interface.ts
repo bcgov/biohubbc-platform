@@ -1,5 +1,6 @@
 import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
 import { DataRequestResponse } from './useDataRequestApi.interface';
+import { ITagSummary } from './useTagsApi.interface';
 
 export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -35,6 +36,11 @@ export interface ITicket {
   create_date: string;
   priority: TicketPriority;
   status: TicketStatus;
+}
+
+/** An administrative ticket list or board row: the ticket and its current tags. */
+export interface ITicketWithTags extends ITicket {
+  tags: ITagSummary[];
 }
 
 export interface ITicketStatusLog {
@@ -229,6 +235,11 @@ export interface IGetTicketsResponse {
   pagination: ApiPaginationResponseParams;
 }
 
+export interface IGetAdminTicketsResponse {
+  tickets: ITicketWithTags[];
+  pagination: ApiPaginationResponseParams;
+}
+
 export interface IGetTicketArtifactsResponse {
   artifacts: ITicketArtifact[];
   pagination: ApiPaginationResponseParams;
@@ -241,4 +252,8 @@ export interface IGetTicketArtifactsQueryParams extends Partial<ApiPaginationReq
 export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions> {
   status?: TicketStatus;
   search?: string;
+  /** Administrative list only: tickets with any of these tags. */
+  tag_ids?: string[];
+  /** Administrative list only: tickets with any of this board's tags. */
+  board_id?: string;
 }

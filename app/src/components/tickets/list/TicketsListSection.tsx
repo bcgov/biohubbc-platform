@@ -11,7 +11,7 @@ import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDat
 import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ITicket, TicketStatus } from 'interfaces/useTicketsApi.interface';
-import { useMemo } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
 import { getRelativeTimeLabel } from 'utils/date';
 
@@ -21,10 +21,10 @@ export interface ITicketListRowActions {
   onDeleteTicket?: (ticket: ITicket) => void;
 }
 
-interface ITicketsListSectionProps extends IServerPaginationProps {
+interface ITicketsListSectionProps<T extends ITicket> extends IServerPaginationProps {
   sectionId: string;
   dataTestId: string;
-  rows: ITicket[];
+  rows: T[];
   searchTerm: string;
   onSearch: (term: string) => void;
   onRowClick: (ticketId: string) => void;
@@ -32,6 +32,10 @@ interface ITicketsListSectionProps extends IServerPaginationProps {
   onAdd?: () => void;
   addLabel?: string;
   rowActions?: ITicketListRowActions;
+  /** Optional columns shown after the subject, such as the administrative list's tags. */
+  additionalColumns?: GridColDef<T>[];
+  /** Optional filter inputs shown before the search box. */
+  filters?: ReactNode;
 }
 
 /**
@@ -39,11 +43,13 @@ interface ITicketsListSectionProps extends IServerPaginationProps {
  *
  * The section is fully prop-driven: it renders the same search + table styling
  * in both contexts, and only enables mutable row actions when handlers are provided.
+ * Callers with richer rows can add columns and filters of their own.
  *
- * @param {ITicketsListSectionProps} props
+ * @template T The row type.
+ * @param {ITicketsListSectionProps<T>} props
  * @returns {JSX.Element}
  */
-export const TicketsListSection = (props: ITicketsListSectionProps) => {
+export const TicketsListSection = <T extends ITicket>(props: ITicketsListSectionProps<T>) => {
   const {
     sectionId,
     dataTestId,
@@ -59,13 +65,15 @@ export const TicketsListSection = (props: ITicketsListSectionProps) => {
     searchPlaceholder = 'Search by ticket subject',
     onAdd,
     addLabel,
-    rowActions
+    rowActions,
+    additionalColumns,
+    filters
   } = props;
 
   const { onEditTicket, onToggleTicketStatus, onDeleteTicket } = rowActions || {};
 
-  const columns: GridColDef<ITicket>[] = useMemo(() => {
-    const baseColumns: GridColDef<ITicket>[] = [
+  const columns: GridColDef<T>[] = useMemo(() => {
+    const baseColumns: GridColDef<T>[] = [
       {
         field: 'ticket_slug',
         headerName: 'Ticket ID',
@@ -86,6 +94,7 @@ export const TicketsListSection = (props: ITicketsListSectionProps) => {
           </Typography>
         )
       },
+      ...(additionalColumns ?? []),
       {
         field: 'priority',
         headerName: 'Priority',
@@ -176,7 +185,7 @@ export const TicketsListSection = (props: ITicketsListSectionProps) => {
         }
       }
     ];
-  }, [onDeleteTicket, onEditTicket, onToggleTicketStatus]);
+  }, [additionalColumns, onDeleteTicket, onEditTicket, onToggleTicketStatus]);
 
   return (
     <PageSection
@@ -193,6 +202,7 @@ export const TicketsListSection = (props: ITicketsListSectionProps) => {
       addLabel={addLabel}
       headerContent={
         <Stack gap={1} direction="row" alignItems="center">
+          {filters}
           <TextField
             size="small"
             placeholder={searchPlaceholder}
@@ -211,7 +221,7 @@ export const TicketsListSection = (props: ITicketsListSectionProps) => {
           />
         </Stack>
       }>
-      <ServerPaginatedDataGrid<ITicket>
+      <ServerPaginatedDataGrid<T>
         dataTestId={dataTestId}
         rows={rows}
         columns={columns}
