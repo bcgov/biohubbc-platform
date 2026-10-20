@@ -1,7 +1,7 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
-import { TagSummary } from '../models/tag';
-import { TicketTagEvent } from '../models/ticket-tag';
+import { RuleTicketTag } from '../models/tag-rule';
+import { TicketTagEvent, TicketTagSummary } from '../models/ticket-tag';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -9,23 +9,24 @@ import { BaseRepository } from './base-repository';
  */
 export class TicketTagRepository extends BaseRepository {
   /**
-   * Get the active tags of a ticket ordered by case-insensitive name.
+   * Get the active tags of a ticket ordered by case-insensitive name, with the rule that applied each.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @returns {Promise<TagSummary[]>} Active tags linked to the ticket.
+   * @returns {Promise<TicketTagSummary[]>} Active tags linked to the ticket.
    * @memberof TicketTagRepository
    */
-  async getTicketTagSummaries(ticketId: string): Promise<TagSummary[]> {
+  async getTicketTagSummaries(ticketId: string): Promise<TicketTagSummary[]> {
     const knex = getKnex();
     const query = knex('ticket_tag')
-      .select('tag.tag_id', 'tag.name', 'tag.color')
+      .select('tag.tag_id', 'tag.name', 'tag.color', 'ticket_tag.tag_rule_id', 'tag_rule.name as tag_rule_name')
       .join('tag', 'tag.tag_id', 'ticket_tag.tag_id')
+      .leftJoin('tag_rule', 'tag_rule.tag_rule_id', 'ticket_tag.tag_rule_id')
       .where('ticket_tag.ticket_id', ticketId)
       .whereNull('ticket_tag.record_end_date')
       .whereNull('tag.record_end_date')
       .orderByRaw('lower(tag.name) ASC, tag.tag_id ASC');
 
-    const response = await this.connection.knex(query, TagSummary);
+    const response = await this.connection.knex(query, TicketTagSummary);
 
     return response.rows;
   }
@@ -49,10 +50,13 @@ export class TicketTagRepository extends BaseRepository {
         tg.color AS tag_color,
         'added' AS action,
         su.user_identifier,
+        tr.name AS tag_rule_name,
         tt.create_date AS event_date
       FROM ticket_tag tt
       JOIN tag tg
         ON tg.tag_id = tt.tag_id
+      LEFT JOIN tag_rule tr
+        ON tr.tag_rule_id = tt.tag_rule_id
       LEFT JOIN "system_user" su
         ON su.system_user_id = tt.create_user
       WHERE tt.ticket_id = ${ticketId}
@@ -66,10 +70,13 @@ export class TicketTagRepository extends BaseRepository {
         tg.color AS tag_color,
         'removed' AS action,
         su.user_identifier,
+        tr.name AS tag_rule_name,
         tt.record_end_date AS event_date
       FROM ticket_tag tt
       JOIN tag tg
         ON tg.tag_id = tt.tag_id
+      LEFT JOIN tag_rule tr
+        ON tr.tag_rule_id = tt.tag_rule_id
       LEFT JOIN "system_user" su
         ON su.system_user_id = tt.update_user
       WHERE tt.ticket_id = ${ticketId}
@@ -126,6 +133,55 @@ export class TicketTagRepository extends BaseRepository {
     `;
 
     await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Link tags to a ticket on behalf of the rules that matched it.
+   *
+   * A tag the ticket has ever had is skipped: an active tag from any source, and a tag that was removed (an ended
+   * row), so a removed tag stays removed when the ticket is re-evaluated, whichever rule or admin added it. The
+   * active-row unique index also absorbs two matching rules with the same tag and concurrent evaluations, which
+   * makes retried and duplicate jobs harmless.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {RuleTicketTag[]} ruleTicketTags - Tags to link, each with the rule that matched.
+   * @returns {Promise<void>}
+   * @memberof TicketTagRepository
+   */
+  async insertRuleTicketTags(ticketId: string, ruleTicketTags: RuleTicketTag[]): Promise<void> {
+    const tagIds = ruleTicketTags.map((ruleTicketTag) => ruleTicketTag.tag_id);
+    const tagRuleIds = ruleTicketTags.map((ruleTicketTag) => ruleTicketTag.tag_rule_id);
+    const sqlStatement = SQL`
+      INSERT INTO ticket_tag (ticket_id, tag_id, tag_rule_id)
+      SELECT ${ticketId}::uuid, requested.tag_id, requested.tag_rule_id
+      FROM unnest(${tagIds}::uuid[], ${tagRuleIds}::uuid[]) AS requested(tag_id, tag_rule_id)
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM ticket_tag tt
+        WHERE tt.ticket_id = ${ticketId}
+          AND tt.tag_id = requested.tag_id
+      )
+      ON CONFLICT (ticket_id, tag_id) WHERE record_end_date IS NULL DO NOTHING;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Soft delete all active tag links applied by a rule.
+   *
+   * @param {string} tagRuleId - Tag rule UUID.
+   * @returns {Promise<void>}
+   * @memberof TicketTagRepository
+   */
+  async deleteTicketTagsByTagRuleId(tagRuleId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex('ticket_tag')
+      .update({ record_end_date: knex.fn.now() })
+      .where('tag_rule_id', tagRuleId)
+      .whereNull('record_end_date');
+
+    await this.connection.knex(query);
   }
 
   /**

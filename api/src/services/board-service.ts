@@ -9,6 +9,7 @@ import {
   BoardTickets,
   BoardTicketSwimlane
 } from '../models/board';
+import { Tag, TagRequest } from '../models/tag';
 import { TicketWithTags } from '../models/ticket';
 import { BoardRepository } from '../repositories/board-repository';
 import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
@@ -136,6 +137,25 @@ export class BoardService extends DBService {
     ]);
 
     return { ...updatedBoard, tags, swimlanes };
+  }
+
+  /**
+   * Create a tag and add it to a board. The tag is a regular tag, available to every ticket and board.
+   *
+   * @param {string} boardId - Board UUID.
+   * @param {TagRequest} tag - Tag payload.
+   * @returns {Promise<Tag>} Created tag.
+   * @throws {ApiNotFoundError} If the board does not exist or is deleted.
+   * @throws {ApiConflictError} If an active tag already has the same name (case-insensitive).
+   * @memberof BoardService
+   */
+  async createBoardTag(boardId: string, tag: TagRequest): Promise<Tag> {
+    await this.boardRepository.getBoardById(boardId);
+
+    const createdTag = await this.tagService.createTag(tag);
+    await this.boardTagRepository.insertBoardTags(boardId, [createdTag.tag_id]);
+
+    return createdTag;
   }
 
   /**

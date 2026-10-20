@@ -64,6 +64,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon
       .stub(indexSubmissionFeaturesJobDependencies, 'publishSubmissionUploadSecurityJob')
       .resolves({ status: 'published', jobId: 'screening-job' });
+    sinon
+      .stub(indexSubmissionFeaturesJobDependencies, 'publishEvaluateTicketTagRulesJob')
+      .resolves({ status: 'published', jobId: 'tag-rules-job' });
   });
 
   it('indexes successfully and sets indexed', async () => {
@@ -109,6 +112,24 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(toIndexedStub.calledBefore(publishScreeningStub)).to.be.true;
   });
 
+  it("queues tag rule evaluation for the upload's ticket alongside screening in the indexing transaction", async () => {
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .resolves({ status: 'ok' });
+
+    await indexSubmissionFeaturesJobHandler([createMockJob()]);
+
+    const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
+    const publishScreeningStub =
+      indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
+    const publishTagRulesStub =
+      indexSubmissionFeaturesJobDependencies.publishEvaluateTicketTagRulesJob as sinon.SinonStub;
+    expect(publishTagRulesStub).to.have.been.calledOnce;
+    expect(publishTagRulesStub.firstCall.args[1]).to.deep.equal({ ticketId: '11111111-1111-1111-1111-111111111111' });
+    expect(publishTagRulesStub.firstCall.args[0]).to.equal(publishScreeningStub.firstCall.args[0]);
+    expect(toIndexedStub.calledBefore(publishTagRulesStub)).to.be.true;
+  });
+
   it('marks invalid for deterministic validation outcomes', async () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
@@ -130,6 +151,8 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     // An invalid outcome must not enqueue a closure recompute — prior closure rows stay untouched.
     expect(publishStub.notCalled).to.be.true;
     expect(publishScreeningStub.notCalled).to.be.true;
+    // Tag rules only match fully indexed features, so an invalid upload is not evaluated.
+    expect(indexSubmissionFeaturesJobDependencies.publishEvaluateTicketTagRulesJob).to.not.have.been.called;
   });
 
   it('skips work when status is terminal', async () => {

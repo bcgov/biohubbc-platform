@@ -1,4 +1,4 @@
-import { ITicketTagsResponse } from 'interfaces/useTagsApi.interface';
+import { ITicketTag, ITicketTagsResponse } from 'interfaces/useTagsApi.interface';
 import { createTestQueryClient } from 'test-helpers/query-client';
 import { act, renderHook, waitFor } from 'test-helpers/test-utils';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
@@ -14,8 +14,20 @@ vi.mock('hooks/useContext', () => ({
 }));
 
 const tagsQueryKey = ticketQueryKeys.tags('ticket-1');
-const urgent = { tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' };
-const blocked = { tag_id: 'tag-2', name: 'Blocked', color: '#FCBA19' };
+const urgent: ITicketTag = {
+  tag_id: 'tag-1',
+  name: 'Urgent',
+  color: '#D8292F',
+  tag_rule_id: null,
+  tag_rule_name: null
+};
+const blocked: ITicketTag = {
+  tag_id: 'tag-2',
+  name: 'Blocked',
+  color: '#FCBA19',
+  tag_rule_id: null,
+  tag_rule_name: null
+};
 const initial: ITicketTagsResponse = { tags: [urgent], events: [] };
 
 describe('useUpdateTicketTagsMutation', () => {
@@ -34,6 +46,7 @@ describe('useUpdateTicketTagsMutation', () => {
           tag_color: '#FCBA19',
           action: 'added',
           user_identifier: 'sarah',
+          tag_rule_name: null,
           event_date: '2026-10-01T00:00:00.000Z'
         }
       ]
@@ -54,6 +67,29 @@ describe('useUpdateTicketTagsMutation', () => {
     await act(async () => finishSave(saved));
 
     await waitFor(() => expect(queryClient.getQueryData(tagsQueryKey)).toEqual(saved));
+  });
+
+  it('keeps the rule attribution of a kept tag and adds a newly picked tag as added by hand', async () => {
+    const ruleTag: ITicketTag = {
+      ...urgent,
+      tag_rule_id: 'rule-1',
+      tag_rule_name: 'Failed uploads'
+    };
+    mocks.updateTicketTags.mockReturnValue(new Promise(() => {}));
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData<ITicketTagsResponse>(tagsQueryKey, { tags: [ruleTag], events: [] });
+    const { result } = renderHook(() => useUpdateTicketTagsMutation(), { queryClient });
+
+    act(() =>
+      result.current.mutate([
+        { tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' },
+        { tag_id: 'tag-2', name: 'Blocked', color: '#FCBA19' }
+      ])
+    );
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData<ITicketTagsResponse>(tagsQueryKey)?.tags).toEqual([ruleTag, blocked])
+    );
   });
 
   it('restores the previous tags and reports the error when the save fails', async () => {

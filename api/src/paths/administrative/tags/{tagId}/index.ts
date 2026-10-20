@@ -10,6 +10,35 @@ import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/tags/{tagId}');
 
+export const GET: Operation = [
+  authorizeRequestHandler(() => ({
+    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+  })),
+  getTag()
+];
+
+GET.apiDoc = {
+  description: 'Get a ticket tag.',
+  tags: ['tags'],
+  security: [{ Bearer: [] }],
+  parameters: [
+    {
+      in: 'path',
+      name: 'tagId',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+      description: 'Tag UUID.'
+    }
+  ],
+  responses: {
+    200: {
+      description: 'Tag retrieved successfully',
+      content: { 'application/json': { schema: TagSchema } }
+    },
+    ...defaultErrorResponses
+  }
+};
+
 export const PUT: Operation = [
   authorizeRequestHandler(() => ({
     and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
@@ -68,6 +97,34 @@ DELETE.apiDoc = {
     ...defaultErrorResponses
   }
 };
+
+/**
+ * Get a tag.
+ *
+ * @returns {RequestHandler}
+ */
+export function getTag(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req.keycloak_token);
+
+    try {
+      await connection.open();
+
+      const tagService = new TagService(connection);
+      const tag = await tagService.getTag(req.params.tagId);
+
+      await connection.commit();
+
+      return res.status(200).json(tag);
+    } catch (error) {
+      defaultLog.error({ label: 'getTag', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      await connection.release();
+    }
+  };
+}
 
 /**
  * Update a tag.

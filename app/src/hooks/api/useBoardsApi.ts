@@ -1,5 +1,6 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { IBoardDetail, IBoardRequest, IBoardsQueryParams, IGetBoardsResponse } from 'interfaces/useBoardsApi.interface';
+import { ITag, ITagRequest } from 'interfaces/useTagsApi.interface';
 
 /**
  * Returns a set of supported api methods for working with ticket boards. Every endpoint is administrative.
@@ -72,11 +73,25 @@ export const useBoardsApi = (axios: AxiosInstance) => {
     await axios.delete(`/api/administrative/boards/${boardId}`);
   };
 
+  /**
+   * Create a tag and add it to a board. The tag is a regular tag, available to every ticket and board.
+   *
+   * @param {string} boardId
+   * @param {ITagRequest} payload
+   * @return {*} {Promise<ITag>} The created tag.
+   */
+  const createBoardTag = async (boardId: string, payload: ITagRequest): Promise<ITag> => {
+    const { data } = await axios.post<ITag>(`/api/administrative/boards/${boardId}/tags`, payload);
+
+    return data;
+  };
+
   return {
     getBoards,
     createBoard,
     getBoard,
     updateBoard,
-    deleteBoard
+    deleteBoard,
+    createBoardTag
   };
 };

@@ -8,6 +8,7 @@ import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
 import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submission-feature-closure-job';
+import { IEvaluateTicketTagRulesJobData } from './jobs/evaluate-ticket-tag-rules-job';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
@@ -855,6 +856,81 @@ export const publishSubmissionUploadSecurityJob = async (
       message: 'Failed to publish job',
       submissionId: data.submissionId,
       submissionUploadId: data.submissionUploadId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Delay before a ticket tag rule evaluation runs, so evaluations queued close together for one ticket coalesce.
+ */
+const TICKET_TAG_RULE_EVALUATION_COOLDOWN_SECONDS = 10;
+
+const TICKET_TAG_RULE_EVALUATION_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 15 // 15 minutes
+};
+
+/**
+ * Publish an evaluate ticket tag rules job to the queue.
+ *
+ * Each ticket gets its own delayed singleton job (`singletonKey: ticket-tag-rules-${ticketId}` with `policy: 'short'`
+ * on the queue), so evaluations queued while one is waiting collapse into one.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IEvaluateTicketTagRulesJobData} data Job data containing ticketId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishEvaluateTicketTagRulesJob = async (
+  connection: IDBConnection,
+  data: IEvaluateTicketTagRulesJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    const mergedOptions = { ...TICKET_TAG_RULE_EVALUATION_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.EVALUATE_TICKET_TAG_RULES);
+
+    const startAfter =
+      mergedOptions.startAfter ?? new Date(Date.now() + TICKET_TAG_RULE_EVALUATION_COOLDOWN_SECONDS * 1000);
+
+    const jobId = await boss.send(JobQueues.EVALUATE_TICKET_TAG_RULES, data, {
+      ...mergedOptions,
+      startAfter,
+      singletonKey: `ticket-tag-rules-${data.ticketId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishEvaluateTicketTagRulesJob',
+        message: 'Evaluate ticket tag rules job published',
+        jobId,
+        ticketId: data.ticketId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.debug({
+      label: 'publishEvaluateTicketTagRulesJob',
+      message: 'Job not published (duplicate or throttled)',
+      ticketId: data.ticketId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this ticket' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishEvaluateTicketTagRulesJob',
+      message: 'Failed to publish job',
+      ticketId: data.ticketId,
       error
     });
     throw error;

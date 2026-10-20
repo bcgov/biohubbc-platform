@@ -552,6 +552,37 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
     });
   });
 
+  describe('board tags', () => {
+    it('creating a tag on a board creates a regular tag and adds it to the board', async () => {
+      const boardId = await createBoard([]);
+
+      const tag = await boardService.createBoardTag(boardId, {
+        name: `Board tag-${runId}`,
+        description: null,
+        color: '#123456'
+      });
+
+      expect((await boardService.getBoard(boardId)).tags.map((boardTag) => boardTag.tag_id)).to.eql([tag.tag_id]);
+      expect((await tagService.getTags({ search: `Board tag-${runId}` })).map((found) => found.tag_id)).to.eql([
+        tag.tag_id
+      ]);
+    });
+
+    it('rejects a duplicate tag name without changing the board', async () => {
+      const boardId = await createBoard([]);
+      await createTag('Taken');
+
+      try {
+        await boardService.createBoardTag(boardId, { name: `TAKEN-${runId}`, description: null, color: '#123456' });
+        expect.fail('Expected conflict');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+
+      expect((await boardService.getBoard(boardId)).tags).to.eql([]);
+    });
+  });
+
   describe('tag and board lists', () => {
     it('board_id filter returns only the board tags, with pagination and count', async () => {
       const [a, b] = await Promise.all(['A', 'B', 'C'].map((name) => createTag(name)));

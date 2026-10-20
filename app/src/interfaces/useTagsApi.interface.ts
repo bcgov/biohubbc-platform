@@ -17,6 +17,17 @@ export interface ITag {
   create_date: string;
 }
 
+/** A tag on a ticket, with the rule that applied it, if any. */
+export interface ITicketTag {
+  tag_id: string;
+  name: string;
+  /** Hex color, `#RRGGBB`. */
+  color: string;
+  /** The rule that applied the tag, or null when it was added by hand. */
+  tag_rule_id: string | null;
+  tag_rule_name: string | null;
+}
+
 export type TicketTagEventAction = 'added' | 'removed';
 
 /** One tag being added to or removed from a ticket, shown on the administrative ticket timeline. */
@@ -27,6 +38,8 @@ export interface ITicketTagEvent {
   tag_color: string;
   action: TicketTagEventAction;
   user_identifier: string | null;
+  /** The rule that applied the tag, or null when it was added by hand. */
+  tag_rule_name: string | null;
   event_date: string;
 }
 
@@ -51,7 +64,7 @@ export interface ITagRequest {
 
 /** A ticket's current tags and its tag history, oldest first. */
 export interface ITicketTagsResponse {
-  tags: ITagSummary[];
+  tags: ITicketTag[];
   events: ITicketTagEvent[];
 }
 

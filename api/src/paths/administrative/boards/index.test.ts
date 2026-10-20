@@ -14,6 +14,7 @@ import { DELETE as boardDELETE, GET as boardGET, PUT as boardPUT, updateBoard } 
 import { POST as swimlanePOST } from './{boardId}/swimlanes';
 import { PUT as orderPUT, reorderBoardSwimlanes } from './{boardId}/swimlanes/order';
 import { DELETE as swimlaneDELETE, PUT as swimlanePUT, updateBoardSwimlane } from './{boardId}/swimlanes/{swimlaneId}';
+import { POST as boardTagPOST, createBoardTag } from './{boardId}/tags';
 import { getBoardTickets, GET as ticketsGET } from './{boardId}/tickets';
 
 const operations = {
@@ -26,7 +27,8 @@ const operations = {
   swimlanePUT,
   swimlaneDELETE,
   orderPUT,
-  ticketsGET
+  ticketsGET,
+  boardTagPOST
 };
 
 const boardId = '11111111-1111-1111-1111-111111111111';
@@ -144,6 +146,20 @@ describe('paths/administrative/boards', () => {
 
     sinon.assert.calledOnceWithExactly(reorderStub, boardId, [swimlaneId]);
     expect(mockRes.jsonValue).to.eql({ swimlanes: [] });
+  });
+
+  it('createBoardTag creates the tag for the board in the route and returns 201', async () => {
+    const connection = mockConnection();
+    const createStub = sinon.stub(BoardService.prototype, 'createBoardTag').resolves({} as any);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { boardId };
+    mockReq.body = { name: 'Fish', description: null, color: '#1A5A96' };
+
+    await createBoardTag()(mockReq, mockRes, mockNext);
+
+    sinon.assert.calledOnceWithExactly(createStub, boardId, mockReq.body);
+    expect(mockRes.statusValue).to.equal(201);
+    sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
   });
 
   describe('getBoardTickets', () => {

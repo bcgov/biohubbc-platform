@@ -72,14 +72,42 @@ export const TicketTagsResponseSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['tags', 'events'],
   properties: {
-    tags: { type: 'array', items: TagSummarySchema },
+    tags: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['tag_id', 'name', 'color', 'tag_rule_id', 'tag_rule_name'],
+        properties: {
+          tag_id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          color: TagColorSchema,
+          tag_rule_id: {
+            type: 'string',
+            format: 'uuid',
+            nullable: true,
+            description: 'The tag rule that applied the tag; null when applied manually.'
+          },
+          tag_rule_name: { type: 'string', nullable: true }
+        }
+      }
+    },
     events: {
       description: 'Tag added/removed history, oldest first. Admin timeline only.',
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['ticket_tag_id', 'tag_id', 'tag_name', 'tag_color', 'action', 'user_identifier', 'event_date'],
+        required: [
+          'ticket_tag_id',
+          'tag_id',
+          'tag_name',
+          'tag_color',
+          'action',
+          'user_identifier',
+          'tag_rule_name',
+          'event_date'
+        ],
         properties: {
           ticket_tag_id: { type: 'string', format: 'uuid' },
           tag_id: { type: 'string', format: 'uuid' },
@@ -87,6 +115,11 @@ export const TicketTagsResponseSchema: OpenAPIV3.SchemaObject = {
           tag_color: TagColorSchema,
           action: { type: 'string', enum: ['added', 'removed'] },
           user_identifier: { type: 'string', nullable: true },
+          tag_rule_name: {
+            type: 'string',
+            nullable: true,
+            description: 'The tag rule that applied the tag; null when applied manually.'
+          },
           event_date: { type: 'string', format: 'date-time' }
         }
       }

@@ -399,6 +399,7 @@ describe('TicketTimeline', () => {
       tag_color: '#D8292F',
       action: 'removed',
       user_identifier: 'sarah@example.com',
+      tag_rule_name: null,
       event_date: '2026-02-24T00:00:00.000Z'
     };
 

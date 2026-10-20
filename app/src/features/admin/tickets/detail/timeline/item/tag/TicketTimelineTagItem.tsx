@@ -9,14 +9,29 @@ interface ITicketTimelineTagItemProps {
 }
 
 /**
- * Ticket timeline row for a tag added to or removed from the ticket: "Tag <chip> added by <user>".
+ * The actor of a tag event: the rule that added the tag, otherwise the user who made the change, if known.
+ *
+ * @param {ITicketTagEvent} tagEvent The tag event.
+ * @returns {string} The actor suffix, such as " by rule 'Failed uploads'", or empty.
+ */
+const getTagEventActor = (tagEvent: ITicketTagEvent): string => {
+  if (tagEvent.action === 'added' && tagEvent.tag_rule_name) {
+    return ` by rule '${tagEvent.tag_rule_name}'`;
+  }
+
+  return tagEvent.user_identifier ? ` by ${tagEvent.user_identifier}` : '';
+};
+
+/**
+ * Ticket timeline row for a tag added to or removed from the ticket: "Tag <chip> added by <user>", or
+ * "Tag <chip> added by rule '<rule>'" when a rule added it.
  *
  * @param {ITicketTimelineTagItemProps} props The tag event and its date label.
  * @returns {JSX.Element} The tag event row.
  */
 export const TicketTimelineTagItem = (props: ITicketTimelineTagItemProps) => {
   const { tagEvent, dateLabel } = props;
-  const actor = tagEvent.user_identifier ? ` by ${tagEvent.user_identifier}` : '';
+  const actor = getTagEventActor(tagEvent);
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
