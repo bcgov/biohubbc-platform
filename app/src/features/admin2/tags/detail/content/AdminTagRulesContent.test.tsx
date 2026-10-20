@@ -110,14 +110,13 @@ describe('AdminTagRulesContent', () => {
     fireEvent.click(await screen.findByTestId(`custom-menu-icon-item-${menuLabel}`));
   };
 
-  it("lists one page of the tag's rules with their state and the server total, and says when rules tag tickets", async () => {
+  it("lists one page of the tag's rules with their state and the server total", async () => {
     renderContent();
 
     expect(await screen.findByText('Moose surveys')).toBeVisible();
     expect(screen.getByText('Uploads and requests about moose')).toBeVisible();
     expect(screen.getByText('Enabled')).toBeVisible();
     expect(screen.getByText('(11)')).toBeVisible();
-    expect(screen.getByText(/don't apply to existing tickets/)).toBeVisible();
     expect(getTagRules).toHaveBeenCalledWith(
       tagId,
       { page: 1, limit: 10, sort: 'name', order: 'asc' },

@@ -1,4 +1,3 @@
-import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
@@ -154,13 +153,6 @@ export const AdminTagRulesContent = (props: IAdminTagRulesContentProps) => {
         }
         onAdd={() => setIsCreateDialogOpen(true)}
         addLabel="New Rule">
-        <Alert severity="info" sx={{ m: 2 }}>
-          Rules tag submission upload tickets when a feature of the upload matches the rule&apos;s expression, checked
-          when the upload&apos;s features are indexed, and data request tickets when the request&apos;s search refers to
-          a property or taxon (including descendants) the expression also refers to, checked when the request is
-          created. Rules only add tags, never re-add a tag removed from a ticket, and don&apos;t apply to existing
-          tickets.
-        </Alert>
         <AdminTagRulesTable
           tagRules={tagRulesQuery.data?.tag_rules ?? []}
           rowCount={rowCount}

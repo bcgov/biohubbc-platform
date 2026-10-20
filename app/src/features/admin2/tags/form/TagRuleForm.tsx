@@ -1,6 +1,5 @@
 import FormHelperText from '@mui/material/FormHelperText';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import { PolicyExpressionBuilder } from 'components/expression-builder/PolicyExpressionBuilder';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { TAG_RULE_DESCRIPTION_MAX_LENGTH, TAG_RULE_NAME_MAX_LENGTH } from 'constants/tag-rule';
@@ -43,11 +42,6 @@ export const TagRuleForm = () => {
         minRows={2}
         slotProps={{ htmlInput: { maxLength: TAG_RULE_DESCRIPTION_MAX_LENGTH } }}
       />
-      <Typography variant="body2" color="text.secondary">
-        Submission upload tickets get the tag when a feature of the upload matches the expression. Data request tickets
-        get the tag when the request&apos;s search refers to a property, or a taxon (including descendant taxa), that
-        the expression also refers to.
-      </Typography>
       <PolicyExpressionBuilder
         value={values.expression ?? undefined}
         onChange={(expression) => setFieldValue('expression', expression, false)}

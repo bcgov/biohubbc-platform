@@ -54,4 +54,12 @@ describe('useBoardsApi', () => {
 
     expect(mock.history.delete).toHaveLength(1);
   });
+
+  it('createBoardTag posts the tag to the board', async () => {
+    const tagRequest = { name: 'Blocked', description: null, color: '#D8292F' };
+    const tag = { tag_id: 'tag-1', ...tagRequest, create_date: '2026-10-01T00:00:00.000Z' };
+    mock.onPost(`/api/administrative/boards/${boardId}/tags`, tagRequest).reply(201, tag);
+
+    expect(await useBoardsApi(axios).createBoardTag(boardId, tagRequest)).toEqual(tag);
+  });
 });

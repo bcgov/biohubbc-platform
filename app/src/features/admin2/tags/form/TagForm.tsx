@@ -43,12 +43,12 @@ export const TagForm = () => {
         required
         placeholder="1A5A96"
         onChange={(event) => setFieldValue('color', getTagColorDigits(event.target.value))}
-        sx={{ width: 200 }}
+        fullWidth
         slotProps={{
           input: {
             startAdornment: (
               <InputAdornment position="start">
-                <Icon path={mdiPound} size={0.875} />
+                <Icon path={mdiPound} size={0.7} />
               </InputAdornment>
             ),
             endAdornment: (

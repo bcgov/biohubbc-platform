@@ -167,6 +167,36 @@ describe('BoardService', () => {
     });
   });
 
+  describe('createBoardTag', () => {
+    it('creates the tag and adds it to the board', async () => {
+      const tag = { tag_id: 'tag-1', name: 'Fish', description: null, color: '#1A5A96', create_date: '' };
+      sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
+      const createStub = sinon.stub(TagService.prototype, 'createTag').resolves(tag);
+      const linkStub = sinon.stub(BoardTagRepository.prototype, 'insertBoardTags').resolves();
+
+      const result = await service.createBoardTag(boardId, { name: 'Fish', description: null, color: '#1A5A96' });
+
+      expect(createStub).to.have.been.calledOnceWith({ name: 'Fish', description: null, color: '#1A5A96' });
+      expect(linkStub).to.have.been.calledOnceWith(boardId, ['tag-1']);
+      expect(createStub).to.have.been.calledBefore(linkStub);
+      expect(result).to.eql(tag);
+    });
+
+    it('creates nothing for a missing board', async () => {
+      sinon.stub(BoardRepository.prototype, 'getBoardById').rejects(new Error('Board not found'));
+      const createStub = sinon.stub(TagService.prototype, 'createTag');
+
+      try {
+        await service.createBoardTag(boardId, { name: 'Fish', description: null, color: '#1A5A96' });
+        expect.fail('Expected error');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Board not found');
+      }
+
+      expect(createStub).to.not.have.been.called;
+    });
+  });
+
   describe('deleteBoard', () => {
     it('soft deletes swimlanes and board tags before the board', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);

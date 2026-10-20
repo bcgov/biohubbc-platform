@@ -56,6 +56,7 @@ describe('AdminBoardPage', () => {
   const getBoard = vi.fn();
   const getTicketsForAdmin = vi.fn();
   const getTags = vi.fn();
+  const createBoardTag = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,7 +70,7 @@ describe('AdminBoardPage', () => {
       pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
     });
     (useApi as Mock).mockReturnValue({
-      boards: { getBoard },
+      boards: { getBoard, createBoardTag },
       tickets: { getTicketsForAdmin },
       tags: { getTags }
     });
@@ -113,5 +114,21 @@ describe('AdminBoardPage', () => {
       )
     );
     expect(screen.queryByText('Board ticket')).not.toBeInTheDocument();
+  });
+
+  it('creates a tag on the board from the Tags tab', async () => {
+    createBoardTag.mockResolvedValue({ ...urgentTag, description: null, create_date: '2026-10-01T00:00:00.000Z' });
+    renderBoardPage('?tab=tags');
+    await screen.findByText('Needs attention today');
+
+    fireEvent.click(screen.getByRole('button', { name: 'New Tag' }));
+    fireEvent.change(await screen.findByLabelText(/Name/), { target: { value: ' Blocked ' } });
+    fireEvent.change(screen.getByLabelText(/Color/), { target: { value: '#D8292F' } });
+    fireEvent.click(screen.getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() =>
+      expect(createBoardTag).toHaveBeenCalledWith(boardId, { name: 'Blocked', description: null, color: '#D8292F' })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
