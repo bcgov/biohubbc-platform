@@ -27,6 +27,7 @@ import { buildExpressionTreeFeatureIdsSubquery } from '../../repositories/expres
 import { ExpressionTreeNormalizationService } from '../../services/expression-tree-normalization-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { createAssignedFeatureProperty } from '../helpers/test-feature-property-helpers';
 import { addTeamMember, createTeam, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
@@ -452,6 +453,25 @@ describe('Tile search function (integration)', function () {
         const tile = await renderTileBytes(context);
         expect(tile).to.not.equal(null);
         expect(Object.values(decodeTile(tile!)).flat()).to.have.length(caller === null ? 1 : 2);
+      }
+    });
+
+    it('excludes superseded features from submission-scoped and unscoped tiles', async () => {
+      const superseded = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const submissionId = await submissionOf(superseded);
+      const successor = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'successor' });
+      await addPointToFeature(successor, TEST_LNG, TEST_LAT);
+      // Approval ends and links the predecessor; the closure rebuild then holds only the current successor.
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now(), successor_submission_feature_id = ${successor}
+        WHERE submission_feature_id = ${superseded};
+      `);
+      await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+
+      for (const context of [await createContext({ submissionIds: [submissionId] }), await createContext({})]) {
+        expect(await canSee(context, superseded)).to.equal(false);
+        expect(await canSee(context, successor)).to.equal(true);
       }
     });
 

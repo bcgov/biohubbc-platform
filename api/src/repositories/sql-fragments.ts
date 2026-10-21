@@ -23,34 +23,15 @@ export function isSubmissionFeaturePublished(alias: string): string {
 }
 
 /**
- * Predicate for a submission_feature occurrence that has not been ended, whether or not it has
- * ever been published.
- *
- * This is the third lifecycle tier, alongside {@link isSubmissionFeaturePublished} and
- * {@link isSubmissionFeatureCurrent}, and it exists for administrative reads of an upload under
- * review: those features have never been approved, so `record_effective_date` is NULL for all of
- * them and either published predicate would exclude every one. Reconciliation retires a superseded
- * upload's pending features by setting `record_end_date = now()`, so "not ended" is exactly the set
- * an administrator is reviewing.
- *
- * The literal `IS NULL` form is deliberate: it is the predicate the partial index
- * `submission_feature_idx9` is defined on, and the planner only uses a
- * partial index when the query repeats its predicate verbatim. Do not widen it to
- * `(record_end_date IS NULL OR now() < record_end_date)`.
- *
- * @param alias SQL alias for submission_feature.
- * @returns SQL predicate with zero placeholders.
- */
-export function isSubmissionFeatureActive(alias: string): string {
-  return `${alias}.record_end_date IS NULL`;
-}
-
-/**
  * Predicate for a current feature: published, not ended, and without a successor.
  *
- * Collection, search, and download paths use this predicate to exclude superseded features.
- * Direct ID lookups use {@link isSubmissionFeaturePublished} instead so previously published
- * features remain accessible.
+ * Lifecycle by read scope:
+ * - Submission collection, search, and download paths use this predicate to exclude superseded features. The closure
+ *   holds only current features, so a closure self-loop is an equivalent check.
+ * - Direct ID lookups use {@link isSubmissionFeaturePublished} instead so previously published features remain
+ *   accessible.
+ * - Upload-scoped reads apply no lifecycle predicate: every feature of an upload is viewable, including unpublished,
+ *   ended, and superseded features.
  *
  * @param alias SQL alias for submission_feature.
  * @returns SQL predicate with zero placeholders.

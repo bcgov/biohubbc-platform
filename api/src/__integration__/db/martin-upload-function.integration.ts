@@ -1,12 +1,12 @@
 // Integration test for the submission-upload tile function — verifies that biohub.martin_upload encodes
-// every spatial property of every active feature of the requested upload, and only of that upload,
-// against the real database.
+// every spatial property of every feature of the requested upload, whatever its lifecycle, and only of
+// that upload, against the real database.
 //
 // Like martin_feature, this function is not the security boundary: access is decided when the token is
 // minted (system administrators only). What it must still guarantee is that the identifiers in the
-// token are honoured exactly — the upload must belong to the named submission — that "active" means
-// not ended rather than published (features under review have never been published), and that a
-// malformed context can never be coaxed into an error or into returning another upload's geometry.
+// token are honoured exactly — the upload must belong to the named submission — that no lifecycle
+// predicate hides an upload's unpublished, ended or superseded features, and that a malformed context
+// can never be coaxed into an error or into returning another upload's geometry.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted. martin_upload is
 // SECURITY DEFINER, but it executes inside the caller's transaction, so uncommitted fixtures are
@@ -278,7 +278,7 @@ describe('Martin upload function (integration)', function () {
       expect(geometries).to.have.length(2);
     });
 
-    it('excludes a feature ended by reconciliation', async () => {
+    it('renders a feature ended by reconciliation', async () => {
       const { submissionId, uploadId } = await createUploadWithPoint();
       // Reconciliation retires a superseded upload's pending features with record_end_date = now().
       const endedFeatureId = await insertFeature(submissionId, uploadId, { ended: true });
@@ -286,22 +286,27 @@ describe('Martin upload function (integration)', function () {
 
       const geometries = await decodeGeometries(contextFor(submissionId, uploadId));
 
-      expect(geometries).to.have.length(1);
-      expect(geometries.map((geometry) => geometry.properties.submission_feature_property_geometry_id)).to.not.include(
+      expect(geometries).to.have.length(2);
+      expect(geometries.map((geometry) => geometry.properties.submission_feature_property_geometry_id)).to.include(
         endedGeometryId
       );
     });
 
-    it('returns an empty tile once every feature of the upload has ended', async () => {
-      const { submissionId, uploadId, featureId } = await createUploadWithPoint();
-
+    it('renders a published feature that a later upload superseded', async () => {
+      const { submissionId, uploadId } = await createUploadWithPoint();
+      const supersededFeatureId = await insertFeature(submissionId, uploadId, { effective: true, ended: true });
+      const successorFeatureId = await insertFeature(submissionId, uploadId, { effective: true });
       await fixture.connection.sql(SQL`
-        UPDATE submission_feature SET record_end_date = now() - interval '1 day'
-        WHERE submission_feature_id = ${featureId};
+        UPDATE submission_feature SET successor_submission_feature_id = ${successorFeatureId}
+        WHERE submission_feature_id = ${supersededFeatureId};
       `);
+      const supersededGeometryId = await addGeometry(supersededFeatureId, `POINT(${TEST_LNG} ${TEST_LAT})`);
 
-      // A token minted before the upload was superseded stops producing tiles immediately.
-      expect(await renderTileBuffer(contextFor(submissionId, uploadId))).to.be.null;
+      const geometries = await decodeGeometries(contextFor(submissionId, uploadId));
+
+      expect(geometries.map((geometry) => geometry.properties.submission_feature_property_geometry_id)).to.include(
+        supersededGeometryId
+      );
     });
   });
 
@@ -402,7 +407,7 @@ describe('Martin upload function (integration)', function () {
       });
     });
 
-    it('returns no extent for missing, cross-upload, cross-submission or ended features', async () => {
+    it('returns no extent for missing, cross-upload or cross-submission features, and frames ended ones', async () => {
       const target = await createUploadWithPoint();
       const other = await createUploadWithPoint(target.submissionId);
       const service = new SubmissionFeaturePropertyGeometryService(fixture.connection);
@@ -422,12 +427,12 @@ describe('Martin upload function (integration)', function () {
         WHERE submission_feature_id = ${target.featureId}`);
       expect(
         await service.getSubmissionUploadFeatureGeometryExtent(target.submissionId, target.uploadId, target.featureId)
-      ).to.eql({ bbox: null, geometry_count: 0 });
+      ).to.eql({ bbox: [TEST_LNG, TEST_LAT, TEST_LNG, TEST_LAT], geometry_count: 1 });
     });
   });
 
   describe('query plan', () => {
-    it('finds the upload through its partial index rather than scanning either table', async () => {
+    it('finds the upload through its index rather than scanning either table', async () => {
       // The candidate set must be bounded by the upload whatever the zoom: a low zoom tile driven
       // from the geometry GIST index would scan every geometry in the province.
       const plan = await fixture.connection.sql(
@@ -438,7 +443,6 @@ describe('Martin upload function (integration)', function () {
           JOIN biohub.submission_feature_property_geometry g ON g.submission_feature_id = sf.submission_feature_id
           WHERE sf.submission_upload_id = '11111111-1111-4111-8111-111111111111'::uuid
             AND sf.submission_id = 1
-            AND sf.record_end_date IS NULL
             AND g.value && public.ST_Transform(public.ST_TileEnvelope(4, 2, 5), 4326);
         `,
         z.object({ 'QUERY PLAN': z.string() })
@@ -446,7 +450,7 @@ describe('Martin upload function (integration)', function () {
 
       const planText = plan.rows.map((row) => row['QUERY PLAN']).join('\n');
 
-      expect(planText).to.match(/submission_feature_idx9/);
+      expect(planText).to.match(/submission_feature_idx4/);
       expect(planText).to.not.contain('Seq Scan on submission_feature ');
       expect(planText).to.not.contain('Seq Scan on submission_feature_property_geometry');
     });

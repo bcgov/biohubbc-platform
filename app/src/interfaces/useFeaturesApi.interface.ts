@@ -13,6 +13,7 @@ export interface ISubmissionFeature {
   contributor_name: string;
   source_id: string | null;
   successor_submission_feature_id: number | null;
+  terminal_submission_feature_id: number | null;
   data?: Record<string, any>;
   secured: boolean;
   security_reasons: string[];

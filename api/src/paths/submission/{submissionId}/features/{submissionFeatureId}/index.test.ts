@@ -55,6 +55,7 @@ describe('index', () => {
         feature_type_id: 1,
         source_id: null,
         successor_submission_feature_id: null,
+        terminal_submission_feature_id: 1,
         feature_type_name: 'sample_site',
         submission_name: 'Test Submission',
         contributor_name: 'SIMS',

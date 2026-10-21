@@ -81,6 +81,9 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
   /**
    * List rules with direct assignment coverage for the selected upload features, applied rules first.
    *
+   * Coverage is computed over the active features that rule assignment can change, so a rule reads as applied exactly
+   * when assigning it would change nothing.
+   *
    * @param {number} submissionId Submission boundary.
    * @param {string} submissionUploadId Upload boundary for every feature in scope.
    * @param {NormalizedSubmissionFeatureSecurityRulesFilters} filters Feature IDs or expression scope, plus optional rule-name matching.
@@ -93,7 +96,11 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
     filters: NormalizedSubmissionFeatureSecurityRulesFilters,
     pagination: ApiPaginationOptions
   ): Promise<SubmissionFeatureSecuritySelectedRulesResult> {
-    const featureIds = buildSubmissionUploadFeatureIdsSubquery(submissionId, submissionUploadId, filters.expression);
+    const featureIds = buildSubmissionUploadFeatureIdsSubquery(
+      submissionId,
+      submissionUploadId,
+      filters.expression
+    ).whereNull('anchor_sf.record_end_date');
     if (filters.submissionFeatureIds) {
       featureIds.whereIn('anchor_sf.submission_feature_id', filters.submissionFeatureIds);
     }
@@ -130,8 +137,8 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
   }
 
   /**
-   * Get direct and inherited rules affecting upload features.
-   * Review-time features are unpublished and absent from submission_feature_closure,
+   * Get direct and inherited rules affecting upload features, whatever their lifecycle.
+   * Upload features may be unpublished or superseded and absent from submission_feature_closure,
    * so ancestry follows upload-local parent_submission_feature_id links, including self.
    * Each ancestor step is a keyed lookup inside an OFFSET 0 fence with the upload boundary applied to its
    * result, so the walk costs a few index probes per selected feature however large the upload.
@@ -152,7 +159,7 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
     const query = SQL`
       WITH RECURSIVE features AS (
         SELECT submission_feature_id FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}::uuid AND record_end_date IS NULL
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
           AND submission_feature_id = ANY(${submissionFeatureIds}::integer[])
       ), ancestors AS (
         SELECT submission_feature_id AS source_id, submission_feature_id AS target_id FROM features
@@ -160,13 +167,13 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
         SELECT ancestors.source_id, parent.submission_feature_id
         FROM ancestors
         CROSS JOIN LATERAL (
-          SELECT parent.submission_feature_id, parent.submission_upload_id, parent.record_end_date
+          SELECT parent.submission_feature_id, parent.submission_upload_id
           FROM submission_feature child
           JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
           WHERE child.submission_feature_id = ancestors.target_id
           OFFSET 0
         ) parent
-        WHERE parent.submission_upload_id = ${submissionUploadId}::uuid AND parent.record_end_date IS NULL
+        WHERE parent.submission_upload_id = ${submissionUploadId}::uuid
       ), coverage AS (
         SELECT ancestors.source_id AS submission_feature_id, sfs.security_rule_id,
           bool_or(sfs.submission_feature_id = ancestors.source_id) AS direct
@@ -247,12 +254,13 @@ export class SubmissionFeatureSecurityRepository extends BaseRepository {
     }
 
     const knex = getKnex();
+    // Screening assigns rules to active upload features only; the upload search itself also returns ended features.
     const ruleMatches = input.rules.map(({ securityRuleId, expression }) =>
       knex
         .from(
-          buildSubmissionUploadFeatureIdsSubquery(input.submissionId, input.submissionUploadId, expression).as(
-            'rule_matches'
-          )
+          buildSubmissionUploadFeatureIdsSubquery(input.submissionId, input.submissionUploadId, expression)
+            .whereNull('anchor_sf.record_end_date')
+            .as('rule_matches')
         )
         .select('rule_matches.submission_feature_id', knex.raw('?::integer AS security_rule_id', [securityRuleId]))
     );

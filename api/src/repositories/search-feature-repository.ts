@@ -172,7 +172,7 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Search review-upload features and resolve security through upload-local parent ancestry.
+   * Search an upload's features, whatever their lifecycle, and resolve security through upload-local parent ancestry.
    * Published closure is neither required nor consulted; properties are not hydrated.
    *
    * @param {number} submissionId Submission boundary.
@@ -225,13 +225,13 @@ export class SearchFeatureRepository extends BaseRepository {
           SELECT parent.submission_feature_id
           FROM ancestors
           CROSS JOIN LATERAL (
-            SELECT parent.submission_feature_id, parent.submission_upload_id, parent.record_end_date
+            SELECT parent.submission_feature_id, parent.submission_upload_id
             FROM submission_feature child
             JOIN submission_feature parent ON parent.submission_feature_id = child.parent_submission_feature_id
             WHERE child.submission_feature_id = ancestors.target_id
             OFFSET 0
           ) parent
-          WHERE parent.submission_upload_id = ?::uuid AND parent.record_end_date IS NULL
+          WHERE parent.submission_upload_id = ?::uuid
         )
         SELECT CASE WHEN bool_or(assignment.submission_feature_id = sf.submission_feature_id)
           THEN 'direct' ELSE 'inherited' END AS provenance

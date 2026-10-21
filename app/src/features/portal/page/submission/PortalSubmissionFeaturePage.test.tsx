@@ -31,6 +31,7 @@ const mockFeature = {
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
+  terminal_submission_feature_id: 10,
   data: { species_name: 'Wolf' },
   secured: false
 };

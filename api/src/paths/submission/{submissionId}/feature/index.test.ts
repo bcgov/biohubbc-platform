@@ -41,7 +41,7 @@ describe('getSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, () => {});
 
-    expect(featuresStub).to.have.been.calledOnceWith(1, sinon.match({ page: 2, limit: 10 }), 1000);
+    expect(featuresStub).to.have.been.calledOnceWith(1, 1000, sinon.match({ page: 2, limit: 10 }));
     expect(countStub).to.have.been.calledOnceWith(1, 1000);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue.features).to.eql(features);
@@ -60,6 +60,6 @@ describe('getSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, () => {});
 
-    expect(featuresStub).to.have.been.calledOnceWith(1, sinon.match.object, 2);
+    expect(featuresStub).to.have.been.calledOnceWith(1, 2, sinon.match.object);
   });
 });

@@ -1,5 +1,4 @@
 import chai, { expect } from 'chai';
-import { Knex } from 'knex';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
@@ -594,41 +593,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSubmissionFeaturesBySubmissionId', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should return an empty array when no features exist', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSubmissionFeaturesBySubmissionId(1);
-
-      expect(response).to.eql([]);
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        feature_type_name: 'name',
-        submission_feature_security_ids: [1]
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSubmissionFeaturesBySubmissionId(1);
-
-      expect(response).to.eql([mockResponse]);
-    });
-  });
-
   describe('getSubmissionRecordBySubmissionIdWithSecurity', () => {
     afterEach(() => {
       sinon.restore();
@@ -637,12 +601,12 @@ describe('SubmissionRepository', () => {
     it('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1);
+        await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1, null);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal(
@@ -661,14 +625,14 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const sqlSpy = sinon.stub().returns(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlSpy });
+      const mockDBConnection = getMockDBConnection({ knex: sqlSpy });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1);
+      const response = await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1, null);
 
       expect(response).to.eql(mockResponse);
-      const sql = sqlSpy.firstCall.args[0].text;
+      const { sql, bindings } = sqlSpy.firstCall.args[0].toSQL();
       expect(sql).to.include('latest_approved_upload.create_date as last_approved_upload_date');
       expect(sql).to.include("submission_upload.decision = 'approved'");
       expect(sql).to.include('submission_upload.record_end_date IS NULL OR now() < submission_upload.record_end_date');
@@ -677,6 +641,20 @@ describe('SubmissionRepository', () => {
       expect(sql).to.include('ORDER BY feature_types.is_root DESC, feature_types.name');
       expect(sql).to.not.include("'display_name', feature_types.display_name");
       expect(sql).to.include('tab_submission_feature.submission_id = submission.submission_id');
+      expect(sql).to.include('NOT (');
+      expect(sql).to.include('current_submission_feature.successor_submission_feature_id IS NULL');
+      expect(bindings[bindings.length - 1]).to.equal(1);
+    });
+
+    it('filters feature type tabs by the caller team scope for an authenticated caller', async () => {
+      const sqlSpy = sinon.stub().resolves({ rowCount: 1, rows: [{}] });
+      const submissionRepository = new SubmissionRepository(getMockDBConnection({ knex: sqlSpy }));
+
+      await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1, 42);
+
+      const { sql, bindings } = sqlSpy.firstCall.args[0].toSQL();
+      expect(sql).to.include('tm.system_user_id = ?');
+      expect(bindings).to.include(42);
     });
   });
 
@@ -711,46 +689,6 @@ describe('SubmissionRepository', () => {
       const response = await submissionFeatureRepository.getSubmissionFeatureByUuid(submissionUuid);
 
       expect(response).to.eql(submissionFeatureRecord);
-    });
-  });
-
-  describe('findSubmissionFeatures', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const submissionFeatureRecords: SubmissionFeatureRecord[] = [
-        {
-          submission_feature_id: 2,
-          uuid: '234-456-234',
-          submission_id: 3,
-          urn: 'urn:3:survey:2',
-          feature_type_id: 1,
-          source_id: 'source-id',
-          data: {},
-          parent_submission_feature_id: 1,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01'
-        }
-      ];
-
-      const mockQueryResponse = { rowCount: 1, rows: submissionFeatureRecords } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
-
-      const criteria = {
-        submissionId: 1,
-        systemUserId: 2,
-        featureTypeNames: ['survey', 'artifact']
-      };
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.findSubmissionFeatures(criteria);
-
-      expect(response).to.eql(submissionFeatureRecords);
     });
   });
 
@@ -842,45 +780,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSubmissionFeaturesBySubmissionId', () => {
-    it('should return a list of submission features', async () => {
-      const mockResponse = {
-        rows: [
-          {
-            submission_feature_id: 1,
-            feature_type_name: 'Type A',
-            submission_feature_security_ids: [1, 2]
-          }
-        ],
-        rowCount: 1
-      } as any;
-      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
-
-      const repository = new SubmissionRepository(dbConnection);
-
-      const response = await repository.getSubmissionFeaturesBySubmissionId(123);
-
-      expect(response).to.eql([
-        {
-          submission_feature_id: 1,
-          feature_type_name: 'Type A',
-          submission_feature_security_ids: [1, 2]
-        }
-      ]);
-    });
-
-    it('should return an empty array when rowCount is 0', async () => {
-      const mockResponse = { rows: [], rowCount: 0 } as any;
-      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
-
-      const repository = new SubmissionRepository(dbConnection);
-
-      const response = await repository.getSubmissionFeaturesBySubmissionId(123);
-
-      expect(response).to.eql([]);
-    });
-  });
-
   describe('getSubmissionFeaturesCount', () => {
     it('should return the correct submission feature count', async () => {
       const mockQueryResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
@@ -888,7 +787,7 @@ describe('SubmissionRepository', () => {
 
       const repository = new SubmissionRepository(dbConnection);
 
-      const count = await repository.getSubmissionFeaturesCount(123);
+      const count = await repository.getSubmissionFeaturesCount(123, null);
 
       expect(count).to.equal(42);
     });
@@ -900,54 +799,11 @@ describe('SubmissionRepository', () => {
       const repository = new SubmissionRepository(dbConnection);
 
       try {
-        await repository.getSubmissionFeaturesCount(123);
+        await repository.getSubmissionFeaturesCount(123, null);
         expect.fail();
       } catch (error) {
         expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
       }
-    });
-  });
-
-  describe('submission upload features', () => {
-    const submissionUploadId = '11111111-1111-4111-8111-111111111111';
-
-    it('gets every feature matching only the submission upload ID', async () => {
-      const knexStub = sinon.stub().callsFake(async (query: Knex.QueryBuilder) => {
-        const { sql, bindings } = query.toSQL();
-
-        expect(sql).to.include('"submission_feature"."submission_upload_id" = ?');
-        expect(sql).to.not.include('submission_feature.record_effective_date');
-        expect(sql).to.not.include('submission_feature.record_end_date');
-        expect(sql).to.not.include('submission_feature.successor_submission_feature_id');
-        expect(sql).to.not.include('join "submission_upload"');
-        expect(bindings).to.include(submissionUploadId);
-
-        return { rows: [], rowCount: 0 } as any;
-      });
-      const repository = new SubmissionRepository(getMockDBConnection({ knex: knexStub }));
-
-      await repository.getSubmissionUploadFeatures(submissionUploadId, { page: 1, limit: 10 });
-
-      expect(knexStub).to.have.been.calledOnce;
-    });
-
-    it('counts every feature matching only the submission upload ID', async () => {
-      const knexStub = sinon.stub().callsFake(async (query: Knex.QueryBuilder) => {
-        const { sql, bindings } = query.toSQL();
-
-        expect(sql).to.include('"submission_feature"."submission_upload_id" = ?');
-        expect(sql).to.not.include('submission_feature.record_effective_date');
-        expect(sql).to.not.include('submission_feature.record_end_date');
-        expect(sql).to.not.include('submission_feature.successor_submission_feature_id');
-        expect(sql).to.not.include('join "submission_upload"');
-        expect(bindings).to.include(submissionUploadId);
-
-        return { rows: [{ count: 2 }], rowCount: 1 } as any;
-      });
-      const repository = new SubmissionRepository(getMockDBConnection({ knex: knexStub }));
-
-      expect(await repository.getSubmissionUploadFeaturesCount(submissionUploadId)).to.equal(2);
-      expect(knexStub).to.have.been.calledOnce;
     });
   });
 

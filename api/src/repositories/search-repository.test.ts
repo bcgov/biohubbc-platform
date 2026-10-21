@@ -6,8 +6,6 @@ import sinonChai from 'sinon-chai';
 
 import { getMockDBConnection } from '../__mocks__/db';
 import {
-  SearchFeatureResult,
-  SearchSubmissionResult,
   SearchSummaryFeature,
   SearchSummarySubmission,
   SearchSummaryTaxon,
@@ -21,96 +19,6 @@ chai.use(sinonChai);
 describe('SearchRepository', () => {
   afterEach(() => {
     Sinon.restore();
-  });
-
-  describe('findFeatures', () => {
-    it('returns paginated feature results with data and total', async () => {
-      const mockFeatureData: SearchFeatureResult[] = [
-        { submission_feature_id: 1, feature_type_id: 1, feature_type_name: 'survey', label: 'Feature1' },
-        { submission_feature_id: 2, feature_type_id: 1, feature_type_name: 'survey', label: 'Feature2' }
-      ];
-
-      const mockRows: WithCount<typeof SearchFeatureResult>[] = [{ data: mockFeatureData, total: 25 }];
-
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: mockRows.map((r) => ({ result: r }))
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new SearchRepository(mockDBConnection);
-
-      const result = await repo.findFeatures({ keyword: 'test' });
-
-      expect(result).to.eql(mockRows[0]);
-    });
-
-    it('returns empty data and total 0 when no results', async () => {
-      const mockRows: WithCount<typeof SearchFeatureResult>[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new SearchRepository(mockDBConnection);
-
-      const result = await repo.findFeatures({ keyword: 'none' });
-
-      expect(result).to.eql({ data: [], total: 0 });
-    });
-  });
-
-  describe('findSubmissions', () => {
-    it('returns paginated submission results with data and total', async () => {
-      const mockSubmissionData: SearchSubmissionResult[] = [
-        { submission_id: 10, name: 'Sub1', description: 'Desc1' },
-        { submission_id: 11, name: 'Sub2', description: null }
-      ];
-
-      const mockRows: WithCount<typeof SearchSubmissionResult>[] = [{ data: mockSubmissionData, total: 15 }];
-
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: mockRows.map((r) => ({ result: r }))
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new SearchRepository(mockDBConnection);
-
-      const result = await repo.findSubmissions({ keyword: 'test' });
-
-      expect(result).to.eql(mockRows[0]);
-    });
-
-    it('returns empty data and total 0 when no results', async () => {
-      const mockRows: WithCount<typeof SearchSubmissionResult>[] = [];
-
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new SearchRepository(mockDBConnection);
-
-      const result = await repo.findSubmissions({ keyword: 'none' });
-
-      expect(result).to.eql({ data: [], total: 0 });
-    });
   });
 
   describe('findTaxon', () => {
@@ -161,12 +69,12 @@ describe('SearchRepository', () => {
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
+        knex: async () => mockQueryResponse
       });
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findFeatureSummary({ keyword: 'test' });
+      const result = await repo.findFeatureSummary({ keyword: 'test' }, null);
 
       expect(result).to.eql(mockRows);
     });
@@ -180,14 +88,36 @@ describe('SearchRepository', () => {
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
+        knex: async () => mockQueryResponse
       });
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findFeatureSummary({ keyword: 'none' });
+      const result = await repo.findFeatureSummary({ keyword: 'none' }, null);
 
       expect(result).to.eql(mockRows);
+    });
+
+    it('counts only unsecured features for anonymous callers', async () => {
+      const knexStub = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new SearchRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repo.findFeatureSummary({ keyword: 'moose' }, null);
+
+      const { sql } = knexStub.firstCall.args[0].toSQL();
+      expect(sql).to.include('NOT (');
+      expect(sql).to.not.include('tm.system_user_id = ?');
+    });
+
+    it('counts features reachable through the caller team scopes for authenticated callers', async () => {
+      const knexStub = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new SearchRepository(getMockDBConnection({ knex: knexStub }));
+
+      await repo.findFeatureSummary({ keyword: 'moose' }, 42);
+
+      const { sql, bindings } = knexStub.firstCall.args[0].toSQL();
+      expect(sql).to.include('tm.system_user_id = ?');
+      expect(bindings).to.include(42);
     });
   });
 

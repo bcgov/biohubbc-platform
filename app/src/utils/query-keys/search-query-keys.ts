@@ -1,6 +1,6 @@
 import { QUERY_KEY_ROOT } from 'constants/query-keys';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
-import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
+import { ApiCursorPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Key prefix of every feature search: counts and results for any feature type, submissions and expression.
@@ -56,16 +56,6 @@ const featureResults = (
  * @returns The keyword search key prefix.
  */
 const keywordSearch = () => [QUERY_KEY_ROOT.SEARCH, 'keyword'] as const;
-
-/**
- * Key of one page of records matching a keyword across every kind of record.
- *
- * @param {string} keyword The keyword searched.
- * @param {ApiPaginationRequestOptions} pagination The page.
- * @returns The keyword records key.
- */
-const keywordRecords = (keyword: string, pagination: ApiPaginationRequestOptions) =>
-  [...keywordSearch(), keyword, 'records', { pagination }] as const;
 
 /**
  * Key of the counts of features, submissions and taxa matching a keyword.
@@ -130,7 +120,6 @@ export const searchQueryKeys = {
   featureScope,
   featureCount,
   featureResults,
-  keywordRecords,
   keywordSummary,
   propertyOptions,
   recommendedProperties,

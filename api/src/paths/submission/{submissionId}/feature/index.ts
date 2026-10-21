@@ -84,7 +84,7 @@ export function getSubmissionFeatures(): RequestHandler {
       const systemUserId = await getActiveSystemUserId(connection);
       const submissionService = new SubmissionService(connection);
       const [features, count] = await Promise.all([
-        submissionService.getSubmissionFeatures(submissionId, paginationOptions, systemUserId),
+        submissionService.getSubmissionFeatures(submissionId, systemUserId, paginationOptions),
         submissionService.getSubmissionFeaturesCount(submissionId, systemUserId)
       ]);
 

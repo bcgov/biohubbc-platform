@@ -11,8 +11,7 @@ export enum PRIORITY_FEATURE_TYPE {
  * The first eight types carry an `sf.data->>'name'` and have been displayable since the
  * dropdown shipped. The remaining eight are researcher-typeable (animal aliases, marking
  * colours, capture/mortality metadata, telemetry serial numbers, habitat codes, file
- * names/titles) but carry no `name`; their rows render via a `COALESCE(name, matched_fragment)`
- * fallback in `_makeFindFeaturesQuery`.
+ * names/titles) but carry no `name`.
  *
  * `file` and `report` may both surface for the same physical document — `report` is the
  * formal-output flavour of an upload, `file` is the generic attachment. Treat the duplication
