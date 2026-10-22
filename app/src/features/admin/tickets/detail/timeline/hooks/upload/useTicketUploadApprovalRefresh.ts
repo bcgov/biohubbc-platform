@@ -30,7 +30,7 @@ export const useTicketUploadApprovalRefresh = (ticket: ITicketExtended): void =>
     }
 
     const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ticketQueryKey, exact: true });
+      void queryClient.invalidateQueries({ queryKey: ticketQueryKey, exact: true });
     }, TICKET_UPLOAD_APPROVAL_REFRESH_MS);
 
     return () => clearInterval(interval);
@@ -38,7 +38,7 @@ export const useTicketUploadApprovalRefresh = (ticket: ITicketExtended): void =>
 
   useEffect(() => {
     if (wasApproving.current && !isApproving) {
-      refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
+      void refreshChangedQueries(queryClient, changedQueryKeys.uploadDecision(ticketId), ticketQueryKey);
     }
 
     wasApproving.current = isApproving;
