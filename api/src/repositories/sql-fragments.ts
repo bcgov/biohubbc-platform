@@ -34,7 +34,7 @@ export function isSubmissionFeaturePublished(alias: string): string {
  * an administrator is reviewing.
  *
  * The literal `IS NULL` form is deliberate: it is the predicate the partial index
- * `submission_feature_idx5_active_submission_upload` is defined on, and the planner only uses a
+ * `submission_feature_idx9` is defined on, and the planner only uses a
  * partial index when the query repeats its predicate verbatim. Do not widen it to
  * `(record_end_date IS NULL OR now() < record_end_date)`.
  *
@@ -59,6 +59,46 @@ export function isSubmissionFeatureCurrent(alias: string): string {
   return `${isSubmissionFeaturePublished(
     alias
   )} AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date) AND ${alias}.successor_submission_feature_id IS NULL`;
+}
+
+/**
+ * Parent source id of a submission_feature row, read from its submitted payload. Empty strings mean no parent.
+ *
+ * @param alias SQL alias for submission_feature.
+ * @returns SQL expression with zero placeholders.
+ */
+export function submissionFeatureParentSourceId(alias: string): string {
+  return `NULLIF(${alias}.data->>'parent', '')`;
+}
+
+/**
+ * Resolve a pending upload feature's parent source id to a parent submission_feature_id.
+ *
+ * Prefers a pending row from the child's own upload, falling back to the submission's current
+ * published rows. Ties resolve to the newest row. Returns NULL when no parent matches.
+ *
+ * @param childAlias SQL alias for the child submission_feature row.
+ * @returns Scalar subquery SQL with zero placeholders.
+ */
+export function resolveSubmissionFeatureParentId(childAlias: string): string {
+  return `(
+    SELECT parent.submission_feature_id
+    FROM submission_feature AS parent
+    WHERE parent.submission_id = ${childAlias}.submission_id
+      AND parent.source_id = ${submissionFeatureParentSourceId(childAlias)}
+      AND (
+        (
+          parent.submission_upload_id = ${childAlias}.submission_upload_id
+          AND parent.record_effective_date IS NULL
+          AND parent.record_end_date IS NULL
+        )
+        OR (${isSubmissionFeatureCurrent('parent')})
+      )
+    ORDER BY
+      (parent.submission_upload_id = ${childAlias}.submission_upload_id) DESC,
+      parent.submission_feature_id DESC
+    LIMIT 1
+  )`;
 }
 
 /**

@@ -1106,7 +1106,7 @@ export async function seed(knex: Knex): Promise<void> {
           -- needs to render is the shape itself; attribute-level data stays in the API.
           SELECT
             public.ST_AsMVTGeom(
-              public.ST_Transform(visible.geometry_4326, 3857),
+              public.ST_Transform(parts.part_4326, 3857),
               v_env_3857,
               c_extent,
               c_buffer,
@@ -1119,6 +1119,15 @@ export async function seed(knex: Knex): Promise<void> {
             v_ctx.submission_ids,
             v_candidates_4326
           ) visible
+          -- A vector tile feature holds one geometry type, and ST_AsMVTGeom keeps only the highest
+          -- dimension of a mixed collection, so a point stored beside a polygon would be dropped. Each
+          -- geometry is split into its point, line and polygon parts; the search layer emits
+          -- geometry only, so the parts simply render side by side.
+          CROSS JOIN LATERAL (
+            SELECT public.ST_CollectionExtract(visible.geometry_4326, part_type.dimension) AS part_4326
+            FROM (VALUES (1), (2), (3)) AS part_type(dimension)
+          ) parts
+          WHERE NOT public.ST_IsEmpty(parts.part_4326)
         ) feature_rows
         WHERE feature_rows.geom IS NOT NULL;
       END IF;

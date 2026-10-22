@@ -27,7 +27,7 @@ export const PATCH: Operation = [
 
 PATCH.apiDoc = {
   description:
-    'Record the human review decision on a submission upload: approved, denied, or pending to clear a prior decision. Only system administrators may perform this action.',
+    'Record the human review decision on a submission upload: approved, denied, or pending to clear a prior decision. An approval is applied asynchronously: the upload is approving until its features have been published. Only system administrators may perform this action.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -62,7 +62,17 @@ PATCH.apiDoc = {
   },
   responses: {
     200: {
-      description: 'Submission upload decision recorded successfully.',
+      description:
+        'Decision recorded: a denial or a reset to pending, or an approval request for an upload whose approval had already been applied.',
+      content: {
+        'application/json': {
+          schema: SubmissionUploadDecisionResponseSchema
+        }
+      }
+    },
+    202: {
+      description:
+        'Approval accepted, or a repeat approval request while an earlier approval is still being applied. The upload is approving until the queued job publishes its features.',
       content: {
         'application/json': {
           schema: SubmissionUploadDecisionResponseSchema
@@ -79,7 +89,7 @@ PATCH.apiDoc = {
         'Submission not found (invalid submission ID) or submission upload not found (submissionUploadId does not belong to this submission).'
     },
     409: {
-      description: 'The decision would reverse published feature state.'
+      description: 'The decision would reverse published feature state, or an approval is still being applied.'
     }
   }
 };
@@ -106,6 +116,11 @@ export function updateSubmissionUploadDecision(): RequestHandler {
       const result = await submissionUploadService.updateSubmissionUploadDecision(submissionUploadId, { decision });
 
       await connection.commit();
+
+      // An approval is applied by a queued job; 202 tells the client the decision is not yet in effect.
+      if (result.decision === 'approving') {
+        return res.status(202).json(result);
+      }
 
       return res.status(200).json(result);
     } catch (error) {

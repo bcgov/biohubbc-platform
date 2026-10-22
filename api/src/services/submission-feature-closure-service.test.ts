@@ -34,6 +34,35 @@ describe('SubmissionFeatureClosureService', () => {
     });
   });
 
+  describe('ensureSubmissionFeatureClosure', () => {
+    it('queues a rebuild when a current feature lacks closure rows', async () => {
+      sinon.stub(SubmissionFeatureClosureRepository.prototype, 'hasMissingClosureForSubmission').resolves(true);
+      const publishStub = sinon
+        .stub(SubmissionFeatureClosureService.dependencies, 'publishComputeSubmissionFeatureClosureJob')
+        .resolves({ status: 'published', jobId: 'closure-job' });
+      const connection = getMockDBConnection();
+
+      await new SubmissionFeatureClosureService(connection).ensureSubmissionFeatureClosure(42, 'upload-1');
+
+      expect(publishStub).to.have.been.calledOnceWithExactly(connection, { submissionUploadId: 'upload-1' });
+    });
+
+    it('queues nothing when the closure is complete', async () => {
+      const missingStub = sinon
+        .stub(SubmissionFeatureClosureRepository.prototype, 'hasMissingClosureForSubmission')
+        .resolves(false);
+      const publishStub = sinon.stub(
+        SubmissionFeatureClosureService.dependencies,
+        'publishComputeSubmissionFeatureClosureJob'
+      );
+
+      await new SubmissionFeatureClosureService(getMockDBConnection()).ensureSubmissionFeatureClosure(42, 'upload-1');
+
+      expect(missingStub).to.have.been.calledOnceWith(42);
+      expect(publishStub).not.to.have.been.called;
+    });
+  });
+
   describe('computeClosureForUpload', () => {
     it("should resolve the upload's submission and recompute that submission's closure", async () => {
       const getUploadStub = sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({

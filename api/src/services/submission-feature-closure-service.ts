@@ -1,4 +1,5 @@
 import { IDBConnection } from '../database/db';
+import { publishComputeSubmissionFeatureClosureJob } from '../queue/publisher';
 import { SubmissionFeatureClosureRepository } from '../repositories/submission-feature-closure-repository';
 import { DBService } from './db-service';
 import { SubmissionUploadService } from './upload/submission-upload-service';
@@ -12,6 +13,11 @@ import { SubmissionUploadService } from './upload/submission-upload-service';
  */
 export class SubmissionFeatureClosureService extends DBService {
   submissionFeatureClosureRepository: SubmissionFeatureClosureRepository;
+
+  /** Mutable dependency bag used by tests to stub queue publication under ESM. */
+  static readonly dependencies = {
+    publishComputeSubmissionFeatureClosureJob
+  };
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -68,6 +74,31 @@ export class SubmissionFeatureClosureService extends DBService {
    */
   async invalidateClosureForSubmission(submissionId: number): Promise<void> {
     await this.submissionFeatureClosureRepository.invalidateClosureForSubmission(submissionId);
+  }
+
+  /**
+   * Queue a closure rebuild for a submission when any of its current features lacks closure rows.
+   *
+   * A complete closure is left alone. A missing one means an approval invalidated the closure and its
+   * rebuild did not complete, for example because the rebuild job exhausted its retries.
+   *
+   * @param {number} submissionId The submission scope.
+   * @param {string} submissionUploadId Upload whose processing found the gap; the rebuild job's payload.
+   * @return {Promise<void>} Resolves after the rebuild is queued in the caller's transaction, or when none is needed.
+   * @memberof SubmissionFeatureClosureService
+   */
+  async ensureSubmissionFeatureClosure(submissionId: number, submissionUploadId: string): Promise<void> {
+    const hasMissingClosure = await this.submissionFeatureClosureRepository.hasMissingClosureForSubmission(
+      submissionId
+    );
+
+    if (!hasMissingClosure) {
+      return;
+    }
+
+    await SubmissionFeatureClosureService.dependencies.publishComputeSubmissionFeatureClosureJob(this.connection, {
+      submissionUploadId
+    });
   }
 
   /**

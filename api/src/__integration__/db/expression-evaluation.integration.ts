@@ -182,8 +182,6 @@ describe('expression-evaluation (integration)', function () {
     parentFeatureId?: number;
     recordEndDate?: boolean;
   }): Promise<number> {
-    const systemUserId = connection.systemUserId();
-
     const result = await connection.sql(SQL`
       INSERT INTO submission_feature (
         submission_id,
@@ -193,8 +191,7 @@ describe('expression-evaluation (integration)', function () {
         data,
         data_byte_size,
         record_effective_date,
-        record_end_date,
-        create_user
+        record_end_date
       )
       VALUES (
         ${params.submissionId},
@@ -204,8 +201,7 @@ describe('expression-evaluation (integration)', function () {
         '{}'::jsonb,
         500,
         now(),
-        ${params.recordEndDate ? 'now()' : null},
-        ${systemUserId}
+        ${params.recordEndDate ? 'now()' : null}
       )
       RETURNING submission_feature_id;
     `);
@@ -245,11 +241,10 @@ describe('expression-evaluation (integration)', function () {
     value: string,
     blueprintFeatureTypePropertyId: number = SAMPLE_SITE_NAME_ASSIGNMENT_ID
   ): Promise<void> {
-    const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_string
-        (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value}, ${systemUserId});
+        (submission_feature_id, blueprint_feature_type_property_id, value)
+      VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value});
     `);
   }
 
@@ -332,8 +327,8 @@ describe('expression-evaluation (integration)', function () {
     value: number
   ): Promise<void> {
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-      VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value}, ${connection.systemUserId()});
+      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value)
+      VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value});
     `);
   }
 
@@ -346,10 +341,9 @@ describe('expression-evaluation (integration)', function () {
    * inserted.
    */
   async function insertContentEdge(sourceFeatureId: number, targetFeatureId: number): Promise<void> {
-    const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id, create_user)
-      VALUES (${sourceFeatureId}, ${targetFeatureId}, ${systemUserId});
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      VALUES (${sourceFeatureId}, ${targetFeatureId});
     `);
   }
 
@@ -364,15 +358,13 @@ describe('expression-evaluation (integration)', function () {
     referencedFeatureId: number,
     blueprintFeatureTypePropertyId: number
   ): Promise<void> {
-    const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
         blueprint_feature_type_property_id,
-        referenced_submission_feature_id,
-        create_user
+        referenced_submission_feature_id
       )
-      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
+      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId});
     `);
   }
 

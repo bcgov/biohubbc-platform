@@ -27,7 +27,7 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * superseded upload's pending features by setting `record_end_date = now()`, so `IS NULL` is exactly
  * the set an administrator is reviewing. The predicate is written literally rather than as
  * `(record_end_date IS NULL OR now() < record_end_date)` because that literal form is what the
- * partial index `submission_feature_idx5_active_submission_upload` is defined on.
+ * partial index `submission_feature_idx9` is defined on.
  *
  * The same predicate set is applied by
  * `SubmissionFeaturePropertyGeometryRepository.getSubmissionUploadGeometryExtent`, which decides
@@ -85,9 +85,10 @@ export async function seed(knex: Knex): Promise<void> {
       v_context_text := query_params ->> 'context';
 
       -- Case insensitive so a token minted from an upper case uuid still resolves; the API mints from
-      -- the stored (lower case) value, so in practice the two never differ.
+      -- the stored (lower case) value, so in practice the two never differ. The optional group's
+      -- question mark is escaped because knex.raw otherwise rewrites it into a $1 bind parameter.
       IF v_context_text IS NULL
-         OR v_context_text !~* '^su:[0-9]{1,10}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:(new|modified|unmodified))?$' THEN
+         OR v_context_text !~* '^su:[0-9]{1,10}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(:(new|modified|unmodified))\\?$' THEN
         RETURN NULL;
       END IF;
 
@@ -127,7 +128,7 @@ export async function seed(knex: Knex): Promise<void> {
       FROM (
         SELECT
           public.ST_AsMVTGeom(
-            public.ST_Transform(g.value, 3857),
+            public.ST_Transform(parts.part_4326, 3857),
             v_env_3857,
             c_extent,
             c_buffer,
@@ -142,7 +143,7 @@ export async function seed(knex: Knex): Promise<void> {
           fp.display_name AS property_display_name,
           fp.name AS property_name
         -- Driven from submission_feature: the upload id is the selective predicate, served by the
-        -- partial index submission_feature_idx5_active_submission_upload, and each feature's
+        -- partial index submission_feature_idx9, and each feature's
         -- geometries are then fetched by submission_feature_id. Driving from the geometry table's
         -- GIST index instead would make a low zoom tile scan every geometry in the envelope, which
         -- at zoom 4 is the whole province.
@@ -158,6 +159,14 @@ export async function seed(knex: Knex): Promise<void> {
         JOIN biohub.feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
           AND fp.record_end_date IS NULL
+        -- A vector tile feature holds one geometry type, and ST_AsMVTGeom keeps only the highest
+        -- dimension of a mixed collection, so a point stored beside a polygon would be dropped. Each
+        -- geometry is split into its point, line and polygon parts; every part keeps the geometry's id
+        -- and attributes, so the parts read as one geometry the way its tile boundary fragments do.
+        CROSS JOIN LATERAL (
+          SELECT public.ST_CollectionExtract(g.value, part_type.dimension) AS part_4326
+          FROM (VALUES (1), (2), (3)) AS part_type(dimension)
+        ) parts
         WHERE sf.submission_upload_id = v_submission_upload_id
           -- The submission is part of the token, so a token cannot be replayed against an upload id
           -- that belongs to a different submission than the one that was authorized.
@@ -166,6 +175,7 @@ export async function seed(knex: Knex): Promise<void> {
           AND sf.record_end_date IS NULL
           AND (v_reconciliation IS NULL OR sf.reconciliation = v_reconciliation)
           AND g.value && v_candidates_4326
+          AND NOT public.ST_IsEmpty(parts.part_4326)
       ) feature_rows
       WHERE feature_rows.geom IS NOT NULL;
 

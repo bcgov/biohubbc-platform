@@ -54,6 +54,19 @@ describe('SubmissionFeatureReconciliationRepository', () => {
     expect(text).to.include('candidate.successor_submission_feature_id IS NULL');
     expect(text).to.include("THEN 'unmodified'");
     expect(text).to.include('UPDATE submission_feature incoming');
+    expect(text).to.include('baseline_submission_feature_id = classified.baseline_submission_feature_id');
+    expect(text).to.include('parent_submission_feature_id = classified.parent_submission_feature_id');
+    expect(sql).to.have.been.calledOnce;
+  });
+
+  it('refreshes submission_feature statistics in one statement', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([], 0));
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
+
+    await repository.analyzeSubmissionFeatures();
+
+    expect(sql).to.have.been.calledOnce;
+    expect(sql.firstCall.args[0].text).to.include('ANALYZE submission_feature');
   });
 
   it('links direct predecessors', async () => {

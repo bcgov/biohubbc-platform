@@ -105,18 +105,16 @@ describe('Ingest → Download → Export (system integration)', function () {
     submissionFeatureId: number,
     data: { dop: number; elevation: number; timestamp: string; geometry: object }
   ): Promise<void> {
-    const systemUserId = connection.systemUserId();
-
     const dopBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'dop');
     const elevationBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'elevation');
     const timestampBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'timestamp');
     const geometryBftpId = await lookupBlueprintFeatureTypePropertyId(submissionFeatureId, 'geometry');
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value)
       VALUES
-        (${submissionFeatureId}, ${dopBftpId}, ${data.dop}, ${systemUserId}),
-        (${submissionFeatureId}, ${elevationBftpId}, ${data.elevation}, ${systemUserId});
+        (${submissionFeatureId}, ${dopBftpId}, ${data.dop}),
+        (${submissionFeatureId}, ${elevationBftpId}, ${data.elevation});
     `);
     // The timestamp table stores partial-component datetimes — split the ISO
     // string into date + time at the call site (the boundary that has the
@@ -126,15 +124,15 @@ describe('Ingest → Download → Export (system integration)', function () {
     const timeValue = data.timestamp.slice(11, 19);
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_timestamp
-        (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
-      VALUES (${submissionFeatureId}, ${timestampBftpId}, ${dateValue}::date, ${timeValue}::time, ${systemUserId});
+        (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value)
+      VALUES (${submissionFeatureId}, ${timestampBftpId}, ${dateValue}::date, ${timeValue}::time);
     `);
     // Geometry uses ST_GeomFromGeoJSON; pass the inner Feature.geometry, not the FeatureCollection wrapper.
     const innerGeom = (data.geometry as any)?.features?.[0]?.geometry ?? data.geometry;
     await connection.query(
-      `INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-       VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
-      [submissionFeatureId, geometryBftpId, JSON.stringify(innerGeom), systemUserId]
+      `INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
+       VALUES ($1, $2, ST_GeomFromGeoJSON($3))`,
+      [submissionFeatureId, geometryBftpId, JSON.stringify(innerGeom)]
     );
   }
 

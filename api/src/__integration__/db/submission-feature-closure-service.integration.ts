@@ -30,6 +30,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { SubmissionFeatureClosureRepository } from '../../repositories/submission-feature-closure-repository';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { createBlueprintFeatureTypeProperty, createTestUpload } from '../helpers/test-feature-property-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
@@ -87,8 +88,6 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     recordEndDate?: boolean;
     pending?: boolean;
   }): Promise<number> {
-    const systemUserId = connection.systemUserId();
-
     const result = await connection.sql(SQL`
       INSERT INTO submission_feature (
         submission_id,
@@ -98,8 +97,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
         data,
         data_byte_size,
         record_effective_date,
-        record_end_date,
-        create_user
+        record_end_date
       )
       VALUES (
         ${params.submissionId},
@@ -109,8 +107,7 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
         '{}'::jsonb,
         500,
         ${params.pending ? null : 'now()'},
-        ${params.recordEndDate ? 'now()' : null},
-        ${systemUserId}
+        ${params.recordEndDate ? 'now()' : null}
       )
       RETURNING submission_feature_id;
     `);
@@ -127,10 +124,9 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
    * of an already-inserted pair cannot also be inserted as a content edge.
    */
   async function insertContentEdge(sourceFeatureId: number, targetFeatureId: number): Promise<void> {
-    const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id, create_user)
-      VALUES (${sourceFeatureId}, ${targetFeatureId}, ${systemUserId});
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      VALUES (${sourceFeatureId}, ${targetFeatureId});
     `);
   }
 
@@ -143,15 +139,13 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
     referencedFeatureId: number,
     blueprintFeatureTypePropertyId: number
   ): Promise<void> {
-    const systemUserId = connection.systemUserId();
     await connection.sql(SQL`
       INSERT INTO submission_feature_property_feature (
         submission_feature_id,
         blueprint_feature_type_property_id,
-        referenced_submission_feature_id,
-        create_user
+        referenced_submission_feature_id
       )
-      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId}, ${systemUserId});
+      VALUES (${sourceFeatureId}, ${blueprintFeatureTypePropertyId}, ${referencedFeatureId});
     `);
   }
 
@@ -528,5 +522,59 @@ describe('SubmissionFeatureClosureService — closure recompute (integration)', 
         [f3, f3]
       ])
     );
+  });
+
+  // The flagged single recursion must AND the ancestry flag along each path and OR it across paths:
+  //   (F3,F1) grandchild via two parent edges          -> is_ancestor TRUE (transitive ancestry)
+  //   (F4,F1) property F4->F2 then parent F2->F1        -> is_ancestor FALSE (mixed path only)
+  //   (F5,F1) mixed path F5->F4->F2->F1 AND parent F5->F1 -> is_ancestor TRUE (a pure-parent path exists)
+  //   (F4,F4) property cycle F4->F2->F4 back to self    -> is_ancestor TRUE (self is always ancestry)
+  //   (F2,F4) property cycle edge                       -> present, is_ancestor FALSE
+  it('12: ancestry flag is transitive over parent edges and false for any mixed-only path', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+    const propertyLabelId = await createPropertyEdgeLabel();
+
+    const f1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
+    const f2 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, parentFeatureId: f1 });
+    const f3 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, parentFeatureId: f2 });
+    const f4 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
+    const f5 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId, parentFeatureId: f1 });
+    await insertPropertyEdge(f4, f2, propertyLabelId);
+    await insertPropertyEdge(f2, f4, propertyLabelId);
+    await insertPropertyEdge(f5, f4, propertyLabelId);
+
+    const { insertedCount } = await service.computeClosureForUpload(uploadId);
+
+    expect(await getIsAncestor(f3, f1)).to.equal(true);
+    expect(await getIsAncestor(f4, f1)).to.equal(false);
+    expect(await getIsAncestor(f5, f1)).to.equal(true);
+    expect(await getIsAncestor(f4, f4)).to.equal(true);
+    expect(await getIsAncestor(f2, f4)).to.equal(false);
+
+    // Every (source, target) pair is stored exactly once even when reached with both flags.
+    const pairs = await getScopedClosurePairs([f1, f2, f3, f4, f5]);
+    expect(new Set(pairs).size).to.equal(pairs.length);
+    expect(insertedCount).to.equal(pairs.length);
+  });
+
+  it('13: reports a missing closure until the rebuild covers every current feature', async () => {
+    const repository = new SubmissionFeatureClosureRepository(connection);
+    const submissionId = await createTestSubmission(connection);
+    const uploadId = await createTestUpload(connection, submissionId);
+
+    const f1 = await insertFeatureRow({ submissionId, submissionUploadId: uploadId });
+    await insertFeatureRow({ submissionId, submissionUploadId: uploadId, parentFeatureId: f1, pending: true });
+
+    expect(await repository.hasMissingClosureForSubmission(submissionId)).to.be.true;
+
+    await service.computeClosureForSubmission(submissionId);
+
+    // The pending feature has no closure rows by design and must not count as missing.
+    expect(await repository.hasMissingClosureForSubmission(submissionId)).to.be.false;
+
+    await service.invalidateClosureForSubmission(submissionId);
+
+    expect(await repository.hasMissingClosureForSubmission(submissionId)).to.be.true;
   });
 });

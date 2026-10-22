@@ -222,7 +222,7 @@ describe('Policy status orchestration (integration)', function () {
 
     // The anchor-computation job for the materialized scope is published exactly once.
     expect(publisherStub.callCount).to.equal(1);
-    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0] });
+    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0], submissionId: null });
 
     // Sanity: cache row points at the same scope_id that the statement was mapped to.
     const teamScopeIds = await getTeamSecurityScopeIds(teamId);
@@ -256,7 +256,7 @@ describe('Policy status orchestration (integration)', function () {
     expect(scopeIds).to.have.length(1);
 
     expect(publisherStub.callCount).to.equal(1);
-    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0] });
+    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0], submissionId: null });
   });
 
   // ── I3: PolicyService.updatePolicy(approved → reviewed) ungrants all teams ─
@@ -799,7 +799,7 @@ describe('Policy status orchestration (integration)', function () {
     await teamPolicyService.createTeamPolicy({ team_id: teamB, policy_id: policyId });
 
     expect(publisherStub.callCount - setupCalls).to.equal(1);
-    expect(publisherStub.lastCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0] });
+    expect(publisherStub.lastCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0], submissionId: null });
 
     // (b) A metadata-only updatePolicy (no status, no statement set change)
     // must not publish. The orchestration short-circuits at the

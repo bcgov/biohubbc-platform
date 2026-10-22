@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { SubmissionFeaturePropertyGeometryService } from '../../services/submission-feature-property-geometry-service';
 import {
   addTestGeometry,
+  buildMixedGeometryCollectionWkt,
   buildWktGeometries,
   decodeGeometriesLayer,
   renderTile,
@@ -56,7 +57,7 @@ describe('Martin upload function (integration)', function () {
       SQL`
         INSERT INTO submission_feature (
           submission_id, submission_upload_id, feature_type_id, data, data_byte_size,
-          record_effective_date, record_end_date, create_user
+          record_effective_date, record_end_date
         )
         VALUES (
           ${submissionId},
@@ -65,8 +66,7 @@ describe('Martin upload function (integration)', function () {
           '{"name":"upload tile test"}'::jsonb,
           600,
           ${lifecycle.effective ? 'now()' : null}::timestamptz,
-          ${lifecycle.ended ? 'now()' : null}::timestamptz,
-          ${fixture.connection.systemUserId()}
+          ${lifecycle.ended ? 'now()' : null}::timestamptz
         )
         RETURNING submission_feature_id;
       `,
@@ -350,6 +350,18 @@ describe('Martin upload function (integration)', function () {
       expect(geometries).to.have.length(wktGeometries.length + 1);
     });
 
+    it('encodes every part of a geometry collection that mixes points, lines and polygons', async () => {
+      const { submissionId, uploadId, featureId } = await createUploadWithPoint();
+      const geometryId = await addGeometry(featureId, buildMixedGeometryCollectionWkt());
+
+      const parts = (await decodeGeometries(contextFor(submissionId, uploadId))).filter(
+        (geometry) => geometry.id === geometryId
+      );
+
+      // One tile feature per geometry type, all keyed by the stored geometry's id.
+      expect(parts.map((part) => part.type).sort((a, b) => a - b)).to.eql([1, 2, 3]);
+    });
+
     it('returns an empty tile where the upload does not reach', async () => {
       const { submissionId, uploadId } = await createUploadWithPoint();
 
@@ -434,7 +446,7 @@ describe('Martin upload function (integration)', function () {
 
       const planText = plan.rows.map((row) => row['QUERY PLAN']).join('\n');
 
-      expect(planText).to.match(/submission_feature_idx5_active_submission_upload|submission_feature_idx9/);
+      expect(planText).to.match(/submission_feature_idx9/);
       expect(planText).to.not.contain('Seq Scan on submission_feature ');
       expect(planText).to.not.contain('Seq Scan on submission_feature_property_geometry');
     });

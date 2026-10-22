@@ -56,6 +56,7 @@ describe('process-submission-features-job', () => {
   describe('processSubmissionFeaturesJobHandler', () => {
     beforeEach(() => {
       stubConnections();
+      sinon.stub(SubmissionUploadService.prototype, 'tryLockSubmissionUploadIngestion').resolves(true);
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadWithLock').resolves({
         ...defaultSubmissionUpload,
         status: 'uploaded'
@@ -216,6 +217,26 @@ describe('process-submission-features-job', () => {
       } catch (error) {
         expect(error).to.equal(testError);
       }
+    });
+
+    it('throws without cleanup or ingestion when another attempt holds the ingestion lock', async () => {
+      (SubmissionUploadService.prototype.tryLockSubmissionUploadIngestion as sinon.SinonStub).resolves(false);
+      const ingestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
+      const deleteFeaturesStub = SubmissionFeatureIngestionService.prototype
+        .deleteSubmissionFeaturesBySubmissionUploadId as sinon.SinonStub;
+      const toIngestingStub = SubmissionUploadService.prototype
+        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
+
+      try {
+        await processSubmissionFeaturesJobHandler([createMockJob()]);
+        expect.fail('expected an error');
+      } catch (error) {
+        expect((error as Error).message).to.include('already being ingested');
+      }
+
+      expect(ingestStub).not.to.have.been.called;
+      expect(deleteFeaturesStub).not.to.have.been.called;
+      expect(toIngestingStub).not.to.have.been.called;
     });
 
     it('skips processing when current status is terminal', async () => {
