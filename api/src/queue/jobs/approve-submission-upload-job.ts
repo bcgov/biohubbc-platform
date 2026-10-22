@@ -29,28 +29,30 @@ export interface IApproveSubmissionUploadJobData {
  * @return {*}  {Promise<void>}
  */
 export const approveSubmissionUploadJobHandler: PgBoss.WorkHandler<IApproveSubmissionUploadJobData> = async (jobs) => {
-  for (const job of jobs) {
-    const { submissionUploadId } = job.data;
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { submissionUploadId } = job.data;
 
-    defaultLog.info({
-      label: 'approveSubmissionUploadJobHandler',
-      message: 'Processing approve submission upload job',
-      jobId: job.id,
-      submissionUploadId
-    });
+      defaultLog.info({
+        label: 'approveSubmissionUploadJobHandler',
+        message: 'Processing approve submission upload job',
+        jobId: job.id,
+        submissionUploadId
+      });
 
-    await withConnection(async (connection) => {
-      const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.applySubmissionUploadApproval(submissionUploadId);
-    });
+      await withConnection(async (connection) => {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        await submissionUploadService.applySubmissionUploadApproval(submissionUploadId);
+      });
 
-    defaultLog.info({
-      label: 'approveSubmissionUploadJobHandler',
-      message: 'Approve submission upload job completed successfully',
-      jobId: job.id,
-      submissionUploadId
-    });
-  }
+      defaultLog.info({
+        label: 'approveSubmissionUploadJobHandler',
+        message: 'Approve submission upload job completed successfully',
+        jobId: job.id,
+        submissionUploadId
+      });
+    })
+  );
 };
 
 /**
@@ -66,23 +68,25 @@ export const approveSubmissionUploadJobHandler: PgBoss.WorkHandler<IApproveSubmi
 export const approveSubmissionUploadFailedHandler: PgBoss.WorkHandler<IApproveSubmissionUploadJobData> = async (
   jobs
 ) => {
-  for (const job of jobs) {
-    const { submissionUploadId } = job.data;
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { submissionUploadId } = job.data;
 
-    // Cast to access output field available on failed jobs
-    const jobOutput = (job as PgBoss.JobWithMetadata<IApproveSubmissionUploadJobData>).output;
+      // Cast to access output field available on failed jobs
+      const jobOutput = (job as PgBoss.JobWithMetadata<IApproveSubmissionUploadJobData>).output;
 
-    defaultLog.warn({
-      label: 'approveSubmissionUploadFailedHandler',
-      message: 'Approve submission upload job failed after all retries',
-      jobId: job.id,
-      submissionUploadId,
-      output: jobOutput ?? 'Job failed after all retries'
-    });
+      defaultLog.warn({
+        label: 'approveSubmissionUploadFailedHandler',
+        message: 'Approve submission upload job failed after all retries',
+        jobId: job.id,
+        submissionUploadId,
+        output: jobOutput ?? 'Job failed after all retries'
+      });
 
-    await withConnection(async (connection) => {
-      const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.revertSubmissionUploadApproval(submissionUploadId);
-    });
-  }
+      await withConnection(async (connection) => {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        await submissionUploadService.revertSubmissionUploadApproval(submissionUploadId);
+      });
+    })
+  );
 };
