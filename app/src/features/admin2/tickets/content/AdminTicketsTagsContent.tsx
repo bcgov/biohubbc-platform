@@ -22,7 +22,7 @@ import { tagQueryKeys } from 'utils/query-keys/tag-query-keys';
  * edit and delete. Each tag opens its own page, which lists the rules that apply it.
  *
  * A save keeps its dialog open and shows the server's error, such as a duplicate name, in the dialog. Deleting a tag
- * removes it from every ticket and board, so its confirmation says so; tag changes refresh everything that shows tags.
+ * removes it from every ticket, so its confirmation says so; tag changes refresh everything that shows tags.
  *
  * @returns {JSX.Element} The tags table and its dialogs.
  */
@@ -94,7 +94,7 @@ export const AdminTicketsTagsContent = () => {
   }, []);
 
   /**
-   * Asks for confirmation before deleting a tag, which also removes it from every ticket and board.
+   * Asks for confirmation before deleting a tag, which also removes it from every ticket.
    *
    * @param {ITag} tag The tag to delete.
    * @returns {void}
@@ -108,8 +108,8 @@ export const AdminTicketsTagsContent = () => {
         dialogTitle: 'Delete tag?',
         dialogContent: (
           <Typography component="div" color="textSecondary">
-            Deleting tag <strong>{tag.name}</strong> removes it from all tickets and boards. This cannot be undone. Are
-            you sure you want to proceed?
+            Deleting tag <strong>{tag.name}</strong> removes it from all tickets. This cannot be undone. Are you sure
+            you want to proceed?
           </Typography>
         ),
         yesButtonLabel: 'Delete Tag',

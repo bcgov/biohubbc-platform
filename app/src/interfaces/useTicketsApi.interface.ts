@@ -254,6 +254,4 @@ export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions
   search?: string;
   /** Administrative list only: tickets with any of these tags. */
   tag_ids?: string[];
-  /** Administrative list only: tickets with any of this board's tags. */
-  board_id?: string;
 }

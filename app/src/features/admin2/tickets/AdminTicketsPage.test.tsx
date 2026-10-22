@@ -1,5 +1,5 @@
 import { useApi } from 'hooks/useApi';
-import { IBoardSummary } from 'interfaces/useBoardsApi.interface';
+import { IBoard } from 'interfaces/useBoardsApi.interface';
 import { ITagSummary } from 'interfaces/useTagsApi.interface';
 import { IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
 import { ComponentProps } from 'react';
@@ -40,12 +40,12 @@ const sampleTicket = {
 const urgentTag: ITagSummary = { tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' };
 const mockGetTags = vi.fn();
 const mockGetBoards = vi.fn();
-const triageBoard: IBoardSummary = {
+const triageBoard: IBoard = {
   board_id: 'board-1',
   name: 'Triage',
   description: 'Tickets that need a first look',
   create_date: '2026-03-01T00:00:00.000Z',
-  tags: [{ board_tag_id: 'board-tag-1', ...urgentTag }]
+  default_swimlane_id: null
 };
 
 const apiMock = {
@@ -324,7 +324,6 @@ describe('AdminTicketsPage', () => {
 
     expect(await findByText('Triage')).toBeVisible();
     expect(getByText('Tickets that need a first look')).toBeVisible();
-    expect(getByText('Urgent')).toBeVisible();
     expect(mockGetBoards).toHaveBeenCalledWith(
       { search: '', page: 1, limit: 10, sort: 'name', order: 'asc' },
       { signal: expect.any(AbortSignal) }

@@ -2,13 +2,12 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
 import { Tag, TagFilters, TagRequest } from '../models/tag';
-import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
-import { BoardTagRepository } from '../repositories/board-tag-repository';
 import { TagRepository } from '../repositories/tag-repository';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { getUnique } from '../utils/unique';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { BoardTagService } from './board-tag-service';
 import { DBService } from './db-service';
 
 /**
@@ -17,17 +16,15 @@ import { DBService } from './db-service';
 export class TagService extends DBService {
   tagRepository: TagRepository;
   ticketTagRepository: TicketTagRepository;
-  boardTagRepository: BoardTagRepository;
-  boardSwimlaneTagRepository: BoardSwimlaneTagRepository;
   tagRuleRepository: TagRuleRepository;
+  boardTagService: BoardTagService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.tagRepository = new TagRepository(connection);
     this.ticketTagRepository = new TicketTagRepository(connection);
-    this.boardTagRepository = new BoardTagRepository(connection);
-    this.boardSwimlaneTagRepository = new BoardSwimlaneTagRepository(connection);
     this.tagRuleRepository = new TagRuleRepository(connection);
+    this.boardTagService = new BoardTagService(connection);
   }
 
   /**
@@ -97,7 +94,8 @@ export class TagService extends DBService {
   }
 
   /**
-   * Soft delete a tag, its tag rules, and every active link to it from tickets, boards, and board swimlanes.
+   * Soft delete a tag, its tag rules, and every active link to it from tickets and boards. The tickets that have it are
+   * taken off the boards it is linked to, except boards another of their tags is linked to.
    *
    * @param {string} tagId - Tag UUID.
    * @returns {Promise<void>}
@@ -107,9 +105,8 @@ export class TagService extends DBService {
   async deleteTag(tagId: string): Promise<void> {
     await this.tagRepository.getTagById(tagId);
 
-    // Swimlane links reference board tags, so they are ended before the board tags they point at.
-    await this.boardSwimlaneTagRepository.deleteBoardSwimlaneTagsByTagId(tagId);
-    await this.boardTagRepository.deleteBoardTagsByTagId(tagId);
+    // Board links are ended first, while the tag's ticket links still show which tickets it put on the boards.
+    await this.boardTagService.deleteBoardTagsByTagId(tagId);
     await this.ticketTagRepository.deleteTicketTagsByTagId(tagId);
     await this.tagRuleRepository.deleteTagRulesByTagId(tagId);
     await this.tagRepository.deleteTag(tagId);
