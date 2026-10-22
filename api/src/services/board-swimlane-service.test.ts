@@ -7,8 +7,8 @@ import { HTTPError } from '../errors/http-error';
 import { Board, BoardSwimlane } from '../models/board';
 import { BoardRepository } from '../repositories/board-repository';
 import { BoardSwimlaneRepository } from '../repositories/board-swimlane-repository';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { BoardSwimlaneService } from './board-swimlane-service';
+import { BoardTicketService } from './board-ticket-service';
 
 chai.use(sinonChai);
 
@@ -118,26 +118,8 @@ describe('BoardSwimlaneService', () => {
       sinon.stub(BoardSwimlaneRepository.prototype, 'getBoardSwimlaneById').resolves(makeSwimlane(laneA, 0));
     });
 
-    it("deletes the board's default lane, leaving the board without a default", async () => {
-      sinon
-        .stub(BoardRepository.prototype, 'getBoardById')
-        .resolves({ board_id: boardId, default_swimlane_id: laneA } as Board);
-      sinon.stub(BoardTicketRepository.prototype, 'getBoardSwimlaneTicketCount').resolves(0);
-      const defaultStub = sinon.stub(BoardRepository.prototype, 'updateBoardDefaultSwimlane').resolves();
-      const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane').resolves();
-
-      await service.deleteBoardSwimlane(boardId, laneA);
-
-      expect(defaultStub).to.have.been.calledOnceWith(boardId, null);
-      expect(deleteStub).to.have.been.calledOnceWith(boardId, laneA);
-      expect(defaultStub).to.have.been.calledBefore(deleteStub);
-    });
-
     it('refuses to delete a lane that has tickets', async () => {
-      sinon
-        .stub(BoardRepository.prototype, 'getBoardById')
-        .resolves({ board_id: boardId, default_swimlane_id: laneB } as Board);
-      sinon.stub(BoardTicketRepository.prototype, 'getBoardSwimlaneTicketCount').resolves(2);
+      sinon.stub(BoardTicketService.prototype, 'getBoardSwimlaneTicketCount').resolves(2);
       const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane');
 
       try {
@@ -150,11 +132,8 @@ describe('BoardSwimlaneService', () => {
       expect(deleteStub).to.not.have.been.called;
     });
 
-    it('deletes a lane without tickets that is not the default', async () => {
-      sinon
-        .stub(BoardRepository.prototype, 'getBoardById')
-        .resolves({ board_id: boardId, default_swimlane_id: laneB } as Board);
-      sinon.stub(BoardTicketRepository.prototype, 'getBoardSwimlaneTicketCount').resolves(0);
+    it('deletes a lane without tickets', async () => {
+      sinon.stub(BoardTicketService.prototype, 'getBoardSwimlaneTicketCount').resolves(0);
       const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane').resolves();
 
       await service.deleteBoardSwimlane(boardId, laneA);

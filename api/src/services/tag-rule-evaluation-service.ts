@@ -1,14 +1,13 @@
 import { IDBConnection } from '../database/db';
 import { TagRule, TagRuleEvaluation } from '../models/tag-rule';
 import { publishEvaluateTicketTagRulesJob } from '../queue/publisher';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
-import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { SubmissionUploadRepository } from '../repositories/upload/submission-upload-repository';
 import { optimizeExpression } from '../utils/expression-optimization';
 import { DBService } from './db-service';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { ExpressionTreeService } from './expression-tree-service';
+import { TicketTagService } from './ticket-tag-service';
 
 /**
  * Service that evaluates tag rules against a ticket.
@@ -24,18 +23,16 @@ export class TagRuleEvaluationService extends DBService {
   };
 
   tagRuleRepository: TagRuleRepository;
-  ticketTagRepository: TicketTagRepository;
-  boardTicketRepository: BoardTicketRepository;
   submissionUploadRepository: SubmissionUploadRepository;
+  ticketTagService: TicketTagService;
   expressionTreeService: ExpressionTreeService;
   expressionTreeNormalizationService: ExpressionTreeNormalizationService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.tagRuleRepository = new TagRuleRepository(connection);
-    this.ticketTagRepository = new TicketTagRepository(connection);
-    this.boardTicketRepository = new BoardTicketRepository(connection);
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
+    this.ticketTagService = new TicketTagService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
   }
@@ -77,14 +74,7 @@ export class TagRuleEvaluationService extends DBService {
       return;
     }
 
-    const addedTags = await this.ticketTagRepository.insertRuleTicketTags(ticketId, ruleTicketTags);
-
-    if (addedTags.length) {
-      await this.boardTicketRepository.insertBoardTicketsByTagIds(
-        ticketId,
-        addedTags.map((tag) => tag.tag_id)
-      );
-    }
+    await this.ticketTagService.insertRuleTicketTags(ticketId, ruleTicketTags);
   }
 
   /**

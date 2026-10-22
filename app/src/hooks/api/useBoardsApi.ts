@@ -113,7 +113,8 @@ export const useBoardsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Unlink a tag from a board. The tag, and the board's tickets, are not affected.
+   * Unlink a tag from a board, taking the tickets that have it off the board unless another of their tags is linked
+   * to it. The tag is not affected.
    *
    * @param {string} boardId
    * @param {string} tagId

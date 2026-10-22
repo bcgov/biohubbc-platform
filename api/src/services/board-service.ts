@@ -16,12 +16,10 @@ import {
 import { Tag, TagRequest } from '../models/tag';
 import { Ticket, TicketWithTags } from '../models/ticket';
 import { BoardRepository } from '../repositories/board-repository';
-import { BoardSwimlaneRepository } from '../repositories/board-swimlane-repository';
-import { BoardTagRepository } from '../repositories/board-tag-repository';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
-import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BoardSwimlaneService } from './board-swimlane-service';
+import { BoardTagService } from './board-tag-service';
+import { BoardTicketService } from './board-ticket-service';
 import { DBService } from './db-service';
 import { TagService } from './tag-service';
 import { TicketService } from './ticket-service';
@@ -31,22 +29,18 @@ import { TicketService } from './ticket-service';
  */
 export class BoardService extends DBService {
   boardRepository: BoardRepository;
-  boardSwimlaneRepository: BoardSwimlaneRepository;
-  boardTagRepository: BoardTagRepository;
-  boardTicketRepository: BoardTicketRepository;
-  ticketRepository: TicketRepository;
   boardSwimlaneService: BoardSwimlaneService;
+  boardTagService: BoardTagService;
+  boardTicketService: BoardTicketService;
   ticketService: TicketService;
   tagService: TagService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.boardRepository = new BoardRepository(connection);
-    this.boardSwimlaneRepository = new BoardSwimlaneRepository(connection);
-    this.boardTagRepository = new BoardTagRepository(connection);
-    this.boardTicketRepository = new BoardTicketRepository(connection);
-    this.ticketRepository = new TicketRepository(connection);
     this.boardSwimlaneService = new BoardSwimlaneService(connection);
+    this.boardTagService = new BoardTagService(connection);
+    this.boardTicketService = new BoardTicketService(connection);
     this.ticketService = new TicketService(connection);
     this.tagService = new TagService(connection);
   }
@@ -104,15 +98,14 @@ export class BoardService extends DBService {
       name: board.name,
       description: board.description
     });
-    const toDoSwimlane = await this.boardSwimlaneRepository.insertBoardSwimlane(createdBoard.board_id, {
+    const toDoSwimlane = await this.boardSwimlaneService.createBoardSwimlane(createdBoard.board_id, {
       name: DEFAULT_BOARD_SWIMLANE_NAME,
       description: null,
       color: null
     });
     await this.boardRepository.updateBoardDefaultSwimlane(createdBoard.board_id, toDoSwimlane.board_swimlane_id);
-    const swimlanes = await this.boardSwimlaneService.getBoardSwimlanes(createdBoard.board_id);
 
-    return { ...createdBoard, default_swimlane_id: toDoSwimlane.board_swimlane_id, swimlanes };
+    return { ...createdBoard, default_swimlane_id: toDoSwimlane.board_swimlane_id, swimlanes: [toDoSwimlane] };
   }
 
   /**
@@ -151,8 +144,8 @@ export class BoardService extends DBService {
     await this.boardRepository.getBoardById(boardId);
 
     // Board tickets reference the board's lanes, so they are ended before the lanes.
-    await this.boardTicketRepository.deleteBoardTicketsByBoardId(boardId);
-    await this.boardTagRepository.deleteBoardTagsByBoardId(boardId);
+    await this.boardTicketService.deleteBoardTicketsByBoardId(boardId);
+    await this.boardTagService.deleteBoardTagsByBoardId(boardId);
     await this.boardSwimlaneService.deleteBoardSwimlanesByBoardId(boardId);
     await this.boardRepository.deleteBoard(boardId);
   }
@@ -172,7 +165,7 @@ export class BoardService extends DBService {
     await this.boardRepository.getBoardById(boardId);
 
     const createdTag = await this.tagService.createTag(tag);
-    await this.boardTagRepository.insertBoardTags(boardId, [createdTag.tag_id]);
+    await this.boardTagService.ensureBoardTag(boardId, createdTag.tag_id);
 
     return createdTag;
   }
@@ -192,16 +185,12 @@ export class BoardService extends DBService {
     await this.boardRepository.getBoardById(boardId);
     await this.tagService.getTag(tagId);
 
-    const linkedTags = await this.boardTagRepository.insertBoardTags(boardId, [tagId]);
-
-    if (linkedTags.length) {
-      await this.boardTicketRepository.insertBoardTicketsByTagId(boardId, tagId);
-    }
+    await this.boardTagService.ensureBoardTag(boardId, tagId);
   }
 
   /**
-   * Unlink a tag from a board. The tag, and the tickets on the board, are not affected. Unlinking an unlinked tag
-   * changes nothing.
+   * Unlink a tag from a board. Unlinking it also takes the tickets that have it off the board, except those that have
+   * another tag linked to the board. The tag itself is not affected. Unlinking an unlinked tag changes nothing.
    *
    * @param {string} boardId - Board UUID.
    * @param {string} tagId - Tag UUID.
@@ -212,7 +201,7 @@ export class BoardService extends DBService {
   async deleteBoardTag(boardId: string, tagId: string): Promise<void> {
     await this.boardRepository.getBoardById(boardId);
 
-    await this.boardTagRepository.deleteBoardTag(boardId, tagId);
+    await this.boardTagService.deleteBoardTag(boardId, tagId);
   }
 
   /**
@@ -230,7 +219,7 @@ export class BoardService extends DBService {
 
     const [swimlanes, boardTickets] = await Promise.all([
       this.boardSwimlaneService.getBoardSwimlanes(boardId),
-      this.boardTicketRepository.getBoardTickets(boardId, filters)
+      this.boardTicketService.getBoardTickets(boardId, filters)
     ]);
 
     const tickets: TicketWithTags[] = [];
@@ -279,7 +268,7 @@ export class BoardService extends DBService {
       description: ticket.description,
       priority: ticket.priority
     });
-    await this.boardTicketRepository.insertBoardTicket(boardId, createdTicket.ticket_id, defaultSwimlaneId);
+    await this.boardTicketService.insertBoardTicket(boardId, createdTicket.ticket_id, defaultSwimlaneId);
 
     return createdTicket;
   }
@@ -302,14 +291,14 @@ export class BoardService extends DBService {
       throw new HTTP400('A position requires a swimlane');
     }
 
-    await this.ticketRepository.getTicketById(ticketId);
+    await this.ticketService.getTicketById(ticketId);
 
     if (boardTicket.boardSwimlaneId) {
-      await this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, boardTicket.boardSwimlaneId);
-      await this.boardTicketRepository.ensureBoardTicket(boardId, ticketId, boardTicket.boardSwimlaneId);
+      await this.boardSwimlaneService.getBoardSwimlane(boardId, boardTicket.boardSwimlaneId);
+      await this.boardTicketService.ensureBoardTicket(boardId, ticketId, boardTicket.boardSwimlaneId);
 
       if (boardTicket.position !== undefined) {
-        await this.boardTicketRepository.updateBoardTicketPosition(
+        await this.boardTicketService.updateBoardTicketPosition(
           boardTicket.boardSwimlaneId,
           ticketId,
           boardTicket.position
@@ -319,7 +308,7 @@ export class BoardService extends DBService {
     }
 
     const defaultSwimlaneId = await this.getDefaultBoardSwimlaneId(boardId);
-    await this.boardTicketRepository.insertBoardTicket(boardId, ticketId, defaultSwimlaneId);
+    await this.boardTicketService.insertBoardTicket(boardId, ticketId, defaultSwimlaneId);
   }
 
   /**
@@ -335,7 +324,28 @@ export class BoardService extends DBService {
   async deleteBoardTicket(boardId: string, ticketId: string): Promise<void> {
     await this.boardRepository.getBoardById(boardId);
 
-    await this.boardTicketRepository.deleteBoardTicket(boardId, ticketId);
+    await this.boardTicketService.deleteBoardTicket(boardId, ticketId);
+  }
+
+  /**
+   * Soft delete a lane that has no tickets. Deleting the board's default lane leaves the board without one, so tickets
+   * cannot be added to it until it has a default again.
+   *
+   * @param {string} boardId - Board UUID.
+   * @param {string} boardSwimlaneId - Board swimlane UUID.
+   * @returns {Promise<void>}
+   * @throws {ApiNotFoundError} If the board does not exist, or the swimlane does not exist on the board.
+   * @throws {ApiConflictError} If the swimlane has tickets.
+   * @memberof BoardService
+   */
+  async deleteBoardSwimlane(boardId: string, boardSwimlaneId: string): Promise<void> {
+    const board = await this.boardRepository.getBoardById(boardId);
+
+    await this.boardSwimlaneService.deleteBoardSwimlane(boardId, boardSwimlaneId);
+
+    if (board.default_swimlane_id === boardSwimlaneId) {
+      await this.boardRepository.updateBoardDefaultSwimlane(boardId, null);
+    }
   }
 
   /**

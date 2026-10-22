@@ -7,12 +7,10 @@ import { HTTPError } from '../errors/http-error';
 import { Board, BoardSwimlane, BoardTicket } from '../models/board';
 import { Ticket } from '../models/ticket';
 import { BoardRepository } from '../repositories/board-repository';
-import { BoardSwimlaneRepository } from '../repositories/board-swimlane-repository';
-import { BoardTagRepository } from '../repositories/board-tag-repository';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
-import { TicketRepository } from '../repositories/ticket-repository';
 import { BoardService } from './board-service';
 import { BoardSwimlaneService } from './board-swimlane-service';
+import { BoardTagService } from './board-tag-service';
+import { BoardTicketService } from './board-ticket-service';
 import { TagService } from './tag-service';
 import { TicketService } from './ticket-service';
 
@@ -71,7 +69,7 @@ describe('BoardService', () => {
         .stub(BoardSwimlaneService.prototype, 'getBoardSwimlanes')
         .resolves([makeSwimlane(laneTodo, 0, true), makeSwimlane(laneDone, 1, false)]);
       const getTicketsStub = sinon
-        .stub(BoardTicketRepository.prototype, 'getBoardTickets')
+        .stub(BoardTicketService.prototype, 'getBoardTickets')
         .resolves([makeTicket('t1', laneTodo), makeTicket('t2', laneDone), makeTicket('t3', laneDone)]);
 
       const result = await service.getBoardTickets(boardId, { include_closed: false });
@@ -93,7 +91,7 @@ describe('BoardService', () => {
       sinon
         .stub(BoardSwimlaneService.prototype, 'getBoardSwimlanes')
         .resolves([makeSwimlane(laneTodo, 0, true), makeSwimlane(laneDone, 1, true)]);
-      sinon.stub(BoardTicketRepository.prototype, 'getBoardTickets').resolves([]);
+      sinon.stub(BoardTicketService.prototype, 'getBoardTickets').resolves([]);
 
       const result = await service.getBoardTickets(boardId, { include_closed: true });
 
@@ -122,11 +120,8 @@ describe('BoardService', () => {
       const toDo = { ...makeSwimlane('lane-1', 0, true), name: 'To Do' };
       sinon.stub(BoardRepository.prototype, 'findBoardByName').resolves(undefined);
       sinon.stub(BoardRepository.prototype, 'insertBoard').resolves({ ...mockBoard, default_swimlane_id: null });
-      const insertLaneStub = sinon
-        .stub(BoardSwimlaneRepository.prototype, 'insertBoardSwimlane')
-        .resolves({ board_swimlane_id: 'lane-1' });
+      const insertLaneStub = sinon.stub(BoardSwimlaneService.prototype, 'createBoardSwimlane').resolves(toDo);
       const defaultStub = sinon.stub(BoardRepository.prototype, 'updateBoardDefaultSwimlane').resolves();
-      sinon.stub(BoardSwimlaneService.prototype, 'getBoardSwimlanes').resolves([toDo]);
 
       const result = await service.createBoard({ name: 'Fisheries', description: null });
 
@@ -140,8 +135,8 @@ describe('BoardService', () => {
   describe('deleteBoard', () => {
     it("takes the board's tickets off it and ends its tag links before deleting its lanes and the board", async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
-      const ticketsStub = sinon.stub(BoardTicketRepository.prototype, 'deleteBoardTicketsByBoardId').resolves();
-      const tagsStub = sinon.stub(BoardTagRepository.prototype, 'deleteBoardTagsByBoardId').resolves();
+      const ticketsStub = sinon.stub(BoardTicketService.prototype, 'deleteBoardTicketsByBoardId').resolves();
+      const tagsStub = sinon.stub(BoardTagService.prototype, 'deleteBoardTagsByBoardId').resolves();
       const swimlanesStub = sinon.stub(BoardSwimlaneService.prototype, 'deleteBoardSwimlanesByBoardId').resolves();
       const boardStub = sinon.stub(BoardRepository.prototype, 'deleteBoard').resolves();
 
@@ -163,42 +158,29 @@ describe('BoardService', () => {
     it('creates a tag and links it to the board', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
       const createStub = sinon.stub(TagService.prototype, 'createTag').resolves(tag);
-      const linkStub = sinon.stub(BoardTagRepository.prototype, 'insertBoardTags').resolves([{ tag_id: tagId }]);
+      const linkStub = sinon.stub(BoardTagService.prototype, 'ensureBoardTag').resolves();
 
       const result = await service.createBoardTag(boardId, { name: 'Fish', description: null, color: '#1A5A96' });
 
-      expect(linkStub).to.have.been.calledOnceWith(boardId, [tagId]);
+      expect(linkStub).to.have.been.calledOnceWith(boardId, tagId);
       expect(createStub).to.have.been.calledBefore(linkStub);
       expect(result).to.equal(tag);
     });
 
-    it('links an existing tag and puts the tickets that have it on the board', async () => {
+    it('links an existing tag to the board', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
       sinon.stub(TagService.prototype, 'getTag').resolves(tag);
-      const linkStub = sinon.stub(BoardTagRepository.prototype, 'insertBoardTags').resolves([{ tag_id: tagId }]);
-      const ticketsStub = sinon.stub(BoardTicketRepository.prototype, 'insertBoardTicketsByTagId').resolves();
+      const linkStub = sinon.stub(BoardTagService.prototype, 'ensureBoardTag').resolves();
 
       await service.ensureBoardTag(boardId, tagId);
 
-      expect(linkStub).to.have.been.calledOnceWith(boardId, [tagId]);
-      expect(ticketsStub).to.have.been.calledOnceWith(boardId, tagId);
-    });
-
-    it('puts no tickets on the board when the tag was already linked', async () => {
-      sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
-      sinon.stub(TagService.prototype, 'getTag').resolves(tag);
-      sinon.stub(BoardTagRepository.prototype, 'insertBoardTags').resolves([]);
-      const ticketsStub = sinon.stub(BoardTicketRepository.prototype, 'insertBoardTicketsByTagId');
-
-      await service.ensureBoardTag(boardId, tagId);
-
-      expect(ticketsStub).to.not.have.been.called;
+      expect(linkStub).to.have.been.calledOnceWith(boardId, tagId);
     });
 
     it('links nothing for a missing tag', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
       sinon.stub(TagService.prototype, 'getTag').rejects(new ApiNotFoundError('Tag not found'));
-      const linkStub = sinon.stub(BoardTagRepository.prototype, 'insertBoardTags');
+      const linkStub = sinon.stub(BoardTagService.prototype, 'ensureBoardTag');
 
       try {
         await service.ensureBoardTag(boardId, tagId);
@@ -212,7 +194,7 @@ describe('BoardService', () => {
 
     it('unlinks a tag from the board', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
-      const unlinkStub = sinon.stub(BoardTagRepository.prototype, 'deleteBoardTag').resolves();
+      const unlinkStub = sinon.stub(BoardTagService.prototype, 'deleteBoardTag').resolves();
 
       await service.deleteBoardTag(boardId, tagId);
 
@@ -227,7 +209,7 @@ describe('BoardService', () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
       const createdTicket = { ticket_id: ticketId } as Ticket;
       const createStub = sinon.stub(TicketService.prototype, 'createTicket').resolves(createdTicket);
-      const insertStub = sinon.stub(BoardTicketRepository.prototype, 'insertBoardTicket').resolves();
+      const insertStub = sinon.stub(BoardTicketService.prototype, 'insertBoardTicket').resolves();
 
       const result = await service.createBoardTicket(boardId, ticketRequest);
 
@@ -253,12 +235,12 @@ describe('BoardService', () => {
 
   describe('ensureBoardTicket', () => {
     beforeEach(() => {
-      sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({ ticket_id: ticketId } as Ticket);
+      sinon.stub(TicketService.prototype, 'getTicketById').resolves({ ticket_id: ticketId } as Ticket);
     });
 
     it('puts the ticket in the picked lane once the lane is found on the board', async () => {
-      sinon.stub(BoardSwimlaneRepository.prototype, 'getBoardSwimlaneById').resolves(makeSwimlane('lane-1', 0, true));
-      const ensureStub = sinon.stub(BoardTicketRepository.prototype, 'ensureBoardTicket').resolves();
+      sinon.stub(BoardSwimlaneService.prototype, 'getBoardSwimlane').resolves(makeSwimlane('lane-1', 0, true));
+      const ensureStub = sinon.stub(BoardTicketService.prototype, 'ensureBoardTicket').resolves();
 
       await service.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: 'lane-1' });
 
@@ -266,9 +248,9 @@ describe('BoardService', () => {
     });
 
     it('moves the ticket to the picked position within the picked lane', async () => {
-      sinon.stub(BoardSwimlaneRepository.prototype, 'getBoardSwimlaneById').resolves(makeSwimlane('lane-1', 0, true));
-      const ensureStub = sinon.stub(BoardTicketRepository.prototype, 'ensureBoardTicket').resolves();
-      const positionStub = sinon.stub(BoardTicketRepository.prototype, 'updateBoardTicketPosition').resolves();
+      sinon.stub(BoardSwimlaneService.prototype, 'getBoardSwimlane').resolves(makeSwimlane('lane-1', 0, true));
+      const ensureStub = sinon.stub(BoardTicketService.prototype, 'ensureBoardTicket').resolves();
+      const positionStub = sinon.stub(BoardTicketService.prototype, 'updateBoardTicketPosition').resolves();
 
       await service.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: 'lane-1', position: 0 });
 
@@ -277,7 +259,7 @@ describe('BoardService', () => {
     });
 
     it('rejects a position without a lane before changing anything', async () => {
-      const insertStub = sinon.stub(BoardTicketRepository.prototype, 'insertBoardTicket');
+      const insertStub = sinon.stub(BoardTicketService.prototype, 'insertBoardTicket');
 
       try {
         await service.ensureBoardTicket(boardId, ticketId, { position: 0 });
@@ -291,9 +273,9 @@ describe('BoardService', () => {
 
     it("places nothing when the lane is not the board's", async () => {
       sinon
-        .stub(BoardSwimlaneRepository.prototype, 'getBoardSwimlaneById')
+        .stub(BoardSwimlaneService.prototype, 'getBoardSwimlane')
         .rejects(new ApiNotFoundError('Board swimlane not found'));
-      const ensureStub = sinon.stub(BoardTicketRepository.prototype, 'ensureBoardTicket');
+      const ensureStub = sinon.stub(BoardTicketService.prototype, 'ensureBoardTicket');
 
       try {
         await service.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: 'foreign-lane' });
@@ -307,8 +289,8 @@ describe('BoardService', () => {
 
     it("adds a ticket without a lane to the board's default lane, keeping a lane it already has", async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
-      const insertStub = sinon.stub(BoardTicketRepository.prototype, 'insertBoardTicket').resolves();
-      const ensureStub = sinon.stub(BoardTicketRepository.prototype, 'ensureBoardTicket');
+      const insertStub = sinon.stub(BoardTicketService.prototype, 'insertBoardTicket').resolves();
+      const ensureStub = sinon.stub(BoardTicketService.prototype, 'ensureBoardTicket');
 
       await service.ensureBoardTicket(boardId, ticketId, {});
 
@@ -317,10 +299,51 @@ describe('BoardService', () => {
     });
   });
 
+  describe('deleteBoardSwimlane', () => {
+    it("deletes the board's default lane, leaving the board without a default", async () => {
+      sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
+      const deleteStub = sinon.stub(BoardSwimlaneService.prototype, 'deleteBoardSwimlane').resolves();
+      const defaultStub = sinon.stub(BoardRepository.prototype, 'updateBoardDefaultSwimlane').resolves();
+
+      await service.deleteBoardSwimlane(boardId, 'to-do');
+
+      expect(deleteStub).to.have.been.calledOnceWith(boardId, 'to-do');
+      expect(defaultStub).to.have.been.calledOnceWith(boardId, null);
+      expect(deleteStub).to.have.been.calledBefore(defaultStub);
+    });
+
+    it('keeps the default lane when another lane is deleted', async () => {
+      sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
+      sinon.stub(BoardSwimlaneService.prototype, 'deleteBoardSwimlane').resolves();
+      const defaultStub = sinon.stub(BoardRepository.prototype, 'updateBoardDefaultSwimlane');
+
+      await service.deleteBoardSwimlane(boardId, 'lane-1');
+
+      expect(defaultStub).to.not.have.been.called;
+    });
+
+    it('keeps the default lane when the lane cannot be deleted', async () => {
+      sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
+      sinon
+        .stub(BoardSwimlaneService.prototype, 'deleteBoardSwimlane')
+        .rejects(new ApiConflictError("Move or remove the swimlane's tickets before deleting it"));
+      const defaultStub = sinon.stub(BoardRepository.prototype, 'updateBoardDefaultSwimlane');
+
+      try {
+        await service.deleteBoardSwimlane(boardId, 'to-do');
+        expect.fail('Expected conflict');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+
+      expect(defaultStub).to.not.have.been.called;
+    });
+  });
+
   describe('deleteBoardTicket', () => {
     it('takes the ticket off the board', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves(mockBoard);
-      const deleteStub = sinon.stub(BoardTicketRepository.prototype, 'deleteBoardTicket').resolves();
+      const deleteStub = sinon.stub(BoardTicketService.prototype, 'deleteBoardTicket').resolves();
 
       await service.deleteBoardTicket(boardId, ticketId);
 

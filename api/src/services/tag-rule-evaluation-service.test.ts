@@ -3,13 +3,12 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { TagRule } from '../models/tag-rule';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
-import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { SubmissionUploadRepository } from '../repositories/upload/submission-upload-repository';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { ExpressionTreeService } from './expression-tree-service';
 import { TagRuleEvaluationService } from './tag-rule-evaluation-service';
+import { TicketTagService } from './ticket-tag-service';
 
 chai.use(sinonChai);
 
@@ -45,11 +44,7 @@ describe('TagRuleEvaluationService', () => {
         .resolves([{ tag_rule_id: 'r1' }, { tag_rule_id: 'r3' }]);
       const uploads = [{ submission_id: 1, submission_upload_id: 'upload-1' }];
       sinon.stub(SubmissionUploadRepository.prototype, 'getActiveSubmissionUploadScopesByTicketId').resolves(uploads);
-      // The ticket once had tag-c, so the rule adds only tag-a.
-      const insertStub = sinon
-        .stub(TicketTagRepository.prototype, 'insertRuleTicketTags')
-        .resolves([{ tag_id: 'tag-a' }]);
-      const boardTicketsStub = sinon.stub(BoardTicketRepository.prototype, 'insertBoardTicketsByTagIds').resolves();
+      const insertStub = sinon.stub(TicketTagService.prototype, 'insertRuleTicketTags').resolves();
 
       await new TagRuleEvaluationService(getMockDBConnection()).evaluateTicketTagRules(ticketId);
 
@@ -64,15 +59,13 @@ describe('TagRuleEvaluationService', () => {
         { tag_id: 'tag-a', tag_rule_id: 'r1' },
         { tag_id: 'tag-c', tag_rule_id: 'r3' }
       ]);
-      // Only the tags the rules added put the ticket on boards.
-      expect(boardTicketsStub).to.have.been.calledOnceWith(ticketId, ['tag-a']);
     });
 
     it('writes nothing when no rule matches', async () => {
       sinon.stub(TagRuleRepository.prototype, 'getEnabledTagRules').resolves([makeRule('r1', 'tag-a')]);
       sinon.stub(TagRuleRepository.prototype, 'getMatchingTagRuleIds').resolves([]);
       sinon.stub(SubmissionUploadRepository.prototype, 'getActiveSubmissionUploadScopesByTicketId').resolves([]);
-      const insertStub = sinon.stub(TicketTagRepository.prototype, 'insertRuleTicketTags');
+      const insertStub = sinon.stub(TicketTagService.prototype, 'insertRuleTicketTags');
 
       await new TagRuleEvaluationService(getMockDBConnection()).evaluateTicketTagRules(ticketId);
 

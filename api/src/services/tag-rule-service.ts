@@ -2,25 +2,25 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { TagRule, TagRuleDetail, TagRulePayload, TagRuleRequest } from '../models/tag-rule';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
-import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { ExpressionTreeService } from './expression-tree-service';
 import { TagService } from './tag-service';
+import { TicketTagService } from './ticket-tag-service';
 
 /**
  * Service for admin-only tag rule management. Every rule belongs to one tag, and every operation is scoped to it.
  */
 export class TagRuleService extends DBService {
   tagRuleRepository: TagRuleRepository;
-  ticketTagRepository: TicketTagRepository;
+  ticketTagService: TicketTagService;
   tagService: TagService;
   expressionTreeService: ExpressionTreeService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.tagRuleRepository = new TagRuleRepository(connection);
-    this.ticketTagRepository = new TicketTagRepository(connection);
+    this.ticketTagService = new TicketTagService(connection);
     this.tagService = new TagService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
   }
@@ -125,7 +125,8 @@ export class TagRuleService extends DBService {
   }
 
   /**
-   * Soft delete a rule, optionally removing the tags it applied.
+   * Soft delete a rule, optionally removing the tags it applied. Removing them takes the tickets off the boards their tag
+   * is linked to, except boards another of their tags is linked to.
    *
    * @param {string} tagId - Tag UUID the rule belongs to.
    * @param {string} tagRuleId - Tag rule UUID.
@@ -138,7 +139,7 @@ export class TagRuleService extends DBService {
     await this.tagRuleRepository.getTagRuleById(tagId, tagRuleId);
 
     if (removeTags) {
-      await this.ticketTagRepository.deleteTicketTagsByTagRuleId(tagRuleId);
+      await this.ticketTagService.deleteTicketTagsByTagRuleId(tagRuleId);
     }
 
     await this.tagRuleRepository.deleteTagRule(tagId, tagRuleId);

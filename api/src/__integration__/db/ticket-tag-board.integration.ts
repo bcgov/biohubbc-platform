@@ -439,17 +439,80 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       expect(await countActive('board_tag', 'board_id', boardId)).to.equal(1);
     });
 
-    it('lists the board tags, and unlinking one leaves the board tickets and the tag', async () => {
+    it('lists the board tags, and unlinking one takes off the tickets no other board tag keeps on', async () => {
+      const bird = await createTag('Bird');
       await boardService.ensureBoardTag(boardId, fish);
-      const ticketId = await createTicket('kept', [fish]);
+      await boardService.ensureBoardTag(boardId, bird);
+      const removed = await createTicket('removed', [fish]);
+      const kept = await createTicket('kept', [fish, bird]);
+      const added = await createTicket('added', []);
+      await boardService.ensureBoardTicket(boardId, added, {});
+      const otherBoardId = await createBoard('Other');
+      await boardService.ensureBoardTag(otherBoardId, fish);
 
-      expect((await tagService.getTags({ board_id: boardId })).map((tag) => tag.tag_id)).to.eql([fish]);
+      expect((await tagService.getTags({ board_id: boardId })).map((tag) => tag.tag_id)).to.have.members([fish, bird]);
 
       await boardService.deleteBoardTag(boardId, fish);
 
-      expect(await tagService.getTagsCount({ board_id: boardId })).to.equal(0);
-      expect((await boardLayout(boardId))['To Do']).to.eql([ticketId]);
+      expect((await tagService.getTags({ board_id: boardId })).map((tag) => tag.tag_id)).to.eql([bird]);
+      expect((await boardLayout(boardId))['To Do']).to.eql([kept, added]);
+      expect((await boardLayout(otherBoardId))['To Do']).to.have.members([removed, kept]);
       expect(await countActive('tag', 'tag_id', fish)).to.equal(1);
+    });
+
+    it('unlinking a tag that is not linked leaves the board tickets', async () => {
+      const ticketId = await createTicket('added', [fish]);
+      await boardService.ensureBoardTicket(boardId, ticketId, {});
+
+      await boardService.deleteBoardTag(boardId, fish);
+
+      expect((await boardLayout(boardId))['To Do']).to.eql([ticketId]);
+    });
+
+    it('takes a ticket off the boards of the tags it loses, unless another of its tags keeps it on', async () => {
+      const bird = await createTag('Bird');
+      const keptBoardId = await createBoard('Kept');
+      await boardService.ensureBoardTag(boardId, fish);
+      await boardService.ensureBoardTag(keptBoardId, fish);
+      await boardService.ensureBoardTag(keptBoardId, bird);
+      const ticketId = await createTicket('loses', [fish, bird]);
+      const untagged = await createTicket('untagged', []);
+      await boardService.ensureBoardTicket(boardId, untagged, {});
+
+      await ticketTagService.replaceTicketTags(ticketId, [bird]);
+
+      expect((await boardLayout(boardId)).All).to.eql([untagged]);
+      expect((await boardLayout(keptBoardId)).All).to.eql([ticketId]);
+
+      await ticketTagService.replaceTicketTags(ticketId, []);
+
+      expect((await boardLayout(keptBoardId)).All).to.eql([]);
+    });
+
+    it('keeps a ticket on a board when a lost tag is swapped for another tag linked to it', async () => {
+      const bird = await createTag('Bird');
+      await boardService.ensureBoardTag(boardId, fish);
+      await boardService.ensureBoardTag(boardId, bird);
+      const ticketId = await createTicket('swapped', [fish]);
+      const laneId = await createSwimlane(boardId, 'Doing');
+      await boardService.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: laneId });
+
+      await ticketTagService.replaceTicketTags(ticketId, [bird]);
+
+      expect((await boardLayout(boardId)).Doing).to.eql([ticketId]);
+    });
+
+    it('takes the tickets of a deleted tag off its boards, unless another of their tags keeps them on', async () => {
+      const bird = await createTag('Bird');
+      await boardService.ensureBoardTag(boardId, fish);
+      await boardService.ensureBoardTag(boardId, bird);
+      const removed = await createTicket('removed', [fish]);
+      const kept = await createTicket('kept', [fish, bird]);
+
+      await tagService.deleteTag(fish);
+
+      expect((await boardLayout(boardId)).All).to.eql([kept]);
+      expect(await countActive('board_ticket', 'ticket_id', removed)).to.equal(0);
     });
 
     it('creates a tag linked to the board', async () => {
@@ -508,14 +571,14 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       await boardService.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: laneId });
 
       try {
-        await boardSwimlaneService.deleteBoardSwimlane(boardId, laneId);
+        await boardService.deleteBoardSwimlane(boardId, laneId);
         expect.fail('Expected conflict');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiConflictError);
       }
 
       await boardService.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: otherLaneId });
-      await boardSwimlaneService.deleteBoardSwimlane(boardId, laneId);
+      await boardService.deleteBoardSwimlane(boardId, laneId);
 
       expect(await countActive('board_swimlane', 'board_swimlane_id', laneId)).to.equal(0);
       expect((await boardLayout(boardId)).Other).to.eql([ticketId]);
@@ -560,7 +623,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       await tagService.deleteTag(tag.tag_id);
       const boardId = await createBoard();
       const laneId = await createSwimlane(boardId, 'Lane');
-      await boardSwimlaneService.deleteBoardSwimlane(boardId, laneId);
+      await boardService.deleteBoardSwimlane(boardId, laneId);
       await createSwimlane(boardId, 'LANE');
       await boardService.deleteBoard(boardId);
 
@@ -593,7 +656,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       ]);
       expect(board.default_swimlane_id).to.equal(board.swimlanes[0].board_swimlane_id);
 
-      await boardSwimlaneService.deleteBoardSwimlane(boardId, board.swimlanes[0].board_swimlane_id);
+      await boardService.deleteBoardSwimlane(boardId, board.swimlanes[0].board_swimlane_id);
 
       const laneless = await boardService.getBoard(boardId);
       expect(laneless.swimlanes).to.eql([]);
@@ -685,7 +748,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
       }
 
       try {
-        await boardSwimlaneService.deleteBoardSwimlane(boardId, foreignLane);
+        await boardService.deleteBoardSwimlane(boardId, foreignLane);
         expect.fail('Expected not found');
       } catch (error) {
         expect(error).to.be.instanceOf(ApiNotFoundError);

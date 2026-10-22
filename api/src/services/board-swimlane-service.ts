@@ -4,9 +4,9 @@ import { HTTP400 } from '../errors/http-error';
 import { BoardSwimlane, BoardSwimlaneRequest } from '../models/board';
 import { BoardRepository } from '../repositories/board-repository';
 import { BoardSwimlaneRepository } from '../repositories/board-swimlane-repository';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { getUnique } from '../utils/unique';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { BoardTicketService } from './board-ticket-service';
 import { DBService } from './db-service';
 
 /**
@@ -15,13 +15,13 @@ import { DBService } from './db-service';
 export class BoardSwimlaneService extends DBService {
   boardRepository: BoardRepository;
   boardSwimlaneRepository: BoardSwimlaneRepository;
-  boardTicketRepository: BoardTicketRepository;
+  boardTicketService: BoardTicketService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.boardRepository = new BoardRepository(connection);
     this.boardSwimlaneRepository = new BoardSwimlaneRepository(connection);
-    this.boardTicketRepository = new BoardTicketRepository(connection);
+    this.boardTicketService = new BoardTicketService(connection);
   }
 
   /**
@@ -33,6 +33,19 @@ export class BoardSwimlaneService extends DBService {
    */
   async getBoardSwimlanes(boardId: string): Promise<BoardSwimlane[]> {
     return this.boardSwimlaneRepository.getBoardSwimlanes(boardId);
+  }
+
+  /**
+   * Get an active swimlane of a board.
+   *
+   * @param {string} boardId - Board UUID the swimlane must belong to.
+   * @param {string} boardSwimlaneId - Board swimlane UUID.
+   * @returns {Promise<BoardSwimlane>} The swimlane.
+   * @throws {ApiNotFoundError} If the swimlane does not exist on the board.
+   * @memberof BoardSwimlaneService
+   */
+  async getBoardSwimlane(boardId: string, boardSwimlaneId: string): Promise<BoardSwimlane> {
+    return this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, boardSwimlaneId);
   }
 
   /**
@@ -113,8 +126,7 @@ export class BoardSwimlaneService extends DBService {
 
   /**
    * Soft delete a swimlane that has no tickets. Every ticket on a board is in one of its lanes, so a lane's tickets must
-   * first be moved to another lane or taken off the board. Deleting the board's default lane leaves the board without
-   * one, so tickets cannot be added to it until it has a default again.
+   * first be moved to another lane or taken off the board. The board's default lane is cleared by the caller.
    *
    * @param {string} boardId - Board UUID the swimlane must belong to.
    * @param {string} boardSwimlaneId - Board swimlane UUID.
@@ -126,17 +138,10 @@ export class BoardSwimlaneService extends DBService {
   async deleteBoardSwimlane(boardId: string, boardSwimlaneId: string): Promise<void> {
     await this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, boardSwimlaneId);
 
-    const [board, ticketCount] = await Promise.all([
-      this.boardRepository.getBoardById(boardId),
-      this.boardTicketRepository.getBoardSwimlaneTicketCount(boardSwimlaneId)
-    ]);
+    const ticketCount = await this.boardTicketService.getBoardSwimlaneTicketCount(boardSwimlaneId);
 
     if (ticketCount > 0) {
       throw new ApiConflictError("Move or remove the swimlane's tickets before deleting it");
-    }
-
-    if (board.default_swimlane_id === boardSwimlaneId) {
-      await this.boardRepository.updateBoardDefaultSwimlane(boardId, null);
     }
 
     await this.boardSwimlaneRepository.deleteBoardSwimlane(boardId, boardSwimlaneId);

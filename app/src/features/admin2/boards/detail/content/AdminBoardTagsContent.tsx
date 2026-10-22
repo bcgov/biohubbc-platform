@@ -28,7 +28,8 @@ interface IAdminBoardTagsContentProps {
  * Tags tab of a board's page: the server-paginated list of the board's tags. Applying one of them to a ticket, by hand
  * or by a tag rule, puts the ticket on the board, in its default lane. New Tag creates a regular tag linked to this
  * board; Add Tags links existing tags, which also puts the tickets that already have them on the board. A row's menu
- * unlinks its tag, which leaves the tag and the board's tickets as they are. Tags are otherwise managed on the tickets
+ * unlinks its tag, which takes the tickets that have it off the board unless another of the board's tags keeps them
+ * there; the tag itself is not affected. Tags are otherwise managed on the tickets
  * page's Tags tab.
  *
  * A save keeps the create dialog open and shows the server's error, such as a duplicate name, in the dialog.
@@ -77,7 +78,8 @@ export const AdminBoardTagsContent = (props: IAdminBoardTagsContentProps) => {
   const { mutate: removeBoardTag } = removeBoardTagMutation;
 
   /**
-   * Asks for confirmation before unlinking a tag from the board. The tag, and the board's tickets, are not affected.
+   * Asks for confirmation before unlinking a tag from the board, which takes the tickets that have it off the board
+   * unless another of the board's tags keeps them there. The tag itself is not affected.
    *
    * @param {ITag} tag The tag to unlink.
    * @returns {void}
@@ -91,8 +93,8 @@ export const AdminBoardTagsContent = (props: IAdminBoardTagsContentProps) => {
         dialogTitle: 'Remove tag from board?',
         dialogContent: (
           <Typography component="div" color="textSecondary">
-            Tickets given tag <strong>{tag.name}</strong> will no longer be added to this board. The tag, and the
-            tickets already on the board, are not affected.
+            Tickets with tag <strong>{tag.name}</strong> are taken off this board, unless another of the board&apos;s
+            tags keeps them on it. The tag itself is not affected.
           </Typography>
         ),
         yesButtonLabel: 'Remove',

@@ -284,6 +284,178 @@ export class BoardTicketRepository extends BaseRepository {
   }
 
   /**
+   * Take the tickets that have a tag off a board the tag is linked to, before the link is ended. A ticket stays on the
+   * board while it has another active tag linked to the board. Nothing changes when the tag is not linked to the board.
+   *
+   * @param {string} boardId - Board UUID.
+   * @param {string} tagId - The tag being unlinked from the board.
+   * @returns {Promise<void>}
+   * @memberof BoardTicketRepository
+   */
+  async deleteBoardTicketsByBoardTag(boardId: string, tagId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE board_ticket
+      SET record_end_date = now()
+      WHERE board_ticket.board_id = ${boardId}
+        AND board_ticket.record_end_date IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM board_tag removed_board_tag
+          JOIN ticket_tag removed_ticket_tag
+            ON removed_ticket_tag.tag_id = removed_board_tag.tag_id
+            AND removed_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND removed_ticket_tag.record_end_date IS NULL
+          WHERE removed_board_tag.board_id = board_ticket.board_id
+            AND removed_board_tag.tag_id = ${tagId}
+            AND removed_board_tag.record_end_date IS NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ticket_tag kept_ticket_tag
+          JOIN tag kept_tag
+            ON kept_tag.tag_id = kept_ticket_tag.tag_id
+            AND kept_tag.record_end_date IS NULL
+          JOIN board_tag kept_board_tag
+            ON kept_board_tag.tag_id = kept_ticket_tag.tag_id
+            AND kept_board_tag.board_id = board_ticket.board_id
+            AND kept_board_tag.record_end_date IS NULL
+          WHERE kept_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND kept_ticket_tag.tag_id <> ${tagId}
+            AND kept_ticket_tag.record_end_date IS NULL
+        );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Take the tickets that have a tag off every board the tag is linked to, before the tag's links are ended. A ticket
+   * stays on a board while it has another active tag linked to that board.
+   *
+   * @param {string} tagId - The tag being deleted.
+   * @returns {Promise<void>}
+   * @memberof BoardTicketRepository
+   */
+  async deleteBoardTicketsByTagId(tagId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE board_ticket
+      SET record_end_date = now()
+      WHERE board_ticket.record_end_date IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM board_tag removed_board_tag
+          JOIN ticket_tag removed_ticket_tag
+            ON removed_ticket_tag.tag_id = removed_board_tag.tag_id
+            AND removed_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND removed_ticket_tag.record_end_date IS NULL
+          WHERE removed_board_tag.board_id = board_ticket.board_id
+            AND removed_board_tag.tag_id = ${tagId}
+            AND removed_board_tag.record_end_date IS NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ticket_tag kept_ticket_tag
+          JOIN tag kept_tag
+            ON kept_tag.tag_id = kept_ticket_tag.tag_id
+            AND kept_tag.record_end_date IS NULL
+          JOIN board_tag kept_board_tag
+            ON kept_board_tag.tag_id = kept_ticket_tag.tag_id
+            AND kept_board_tag.board_id = board_ticket.board_id
+            AND kept_board_tag.record_end_date IS NULL
+          WHERE kept_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND kept_ticket_tag.tag_id <> ${tagId}
+            AND kept_ticket_tag.record_end_date IS NULL
+        );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Take the tickets that a tag rule tagged off the boards their tag is linked to, before the rule's tags are removed
+   * from them. A ticket stays on a board while it has another active tag linked to that board.
+   *
+   * @param {string} tagRuleId - The tag rule whose tags are being removed.
+   * @returns {Promise<void>}
+   * @memberof BoardTicketRepository
+   */
+  async deleteBoardTicketsByTagRuleId(tagRuleId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE board_ticket
+      SET record_end_date = now()
+      WHERE board_ticket.record_end_date IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM ticket_tag removed_ticket_tag
+          JOIN board_tag removed_board_tag
+            ON removed_board_tag.tag_id = removed_ticket_tag.tag_id
+            AND removed_board_tag.board_id = board_ticket.board_id
+            AND removed_board_tag.record_end_date IS NULL
+          WHERE removed_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND removed_ticket_tag.tag_rule_id = ${tagRuleId}
+            AND removed_ticket_tag.record_end_date IS NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ticket_tag kept_ticket_tag
+          JOIN tag kept_tag
+            ON kept_tag.tag_id = kept_ticket_tag.tag_id
+            AND kept_tag.record_end_date IS NULL
+          JOIN board_tag kept_board_tag
+            ON kept_board_tag.tag_id = kept_ticket_tag.tag_id
+            AND kept_board_tag.board_id = board_ticket.board_id
+            AND kept_board_tag.record_end_date IS NULL
+          WHERE kept_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND kept_ticket_tag.tag_rule_id IS DISTINCT FROM ${tagRuleId}
+            AND kept_ticket_tag.record_end_date IS NULL
+        );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Take a ticket off the boards linked to the tags it is losing, before they are removed: its active tags not in the
+   * given set. The ticket stays on a board while a tag in the given set is linked to that board.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {string[]} tagIds - The ticket's tags after the change. Empty takes it off every board a tag put it on.
+   * @returns {Promise<void>}
+   * @memberof BoardTicketRepository
+   */
+  async deleteBoardTicketsByTicketTagsNotIn(ticketId: string, tagIds: string[]): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE board_ticket
+      SET record_end_date = now()
+      WHERE board_ticket.ticket_id = ${ticketId}
+        AND board_ticket.record_end_date IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM ticket_tag removed_ticket_tag
+          JOIN board_tag removed_board_tag
+            ON removed_board_tag.tag_id = removed_ticket_tag.tag_id
+            AND removed_board_tag.board_id = board_ticket.board_id
+            AND removed_board_tag.record_end_date IS NULL
+          WHERE removed_ticket_tag.ticket_id = board_ticket.ticket_id
+            AND removed_ticket_tag.tag_id <> ALL(${tagIds}::uuid[])
+            AND removed_ticket_tag.record_end_date IS NULL
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM board_tag kept_board_tag
+          JOIN tag kept_tag
+            ON kept_tag.tag_id = kept_board_tag.tag_id
+            AND kept_tag.record_end_date IS NULL
+          WHERE kept_board_tag.board_id = board_ticket.board_id
+            AND kept_board_tag.tag_id = ANY(${tagIds}::uuid[])
+            AND kept_board_tag.record_end_date IS NULL
+        );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Soft delete every active ticket row of a board.
    *
    * @param {string} boardId - Board UUID.

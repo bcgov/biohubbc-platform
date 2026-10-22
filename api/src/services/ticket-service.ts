@@ -12,11 +12,11 @@ import {
   UpdateTicketRequest
 } from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
-import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { BoardTicketService } from './board-ticket-service';
 import { DataRequestService } from './data-request-service';
 import { DBService } from './db-service';
 import { TicketCommentService } from './ticket-comment-service';
@@ -35,7 +35,7 @@ export class TicketService extends DBService {
   ticketSystemUserService: TicketSystemUserService;
   submissionUploadService: SubmissionUploadService;
   ticketTagRepository: TicketTagRepository;
-  boardTicketRepository: BoardTicketRepository;
+  boardTicketService: BoardTicketService;
 
   /**
    * Creates an instance of TicketService.
@@ -54,7 +54,7 @@ export class TicketService extends DBService {
     this.ticketSystemUserService = new TicketSystemUserService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
     this.ticketTagRepository = new TicketTagRepository(connection);
-    this.boardTicketRepository = new BoardTicketRepository(connection);
+    this.boardTicketService = new BoardTicketService(connection);
   }
 
   /**
@@ -102,6 +102,18 @@ export class TicketService extends DBService {
     });
 
     return team;
+  }
+
+  /**
+   * Get a ticket's core fields by its UUID.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<Ticket>} The ticket.
+   * @throws {ApiNotFoundError} If the ticket does not exist or is deleted.
+   * @memberof TicketService
+   */
+  async getTicketById(ticketId: string): Promise<Ticket> {
+    return this.ticketRepository.getTicketById(ticketId);
   }
 
   /**
@@ -276,7 +288,7 @@ export class TicketService extends DBService {
     );
 
     await this.ticketTagRepository.deleteTicketTagsByTicketId(ticketId);
-    await this.boardTicketRepository.deleteBoardTicketsByTicketId(ticketId);
+    await this.boardTicketService.deleteBoardTicketsByTicketId(ticketId);
     await this.ticketRepository.deleteTicket(ticketId);
   }
 

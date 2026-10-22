@@ -51,7 +51,8 @@ export const DELETE: Operation = [
 ];
 
 DELETE.apiDoc = {
-  description: "Unlink a tag from a board. The tag, and the board's tickets, are not affected.",
+  description:
+    'Unlink a tag from a board, taking the tickets that have it off the board unless another of their tags is linked to it. The tag is not affected.',
   tags: ['boards', 'tags'],
   security: [{ Bearer: [] }],
   parameters: [

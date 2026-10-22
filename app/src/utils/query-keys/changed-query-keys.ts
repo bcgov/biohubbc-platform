@@ -248,7 +248,7 @@ const board = () => [boardQueryKeys.all(), ticketQueryKeys.lists('admin')];
 
 /**
  * A tag linked to or unlinked from a board: the tag lists, which list a board's tags, and, because linking a tag puts
- * the tickets that have it on the board, the board's ticket list.
+ * the tickets that have it on the board and unlinking it takes them off, the board's ticket list.
  *
  * @returns The keys to refresh.
  */
