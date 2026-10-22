@@ -12,6 +12,7 @@ import {
   UpdateTicketRequest
 } from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
+import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -34,6 +35,7 @@ export class TicketService extends DBService {
   ticketSystemUserService: TicketSystemUserService;
   submissionUploadService: SubmissionUploadService;
   ticketTagRepository: TicketTagRepository;
+  boardTicketRepository: BoardTicketRepository;
 
   /**
    * Creates an instance of TicketService.
@@ -52,6 +54,7 @@ export class TicketService extends DBService {
     this.ticketSystemUserService = new TicketSystemUserService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
     this.ticketTagRepository = new TicketTagRepository(connection);
+    this.boardTicketRepository = new BoardTicketRepository(connection);
   }
 
   /**
@@ -273,6 +276,7 @@ export class TicketService extends DBService {
     );
 
     await this.ticketTagRepository.deleteTicketTagsByTicketId(ticketId);
+    await this.boardTicketRepository.deleteBoardTicketsByTicketId(ticketId);
     await this.ticketRepository.deleteTicket(ticketId);
   }
 

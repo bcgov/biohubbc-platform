@@ -2,13 +2,12 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ApiNotFoundError } from '../errors/api-error';
+import { ApiConflictError, ApiNotFoundError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
 import { Board, BoardSwimlane } from '../models/board';
 import { BoardRepository } from '../repositories/board-repository';
 import { BoardSwimlaneRepository } from '../repositories/board-swimlane-repository';
-import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
-import { BoardTagRepository } from '../repositories/board-tag-repository';
+import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { BoardSwimlaneService } from './board-swimlane-service';
 
 chai.use(sinonChai);
@@ -25,8 +24,7 @@ const makeSwimlane = (id: string, sortOrder: number): BoardSwimlane => ({
   description: null,
   color: null,
   sort_order: sortOrder,
-  is_visible: true,
-  tags: []
+  is_visible: true
 });
 
 describe('BoardSwimlaneService', () => {
@@ -91,9 +89,7 @@ describe('BoardSwimlaneService', () => {
         await service.updateBoardSwimlane(boardId, foreignLane, {
           name: 'Done',
           description: null,
-          color: null,
-          isVisible: true,
-          boardTagIds: []
+          color: null
         });
         expect.fail('Expected not found');
       } catch (error) {
@@ -104,7 +100,7 @@ describe('BoardSwimlaneService', () => {
     });
 
     it('deleteBoardSwimlane rejects a lane that does not belong to the board', async () => {
-      const deleteTagsStub = sinon.stub(BoardSwimlaneTagRepository.prototype, 'deleteBoardSwimlaneTagsBySwimlaneId');
+      const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane');
 
       try {
         await service.deleteBoardSwimlane(boardId, foreignLane);
@@ -113,61 +109,82 @@ describe('BoardSwimlaneService', () => {
         expect(error).to.be.instanceOf(ApiNotFoundError);
       }
 
-      expect(deleteTagsStub).to.not.have.been.called;
+      expect(deleteStub).to.not.have.been.called;
+    });
+  });
+
+  describe('deleteBoardSwimlane', () => {
+    beforeEach(() => {
+      sinon.stub(BoardSwimlaneRepository.prototype, 'getBoardSwimlaneById').resolves(makeSwimlane(laneA, 0));
+    });
+
+    it("deletes the board's default lane, leaving the board without a default", async () => {
+      sinon
+        .stub(BoardRepository.prototype, 'getBoardById')
+        .resolves({ board_id: boardId, default_swimlane_id: laneA } as Board);
+      sinon.stub(BoardTicketRepository.prototype, 'getBoardSwimlaneTicketCount').resolves(0);
+      const defaultStub = sinon.stub(BoardRepository.prototype, 'updateBoardDefaultSwimlane').resolves();
+      const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane').resolves();
+
+      await service.deleteBoardSwimlane(boardId, laneA);
+
+      expect(defaultStub).to.have.been.calledOnceWith(boardId, null);
+      expect(deleteStub).to.have.been.calledOnceWith(boardId, laneA);
+      expect(defaultStub).to.have.been.calledBefore(deleteStub);
+    });
+
+    it('refuses to delete a lane that has tickets', async () => {
+      sinon
+        .stub(BoardRepository.prototype, 'getBoardById')
+        .resolves({ board_id: boardId, default_swimlane_id: laneB } as Board);
+      sinon.stub(BoardTicketRepository.prototype, 'getBoardSwimlaneTicketCount').resolves(2);
+      const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane');
+
+      try {
+        await service.deleteBoardSwimlane(boardId, laneA);
+        expect.fail('Expected conflict');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
+
+      expect(deleteStub).to.not.have.been.called;
+    });
+
+    it('deletes a lane without tickets that is not the default', async () => {
+      sinon
+        .stub(BoardRepository.prototype, 'getBoardById')
+        .resolves({ board_id: boardId, default_swimlane_id: laneB } as Board);
+      sinon.stub(BoardTicketRepository.prototype, 'getBoardSwimlaneTicketCount').resolves(0);
+      const deleteStub = sinon.stub(BoardSwimlaneRepository.prototype, 'deleteBoardSwimlane').resolves();
+
+      await service.deleteBoardSwimlane(boardId, laneA);
+
+      expect(deleteStub).to.have.been.calledOnceWith(boardId, laneA);
     });
   });
 
   describe('createBoardSwimlane', () => {
-    it('maps isVisible to is_visible and links the board tags on the same board', async () => {
+    it('inserts the lane with its name, description, color and sort order', async () => {
       sinon.stub(BoardRepository.prototype, 'getBoardById').resolves({ board_id: boardId } as Board);
       sinon.stub(BoardSwimlaneRepository.prototype, 'findBoardSwimlaneByName').resolves(undefined);
-      const boardTagsStub = sinon
-        .stub(BoardTagRepository.prototype, 'getActiveBoardTagIds')
-        .resolves([{ board_tag_id: 'bt1' }]);
       const insertStub = sinon
         .stub(BoardSwimlaneRepository.prototype, 'insertBoardSwimlane')
         .resolves({ board_swimlane_id: laneA });
-      const insertTagsStub = sinon.stub(BoardSwimlaneTagRepository.prototype, 'insertBoardSwimlaneTags').resolves();
       sinon.stub(BoardSwimlaneRepository.prototype, 'getBoardSwimlaneById').resolves(makeSwimlane(laneA, 0));
 
       await service.createBoardSwimlane(boardId, {
         name: 'Done',
         description: null,
         color: '#00FF00',
-        isVisible: false,
-        boardTagIds: ['bt1', 'bt1']
+        sortOrder: 3
       });
 
       expect(insertStub).to.have.been.calledOnceWith(boardId, {
         name: 'Done',
         description: null,
         color: '#00FF00',
-        is_visible: false
+        sort_order: 3
       });
-      expect(boardTagsStub).to.have.been.calledOnceWith(boardId, ['bt1']);
-      expect(insertTagsStub).to.have.been.calledOnceWith(boardId, laneA, ['bt1', 'bt1']);
-    });
-
-    it('rejects board tags that are not active tags of the board without writing', async () => {
-      sinon.stub(BoardRepository.prototype, 'getBoardById').resolves({ board_id: boardId } as Board);
-      sinon.stub(BoardSwimlaneRepository.prototype, 'findBoardSwimlaneByName').resolves(undefined);
-      sinon.stub(BoardTagRepository.prototype, 'getActiveBoardTagIds').resolves([]);
-      const insertStub = sinon.stub(BoardSwimlaneRepository.prototype, 'insertBoardSwimlane');
-
-      try {
-        await service.createBoardSwimlane(boardId, {
-          name: 'Done',
-          description: null,
-          color: null,
-          isVisible: true,
-          boardTagIds: ['foreign-board-tag']
-        });
-        expect.fail('Expected 400');
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-      }
-
-      expect(insertStub).to.not.have.been.called;
     });
   });
 });

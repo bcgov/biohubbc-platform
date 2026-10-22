@@ -1,7 +1,6 @@
 import { mdiDotsVertical, mdiPencil, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,7 +8,6 @@ import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDat
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
 import SearchTextField from 'components/fields/SearchTextField';
 import { PageSection } from 'components/section/PageSection';
-import { TagChip } from 'components/tags/TagChip';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { BoardDialog } from 'features/admin2/boards/dialog/BoardDialog';
 import { IBoardFormValues } from 'features/admin2/boards/form/BoardForm';
@@ -17,7 +15,7 @@ import { useSaveBoardMutation } from 'features/admin2/boards/hooks/useSaveBoardM
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
-import { IBoardSummary, IBoardsQueryParams } from 'interfaces/useBoardsApi.interface';
+import { IBoard, IBoardsQueryParams } from 'interfaces/useBoardsApi.interface';
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { refreshChangedQueries } from 'utils/query-client';
@@ -27,7 +25,7 @@ import { getRelativeTimeLabel } from 'utils/date';
 
 /**
  * Boards tab of the administrative tickets page: the searchable, server-paginated list of ticket boards, with create,
- * edit and delete. Each board opens its own page, which lists the tickets with any of its tags.
+ * edit and delete. Each board opens its own page, which shows its tickets by swimlane.
  *
  * A save keeps its dialog open and shows the server's error, such as a duplicate name, in the dialog.
  *
@@ -40,7 +38,7 @@ export const AdminTicketsBoardsContent = () => {
   const dialogContext = useDialogContext();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBoard, setEditingBoard] = useState<IBoardSummary | undefined>();
+  const [editingBoard, setEditingBoard] = useState<IBoard | undefined>();
 
   const grid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
   const listParams: IBoardsQueryParams = { search: grid.debouncedSearchTerm, ...grid.apiPagination };
@@ -51,7 +49,7 @@ export const AdminTicketsBoardsContent = () => {
   });
   const saveBoardMutation = useSaveBoardMutation();
   const deleteBoardMutation = useMutation({
-    mutationFn: (board: IBoardSummary) => api.boards.deleteBoard(board.board_id),
+    mutationFn: (board: IBoard) => api.boards.deleteBoard(board.board_id),
     onSuccess: (_data, board) => {
       dialogContext.setSnackbar({ open: true, snackbarMessage: `Deleted board ${board.name}` });
       void refreshChangedQueries(queryClient, changedQueryKeys.board());
@@ -92,19 +90,19 @@ export const AdminTicketsBoardsContent = () => {
     );
   };
 
-  const handleEditBoard = useCallback((board: IBoardSummary) => {
+  const handleEditBoard = useCallback((board: IBoard) => {
     setEditingBoard(board);
     setIsDialogOpen(true);
   }, []);
 
   /**
-   * Asks for confirmation before deleting a board. Tickets and tags are not affected.
+   * Asks for confirmation before deleting a board. Its tickets are taken off it, but not otherwise affected.
    *
-   * @param {IBoardSummary} board The board to delete.
+   * @param {IBoard} board The board to delete.
    * @returns {void}
    */
   const handleDeleteBoard = useCallback(
-    (board: IBoardSummary) => {
+    (board: IBoard) => {
       const closeConfirmation = () => dialogContext.setYesNoDialog({ open: false });
 
       dialogContext.setYesNoDialog({
@@ -112,8 +110,8 @@ export const AdminTicketsBoardsContent = () => {
         dialogTitle: 'Delete board?',
         dialogContent: (
           <Typography component="div" color="textSecondary">
-            Deleting board <strong>{board.name}</strong> does not affect its tickets or tags. Are you sure you want to
-            proceed?
+            Deleting board <strong>{board.name}</strong> takes its tickets off it, but does not affect them. Are you
+            sure you want to proceed?
           </Typography>
         ),
         yesButtonLabel: 'Delete Board',
@@ -130,7 +128,7 @@ export const AdminTicketsBoardsContent = () => {
     [deleteBoard, dialogContext]
   );
 
-  const columns: GridColDef<IBoardSummary>[] = useMemo(
+  const columns: GridColDef<IBoard>[] = useMemo(
     () => [
       {
         field: 'name',
@@ -153,20 +151,6 @@ export const AdminTicketsBoardsContent = () => {
           <Typography variant="body2" noWrap title={params.row.description ?? ''} color="text.secondary">
             {params.row.description}
           </Typography>
-        )
-      },
-      {
-        field: 'tags',
-        headerName: 'Tags',
-        minWidth: 200,
-        flex: 1.5,
-        sortable: false,
-        renderCell: (params) => (
-          <Stack direction="row" gap={0.5} alignItems="center" sx={{ height: '100%', overflow: 'hidden' }}>
-            {params.row.tags.map((tag) => (
-              <TagChip key={tag.tag_id} tag={tag} />
-            ))}
-          </Stack>
         )
       },
       {
@@ -238,7 +222,7 @@ export const AdminTicketsBoardsContent = () => {
             onChange={(event) => grid.handleSearch(event.target.value)}
           />
         }>
-        <ServerPaginatedDataGrid<IBoardSummary>
+        <ServerPaginatedDataGrid<IBoard>
           dataTestId="boards-table"
           rows={boardsQuery.data?.boards ?? []}
           columns={columns}

@@ -30,6 +30,15 @@ const lists = (scope: TicketAccessScope) => [...all(scope), 'list'] as const;
 const list = (scope: TicketAccessScope, params: ITicketsQueryParams) => [...lists(scope), params] as const;
 
 /**
+ * Key of a board's open tickets grouped by lane. It is one of the administrative ticket lists, so every change that
+ * refreshes those lists refreshes the board.
+ *
+ * @param {string} boardId The board.
+ * @returns The board tickets key.
+ */
+const boardList = (boardId: string) => [...lists('admin'), 'board', boardId] as const;
+
+/**
  * Key prefix of every ticket's detail read through one scope's endpoints.
  *
  * @param {TicketAccessScope} scope The endpoints the tickets are read through.
@@ -83,4 +92,15 @@ const tags = (ticketId: string) => [...tagsAll(), ticketId] as const;
  * Query keys for tickets, ordered from broad to narrow so that each prefix names the set of queries a
  * change invalidates.
  */
-export const ticketQueryKeys = { all, lists, list, details, detail, artifactsAll, artifacts, tagsAll, tags };
+export const ticketQueryKeys = {
+  all,
+  lists,
+  list,
+  boardList,
+  details,
+  detail,
+  artifactsAll,
+  artifacts,
+  tagsAll,
+  tags
+};

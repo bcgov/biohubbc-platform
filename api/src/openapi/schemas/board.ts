@@ -1,36 +1,30 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
-import { TagColorSchema, TagIdsRequestPropertySchema } from './tag';
+import { TagColorSchema } from './tag';
 import { TicketWithTagsSchema } from './ticket';
 
 export const BoardSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['board_id', 'name', 'description', 'create_date'],
+  required: ['board_id', 'name', 'description', 'default_swimlane_id', 'create_date'],
   properties: {
     board_id: { type: 'string', format: 'uuid' },
     name: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 500, nullable: true },
+    default_swimlane_id: {
+      type: 'string',
+      format: 'uuid',
+      nullable: true,
+      description: 'The swimlane tickets created on or added to the board go in.'
+    },
     create_date: { type: 'string', format: 'date-time' }
-  }
-};
-
-export const BoardTagSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['board_tag_id', 'tag_id', 'name', 'color'],
-  properties: {
-    board_tag_id: { type: 'string', format: 'uuid' },
-    tag_id: { type: 'string', format: 'uuid' },
-    name: { type: 'string' },
-    color: TagColorSchema
   }
 };
 
 export const BoardSwimlaneSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['board_swimlane_id', 'board_id', 'name', 'description', 'color', 'sort_order', 'is_visible', 'tags'],
+  required: ['board_swimlane_id', 'board_id', 'name', 'description', 'color', 'sort_order', 'is_visible'],
   properties: {
     board_swimlane_id: { type: 'string', format: 'uuid' },
     board_id: { type: 'string', format: 'uuid' },
@@ -38,8 +32,7 @@ export const BoardSwimlaneSchema: OpenAPIV3.SchemaObject = {
     description: { type: 'string', maxLength: 250, nullable: true },
     color: { ...TagColorSchema, nullable: true },
     sort_order: { type: 'integer' },
-    is_visible: { type: 'boolean' },
-    tags: { type: 'array', items: BoardTagSchema }
+    is_visible: { type: 'boolean' }
   }
 };
 
@@ -48,19 +41,7 @@ export const BoardListResponseSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   required: ['boards', 'pagination'],
   properties: {
-    boards: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: [...(BoardSchema.required ?? []), 'tags', 'swimlane_count'],
-        properties: {
-          ...BoardSchema.properties,
-          tags: { type: 'array', items: BoardTagSchema },
-          swimlane_count: { type: 'integer', minimum: 0 }
-        }
-      }
-    },
+    boards: { type: 'array', items: BoardSchema },
     pagination: paginationResponseSchema
   }
 };
@@ -68,10 +49,9 @@ export const BoardListResponseSchema: OpenAPIV3.SchemaObject = {
 export const BoardDetailSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: [...(BoardSchema.required ?? []), 'tags', 'swimlanes'],
+  required: [...(BoardSchema.required ?? []), 'swimlanes'],
   properties: {
     ...BoardSchema.properties,
-    tags: { type: 'array', items: BoardTagSchema },
     swimlanes: {
       description: 'Swimlanes in display order (sort_order, then id), including hidden ones.',
       type: 'array',
@@ -83,27 +63,26 @@ export const BoardDetailSchema: OpenAPIV3.SchemaObject = {
 export const BoardRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'description', 'tagIds'],
+  required: ['name', 'description'],
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 100 },
-    description: { type: 'string', maxLength: 500, nullable: true },
-    tagIds: TagIdsRequestPropertySchema
+    description: { type: 'string', maxLength: 500, nullable: true }
   }
 };
 
 export const BoardSwimlaneRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'description', 'color', 'isVisible', 'boardTagIds'],
+  required: ['name', 'description', 'color'],
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 100 },
     description: { type: 'string', maxLength: 250, nullable: true },
     color: { ...TagColorSchema, nullable: true },
-    isVisible: { type: 'boolean' },
-    boardTagIds: {
-      type: 'array',
-      items: { type: 'string', format: 'uuid' },
-      description: 'Complete desired set of board tags (board_tag_id) for the swimlane. Must be tags of the board.'
+    sortOrder: {
+      type: 'integer',
+      minimum: 0,
+      description:
+        'Left-to-right position: higher is further right; ties keep their order. Omitted, a new swimlane goes last and an edited one keeps its position.'
     }
   }
 };
@@ -121,6 +100,35 @@ export const ReorderBoardSwimlanesRequestSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const BoardTicketRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    boardSwimlaneId: {
+      type: 'string',
+      format: 'uuid',
+      description:
+        "The board's swimlane the ticket is put or moved in. Omitted, a ticket not on the board is put in the board's default swimlane, and a ticket on it stays in its swimlane."
+    },
+    position: {
+      type: 'integer',
+      minimum: 0,
+      description:
+        'Zero-based position of the ticket within the swimlane; past the end puts it last. Omitted, a ticket that changes swimlane goes last. Requires boardSwimlaneId.'
+    }
+  }
+};
+
+export const BoardSwimlanePageResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['swimlanes', 'pagination'],
+  properties: {
+    swimlanes: { type: 'array', items: BoardSwimlaneSchema },
+    pagination: paginationResponseSchema
+  }
+};
+
 export const BoardSwimlaneListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
@@ -133,34 +141,31 @@ export const BoardSwimlaneListResponseSchema: OpenAPIV3.SchemaObject = {
 export const BoardTicketsResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['board', 'unsorted', 'swimlanes', 'hidden_ticket_count'],
+  required: ['board', 'tickets', 'swimlanes'],
   properties: {
     board: BoardSchema,
-    unsorted: {
-      description: 'Board tickets matching no swimlane. Always visible and displayed first.',
+    tickets: {
+      description: 'Every ticket on the board.',
       type: 'array',
       items: TicketWithTagsSchema
     },
     swimlanes: {
-      description: 'Visible swimlanes in display order, each with its placed tickets.',
+      description:
+        'Swimlanes in display order, including hidden ones, each with the tickets in it. Each ticket is in exactly one swimlane.',
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['board_swimlane_id', 'name', 'color', 'sort_order', 'tickets'],
+        required: ['board_swimlane_id', 'name', 'color', 'sort_order', 'is_visible', 'tickets'],
         properties: {
           board_swimlane_id: { type: 'string', format: 'uuid' },
           name: { type: 'string' },
           color: { ...TagColorSchema, nullable: true },
           sort_order: { type: 'integer' },
+          is_visible: { type: 'boolean' },
           tickets: { type: 'array', items: TicketWithTagsSchema }
         }
       }
-    },
-    hidden_ticket_count: {
-      description: 'Number of board tickets placed in hidden swimlanes and omitted from the response.',
-      type: 'integer',
-      minimum: 0
     }
   }
 };

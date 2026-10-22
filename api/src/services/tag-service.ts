@@ -2,7 +2,6 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
 import { Tag, TagFilters, TagRequest } from '../models/tag';
-import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
 import { BoardTagRepository } from '../repositories/board-tag-repository';
 import { TagRepository } from '../repositories/tag-repository';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
@@ -18,7 +17,6 @@ export class TagService extends DBService {
   tagRepository: TagRepository;
   ticketTagRepository: TicketTagRepository;
   boardTagRepository: BoardTagRepository;
-  boardSwimlaneTagRepository: BoardSwimlaneTagRepository;
   tagRuleRepository: TagRuleRepository;
 
   constructor(connection: IDBConnection) {
@@ -26,7 +24,6 @@ export class TagService extends DBService {
     this.tagRepository = new TagRepository(connection);
     this.ticketTagRepository = new TicketTagRepository(connection);
     this.boardTagRepository = new BoardTagRepository(connection);
-    this.boardSwimlaneTagRepository = new BoardSwimlaneTagRepository(connection);
     this.tagRuleRepository = new TagRuleRepository(connection);
   }
 
@@ -97,7 +94,7 @@ export class TagService extends DBService {
   }
 
   /**
-   * Soft delete a tag, its tag rules, and every active link to it from tickets, boards, and board swimlanes.
+   * Soft delete a tag, its tag rules, and every active link to it from tickets and boards.
    *
    * @param {string} tagId - Tag UUID.
    * @returns {Promise<void>}
@@ -107,8 +104,6 @@ export class TagService extends DBService {
   async deleteTag(tagId: string): Promise<void> {
     await this.tagRepository.getTagById(tagId);
 
-    // Swimlane links reference board tags, so they are ended before the board tags they point at.
-    await this.boardSwimlaneTagRepository.deleteBoardSwimlaneTagsByTagId(tagId);
     await this.boardTagRepository.deleteBoardTagsByTagId(tagId);
     await this.ticketTagRepository.deleteTicketTagsByTagId(tagId);
     await this.tagRuleRepository.deleteTagRulesByTagId(tagId);

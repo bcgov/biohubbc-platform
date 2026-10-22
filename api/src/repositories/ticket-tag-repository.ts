@@ -1,5 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
+import { TagId } from '../models/tag';
 import { RuleTicketTag } from '../models/tag-rule';
 import { TicketTagEvent, TicketTagSummary } from '../models/ticket-tag';
 import { BaseRepository } from './base-repository';
@@ -95,10 +96,10 @@ export class TicketTagRepository extends BaseRepository {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string[]} tagIds - Tag UUIDs to link.
-   * @returns {Promise<void>}
+   * @returns {Promise<TagId[]>} The tags newly linked.
    * @memberof TicketTagRepository
    */
-  async insertTicketTags(ticketId: string, tagIds: string[]): Promise<void> {
+  async insertTicketTags(ticketId: string, tagIds: string[]): Promise<TagId[]> {
     const sqlStatement = SQL`
       INSERT INTO ticket_tag (ticket_id, tag_id)
       SELECT ${ticketId}::uuid, requested.tag_id
@@ -109,10 +110,13 @@ export class TicketTagRepository extends BaseRepository {
         WHERE tt.ticket_id = ${ticketId}
           AND tt.tag_id = requested.tag_id
           AND tt.record_end_date IS NULL
-      );
+      )
+      RETURNING tag_id;
     `;
 
-    await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, TagId);
+
+    return response.rows;
   }
 
   /**
@@ -145,10 +149,10 @@ export class TicketTagRepository extends BaseRepository {
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {RuleTicketTag[]} ruleTicketTags - Tags to link, each with the rule that matched.
-   * @returns {Promise<void>}
+   * @returns {Promise<TagId[]>} The tags newly linked.
    * @memberof TicketTagRepository
    */
-  async insertRuleTicketTags(ticketId: string, ruleTicketTags: RuleTicketTag[]): Promise<void> {
+  async insertRuleTicketTags(ticketId: string, ruleTicketTags: RuleTicketTag[]): Promise<TagId[]> {
     const tagIds = ruleTicketTags.map((ruleTicketTag) => ruleTicketTag.tag_id);
     const tagRuleIds = ruleTicketTags.map((ruleTicketTag) => ruleTicketTag.tag_rule_id);
     const sqlStatement = SQL`
@@ -161,10 +165,13 @@ export class TicketTagRepository extends BaseRepository {
         WHERE tt.ticket_id = ${ticketId}
           AND tt.tag_id = requested.tag_id
       )
-      ON CONFLICT (ticket_id, tag_id) WHERE record_end_date IS NULL DO NOTHING;
+      ON CONFLICT (ticket_id, tag_id) WHERE record_end_date IS NULL DO NOTHING
+      RETURNING tag_id;
     `;
 
-    await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, TagId);
+
+    return response.rows;
   }
 
   /**

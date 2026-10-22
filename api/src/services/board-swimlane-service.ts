@@ -4,9 +4,9 @@ import { HTTP400 } from '../errors/http-error';
 import { BoardSwimlane, BoardSwimlaneRequest } from '../models/board';
 import { BoardRepository } from '../repositories/board-repository';
 import { BoardSwimlaneRepository } from '../repositories/board-swimlane-repository';
-import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
-import { BoardTagRepository } from '../repositories/board-tag-repository';
+import { BoardTicketRepository } from '../repositories/board-ticket-repository';
 import { getUnique } from '../utils/unique';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 /**
@@ -15,22 +15,20 @@ import { DBService } from './db-service';
 export class BoardSwimlaneService extends DBService {
   boardRepository: BoardRepository;
   boardSwimlaneRepository: BoardSwimlaneRepository;
-  boardSwimlaneTagRepository: BoardSwimlaneTagRepository;
-  boardTagRepository: BoardTagRepository;
+  boardTicketRepository: BoardTicketRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.boardRepository = new BoardRepository(connection);
     this.boardSwimlaneRepository = new BoardSwimlaneRepository(connection);
-    this.boardSwimlaneTagRepository = new BoardSwimlaneTagRepository(connection);
-    this.boardTagRepository = new BoardTagRepository(connection);
+    this.boardTicketRepository = new BoardTicketRepository(connection);
   }
 
   /**
    * Get the active swimlanes of a board in display order.
    *
    * @param {string} boardId - Board UUID.
-   * @returns {Promise<BoardSwimlane[]>} Active swimlanes with their tags.
+   * @returns {Promise<BoardSwimlane[]>} Active swimlanes.
    * @memberof BoardSwimlaneService
    */
   async getBoardSwimlanes(boardId: string): Promise<BoardSwimlane[]> {
@@ -38,47 +36,61 @@ export class BoardSwimlaneService extends DBService {
   }
 
   /**
-   * Create a swimlane at the end of a board.
+   * Get one page of the active swimlanes of a board, in display order unless a sort is given.
+   *
+   * @param {string} boardId - Board UUID.
+   * @param {ApiPaginationOptions} [pagination] - Page, page size and sort.
+   * @returns {Promise<BoardSwimlane[]>} One page of the board's swimlanes.
+   * @memberof BoardSwimlaneService
+   */
+  async getPaginatedBoardSwimlanes(boardId: string, pagination?: ApiPaginationOptions): Promise<BoardSwimlane[]> {
+    return this.boardSwimlaneRepository.getPaginatedBoardSwimlanes(boardId, pagination);
+  }
+
+  /**
+   * Count the active swimlanes of a board.
+   *
+   * @param {string} boardId - Board UUID.
+   * @returns {Promise<number>} Number of active swimlanes.
+   * @memberof BoardSwimlaneService
+   */
+  async getBoardSwimlanesCount(boardId: string): Promise<number> {
+    return this.boardSwimlaneRepository.getBoardSwimlanesCount(boardId);
+  }
+
+  /**
+   * Create a visible swimlane at its sort order, or else at the end of a board.
    *
    * @param {string} boardId - Board UUID.
    * @param {BoardSwimlaneRequest} swimlane - Swimlane payload.
-   * @returns {Promise<BoardSwimlane>} Created swimlane with its tags.
+   * @returns {Promise<BoardSwimlane>} Created swimlane.
    * @throws {ApiNotFoundError} If the board does not exist or is deleted.
    * @throws {ApiConflictError} If an active lane on the board already has the same name (case-insensitive).
-   * @throws {HTTP400} If any board tag is unknown, deleted, or belongs to another board.
    * @memberof BoardSwimlaneService
    */
   async createBoardSwimlane(boardId: string, swimlane: BoardSwimlaneRequest): Promise<BoardSwimlane> {
     await this.boardRepository.getBoardById(boardId);
     await this.assertBoardSwimlaneNameAvailable(boardId, swimlane.name);
-    await this.assertBoardTagIds(boardId, swimlane.boardTagIds);
 
     const created = await this.boardSwimlaneRepository.insertBoardSwimlane(boardId, {
       name: swimlane.name,
       description: swimlane.description,
       color: swimlane.color,
-      is_visible: swimlane.isVisible
+      sort_order: swimlane.sortOrder
     });
-
-    await this.boardSwimlaneTagRepository.insertBoardSwimlaneTags(
-      boardId,
-      created.board_swimlane_id,
-      swimlane.boardTagIds
-    );
 
     return this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, created.board_swimlane_id);
   }
 
   /**
-   * Update a swimlane and replace its board tag set.
+   * Update a swimlane's name, description, color and, if given, sort order. Its visibility is kept.
    *
    * @param {string} boardId - Board UUID the swimlane must belong to.
    * @param {string} boardSwimlaneId - Board swimlane UUID.
    * @param {BoardSwimlaneRequest} swimlane - Swimlane payload.
-   * @returns {Promise<BoardSwimlane>} Updated swimlane with its tags.
+   * @returns {Promise<BoardSwimlane>} Updated swimlane.
    * @throws {ApiNotFoundError} If the swimlane does not exist on the board.
    * @throws {ApiConflictError} If another active lane on the board already has the new name (case-insensitive).
-   * @throws {HTTP400} If any board tag is unknown, deleted, or belongs to another board.
    * @memberof BoardSwimlaneService
    */
   async updateBoardSwimlane(
@@ -88,46 +100,56 @@ export class BoardSwimlaneService extends DBService {
   ): Promise<BoardSwimlane> {
     await this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, boardSwimlaneId);
     await this.assertBoardSwimlaneNameAvailable(boardId, swimlane.name, boardSwimlaneId);
-    await this.assertBoardTagIds(boardId, swimlane.boardTagIds);
 
     await this.boardSwimlaneRepository.updateBoardSwimlane(boardId, boardSwimlaneId, {
       name: swimlane.name,
       description: swimlane.description,
       color: swimlane.color,
-      is_visible: swimlane.isVisible
+      sort_order: swimlane.sortOrder
     });
-
-    await this.boardSwimlaneTagRepository.deleteBoardSwimlaneTagsNotIn(boardSwimlaneId, swimlane.boardTagIds);
-    await this.boardSwimlaneTagRepository.insertBoardSwimlaneTags(boardId, boardSwimlaneId, swimlane.boardTagIds);
 
     return this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, boardSwimlaneId);
   }
 
   /**
-   * Soft delete a swimlane and its tag links.
+   * Soft delete a swimlane that has no tickets. Every ticket on a board is in one of its lanes, so a lane's tickets must
+   * first be moved to another lane or taken off the board. Deleting the board's default lane leaves the board without
+   * one, so tickets cannot be added to it until it has a default again.
    *
    * @param {string} boardId - Board UUID the swimlane must belong to.
    * @param {string} boardSwimlaneId - Board swimlane UUID.
    * @returns {Promise<void>}
    * @throws {ApiNotFoundError} If the swimlane does not exist on the board.
+   * @throws {ApiConflictError} If the swimlane has tickets.
    * @memberof BoardSwimlaneService
    */
   async deleteBoardSwimlane(boardId: string, boardSwimlaneId: string): Promise<void> {
     await this.boardSwimlaneRepository.getBoardSwimlaneById(boardId, boardSwimlaneId);
 
-    await this.boardSwimlaneTagRepository.deleteBoardSwimlaneTagsBySwimlaneId(boardSwimlaneId);
+    const [board, ticketCount] = await Promise.all([
+      this.boardRepository.getBoardById(boardId),
+      this.boardTicketRepository.getBoardSwimlaneTicketCount(boardSwimlaneId)
+    ]);
+
+    if (ticketCount > 0) {
+      throw new ApiConflictError("Move or remove the swimlane's tickets before deleting it");
+    }
+
+    if (board.default_swimlane_id === boardSwimlaneId) {
+      await this.boardRepository.updateBoardDefaultSwimlane(boardId, null);
+    }
+
     await this.boardSwimlaneRepository.deleteBoardSwimlane(boardId, boardSwimlaneId);
   }
 
   /**
-   * Soft delete every swimlane of a board and their tag links.
+   * Soft delete every swimlane of a board. Callers end the board's tickets first.
    *
    * @param {string} boardId - Board UUID.
    * @returns {Promise<void>}
    * @memberof BoardSwimlaneService
    */
   async deleteBoardSwimlanesByBoardId(boardId: string): Promise<void> {
-    await this.boardSwimlaneTagRepository.deleteBoardSwimlaneTagsByBoardId(boardId);
     await this.boardSwimlaneRepository.deleteBoardSwimlanesByBoardId(boardId);
   }
 
@@ -162,30 +184,6 @@ export class BoardSwimlaneService extends DBService {
       ...(swimlanesById.get(boardSwimlaneId) as BoardSwimlane),
       sort_order: index
     }));
-  }
-
-  /**
-   * Assert that every given board tag is active and belongs to the board.
-   *
-   * @private
-   * @param {string} boardId - Board UUID.
-   * @param {string[]} boardTagIds - Board tag UUIDs; duplicates are allowed.
-   * @returns {Promise<void>}
-   * @throws {HTTP400} If any board tag is unknown, deleted, or belongs to another board.
-   * @memberof BoardSwimlaneService
-   */
-  private async assertBoardTagIds(boardId: string, boardTagIds: string[]): Promise<void> {
-    const uniqueBoardTagIds = getUnique(boardTagIds);
-
-    if (uniqueBoardTagIds.length === 0) {
-      return;
-    }
-
-    const activeBoardTagIds = await this.boardTagRepository.getActiveBoardTagIds(boardId, uniqueBoardTagIds);
-
-    if (activeBoardTagIds.length !== uniqueBoardTagIds.length) {
-      throw new HTTP400('Swimlane tags must be active tags of the board');
-    }
   }
 
   /**

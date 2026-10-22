@@ -5,7 +5,6 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { ApiConflictError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
 import { Tag } from '../models/tag';
-import { BoardSwimlaneTagRepository } from '../repositories/board-swimlane-tag-repository';
 import { BoardTagRepository } from '../repositories/board-tag-repository';
 import { TagRepository } from '../repositories/tag-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
@@ -89,23 +88,17 @@ describe('TagService', () => {
   });
 
   describe('deleteTag', () => {
-    it('soft deletes ticket, board, and swimlane links before the tag', async () => {
+    it('soft deletes ticket and board links before the tag', async () => {
       sinon.stub(TagRepository.prototype, 'getTagById').resolves(mockTag);
       const ticketTagStub = sinon.stub(TicketTagRepository.prototype, 'deleteTicketTagsByTagId').resolves();
       const boardTagStub = sinon.stub(BoardTagRepository.prototype, 'deleteBoardTagsByTagId').resolves();
-      const swimlaneTagStub = sinon
-        .stub(BoardSwimlaneTagRepository.prototype, 'deleteBoardSwimlaneTagsByTagId')
-        .resolves();
       const deleteStub = sinon.stub(TagRepository.prototype, 'deleteTag').resolves();
 
       await service.deleteTag(tagA);
 
       expect(ticketTagStub).to.have.been.calledOnceWith(tagA);
       expect(boardTagStub).to.have.been.calledOnceWith(tagA);
-      expect(swimlaneTagStub).to.have.been.calledOnceWith(tagA);
       expect(deleteStub).to.have.been.calledOnceWith(tagA);
-      // Lane links reference board tags, so they must end before the board tags do.
-      expect(swimlaneTagStub).to.have.been.calledBefore(boardTagStub);
       expect(ticketTagStub).to.have.been.calledBefore(deleteStub);
     });
   });

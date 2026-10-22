@@ -198,20 +198,27 @@ const downloadExport = (downloadId: string, downloadVersionId: string) => [
 ];
 
 /**
- * A ticket's tags, which the administrative ticket lists show as chips and which decide the boards whose ticket lists
- * include the ticket.
+ * A ticket's tags, which the administrative ticket lists, boards included, show as chips.
  *
  * @returns The keys to refresh.
  */
 const ticketTags = () => [ticketQueryKeys.lists('admin')];
 
 /**
- * A tag's name, color or removal: the tag lists and pickers, every ticket's tags and tag history, the administrative
- * ticket lists' chips, and the boards, whose tags show it.
+ * A ticket put on, moved on, or taken off a board: the administrative ticket lists, which include each board's
+ * tickets.
  *
  * @returns The keys to refresh.
  */
-const tag = () => [tagQueryKeys.all(), ticketQueryKeys.tagsAll(), ticketQueryKeys.lists('admin'), boardQueryKeys.all()];
+const boardTicket = () => [ticketQueryKeys.lists('admin')];
+
+/**
+ * A tag's name, color or removal: the tag lists and pickers, every ticket's tags and tag history, and the
+ * administrative ticket lists' chips.
+ *
+ * @returns The keys to refresh.
+ */
+const tag = () => [tagQueryKeys.all(), ticketQueryKeys.tagsAll(), ticketQueryKeys.lists('admin')];
 
 /**
  * A tag rule's creation or enabled state: its tag's rule list and details. Rules do not apply to existing tickets, so
@@ -233,12 +240,32 @@ const tagRule = (tagId: string) => [tagQueryKeys.rules(tagId)];
 const tagRuleApplied = (tagId: string) => [...tagRule(tagId), ticketQueryKeys.tagsAll(), ...ticketTags()];
 
 /**
- * A board's details, tags or removal: the board list and detail, and the board's tag and ticket lists, which its tags
- * decide.
+ * A board's details or removal: the board list and detail, and the board's ticket list.
  *
  * @returns The keys to refresh.
  */
-const board = () => [boardQueryKeys.all(), tagQueryKeys.all(), ticketQueryKeys.lists('admin')];
+const board = () => [boardQueryKeys.all(), ticketQueryKeys.lists('admin')];
+
+/**
+ * A tag linked to or unlinked from a board: the tag lists, which list a board's tags, and, because linking a tag puts
+ * the tickets that have it on the board, the board's ticket list.
+ *
+ * @returns The keys to refresh.
+ */
+const boardTag = () => [tagQueryKeys.all(), ticketQueryKeys.lists('admin')];
+
+/**
+ * A board swimlane's creation, edit or removal: the board's detail and swimlane list, which list its lanes, and the
+ * board's ticket list, which groups its tickets by lane.
+ *
+ * @param {string} boardId The lane's board.
+ * @returns The keys to refresh.
+ */
+const boardSwimlane = (boardId: string) => [
+  boardQueryKeys.detail(boardId),
+  boardQueryKeys.swimlanesAll(boardId),
+  ticketQueryKeys.lists('admin')
+];
 
 /**
  * The cached queries each kind of change makes out of date, beyond the query the change is written to. Pass them to
@@ -265,8 +292,11 @@ export const changedQueryKeys = {
   download,
   downloadExport,
   ticketTags,
+  boardTicket,
   tag,
   tagRule,
   tagRuleApplied,
-  board
+  board,
+  boardTag,
+  boardSwimlane
 };

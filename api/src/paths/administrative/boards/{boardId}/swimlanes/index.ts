@@ -2,13 +2,49 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
-import { BoardSwimlaneRequestSchema, BoardSwimlaneSchema } from '../../../../../openapi/schemas/board';
+import {
+  BoardSwimlanePageResponseSchema,
+  BoardSwimlaneRequestSchema,
+  BoardSwimlaneSchema
+} from '../../../../../openapi/schemas/board';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { BoardSwimlaneService } from '../../../../../services/board-swimlane-service';
 import { getLogger } from '../../../../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/boards/{boardId}/swimlanes');
+
+export const GET: Operation = [
+  authorizeRequestHandler(() => ({
+    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+  })),
+  getBoardSwimlanes()
+];
+
+GET.apiDoc = {
+  description: "List one page of a board's swimlanes with their tags, in display order unless a sort is given.",
+  tags: ['boards'],
+  security: [{ Bearer: [] }],
+  parameters: [
+    {
+      in: 'path',
+      name: 'boardId',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+      description: 'Board UUID.'
+    },
+    ...paginationRequestQueryParamSchema
+  ],
+  responses: {
+    200: {
+      description: 'Swimlanes retrieved successfully',
+      content: { 'application/json': { schema: BoardSwimlanePageResponseSchema } }
+    },
+    ...defaultErrorResponses
+  }
+};
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
@@ -42,6 +78,38 @@ POST.apiDoc = {
     ...defaultErrorResponses
   }
 };
+
+/**
+ * List one page of a board's swimlanes.
+ *
+ * @returns {RequestHandler}
+ */
+export function getBoardSwimlanes(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req.keycloak_token);
+
+    try {
+      await connection.open();
+
+      const boardSwimlaneService = new BoardSwimlaneService(connection);
+      const pagination = makePaginationOptionsFromRequest(req);
+      const [swimlanes, count] = await Promise.all([
+        boardSwimlaneService.getPaginatedBoardSwimlanes(req.params.boardId, pagination),
+        boardSwimlaneService.getBoardSwimlanesCount(req.params.boardId)
+      ]);
+
+      await connection.commit();
+
+      return res.status(200).json({ swimlanes, pagination: makePaginationResponse(count, pagination) });
+    } catch (error) {
+      defaultLog.error({ label: 'getBoardSwimlanes', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      await connection.release();
+    }
+  };
+}
 
 /**
  * Create a board swimlane.
