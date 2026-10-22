@@ -21,9 +21,18 @@ export type SubmissionUploadJobStatus = z.infer<typeof SubmissionUploadJobStatus
 
 /**
  * Human review decision on a submission upload, independent of its processing status.
+ *
+ * `approving` records an accepted approval whose feature activation is queued; the approval job moves it to
+ * `approved` once the upload's features are published.
  */
-export const SubmissionUploadDecision = z.enum(['pending', 'approved', 'denied']);
+export const SubmissionUploadDecision = z.enum(['pending', 'approving', 'approved', 'denied']);
 export type SubmissionUploadDecision = z.infer<typeof SubmissionUploadDecision>;
+
+/**
+ * Review decision an administrator can request. `approving` is only ever set by the approval workflow.
+ */
+export const RequestedSubmissionUploadDecision = SubmissionUploadDecision.exclude(['approving']);
+export type RequestedSubmissionUploadDecision = z.infer<typeof RequestedSubmissionUploadDecision>;
 
 /**
  * SubmissionUpload table schema

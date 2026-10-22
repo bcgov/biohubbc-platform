@@ -30,19 +30,14 @@ export class SubmissionFeatureSecurityService extends DBService {
   /**
    * Copy live predecessor rules to pending successor occurrences, preserving provenance.
    *
+   * Must run after reconciliation has stored each occurrence's baseline.
+   *
    * @param {string} submissionUploadId Pending successor upload identifier.
-   * @param {string | null} predecessorSubmissionUploadId Preferred pending predecessor upload identifier.
    * @returns {Promise<void>} Resolves after missing inherited assignments have been inserted.
    * @memberof SubmissionFeatureSecurityService
    */
-  async copySubmissionFeatureSecurityToSuccessors(
-    submissionUploadId: string,
-    predecessorSubmissionUploadId: string | null
-  ): Promise<void> {
-    await this.submissionFeatureSecurityRepository.copySubmissionFeatureSecurityToSuccessors(
-      submissionUploadId,
-      predecessorSubmissionUploadId
-    );
+  async copySubmissionFeatureSecurityToSuccessors(submissionUploadId: string): Promise<void> {
+    await this.submissionFeatureSecurityRepository.copySubmissionFeatureSecurityToSuccessors(submissionUploadId);
   }
 
   /**

@@ -28,6 +28,12 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
 ) => {
   for (const job of jobs) {
     const { submissionUploadId } = job.data;
+    // Ingestion has just bulk-inserted this upload's rows; refresh statistics before planning reconciliation.
+    await withConnection(async (connection) => {
+      const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(connection);
+      await submissionUploadReconciliationService.analyzeSubmissionFeatures();
+    });
+
     await withConnection(async (connection) => {
       const submissionUploadService = new SubmissionUploadService(connection);
       const upload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
@@ -47,10 +53,7 @@ export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcil
         submissionUploadId
       );
       const submissionFeatureSecurityService = new SubmissionFeatureSecurityService(connection);
-      await submissionFeatureSecurityService.copySubmissionFeatureSecurityToSuccessors(
-        submissionUploadId,
-        predecessorSubmissionUploadId
-      );
+      await submissionFeatureSecurityService.copySubmissionFeatureSecurityToSuccessors(submissionUploadId);
       if (predecessorSubmissionUploadId) {
         await submissionUploadReconciliationService.endPendingSubmissionFeatures(predecessorSubmissionUploadId);
       }

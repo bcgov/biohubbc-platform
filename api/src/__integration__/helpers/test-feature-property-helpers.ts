@@ -345,20 +345,16 @@ export async function insertSubmissionFeaturePropertyFeature(
   blueprintFeatureTypePropertyId: number,
   referencedSubmissionFeatureId: number
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
-
   await connection.sql(SQL`
     INSERT INTO submission_feature_property_feature (
       submission_feature_id,
       blueprint_feature_type_property_id,
-      referenced_submission_feature_id,
-      create_user
+      referenced_submission_feature_id
     )
     VALUES (
       ${sourceSubmissionFeatureId},
       ${blueprintFeatureTypePropertyId},
-      ${referencedSubmissionFeatureId},
-      ${systemUserId}
+      ${referencedSubmissionFeatureId}
     );
   `);
 }
@@ -418,12 +414,11 @@ export async function addStringProperty(
   propertyName: string,
   value: string
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
   const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-    VALUES (${submissionFeatureId}, ${bftpId}, ${value}, ${systemUserId});
+    INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${value});
   `);
 }
 
@@ -434,12 +429,11 @@ export async function addCodeProperty(
   propertyName: string,
   contributorCodesetCodeId: number
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
   const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
-    VALUES (${submissionFeatureId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
+    INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${contributorCodesetCodeId});
   `);
 }
 
@@ -450,12 +444,11 @@ export async function addTaxonProperty(
   propertyName: string,
   taxonId: number
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
   const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id, create_user)
-    VALUES (${submissionFeatureId}, ${bftpId}, ${taxonId}, ${systemUserId});
+    INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${taxonId});
   `);
 }
 

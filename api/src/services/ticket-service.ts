@@ -68,10 +68,11 @@ export class TicketService extends DBService {
     const { systemUserIds, ...ticketData } = ticket;
 
     // Ticket creation always provisions a dedicated ticket team plus a unique ticket slug.
-    const [team, slug] = await Promise.all([
-      this.createTicketTeam({ systemUserIds: systemUserIds ?? [] }),
-      this.ticketRepository.getNextTicketSlug()
-    ]);
+    const team = await this.createTicketTeam({ systemUserIds: systemUserIds ?? [] });
+
+    // The slug lock is held until commit; it must be taken before the latest slug is read.
+    await this.ticketRepository.lockTicketSlugGeneration();
+    const slug = await this.ticketRepository.getNextTicketSlug();
 
     const createdTicket = await this.ticketRepository.insertTicket({
       ...ticketData,

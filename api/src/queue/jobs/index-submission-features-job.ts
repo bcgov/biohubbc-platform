@@ -4,23 +4,18 @@ import { IDBConnection } from '../../database/db';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-import {
-  publishComputeSubmissionFeatureClosureJob,
-  publishEvaluateTicketTagRulesJob,
-  publishSubmissionUploadSecurityJob
-} from '../publisher';
+import { publishEvaluateTicketTagRulesJob, publishSubmissionUploadSecurityJob } from '../publisher';
 import { withConnection } from '../with-connection';
 
 export interface IndexSubmissionFeaturesJobDependencies {
-  publishComputeSubmissionFeatureClosureJob: typeof publishComputeSubmissionFeatureClosureJob;
   publishSubmissionUploadSecurityJob: typeof publishSubmissionUploadSecurityJob;
   publishEvaluateTicketTagRulesJob: typeof publishEvaluateTicketTagRulesJob;
 }
 
 export const indexSubmissionFeaturesJobDependencies: IndexSubmissionFeaturesJobDependencies = {
-  publishComputeSubmissionFeatureClosureJob,
   publishSubmissionUploadSecurityJob,
   publishEvaluateTicketTagRulesJob
 };
@@ -159,14 +154,12 @@ async function finalizeIndexSubmissionFeaturesStage(
 
   await submissionUploadService.transitionSubmissionUploadToIndexed(submissionUploadId);
 
-  // Queue the closure recompute only on success, in the same transaction as the `indexed` transition.
-  // There is no upload status that tracks closure freshness, so binding the enqueue to this commit is
-  // what guarantees that reaching `indexed` always implies a recompute was queued — an `invalid` outcome
-  // leaves any prior closure rows untouched until re-indexing succeeds. The recompute is derived and
-  // idempotent, so the retry triggered by a rollback on any failure here is safe.
-  await indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob(connection, {
-    submissionUploadId
-  });
+  // Indexing only runs for undecided uploads, whose rows are all pending, and the closure covers only current
+  // (published) rows, so indexing never changes the closure; approval queues the rebuild that does. The one
+  // case this stage still repairs is a closure left invalidated by an approval rebuild that exhausted its
+  // retries, which is queued in the same transaction as the `indexed` transition.
+  const submissionFeatureClosureService = new SubmissionFeatureClosureService(connection);
+  await submissionFeatureClosureService.ensureSubmissionFeatureClosure(submissionId, submissionUploadId);
 
   // Screening reads the upload's own features rather than the published closure, so it depends on indexing alone.
   // This is its only trigger: a run after approval would restore assignments a reviewer removed during review.

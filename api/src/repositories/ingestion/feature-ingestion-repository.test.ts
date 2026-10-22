@@ -66,23 +66,21 @@ describe('FeatureIngestionRepository', () => {
           submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
           sourceId: 'feature-1',
           featureTypeId: 77,
-          data: {
-            id: 'feature-1',
-            type: 'survey',
-            properties: { name: 'Survey 1' },
-            content: [],
-            parent: null
-          },
+          featureTypeName: 'survey',
+          dataJson: '{"id":"feature-1"}',
           dataByteSize: 123,
-          contentHash: 'a'.repeat(64)
+          contentHash: 'a'.repeat(64),
+          universalId: null
         }
       ];
 
-      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string; values: unknown[] }) => {
+        expect(sqlStatement.values).to.deep.include(['{"id":"feature-1"}']);
         expect(sqlStatement.text).to.include('::integer[]');
         expect(sqlStatement.text).to.include('::bigint[]');
         expect(sqlStatement.text).to.include('content_hash');
         expect(sqlStatement.text).to.not.include('INNER JOIN feature_type');
+        expect(sqlStatement.values).to.deep.include(['survey']);
         return Promise.resolve({ rowCount: 1, rows: [], command: '', oid: 0, fields: [] });
       });
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
@@ -95,7 +93,7 @@ describe('FeatureIngestionRepository', () => {
   });
 
   describe('updateSubmissionFeatureParentsBySubmissionUploadId', () => {
-    it('resolves parents preferring the same upload with fallback to the submission published live rows', async () => {
+    it('resolves parents from data.parent and only rewrites rows whose parent changed', async () => {
       const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [], command: '', oid: 0, fields: [] });
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
@@ -109,7 +107,7 @@ describe('FeatureIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('SET parent_submission_feature_id');
       expect(sqlText).to.include('parent.submission_id =');
-      expect(sqlText).to.include("parent.source_id = child.data->>'parent'");
+      expect(sqlText).to.include('IS DISTINCT FROM resolved.parent_submission_feature_id');
       expect(sqlText).to.include('parent.record_effective_date <= now()');
       expect(sqlText).to.include('parent.successor_submission_feature_id IS NULL');
       expect(sqlText).to.include('parent.submission_upload_id =');

@@ -74,9 +74,26 @@ export class TicketRepository extends BaseRepository {
   }
 
   /**
+   * Serialize ticket slug generation until the transaction ends.
+   *
+   * Must run as its own statement before {@link getNextTicketSlug}: a statement's snapshot is taken before
+   * any lock it acquires, so reading the latest slug in the locking statement could miss a ticket that a
+   * concurrent transaction committed while this one waited, and generate the same slug.
+   *
+   * @returns {Promise<void>} Resolves once the lock is held.
+   * @memberof TicketRepository
+   */
+  async lockTicketSlugGeneration(): Promise<void> {
+    const sqlStatement = SQL`SELECT pg_advisory_xact_lock(hashtext('ticket_slug_generation'));`;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Generate the next unique ticket slug for the current UTC day in DDDNNNNN format.
    *
-   * Uses a transaction-scoped advisory lock plus existing ticket rows to guarantee uniqueness without retries.
+   * The caller must hold {@link lockTicketSlugGeneration} in the same transaction until the ticket is
+   * inserted, which guarantees uniqueness without retries.
    *
    * @returns {Promise<string>} Next ticket slug.
    * @throws {ApiExecuteSQLError} If slug generation fails.
@@ -84,16 +101,13 @@ export class TicketRepository extends BaseRepository {
    */
   async getNextTicketSlug(): Promise<string> {
     const sqlStatement = SQL`
-      WITH advisory_lock AS (
-        SELECT pg_advisory_xact_lock(hashtext('ticket_slug_generation'))
-      ),
-      day_context AS (
+      WITH day_context AS (
         SELECT TO_CHAR((now() AT TIME ZONE 'UTC')::date, 'DDD') AS day_of_year
       ),
       latest AS (
         SELECT
           COALESCE(MAX(RIGHT(ticket_slug, 5)::integer), -1) AS last_value
-        FROM ticket, day_context, advisory_lock
+        FROM ticket, day_context
         WHERE ticket_slug LIKE day_context.day_of_year || '%'
       ),
       next_value AS (

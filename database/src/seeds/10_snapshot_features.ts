@@ -179,7 +179,7 @@ export async function seed(knex: Knex): Promise<void> {
       const idMap = await insertFeatures(trx, fixture, chain, context);
 
       await insertProperties(trx, fixture, idMap, context);
-      await insertClosureAndEdges(trx, fixture, idMap, context);
+      await insertClosureAndEdges(trx, fixture, idMap);
       await insertArtifactLinks(trx, fixture, idMap, chain, context);
       await insertSecurity(trx, fixture, idMap, context);
       await insertAnchors(trx, fixture, idMap);
@@ -514,8 +514,7 @@ async function insertFeatures(
     parent_submission_feature_id: null,
     // Synthetic outcomes populate validation review without changing the captured feature data.
     reconciliation: faker.helpers.arrayElement(['new', 'unmodified', 'modified']),
-    record_effective_date: effectiveDate,
-    create_user: context.systemUserId
+    record_effective_date: effectiveDate
   }));
 
   const inserted = await knex
@@ -590,8 +589,7 @@ async function insertScalarProperty(
   const rows = properties.map((property) => ({
     submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'property feature'),
     blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
-    value: property.value,
-    create_user: context.systemUserId
+    value: property.value
   }));
 
   await knex.batchInsert(table, rows, BATCH_SIZE);
@@ -608,8 +606,7 @@ async function insertTimestampProperty(
     submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'timestamp property feature'),
     blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
     date_value: property.date_value,
-    time_value: property.time_value,
-    create_user: context.systemUserId
+    time_value: property.time_value
   }));
 
   await knex.batchInsert('submission_feature_property_timestamp', rows, BATCH_SIZE);
@@ -633,8 +630,7 @@ async function insertGeometryProperty(
     const rows = chunk.map((property) => ({
       submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'geometry property feature'),
       blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
-      value: knex.raw('public.ST_Force2D(public.ST_GeomFromGeoJSON(?))', [JSON.stringify(property.geojson)]),
-      create_user: context.systemUserId
+      value: knex.raw('public.ST_Force2D(public.ST_GeomFromGeoJSON(?))', [JSON.stringify(property.geojson)])
     }));
 
     await knex('submission_feature_property_geometry').insert(rows);
@@ -651,12 +647,7 @@ async function insertFeatureProperty(
   const rows = fixture.property_feature.map((property) => ({
     submission_feature_id: resolveOrThrow(idMap, property.feature_uuid, 'feature property owner'),
     blueprint_feature_type_property_id: resolveBlueprintFeatureTypePropertyId(context, property),
-    referenced_submission_feature_id: resolveOrThrow(
-      idMap,
-      property.referenced_feature_uuid,
-      'feature property target'
-    ),
-    create_user: context.systemUserId
+    referenced_submission_feature_id: resolveOrThrow(idMap, property.referenced_feature_uuid, 'feature property target')
   }));
 
   await knex.batchInsert('submission_feature_property_feature', rows, BATCH_SIZE);
@@ -667,12 +658,7 @@ async function insertFeatureProperty(
 // ---------------------------------------------------------------------------
 
 /** Insert the reachability closure and content edges, remapping both endpoints of every edge. */
-async function insertClosureAndEdges(
-  knex: Knex,
-  fixture: SnapshotFixture,
-  idMap: Map<string, number>,
-  context: SeedContext
-): Promise<void> {
+async function insertClosureAndEdges(knex: Knex, fixture: SnapshotFixture, idMap: Map<string, number>): Promise<void> {
   const closureRows = fixture.closure.map((edge) => ({
     source_submission_feature_id: resolveOrThrow(idMap, edge.source_uuid, 'closure source'),
     target_submission_feature_id: resolveOrThrow(idMap, edge.target_uuid, 'closure target'),
@@ -683,8 +669,7 @@ async function insertClosureAndEdges(
 
   const edgeRows = fixture.feature_feature.map((edge) => ({
     source_feature_id: resolveOrThrow(idMap, edge.source_uuid, 'content edge source'),
-    target_feature_id: resolveOrThrow(idMap, edge.target_uuid, 'content edge target'),
-    create_user: context.systemUserId
+    target_feature_id: resolveOrThrow(idMap, edge.target_uuid, 'content edge target')
   }));
 
   await knex.batchInsert('submission_feature_feature', edgeRows, BATCH_SIZE);

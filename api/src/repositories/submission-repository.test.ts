@@ -697,11 +697,7 @@ describe('SubmissionRepository', () => {
         parent_submission_feature_id: 1,
         record_effective_date: '2024-01-01',
         record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 3,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
+        create_date: '2024-01-01'
       };
 
       const mockQueryResponse = { rowCount: 1, rows: [submissionFeatureRecord] } as any as Promise<QueryResult<any>>;
@@ -736,11 +732,7 @@ describe('SubmissionRepository', () => {
           parent_submission_feature_id: 1,
           record_effective_date: '2024-01-01',
           record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 3,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
+          create_date: '2024-01-01'
         }
       ];
 

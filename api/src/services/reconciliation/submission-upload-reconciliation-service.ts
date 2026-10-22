@@ -41,6 +41,20 @@ export class SubmissionUploadReconciliationService extends DBService {
   }
 
   /**
+   * Refresh submission_feature planner statistics after an upload's rows have been bulk inserted.
+   *
+   * Callers run this in its own short transaction: ANALYZE holds a lock that conflicts with other
+   * ANALYZE runs until the transaction ends, so running it inside reconciliation would serialize
+   * concurrent reconciliation jobs.
+   *
+   * @returns {Promise<void>} Resolves after statistics are refreshed.
+   * @memberof SubmissionUploadReconciliationService
+   */
+  async analyzeSubmissionFeatures(): Promise<void> {
+    await this.submissionFeatureReconciliationRepository.analyzeSubmissionFeatures();
+  }
+
+  /**
    * Classify an upload's pending feature rows against current published state.
    *
    * Acquires the submission feature-state lock before deriving current published predecessors by

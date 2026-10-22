@@ -105,7 +105,7 @@ export async function seed(knex: Knex): Promise<void> {
       FROM (
         SELECT
           public.ST_AsMVTGeom(
-            public.ST_Transform(g.value, 3857),
+            public.ST_Transform(parts.part_4326, 3857),
             v_env_3857,
             c_extent,
             c_buffer,
@@ -135,11 +135,20 @@ export async function seed(knex: Knex): Promise<void> {
         JOIN biohub.feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
           AND fp.record_end_date IS NULL
+        -- A vector tile feature holds one geometry type, and ST_AsMVTGeom keeps only the highest
+        -- dimension of a mixed collection, so a point stored beside a polygon would be dropped. Each
+        -- geometry is split into its point, line and polygon parts; every part keeps the geometry's id
+        -- and attributes, so the parts read as one geometry the way its tile boundary fragments do.
+        CROSS JOIN LATERAL (
+          SELECT public.ST_CollectionExtract(g.value, part_type.dimension) AS part_4326
+          FROM (VALUES (1), (2), (3)) AS part_type(dimension)
+        ) parts
         -- Equality on submission_feature_id first: this is the condition
         -- submission_feature_property_geometry_idx1 serves, and one feature's geometries are few
         -- enough that filtering them by envelope afterwards costs nothing.
         WHERE g.submission_feature_id = v_submission_feature_id
           AND g.value && v_candidates_4326
+          AND NOT public.ST_IsEmpty(parts.part_4326)
       ) feature_rows
       WHERE feature_rows.geom IS NOT NULL;
 

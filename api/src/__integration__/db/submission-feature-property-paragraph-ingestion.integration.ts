@@ -93,8 +93,7 @@ describe('SubmissionFeaturePropertyIngestionService — long text property index
         feature_type_id,
         data,
         data_byte_size,
-        record_effective_date,
-        create_user
+        record_effective_date
       )
       VALUES (
         ${scenario.submissionId},
@@ -102,8 +101,7 @@ describe('SubmissionFeaturePropertyIngestionService — long text property index
         (SELECT feature_type_id FROM feature_type WHERE name = ${FEATURE_TYPE} AND record_end_date IS NULL),
         ${dataJson}::jsonb,
         octet_length(${dataJson}::jsonb::text) + 500,
-        now(),
-        ${connection.systemUserId()}
+        now()
       )
       RETURNING submission_feature_id;
     `);

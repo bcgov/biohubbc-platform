@@ -116,7 +116,17 @@ export const JobQueues = {
    * Dead letter queue for failed evaluate-ticket-tag-rules jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  EVALUATE_TICKET_TAG_RULES_FAILED: 'evaluate-ticket-tag-rules-failed'
+  EVALUATE_TICKET_TAG_RULES_FAILED: 'evaluate-ticket-tag-rules-failed',
+  /**
+   * Apply an administrator's approval of a submission upload: publish its reconciled features and queue the
+   * closure rebuild, then record the `approved` decision.
+   */
+  APPROVE_SUBMISSION_UPLOAD: 'approve-submission-upload',
+  /**
+   * Dead letter queue for failed approve-submission-upload jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  APPROVE_SUBMISSION_UPLOAD_FAILED: 'approve-submission-upload-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

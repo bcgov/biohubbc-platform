@@ -51,6 +51,7 @@ describe('TicketService', () => {
     it('creates team, ticket and initial status history', async () => {
       const generatedTeamId = '99999999-9999-9999-9999-999999999999';
       const createdTicket: Ticket = { ...mockTicket, team_id: generatedTeamId };
+      const lockSlugStub = sinon.stub(TicketRepository.prototype, 'lockTicketSlugGeneration').resolves();
       const getNextTicketSlugStub = sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {
         team_id: generatedTeamId,
@@ -72,6 +73,8 @@ describe('TicketService', () => {
         })
       );
       expect(getNextTicketSlugStub).to.have.been.calledOnce;
+      expect(lockSlugStub).to.have.been.calledOnce;
+      expect(lockSlugStub).to.have.been.calledBefore(getNextTicketSlugStub);
       expect(insertTicketStub).to.have.been.calledWith(
         sinon.match({
           subject: 'A ticket',
@@ -88,6 +91,7 @@ describe('TicketService', () => {
     it('passes system user ids to createTeam when provided', async () => {
       const generatedTeamId = '99999999-9999-9999-9999-999999999999';
       const createdTicket: Ticket = { ...mockTicket, team_id: generatedTeamId };
+      sinon.stub(TicketRepository.prototype, 'lockTicketSlugGeneration').resolves();
       sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {
         team_id: generatedTeamId,
@@ -112,6 +116,7 @@ describe('TicketService', () => {
     });
 
     it('throws when insert fails', async () => {
+      sinon.stub(TicketRepository.prototype, 'lockTicketSlugGeneration').resolves();
       sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {
         team_id: mockTicket.team_id,

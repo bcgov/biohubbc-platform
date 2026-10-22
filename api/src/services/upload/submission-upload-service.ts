@@ -21,7 +21,11 @@ import {
   UpdateSubmissionUploadDecision
 } from '../../models/submission-upload-decision';
 import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
-import { publishComputeSubmissionFeatureClosureJob, publishIndexSubmissionFeaturesJob } from '../../queue/publisher';
+import {
+  publishApproveSubmissionUploadJob,
+  publishComputeSubmissionFeatureClosureJob,
+  publishIndexSubmissionFeaturesJob
+} from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
@@ -64,6 +68,7 @@ export class SubmissionUploadService extends DBService {
 
   /** Mutable dependency bag used by tests to stub queue publication under ESM. */
   static readonly dependencies = {
+    publishApproveSubmissionUploadJob,
     publishComputeSubmissionFeatureClosureJob,
     publishIndexSubmissionFeaturesJob
   };
@@ -266,6 +271,20 @@ export class SubmissionUploadService extends DBService {
    */
   async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
     return this.submissionUploadRepository.getSubmissionUploadWithLock(submissionUploadId);
+  }
+
+  /**
+   * Try to take the per-upload ingestion lock for the current transaction.
+   *
+   * Process-stage workers hold this for the full ingestion so a retried job cannot run
+   * alongside an earlier attempt that is still persisting the same upload.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<boolean>} True when the lock was acquired.
+   * @memberof SubmissionUploadService
+   */
+  async tryLockSubmissionUploadIngestion(submissionUploadId: string): Promise<boolean> {
+    return this.submissionUploadRepository.tryLockSubmissionUploadIngestion(submissionUploadId);
   }
 
   /**
@@ -614,15 +633,17 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Record a human review decision and apply its submission-feature lifecycle effects.
+   * Record a human review decision on a submission upload.
    *
    * The upload row is locked first so a decision cannot race processing transitions or a concurrent
-   * decision. Approval activates the upload's features and queues the closure recompute; `pending`
-   * and `denied` are refused once any of the upload's features has been activated.
+   * decision. Approval is recorded as `approving` and applied by the approval job, which activates the
+   * upload's features; while it is `approving`, re-approving is idempotent and every other decision is
+   * refused. `pending` and `denied` are refused once any of the upload's features has been activated.
    *
    * @param {string} submissionUploadId Submission upload identifier.
    * @param {UpdateSubmissionUploadDecision} data Requested decision.
-   * @returns {Promise<SubmissionUploadDecisionResult>} Persisted decision.
+   * @returns {Promise<SubmissionUploadDecisionResult>} Persisted decision; `approving` while an approval is queued.
+   * @throws {HTTP409} When a non-approval decision is requested while an approval is being applied.
    * @memberof SubmissionUploadService
    */
   async updateSubmissionUploadDecision(
@@ -632,12 +653,99 @@ export class SubmissionUploadService extends DBService {
     const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
 
     if (data.decision === 'approved') {
-      return this.approveSubmissionUpload(upload);
+      return this.requestSubmissionUploadApproval(upload);
+    }
+
+    if (upload.decision === 'approving') {
+      throw new HTTP409('Submission upload approval is being applied and cannot be changed until it completes');
     }
 
     await this.assertSubmissionUploadHasNoActivatedFeatures(upload.submission_upload_id);
 
     return this.recordDecision(upload.submission_upload_id, data.decision);
+  }
+
+  /**
+   * Apply a queued approval: activate the upload's reconciled features, invalidate the submission's closure,
+   * record `approved` and queue the closure rebuild.
+   *
+   * Called by the approval job in its own transaction. The upload row is locked, and an upload that is no
+   * longer `approving` is skipped, so a duplicate or retried job never applies an approval twice. The
+   * approval preconditions are asserted again because the request that recorded `approving` committed
+   * before this transaction began.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves after the approval is applied, after a superseded upload is returned to
+   *   `pending`, or immediately when there is none to apply.
+   * @throws {HTTP400} When the upload no longer meets the approval preconditions.
+   * @memberof SubmissionUploadService
+   */
+  async applySubmissionUploadApproval(submissionUploadId: string): Promise<void> {
+    const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
+
+    if (upload.decision !== 'approving') {
+      defaultLog.info({
+        label: 'applySubmissionUploadApproval',
+        message: 'Skipping approval because the upload is not approving',
+        submissionUploadId,
+        decision: upload.decision
+      });
+
+      return;
+    }
+
+    // A newer upload can supersede this one after approval was requested. Retrying can never succeed, so
+    // return it to pending straight away; the newer upload was reconciled against its pending features.
+    if (upload.successor_submission_upload_id) {
+      defaultLog.warn({
+        label: 'applySubmissionUploadApproval',
+        message: 'Returning approval to pending because a newer upload superseded the upload',
+        submissionUploadId,
+        successorSubmissionUploadId: upload.successor_submission_upload_id
+      });
+
+      await this.submissionUploadRepository.updateSubmissionUploadDecision(submissionUploadId, 'pending');
+
+      return;
+    }
+
+    await this.assertSubmissionUploadCanBeApproved(upload);
+
+    // Not a constructor member: SubmissionUploadReconciliationService constructs a SubmissionUploadService, so
+    // creating it in this constructor would recurse.
+    const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(this.connection);
+    await submissionUploadReconciliationService.activateSubmissionUploadReconciliation(upload.submission_upload_id);
+
+    // Feature activation changes the graph consumed by authorization. Remove the prior derived snapshot
+    // in the same transaction so readers can never combine newly-active features with stale closure
+    // self-loops. Until the asynchronous rebuild commits, canonical authorization fails closed.
+    await this.submissionFeatureClosureService.invalidateClosureForSubmission(upload.submission_id);
+
+    await this.submissionUploadRepository.updateSubmissionUploadDecision(upload.submission_upload_id, 'approved');
+
+    await SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob(this.connection, {
+      submissionUploadId: upload.submission_upload_id
+    });
+  }
+
+  /**
+   * Return an upload whose approval could not be applied to `pending`.
+   *
+   * Called after the approval job exhausted its retries. Each failed attempt rolled back, so the upload's
+   * features were never activated. Uploads that are not `approving` are left unchanged.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves after a still-approving upload has been returned to `pending`.
+   * @memberof SubmissionUploadService
+   */
+  async revertSubmissionUploadApproval(submissionUploadId: string): Promise<void> {
+    const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
+
+    if (upload.decision !== 'approving') {
+      return;
+    }
+
+    await this.submissionUploadRepository.updateSubmissionUploadDecision(submissionUploadId, 'pending');
   }
 
   /**
@@ -740,52 +848,33 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Validate and apply an approval, or return the existing decision idempotently.
+   * Validate an approval, record it as `approving` and queue the job that applies it, or return the existing
+   * approval idempotently.
+   *
+   * The job is queued in the request transaction, so an upload is never left `approving` without a durable job
+   * to apply the approval.
    *
    * @param {SubmissionUpload} upload Locked submission upload.
-   * @returns {Promise<SubmissionUploadDecisionResult>} Approved decision.
+   * @returns {Promise<SubmissionUploadDecisionResult>} `approving`, or `approved` when the approval was already applied.
    * @memberof SubmissionUploadService
    */
-  private async approveSubmissionUpload(upload: SubmissionUpload): Promise<SubmissionUploadDecisionResult> {
-    if (upload.decision === 'approved') {
+  private async requestSubmissionUploadApproval(upload: SubmissionUpload): Promise<SubmissionUploadDecisionResult> {
+    if (upload.decision === 'approved' || upload.decision === 'approving') {
       return { submission_upload_id: upload.submission_upload_id, decision: upload.decision };
     }
 
     await this.assertSubmissionUploadCanBeApproved(upload);
-    const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(this.connection);
-    await submissionUploadReconciliationService.activateSubmissionUploadReconciliation(upload.submission_upload_id);
 
-    // Feature activation changes the graph consumed by authorization. Remove the prior derived snapshot
-    // in the same transaction so readers can never combine newly-active features with stale closure
-    // self-loops. Until the asynchronous rebuild commits, canonical authorization fails closed.
-    await this.submissionFeatureClosureService.invalidateClosureForSubmission(upload.submission_id);
-
-    const approved = await this.submissionUploadRepository.updateSubmissionUploadDecision(
+    const approving = await this.submissionUploadRepository.updateSubmissionUploadDecision(
       upload.submission_upload_id,
-      'approved'
+      'approving'
     );
 
-    await this.publishSubmissionFeatureClosure(upload, approved.revision_count);
+    await SubmissionUploadService.dependencies.publishApproveSubmissionUploadJob(this.connection, {
+      submissionUploadId: upload.submission_upload_id
+    });
 
-    return { submission_upload_id: approved.submission_upload_id, decision: approved.decision };
-  }
-
-  /**
-   * Queue closure recomputation for one approved feature-state revision.
-   *
-   * @param {SubmissionUpload} upload Approved submission upload.
-   * @param {number} closureRevision Upload audit revision after the approval write, making the queued job idempotent.
-   * @returns {Promise<void>} Resolves after the closure recomputation job has been queued transactionally.
-   * @memberof SubmissionUploadService
-   */
-  private async publishSubmissionFeatureClosure(upload: SubmissionUpload, closureRevision: number): Promise<void> {
-    await SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob(
-      this.connection,
-      {
-        submissionUploadId: upload.submission_upload_id
-      },
-      { singletonKey: `closure-recompute-${upload.submission_upload_id}-${closureRevision}` }
-    );
+    return { submission_upload_id: approving.submission_upload_id, decision: approving.decision };
   }
 
   /**
@@ -809,7 +898,7 @@ export class SubmissionUploadService extends DBService {
    * Publish history of a submission: every upload with its review state, newest first.
    *
    * The wire values predate the `decision` column and are kept stable for external consumers: a
-   * soft-deleted upload is `deleted`, a pending decision is `submitted`.
+   * soft-deleted upload is `deleted`, a pending or still-approving decision is `submitted`.
    * Requires submission-team authorization or system-administrator access, enforced by middleware.
    *
    * @param {string} submissionUuid Submission UUID whose uploads are requested.
@@ -998,5 +1087,10 @@ const toSubmissionUploadHistoryStatus = (
     return 'deleted';
   }
 
-  return decision === 'pending' ? 'submitted' : decision;
+  // An approval whose features are not yet published is still awaiting its outcome for external consumers.
+  if (decision === 'pending' || decision === 'approving') {
+    return 'submitted';
+  }
+
+  return decision;
 };

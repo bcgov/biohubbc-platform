@@ -39,6 +39,10 @@ describe('SubmissionUploadService decisions', () => {
       status: 'published',
       jobId: 'closure-job'
     });
+    sinon.stub(SubmissionUploadService.dependencies, 'publishApproveSubmissionUploadJob').resolves({
+      status: 'published',
+      jobId: 'approve-job'
+    });
     sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadWithLock').resolves(buildUpload());
     sinon
       .stub(SubmissionFeatureRepository.prototype, 'getActivatedSubmissionFeatureCountBySubmissionUploadId')
@@ -90,37 +94,66 @@ describe('SubmissionUploadService decisions', () => {
       expect(updateStub).not.to.have.been.called;
     });
 
-    it('records approval, activates the indexed upload and queues the closure recompute keyed on the audit revision', async () => {
+    it('records approving and queues the approval job without activating features', async () => {
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves({
         submission_validation_id: 1,
         job_id: 'job-1',
         status: 'completed'
       });
-      const reconcileStub = sinon
-        .stub(SubmissionUploadReconciliationService.prototype, 'activateSubmissionUploadReconciliation')
-        .resolves({ new: 1, modified: 3, unmodified: 2 });
+      const reconcileStub = sinon.stub(
+        SubmissionUploadReconciliationService.prototype,
+        'activateSubmissionUploadReconciliation'
+      );
       const updateStub = sinon
         .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision')
-        .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approved', revision_count: 5 });
-      const invalidateStub = SubmissionFeatureClosureService.prototype
-        .invalidateClosureForSubmission as sinon.SinonStub;
+        .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving', revision_count: 4 });
 
       const service = new SubmissionUploadService(getMockDBConnection());
       const result = await service.updateSubmissionUploadDecision(SUBMISSION_UPLOAD_ID, { decision: 'approved' });
 
-      expect(result).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approved' });
-      expect(reconcileStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID);
-      expect(invalidateStub).to.have.been.calledOnceWith(1);
-      expect(reconcileStub).to.have.been.calledBefore(invalidateStub);
-      expect(invalidateStub).to.have.been.calledBefore(updateStub);
-      expect(updateStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID, 'approved');
-      expect(
-        SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob
-      ).to.have.been.calledOnceWith(
+      expect(result).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving' });
+      expect(updateStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID, 'approving');
+      expect(SubmissionUploadService.dependencies.publishApproveSubmissionUploadJob).to.have.been.calledOnceWith(
         sinon.match.any,
-        { submissionUploadId: SUBMISSION_UPLOAD_ID },
-        { singletonKey: `closure-recompute-${SUBMISSION_UPLOAD_ID}-5` }
+        { submissionUploadId: SUBMISSION_UPLOAD_ID }
       );
+      expect(updateStub).to.have.been.calledBefore(
+        SubmissionUploadService.dependencies.publishApproveSubmissionUploadJob as sinon.SinonStub
+      );
+      expect(reconcileStub).not.to.have.been.called;
+      expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).not.to.have.been.called;
+    });
+
+    it('returns approving without writing or queueing when an approval is already queued', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approving' })
+      );
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision');
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+      const result = await service.updateSubmissionUploadDecision(SUBMISSION_UPLOAD_ID, { decision: 'approved' });
+
+      expect(result).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving' });
+      expect(updateStub).not.to.have.been.called;
+      expect(SubmissionUploadService.dependencies.publishApproveSubmissionUploadJob).not.to.have.been.called;
+    });
+
+    it('refuses a denial while an approval is being applied', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approving' })
+      );
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision');
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+
+      try {
+        await service.updateSubmissionUploadDecision(SUBMISSION_UPLOAD_ID, { decision: 'denied' });
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
+
+      expect(updateStub).not.to.have.been.called;
     });
 
     it('blocks approval before indexing is complete', async () => {
@@ -264,6 +297,107 @@ describe('SubmissionUploadService decisions', () => {
       expect(result).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'pending' });
       expect(reconcileStub).not.to.have.been.called;
       expect(updateStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID, 'pending');
+    });
+  });
+
+  describe('applySubmissionUploadApproval', () => {
+    it('activates the upload, invalidates closure, records approved and queues the closure recompute', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approving' })
+      );
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionUploadId').resolves({
+        submission_validation_id: 1,
+        job_id: 'job-1',
+        status: 'completed'
+      });
+      const reconcileStub = sinon
+        .stub(SubmissionUploadReconciliationService.prototype, 'activateSubmissionUploadReconciliation')
+        .resolves({ new: 1, modified: 3, unmodified: 2 });
+      const updateStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision')
+        .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approved', revision_count: 5 });
+      const invalidateStub = SubmissionFeatureClosureService.prototype
+        .invalidateClosureForSubmission as sinon.SinonStub;
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+      await service.applySubmissionUploadApproval(SUBMISSION_UPLOAD_ID);
+
+      expect(reconcileStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID);
+      expect(invalidateStub).to.have.been.calledOnceWith(1);
+      expect(reconcileStub).to.have.been.calledBefore(invalidateStub);
+      expect(invalidateStub).to.have.been.calledBefore(updateStub);
+      expect(updateStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID, 'approved');
+      expect(
+        SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob
+      ).to.have.been.calledOnceWithExactly(sinon.match.any, { submissionUploadId: SUBMISSION_UPLOAD_ID });
+    });
+
+    it('skips an upload that is no longer approving so a duplicate job never applies twice', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approved' })
+      );
+      const reconcileStub = sinon.stub(
+        SubmissionUploadReconciliationService.prototype,
+        'activateSubmissionUploadReconciliation'
+      );
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision');
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+      await service.applySubmissionUploadApproval(SUBMISSION_UPLOAD_ID);
+
+      expect(reconcileStub).not.to.have.been.called;
+      expect(updateStub).not.to.have.been.called;
+      expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).not.to.have.been.called;
+    });
+  });
+
+  describe('applySubmissionUploadApproval superseded', () => {
+    it('returns an upload superseded while approving to pending without activating or retrying', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approving', successor_submission_upload_id: '660e8400-e29b-41d4-a716-446655440000' })
+      );
+      const reconcileStub = sinon.stub(
+        SubmissionUploadReconciliationService.prototype,
+        'activateSubmissionUploadReconciliation'
+      );
+      const updateStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision')
+        .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'pending', revision_count: 6 });
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+      await service.applySubmissionUploadApproval(SUBMISSION_UPLOAD_ID);
+
+      expect(updateStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID, 'pending');
+      expect(reconcileStub).not.to.have.been.called;
+      expect(SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob).not.to.have.been.called;
+    });
+  });
+
+  describe('revertSubmissionUploadApproval', () => {
+    it('returns a still-approving upload to pending', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approving' })
+      );
+      const updateStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision')
+        .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'pending', revision_count: 6 });
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+      await service.revertSubmissionUploadApproval(SUBMISSION_UPLOAD_ID);
+
+      expect(updateStub).to.have.been.calledOnceWith(SUBMISSION_UPLOAD_ID, 'pending');
+    });
+
+    it('leaves an upload that is no longer approving unchanged', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves(
+        buildUpload({ decision: 'approved' })
+      );
+      const updateStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUploadDecision');
+
+      const service = new SubmissionUploadService(getMockDBConnection());
+      await service.revertSubmissionUploadApproval(SUBMISSION_UPLOAD_ID);
+
+      expect(updateStub).not.to.have.been.called;
     });
   });
 

@@ -6,6 +6,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import {
   IIndexSubmissionFeaturesJobData,
@@ -58,9 +59,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailed').resolves();
-    sinon
-      .stub(indexSubmissionFeaturesJobDependencies, 'publishComputeSubmissionFeatureClosureJob')
-      .resolves({ status: 'published', jobId: 'job-xyz' });
+    sinon.stub(SubmissionFeatureClosureService.prototype, 'ensureSubmissionFeatureClosure').resolves();
     sinon
       .stub(indexSubmissionFeaturesJobDependencies, 'publishSubmissionUploadSecurityJob')
       .resolves({ status: 'published', jobId: 'screening-job' });
@@ -69,7 +68,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       .resolves({ status: 'published', jobId: 'tag-rules-job' });
   });
 
-  it('indexes successfully and sets indexed', async () => {
+  it('indexes successfully, sets indexed and ensures the submission closure', async () => {
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves({ status: 'ok' });
@@ -78,17 +77,14 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     const toIndexingStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexing as sinon.SinonStub;
     const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
-    const publishStub =
-      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
+    const ensureClosureStub = SubmissionFeatureClosureService.prototype
+      .ensureSubmissionFeatureClosure as sinon.SinonStub;
     expect(toIndexingStub.calledWith('submission-upload-1')).to.be.true;
     expect(indexStub.calledOnceWith(777, 'submission-upload-1')).to.be.true;
     expect(toIndexedStub.calledWith('submission-upload-1')).to.be.true;
-    expect(publishStub.calledOnce).to.be.true;
-    expect(publishStub.firstCall.args[1]).to.deep.equal({
-      submissionUploadId: 'submission-upload-1'
-    });
-    // The closure recompute must be queued only after the upload reaches `indexed`.
-    expect(toIndexedStub.calledBefore(publishStub)).to.be.true;
+    expect(ensureClosureStub).to.have.been.calledOnceWith(777, 'submission-upload-1');
+    // A rebuild is queued only after the upload reaches `indexed`, in the same transaction as screening.
+    expect(toIndexedStub.calledBefore(ensureClosureStub)).to.be.true;
   });
 
   it('queues security screening for the indexed upload in the indexing transaction', async () => {
@@ -99,8 +95,6 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toIndexedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIndexed as sinon.SinonStub;
-    const publishClosureStub =
-      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
     const publishScreeningStub =
       indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
     expect(publishScreeningStub).to.have.been.calledOnce;
@@ -108,7 +102,6 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       submissionId: 777,
       submissionUploadId: 'submission-upload-1'
     });
-    expect(publishScreeningStub.firstCall.args[0]).to.equal(publishClosureStub.firstCall.args[0]);
     expect(toIndexedStub.calledBefore(publishScreeningStub)).to.be.true;
   });
 
@@ -143,13 +136,13 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     await indexSubmissionFeaturesJobHandler([createMockJob()]);
 
     const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
-    const publishStub =
-      indexSubmissionFeaturesJobDependencies.publishComputeSubmissionFeatureClosureJob as sinon.SinonStub;
+    const ensureClosureStub = SubmissionFeatureClosureService.prototype
+      .ensureSubmissionFeatureClosure as sinon.SinonStub;
     const publishScreeningStub =
       indexSubmissionFeaturesJobDependencies.publishSubmissionUploadSecurityJob as sinon.SinonStub;
     expect(toInvalidStub.calledWith('submission-upload-1')).to.be.true;
     // An invalid outcome must not enqueue a closure recompute — prior closure rows stay untouched.
-    expect(publishStub.notCalled).to.be.true;
+    expect(ensureClosureStub.notCalled).to.be.true;
     expect(publishScreeningStub.notCalled).to.be.true;
     // Tag rules only match fully indexed features, so an invalid upload is not evaluated.
     expect(indexSubmissionFeaturesJobDependencies.publishEvaluateTicketTagRulesJob).to.not.have.been.called;
