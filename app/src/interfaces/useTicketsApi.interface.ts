@@ -16,7 +16,10 @@ export type SubmissionUploadJobStatus =
   | 'invalid'
   | 'failed';
 export type SubmissionValidationStatus = 'pending' | 'started' | 'completed' | 'invalid' | 'failed';
-export type SubmissionUploadDecision = 'pending' | 'approved' | 'denied';
+/** `approving` is an approval whose features are still being published by a background job. */
+export type SubmissionUploadDecision = 'pending' | 'approving' | 'approved' | 'denied';
+/** Decision an administrator can request; `approving` is only ever set by the server. */
+export type RequestedSubmissionUploadDecision = 'pending' | 'approved' | 'denied';
 export type SubmissionUploadReviewScope = 'validation' | 'security';
 export type SubmissionUploadReviewTaskStatus =
   | 'pending'
@@ -190,7 +193,7 @@ export interface ITicketArtifactDownloadResponse {
 }
 
 export interface IUpdateSubmissionUploadDecisionRequest {
-  decision: SubmissionUploadDecision;
+  decision: RequestedSubmissionUploadDecision;
 }
 
 export interface ISubmissionUploadDecisionResponse {
@@ -254,6 +257,4 @@ export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions
   search?: string;
   /** Administrative list only: tickets with any of these tags. */
   tag_ids?: string[];
-  /** Administrative list only: tickets with any of this board's tags. */
-  board_id?: string;
 }

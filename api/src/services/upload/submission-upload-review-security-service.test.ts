@@ -20,6 +20,9 @@ describe('SubmissionUploadReviewSecurityService', () => {
       const insert = sinon.stub(domain, 'insertSubmissionFeatureSecurity').resolves();
       const remove = sinon.stub(domain, 'deleteSubmissionFeatureSecurityRules').resolves();
       const reset = sinon.stub(domain, 'deleteSubmissionFeatureSecurity').resolves();
+      const triggerAnchors = sinon
+        .stub(service.securityScopeService, 'triggerAnchorComputationForSubmission')
+        .resolves();
       const input = {
         submissionId: 7,
         submissionUploadId: 'upload',
@@ -39,6 +42,8 @@ describe('SubmissionUploadReviewSecurityService', () => {
       });
       sinon.assert.calledOnceWithExactly(remove, { ...input, securityRuleIds: [8] });
       sinon.assert.calledOnceWithExactly(reset, input);
+      sinon.assert.calledThrice(triggerAnchors);
+      sinon.assert.alwaysCalledWithExactly(triggerAnchors, 7);
     });
   }
 

@@ -72,7 +72,6 @@ const validationReview: ISubmissionUploadReviewDetail = {
   requested_by: 1
 };
 const getReconciliationCounts = vi.fn();
-const getSubmissionUploadFeatures = vi.fn();
 const setYesNoDialog = vi.fn();
 const setSnackbar = vi.fn();
 const updateSubmissionUploadReview = vi.fn();
@@ -84,7 +83,6 @@ describe('SubmissionUploadReviewValidationPage', () => {
     (useApi as Mock).mockReturnValue({
       admin: {
         getSubmissionUploadReconciliationCounts: getReconciliationCounts,
-        getSubmissionUploadFeatures,
         updateSubmissionUploadReview
       }
     });
@@ -161,7 +159,6 @@ describe('SubmissionUploadReviewValidationPage', () => {
     expect(screen.getByText('Unchanged')).toBeVisible();
     expect(screen.getByText('Changed')).toBeVisible();
     expect(screen.queryByRole('heading', { name: /^Features/ })).not.toBeInTheDocument();
-    expect(getSubmissionUploadFeatures).not.toHaveBeenCalled();
   });
 
   it('maps the reviewed upload in its own section after the overview', async () => {

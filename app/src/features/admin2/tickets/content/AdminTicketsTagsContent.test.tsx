@@ -85,7 +85,7 @@ describe('AdminTicketsTagsContent', () => {
     expect(await screen.findByTestId('tag-page')).toHaveTextContent(tag.tag_id);
   });
 
-  it('warns that deleting a tag removes it from every ticket and board, and deletes it once confirmed', async () => {
+  it('warns that deleting a tag removes it from every ticket, and deletes it once confirmed', async () => {
     deleteTag.mockResolvedValue(undefined);
     renderContent();
     await screen.findByText('Urgent');
@@ -95,7 +95,7 @@ describe('AdminTicketsTagsContent', () => {
 
     const confirmation = setYesNoDialog.mock.lastCall![0];
     render(confirmation.dialogContent);
-    expect(screen.getByText(/removes it from all tickets and boards/)).toBeVisible();
+    expect(screen.getByText(/removes it from all tickets/)).toBeVisible();
     expect(deleteTag).not.toHaveBeenCalled();
 
     act(() => confirmation.onYes());

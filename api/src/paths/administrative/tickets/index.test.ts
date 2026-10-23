@@ -64,7 +64,6 @@ describe('paths/administrative/tickets', () => {
       status: 'open',
       search: 'ticket',
       tag_ids: ['33333333-3333-3333-3333-333333333333'],
-      board_id: '44444444-4444-4444-4444-444444444444',
       page: '2',
       limit: '10'
     };
@@ -76,8 +75,7 @@ describe('paths/administrative/tickets', () => {
       team_ids: [mockTicket.team_id],
       status: 'open',
       search: 'ticket',
-      tag_ids: ['33333333-3333-3333-3333-333333333333'],
-      board_id: '44444444-4444-4444-4444-444444444444'
+      tag_ids: ['33333333-3333-3333-3333-333333333333']
     };
 
     expect(listStub).to.have.been.calledWith(expectedFilters, {
@@ -117,8 +115,7 @@ describe('paths/administrative/tickets', () => {
       team_ids: undefined,
       status: undefined,
       search: undefined,
-      tag_ids: undefined,
-      board_id: undefined
+      tag_ids: undefined
     };
 
     await getTickets()(mockReq, mockRes, mockNext);

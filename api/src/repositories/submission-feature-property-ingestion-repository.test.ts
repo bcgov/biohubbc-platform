@@ -417,19 +417,44 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
-  describe('recordReferenceErrorsBySubmissionUploadId', () => {
-    it('counts reference errors in the grouped error phase', async () => {
+  describe('insertContentReferenceStagingBySubmissionUploadId', () => {
+    it('resolves each data.content reference once into content reference staging', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.recordReferenceErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
+      await repository.insertContentReferenceStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('error_rows AS');
-      expect(sqlText).to.include('grouped_errors AS');
-      expect(sqlText).to.not.match(/error_rows AS \([\s\S]*COUNT\(\*\)::integer AS count[\s\S]*FROM expanded e/);
+      expect(sqlText).to.include("sf.data -> 'content'");
+      // Unresolved references are kept with a null target so they can be reported.
+      expect(sqlText).to.include('LEFT JOIN LATERAL');
+      // Resolution picks exactly one target: same-upload live rows first, else the
+      // submission's published live rows.
+      expect(sqlText).to.include('candidate.submission_id =');
+      expect(sqlText).to.include('candidate.source_id = e.reference_source_id');
+      expect(sqlText).to.include('candidate.record_effective_date IS NOT NULL');
+      expect(sqlText).to.include('LIMIT 1');
+      expect(sqlStub.firstCall.args[0].values).to.include(42);
+    });
+  });
+
+  describe('recordReferenceErrorsBySubmissionUploadId', () => {
+    it('counts unresolved and self references from content reference staging', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordReferenceErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.not.include("data -> 'content'");
+      expect(sqlText).to.include('r.target_feature_id IS NULL');
+      expect(sqlText).to.include('r.target_feature_id = r.source_feature_id');
+      expect(sqlText).to.include('UNRESOLVED_REFERENCE');
+      expect(sqlText).to.include('INVALID_SELF_REFERENCE');
       expect(sqlText).to.match(/grouped_errors AS \([\s\S]*COUNT\(\*\)::integer AS count/);
     });
   });
@@ -446,6 +471,10 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
 
       expect(sqlText).to.include('INSERT INTO submission_upload_staging_resolved_property');
+
+      // Properties are expanded straight from the upload's live features.
+      expect(sqlText).to.include("CROSS JOIN LATERAL jsonb_each(sf.data -> 'properties') AS props");
+      expect(sqlText).to.include('sf.record_end_date IS NULL');
 
       // Selected Blueprint is the one pinned to the upload, passed in by the caller — not re-selected
       // here. The default Blueprint is no longer chosen inside the SQL.
@@ -517,7 +546,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.not.include('bftp.feature_type_id');
     });
 
-    it('uses an indexable raw-property anti-lookup for present required properties', async () => {
+    it('uses an indexable resolved-property anti-lookup for present required properties', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
@@ -531,14 +560,10 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('NOT EXISTS');
       expect(sqlText).to.include('FROM submission_feature');
-      expect(sqlText).to.include('FROM submission_upload_staging_raw_property raw');
-      expect(sqlText).to.include('raw.submission_upload_id');
-      expect(sqlText).to.include('raw.submission_feature_id = sf.submission_feature_id');
-      expect(sqlText).to.include('raw.property_name = rp.property_name');
+      expect(sqlText).to.include('rsp.submission_upload_id');
+      expect(sqlText).to.include('rsp.submission_feature_id = sf.submission_feature_id');
+      expect(sqlText).to.include('rsp.property_name = rp.property_name');
       expect(sqlText).to.not.include('present_properties AS');
-      expect(sqlText).to.not.include('FROM submission_upload_staging_raw_property\n        WHERE submission_upload_id');
-      expect(sqlText).to.not.include('FROM submission_upload_staging_resolved_property rsp');
-      expect(sqlText).to.not.include('SELECT DISTINCT\n          rsp.submission_feature_id');
     });
   });
 
@@ -587,27 +612,104 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
   });
 
   describe('insertFeatureRelationshipsBySubmissionUploadId', () => {
-    it('ignores exact and inverse duplicate feature relationship conflicts', async () => {
+    it('inserts distinct resolved non-self references from content reference staging', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.insertFeatureRelationshipsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000', 42);
+      await repository.insertFeatureRelationshipsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('jsonb_array_elements');
-      expect(sqlText).to.include("sf.data -> 'content'");
+      expect(sqlText).to.not.include("data -> 'content'");
       expect(sqlText).to.include('SELECT DISTINCT');
-      expect(sqlText).to.include('FROM resolved');
-      // Resolution picks exactly one target: same-upload live rows first, else the
-      // submission's published live rows.
-      expect(sqlText).to.include('CROSS JOIN LATERAL');
-      expect(sqlText).to.include('candidate.submission_id =');
-      expect(sqlText).to.include('candidate.source_id = e.reference_source_id');
-      expect(sqlText).to.include('LIMIT 1');
+      expect(sqlText).to.include('r.target_feature_id IS NOT NULL');
+      expect(sqlText).to.include('r.target_feature_id <> r.source_feature_id');
       expect(sqlText).to.include('ON CONFLICT DO NOTHING');
-      expect(sqlText).to.not.include('ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING');
+    });
+  });
+
+  describe('clearComplexPropertyCandidateStagingBySubmissionUploadId', () => {
+    it('clears candidate and content reference staging in one upload-scoped statement', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.clearComplexPropertyCandidateStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('DELETE FROM submission_upload_staging_feature_candidate');
+      expect(sqlText).to.include('DELETE FROM submission_upload_staging_content_reference');
+    });
+  });
+
+  describe('analyzePropertyStagingTables', () => {
+    it('analyzes the staging tables without waiting on concurrent indexing transactions', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.analyzePropertyStagingTables();
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('ANALYZE (SKIP_LOCKED)');
+      expect(sqlText).to.include('submission_upload_staging_typed_property_value');
+      expect(sqlText).to.include('submission_upload_staging_content_reference');
+    });
+  });
+
+  describe('populateSpatialCandidateStagingBySubmissionUploadId', () => {
+    it('parses and validates each geometry once behind lateral optimization fences', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.populateSpatialCandidateStagingBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText.match(/biohub\.try_geom_from_geojson\(/g)).to.have.length(1);
+      expect(sqlText.match(/public\.ST_IsValid\(/g)).to.have.length(1);
+      expect(sqlText.match(/OFFSET 0/g)).to.have.length(3);
+      // The reason is only computed for geometries that failed validation.
+      expect(sqlText).to.include("WHEN v.is_valid THEN 'Valid Geometry'");
+    });
+  });
+
+  describe('spatial validity consumers', () => {
+    it('reuse the staged validity flag instead of recomputing ST_IsValid', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordSpatialNormalizationErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.insertGeometryPropertiesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      const errorSql = sqlStub.firstCall.args[0].text as string;
+      const insertSql = sqlStub.secondCall.args[0].text as string;
+      expect(errorSql).to.include('NOT p.is_valid');
+      expect(insertSql).to.include('AND p.is_valid');
+      expect(errorSql).to.not.include('ST_IsValid(');
+      expect(insertSql).to.not.include('ST_IsValid(');
+    });
+  });
+
+  describe('recordCircularFeatureReferenceErrorsBySubmissionUploadId', () => {
+    it('computes reachability only over edges that can be part of a cycle', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.recordCircularFeatureReferenceErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('pruned_edges AS');
+      expect(sqlText).to.include('core_edges AS');
+      expect(sqlText).to.match(/reachable AS \([\s\S]*FROM core_edges e[\s\S]*UNION[\s\S]*JOIN core_edges e/);
+      expect(sqlText).to.include('CIRCULAR_FEATURE_REFERENCE');
     });
   });
 });

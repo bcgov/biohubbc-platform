@@ -19,7 +19,7 @@ import {
 } from 'interfaces/useAdminApi.interface';
 import { IBlueprint } from 'interfaces/useBlueprintsApi.interface';
 import { ISubmissionFeaturePropertiesResponse, ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface';
-import { AdminSubmissionUpload, ISubmissionFeatureForReviewResponse } from 'interfaces/useSubmissionsApi.interface';
+import { AdminSubmissionUpload } from 'interfaces/useSubmissionsApi.interface';
 import qs from 'qs';
 import { ApiCursorPaginationRequestOptions, ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -249,33 +249,6 @@ const useAdminApi = (axios: AxiosInstance) => {
     const { data } = await axios.patch(
       `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/review/${submissionUploadReviewId}`,
       { status }
-    );
-
-    return data;
-  };
-
-  /**
-   * Fetch paginated features belonging to one submission upload.
-   *
-   * @param {number} submissionId ID of the submission that owns the upload.
-   * @param {string} submissionUploadId UUID of the submission upload.
-   * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated features belonging to the upload.
-   */
-  const getSubmissionUploadFeatures = async (
-    submissionId: number,
-    submissionUploadId: string,
-    pagination?: ApiPaginationRequestOptions,
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<ISubmissionFeatureForReviewResponse> => {
-    const { data } = await axios.get(
-      `/api/administrative/submission/${submissionId}/upload/${submissionUploadId}/features`,
-      {
-        params: pagination,
-        paramsSerializer: (params) => qs.stringify(params),
-        ...options
-      }
     );
 
     return data;
@@ -520,28 +493,6 @@ const useAdminApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch the paginated features for a submission for administrative review.
-   *
-   * @param {number} submissionId ID of the submission whose features should be returned.
-   * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated submission features.
-   */
-  const getSubmissionFeatures = async (
-    submissionId: number,
-    pagination?: ApiPaginationRequestOptions,
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<ISubmissionFeatureForReviewResponse> => {
-    const { data } = await axios.get(`/api/administrative/submission/${submissionId}/features`, {
-      params: pagination,
-      paramsSerializer: (params) => qs.stringify(params),
-      ...options
-    });
-
-    return data;
-  };
-
-  /**
    * Send notification to recipient
    *
    * @param {IgcNotifyRecipient} recipient
@@ -599,7 +550,6 @@ const useAdminApi = (axios: AxiosInstance) => {
     getSubmissionUploadFeatureGeometryExtent,
     getSubmissionUploadReview,
     updateSubmissionUploadReview,
-    getSubmissionUploadFeatures,
     searchSubmissionUploadFeatures,
     countSubmissionUploadFeatures,
     getSubmissionUploadReviewFeatureRules,
@@ -609,7 +559,6 @@ const useAdminApi = (axios: AxiosInstance) => {
     deleteSubmissionUploadReviewSecurityAssignments,
     getSubmissionUploadFeature,
     getSubmissionUploadFeatureProperties,
-    getSubmissionFeatures,
     sendGCNotification,
     addSystemUser
   };

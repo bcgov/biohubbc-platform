@@ -1,11 +1,11 @@
-import { mdiDotsVertical, mdiPencil, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiLinkVariantOff, mdiPencil, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { TagChip } from 'components/tags/TagChip';
-import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
+import { CustomMenuIconButton, IMenuToolbarItem } from 'components/toolbar/ActionToolbars';
 import { ITag } from 'interfaces/useTagsApi.interface';
 import { useMemo } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
@@ -14,17 +14,19 @@ import { getRelativeTimeLabel } from 'utils/date';
 interface IAdminTagsTableProps extends IServerPaginationProps {
   /** The current page of tags. */
   tags: ITag[];
-  /** Edits a tag; the actions column is shown only with edit and delete handlers. */
+  /** Edits a tag; the actions column shows the actions given handlers, if any. */
   onEditTag?: (tag: ITag) => void;
-  /** Deletes a tag; the actions column is shown only with edit and delete handlers. */
+  /** Deletes a tag. */
   onDeleteTag?: (tag: ITag) => void;
+  /** Unlinks a tag from the board whose tags are listed. */
+  onRemoveTag?: (tag: ITag) => void;
   /** Opens a tag's page when its row is clicked. */
   onOpenTag?: (tag: ITag) => void;
 }
 
 /**
  * Server-paginated table of tags: each tag's chip, description and created date, sortable by name and created date,
- * with edit and delete actions and a row click that opens the tag when handlers are given.
+ * with edit, delete and remove-from-board actions and a row click that opens the tag when handlers are given.
  *
  * @param {IAdminTagsTableProps} props The page of tags, the grid's pagination and sort, and the optional row actions.
  * @returns {JSX.Element} The tags table.
@@ -39,6 +41,7 @@ export const AdminTagsTable = (props: IAdminTagsTableProps) => {
     setSortModel,
     onEditTag,
     onDeleteTag,
+    onRemoveTag,
     onOpenTag
   } = props;
 
@@ -76,7 +79,43 @@ export const AdminTagsTable = (props: IAdminTagsTableProps) => {
       }
     ];
 
-    if (!onEditTag || !onDeleteTag) {
+    /**
+     * The row actions given handlers.
+     *
+     * @param {ITag} tag The row's tag.
+     * @returns {IMenuToolbarItem[]} The tag's menu items.
+     */
+    const getMenuItems = (tag: ITag): IMenuToolbarItem[] => [
+      ...(onEditTag
+        ? [
+            {
+              menuIcon: <Icon path={mdiPencil} size={0.875} />,
+              menuLabel: 'Edit tag',
+              menuOnClick: () => onEditTag(tag)
+            }
+          ]
+        : []),
+      ...(onDeleteTag
+        ? [
+            {
+              menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+              menuLabel: 'Delete tag',
+              menuOnClick: () => onDeleteTag(tag)
+            }
+          ]
+        : []),
+      ...(onRemoveTag
+        ? [
+            {
+              menuIcon: <Icon path={mdiLinkVariantOff} size={0.875} />,
+              menuLabel: 'Remove from board',
+              menuOnClick: () => onRemoveTag(tag)
+            }
+          ]
+        : [])
+    ];
+
+    if (!onEditTag && !onDeleteTag && !onRemoveTag) {
       return tagColumns;
     }
 
@@ -95,24 +134,13 @@ export const AdminTagsTable = (props: IAdminTagsTableProps) => {
             <CustomMenuIconButton
               buttonTitle="Actions"
               buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-              menuItems={[
-                {
-                  menuIcon: <Icon path={mdiPencil} size={0.875} />,
-                  menuLabel: 'Edit tag',
-                  menuOnClick: () => onEditTag(params.row)
-                },
-                {
-                  menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-                  menuLabel: 'Delete tag',
-                  menuOnClick: () => onDeleteTag(params.row)
-                }
-              ]}
+              menuItems={getMenuItems(params.row)}
             />
           </Box>
         )
       }
     ];
-  }, [onDeleteTag, onEditTag]);
+  }, [onDeleteTag, onEditTag, onRemoveTag]);
 
   return (
     <ServerPaginatedDataGrid<ITag>

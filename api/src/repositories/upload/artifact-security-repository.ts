@@ -74,6 +74,38 @@ export class ArtifactSecurityRepository extends BaseRepository {
   }
 
   /**
+   * Get a security record by ID and lock it until the transaction ends.
+   *
+   * @param {string} uploadArtifactSecurityId Artifact security record identifier.
+   * @return {Promise<ArtifactSecurity>} The locked security record.
+   * @throws {ApiNotFoundError} When the record does not exist.
+   */
+  async getArtifactSecurityWithLock(uploadArtifactSecurityId: string): Promise<ArtifactSecurity> {
+    const sqlStatement = SQL`
+      SELECT
+        artifact_security_id,
+        artifact_id,
+        security
+      FROM
+        artifact_security
+      WHERE
+        artifact_security_id = ${uploadArtifactSecurityId}
+      FOR UPDATE;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurity);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Artifact security record not found', [
+        'ArtifactSecurityRepository->getArtifactSecurityWithLock',
+        { uploadArtifactSecurityId }
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Get all security records.
    *
    * @return {Promise<ArtifactSecurity[]>}

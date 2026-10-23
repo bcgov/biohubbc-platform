@@ -1,6 +1,10 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
-import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../models/submission-upload';
+import {
+  RequestedSubmissionUploadDecision,
+  SubmissionUploadDecision,
+  SubmissionUploadJobStatus
+} from '../../models/submission-upload';
 import { SubmissionUploadHistoryStatus } from '../../models/submission-upload-decision';
 
 /**
@@ -218,7 +222,8 @@ export const SubmissionUploadDecisionResponseSchema: OpenAPIV3.SchemaObject = {
     decision: {
       type: 'string',
       enum: SubmissionUploadDecision.options,
-      description: 'The human review decision on the submission upload.'
+      description:
+        'The human review decision on the submission upload. An approval returns approving until its features have been published.'
     }
   }
 };
@@ -312,7 +317,7 @@ export const UpdateSubmissionUploadDecisionRequestSchema: OpenAPIV3.SchemaObject
   properties: {
     decision: {
       type: 'string',
-      enum: SubmissionUploadDecision.options,
+      enum: RequestedSubmissionUploadDecision.options,
       description: 'The new decision for the submission upload; pending clears a prior decision.'
     }
   }

@@ -22,8 +22,9 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * must re-check.
  *
  * What is still enforced here is the shape of the request rather than the identity of the caller: the
- * feature must belong to the submission named in the same token, and it must still be active. Both are
- * join conditions below, so a token minted before a feature was end-dated stops producing tiles.
+ * feature must belong to the submission named in the same token, and it must have been published. Both
+ * are join conditions below. A superseded feature stays published, so its detail page keeps rendering its
+ * map, matching the direct-ID detail, properties, and extent reads.
  *
  * SECURITY DEFINER with a pinned search_path: the function is owned by the migration role, which can
  * read the underlying tables, so the `martin` role needs EXECUTE on this function and nothing else —
@@ -105,7 +106,7 @@ export async function seed(knex: Knex): Promise<void> {
       FROM (
         SELECT
           public.ST_AsMVTGeom(
-            public.ST_Transform(g.value, 3857),
+            public.ST_Transform(parts.part_4326, 3857),
             v_env_3857,
             c_extent,
             c_buffer,
@@ -125,7 +126,6 @@ export async function seed(knex: Knex): Promise<void> {
           -- that belongs to a different submission than the one that was authorized.
           AND sf.submission_id = v_submission_id
           AND sf.record_effective_date <= now()
-          AND (sf.record_end_date IS NULL OR now() < sf.record_end_date)
         -- The Blueprint assignment is what makes a geometry row nameable. It is joined at any lifecycle,
         -- as api/src/repositories/submission-feature-property-repository.ts does, so the map and the
         -- properties table label the same geometry the same way, including under a superseded Blueprint.
@@ -135,11 +135,20 @@ export async function seed(knex: Knex): Promise<void> {
         JOIN biohub.feature_property fp
           ON fp.feature_property_id = bftp.feature_property_id
           AND fp.record_end_date IS NULL
+        -- A vector tile feature holds one geometry type, and ST_AsMVTGeom keeps only the highest
+        -- dimension of a mixed collection, so a point stored beside a polygon would be dropped. Each
+        -- geometry is split into its point, line and polygon parts; every part keeps the geometry's id
+        -- and attributes, so the parts read as one geometry the way its tile boundary fragments do.
+        CROSS JOIN LATERAL (
+          SELECT public.ST_CollectionExtract(g.value, part_type.dimension) AS part_4326
+          FROM (VALUES (1), (2), (3)) AS part_type(dimension)
+        ) parts
         -- Equality on submission_feature_id first: this is the condition
         -- submission_feature_property_geometry_idx1 serves, and one feature's geometries are few
         -- enough that filtering them by envelope afterwards costs nothing.
         WHERE g.submission_feature_id = v_submission_feature_id
           AND g.value && v_candidates_4326
+          AND NOT public.ST_IsEmpty(parts.part_4326)
       ) feature_rows
       WHERE feature_rows.geom IS NOT NULL;
 

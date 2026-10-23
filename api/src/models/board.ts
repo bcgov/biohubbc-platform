@@ -1,20 +1,15 @@
 import { z } from 'zod';
-import { BoardTag } from './tag';
-import { TicketWithTags } from './ticket';
+import { TicketPriority, TicketWithTags } from './ticket';
 
 export const Board = z.object({
   board_id: z.string().uuid(),
   name: z.string(),
   description: z.string().nullable(),
+  /** The lane tickets created on or added to the board go in. */
+  default_swimlane_id: z.string().uuid().nullable(),
   create_date: z.string()
 });
 export type Board = z.infer<typeof Board>;
-
-export const BoardSummary = Board.extend({
-  tags: z.array(BoardTag),
-  swimlane_count: z.number()
-});
-export type BoardSummary = z.infer<typeof BoardSummary>;
 
 export const BoardSwimlane = z.object({
   board_swimlane_id: z.string().uuid(),
@@ -23,15 +18,9 @@ export const BoardSwimlane = z.object({
   description: z.string().nullable(),
   color: z.string().nullable(),
   sort_order: z.number(),
-  is_visible: z.boolean(),
-  tags: z.array(BoardTag)
+  is_visible: z.boolean()
 });
 export type BoardSwimlane = z.infer<typeof BoardSwimlane>;
-
-export const BoardTagId = z.object({
-  board_tag_id: z.string().uuid()
-});
-export type BoardTagId = z.infer<typeof BoardTagId>;
 
 export const BoardSwimlaneId = z.object({
   board_swimlane_id: z.string().uuid()
@@ -39,15 +28,14 @@ export const BoardSwimlaneId = z.object({
 export type BoardSwimlaneId = z.infer<typeof BoardSwimlaneId>;
 
 export interface BoardDetail extends Board {
-  tags: BoardTag[];
   swimlanes: BoardSwimlane[];
 }
 
 /**
- * A ticket on a board with its placed lane. A null lane means the implicit "Unsorted" bucket.
+ * A ticket on a board with the lane it is in.
  */
 export const BoardTicket = TicketWithTags.extend({
-  board_swimlane_id: z.string().uuid().nullable()
+  board_swimlane_id: z.string().uuid()
 });
 export type BoardTicket = z.infer<typeof BoardTicket>;
 
@@ -56,14 +44,15 @@ export interface BoardTicketSwimlane {
   name: string;
   color: string | null;
   sort_order: number;
+  is_visible: boolean;
   tickets: TicketWithTags[];
 }
 
 export interface BoardTickets {
   board: Board;
-  unsorted: TicketWithTags[];
+  /** Every ticket on the board. */
+  tickets: TicketWithTags[];
   swimlanes: BoardTicketSwimlane[];
-  hidden_ticket_count: number;
 }
 
 export interface BoardFilters {
@@ -83,31 +72,50 @@ export interface BoardPayload {
 }
 
 /**
- * Board swimlane columns written on insert and update.
+ * Board swimlane columns written on insert and update. Lanes are inserted visible, and updates keep their visibility.
  */
 export interface BoardSwimlanePayload {
   name: string;
   description: string | null;
   color: string | null;
-  is_visible: boolean;
+  /** Left-to-right position; omitted to insert the lane last, or to keep its position on update. */
+  sort_order?: number;
 }
 
 /**
- * Create or update board request. Tags are replaced as a set.
+ * Create or update board request.
  */
 export interface BoardRequest {
   name: string;
   description: string | null;
-  tagIds: string[];
 }
 
 /**
- * Create or update board swimlane request. Board tags are replaced as a set and must belong to the board.
+ * Create or update board swimlane request.
  */
 export interface BoardSwimlaneRequest {
   name: string;
   description: string | null;
   color: string | null;
-  isVisible: boolean;
-  boardTagIds: string[];
+  /** Left-to-right position: higher is further right. Omitted to create the lane last, or to keep its position. */
+  sortOrder?: number;
+}
+
+/**
+ * Put a ticket on a board, or move it to another of the board's lanes.
+ */
+export interface BoardTicketRequest {
+  /** The board's lane the ticket is in; omitted to put a ticket not on the board in its default lane. */
+  boardSwimlaneId?: string;
+  /** Zero-based position within the lane; omitted to put the ticket last when it changes lane. Requires a lane. */
+  position?: number;
+}
+
+/**
+ * Create a ticket on a board, in the board's default lane.
+ */
+export interface BoardTicketCreateRequest {
+  subject: string;
+  description: string | null;
+  priority: TicketPriority;
 }

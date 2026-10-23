@@ -19,7 +19,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description:
-    'Create a ticket tag and add it to a board. The tag is a regular tag, available to every ticket and board.',
+    "Create a ticket tag and link it to a board, so applying it to a ticket puts the ticket in the board's default swimlane. The tag is a regular tag, available to every ticket.",
   tags: ['boards', 'tags'],
   security: [{ Bearer: [] }],
   parameters: [

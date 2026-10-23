@@ -54,7 +54,7 @@ export const AdminTagRulesTable = (props: IAdminTagRulesTableProps) => {
         minWidth: 200,
         flex: 1,
         renderCell: (params) => (
-          <Typography variant="body2" noWrap title={params.row.name} fontWeight={700}>
+          <Typography variant="body2" noWrap title={params.row.name}>
             {params.row.name}
           </Typography>
         )

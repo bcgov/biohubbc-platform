@@ -31,7 +31,7 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(24);
+      expect(createQueueStub.callCount).to.equal(26);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.RECONCILE_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
@@ -166,13 +166,14 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 22 queues: PROCESS_SUBMISSION_FEATURES + FAILED, RECONCILE_SUBMISSION_FEATURES + FAILED,
+      // 26 queues: PROCESS_SUBMISSION_FEATURES + FAILED, RECONCILE_SUBMISSION_FEATURES + FAILED,
       // MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED,
       // PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED,
       // COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED,
       // POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED,
-      // DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED, EVALUATE_TICKET_TAG_RULES + FAILED.
-      expect(createQueueStub.callCount).to.equal(24);
+      // DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED, EVALUATE_TICKET_TAG_RULES + FAILED,
+      // APPROVE_SUBMISSION_UPLOAD + FAILED.
+      expect(createQueueStub.callCount).to.equal(26);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -212,6 +213,27 @@ describe('worker', () => {
 
       const queue = JobQueues.EVALUATE_TICKET_TAG_RULES;
       const deadLetter = JobQueues.EVALUATE_TICKET_TAG_RULES_FAILED;
+      const queueCall = createQueueStub.getCalls().find((call) => call.args[0] === queue);
+      const deadLetterCall = createQueueStub.getCalls().find((call) => call.args[0] === deadLetter);
+
+      expect(queueCall?.args[1]).to.include({ deadLetter, policy: 'short' });
+      expect(deadLetterCall?.calledBefore(queueCall!)).to.be.true;
+      expect(workStub.getCalls().some((call) => call.args[0] === queue)).to.be.true;
+      expect(workStub.getCalls().some((call) => call.args[0] === deadLetter)).to.be.true;
+    });
+
+    it('configures the singleton approval queue with a dead letter queue', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      const queue = JobQueues.APPROVE_SUBMISSION_UPLOAD;
+      const deadLetter = JobQueues.APPROVE_SUBMISSION_UPLOAD_FAILED;
       const queueCall = createQueueStub.getCalls().find((call) => call.args[0] === queue);
       const deadLetterCall = createQueueStub.getCalls().find((call) => call.args[0] === deadLetter);
 

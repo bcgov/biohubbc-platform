@@ -17,7 +17,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
-  SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
@@ -383,12 +382,16 @@ export class SubmissionService extends DBService {
   /**
    * Get a submission record by id (with security status).
    *
-   * @param {number} submissionId
-   * @returns {Promise<SubmissionRecordWithSecurity>}
+   * @param {number} submissionId Submission identifier.
+   * @param {number | null} systemUserId Caller identity used to filter feature type tabs, or null for anonymous.
+   * @returns {Promise<SubmissionRecordWithSecurity>} Submission metadata, visible feature types, and security status.
    * @memberof SubmissionService
    */
-  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
-    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+  async getSubmissionRecordBySubmissionIdWithSecurity(
+    submissionId: number,
+    systemUserId: number | null
+  ): Promise<SubmissionRecordWithSecurity> {
+    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, systemUserId);
   }
 
   /**
@@ -404,100 +407,32 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Retrieves submission feature records with type, name, and security data included.
-   *
-   * @param {number} submissionId
-   * @returns {Promise<
-   *     {
-   *       feature_type_name: string;
-   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
-   *     }[]
-   *   >}
-   * @memberof SubmissionService
-   */
-  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
-    {
-      feature_type_name: string;
-      features: SubmissionFeatureRecordWithTypeAndSecurity[];
-    }[]
-  > {
-    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
-
-    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
-
-    for (const feature of uncategorizedFeatures) {
-      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
-
-      if (featureCategoryArray) {
-        // Append to existing array of matching feature type
-        categorizedFeatures[feature.feature_type_name] = featureCategoryArray.concat(feature);
-      } else {
-        // Create new array for feature type
-        categorizedFeatures[feature.feature_type_name] = [feature];
-      }
-    }
-
-    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
-      feature_type_name: featureType,
-      features: submissionFeatures
-    }));
-
-    return submissionFeatures;
-  }
-
-  /**
    * Fetch the flattened array of features in the given submission with optional pagination
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
+   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
    * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting options.
-   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
-   * @returns {Promise<SubmissionFeatureForReview[]>} Active submission features visible to the requesting user.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Current submission features visible to the requesting user.
    * @memberof SubmissionService
    */
   async getSubmissionFeatures(
     submissionId: number,
-    pagination?: ApiPaginationOptions,
-    systemUserId?: number | null
+    systemUserId: number | null,
+    pagination?: ApiPaginationOptions
   ): Promise<SubmissionFeatureForReview[]> {
-    return this.submissionRepository.getSubmissionFeatures(submissionId, pagination, systemUserId);
+    return this.submissionRepository.getSubmissionFeatures(submissionId, systemUserId, pagination);
   }
 
   /**
    * Fetch the total count of features in the given submission
    *
    * @param {number} submissionId ID of the submission whose features should be counted.
-   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
-   * @returns {Promise<number>} Number of matching active submission features visible to the requesting user.
+   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
+   * @returns {Promise<number>} Number of current submission features visible to the requesting user.
    * @memberof SubmissionService
    */
-  async getSubmissionFeaturesCount(submissionId: number, systemUserId?: number | null): Promise<number> {
+  async getSubmissionFeaturesCount(submissionId: number, systemUserId: number | null): Promise<number> {
     return this.submissionRepository.getSubmissionFeaturesCount(submissionId, systemUserId);
-  }
-
-  /**
-   * Get all paginated features belonging to one submission upload.
-   *
-   * @param {string} submissionUploadId UUID of the submission upload.
-   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting parameters.
-   * @returns {Promise<SubmissionFeatureForReview[]>} Features belonging to the upload.
-   * @memberof SubmissionService
-   */
-  async getSubmissionUploadFeatures(
-    submissionUploadId: string,
-    pagination?: ApiPaginationOptions
-  ): Promise<SubmissionFeatureForReview[]> {
-    return this.submissionRepository.getSubmissionUploadFeatures(submissionUploadId, pagination);
-  }
-
-  /**
-   * Count all features belonging to one submission upload.
-   *
-   * @param {string} submissionUploadId UUID of the submission upload.
-   * @returns {Promise<number>} Number of features belonging to the upload.
-   * @memberof SubmissionService
-   */
-  async getSubmissionUploadFeaturesCount(submissionUploadId: string): Promise<number> {
-    return this.submissionRepository.getSubmissionUploadFeaturesCount(submissionUploadId);
   }
 
   /**
@@ -538,24 +473,5 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
     return this.submissionRepository.getSubmissionRootFeature(submissionId);
-  }
-
-  /**
-   * Find and return all submission feature records that match the provided criteria.
-   *
-   * @param {{
-   *     submissionId?: number;
-   *     systemUserId?: number;
-   *     featureTypeNames?: string[];
-   *   }} [criteria]
-   * @returns {Promise<SubmissionFeatureRecord[]>}
-   * @memberof SubmissionService
-   */
-  async findSubmissionFeatures(criteria?: {
-    submissionId?: number;
-    systemUserId?: number;
-    featureTypeNames?: string[];
-  }): Promise<SubmissionFeatureRecord[]> {
-    return this.submissionRepository.findSubmissionFeatures(criteria);
   }
 }

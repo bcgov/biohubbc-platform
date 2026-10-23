@@ -40,16 +40,22 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const deleteErrorsStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
       .resolves();
-    const stageStub = sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
-      .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
         'clearUploadPropertyWorkingSetStagingBySubmissionUploadId'
       )
       .resolves();
-    sinon
+    const clearCandidatesStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'clearComplexPropertyCandidateStagingBySubmissionUploadId'
+      )
+      .resolves();
+    const analyzeStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'analyzePropertyStagingTables')
+      .resolves();
+    const populateResolvedStub = sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
         'populateResolvedPropertyStagingBySubmissionUploadId'
@@ -160,11 +166,17 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(insertReferencesStub.calledOnce).to.equal(true);
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
+    expect(referenceErrorsStub.calledOnceWithExactly('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
+    expect(insertReferencesStub.calledOnceWithExactly('550e8400-e29b-41d4-a716-446655440000')).to.equal(true);
+    expect(analyzeStub.calledTwice).to.equal(true);
+    // Staging is cleared before candidates are rebuilt and again once indexing completes.
+    expect(clearCandidatesStub.calledTwice).to.equal(true);
+    expect(clearCandidatesStub.lastCall.calledAfter(insertReferencesStub.lastCall)).to.equal(true);
     expect(outcome).to.eql({ status: 'ok' });
 
     sinon.assert.callOrder(
       deleteErrorsStub,
-      stageStub,
+      populateResolvedStub,
       requiredStub,
       primitiveStub,
       getUnresolvedTaxonStub,
@@ -209,9 +221,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
     sinon
       .stub(
@@ -315,6 +324,12 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
       .resolves(2);
+    const clearCandidatesStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'clearComplexPropertyCandidateStagingBySubmissionUploadId'
+      )
+      .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountsByCode')
       .resolves([{ error_code: 'TYPE_MISMATCH', error_count: 2 }]);
@@ -339,6 +354,8 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(insertRelationshipsStub.called).to.equal(false);
     expect(deleteDerivedPropertiesStub.called).to.equal(false);
     expect(deleteRelationshipsStub.called).to.equal(false);
+    // Staging is cleared before candidates are rebuilt and again after errors are persisted.
+    expect(clearCandidatesStub.calledTwice).to.equal(true);
     expect(outcome.status).to.equal('invalid');
     if (outcome.status === 'invalid') {
       expect(outcome.errorCount).to.equal(2);
@@ -367,9 +384,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
     sinon
       .stub(

@@ -48,16 +48,29 @@ describe('TicketSidebarTags', () => {
    */
   const getChip = (name: string) => screen.getByText(name).closest('.MuiChip-root') as HTMLElement;
 
-  it('removes a tag a rule added like any other tag', () => {
-    render(<TicketSidebarTags />);
+  it('shows the tags as chips and opens the add dialog from the add button', () => {
+    const onOpenDialog = vi.fn();
+    render(<TicketSidebarTags onOpenDialog={onOpenDialog} />);
 
-    fireEvent.click(within(getChip('Failed')).getByTestId('CancelIcon'));
+    expect(getChip('Failed')).toBeVisible();
+    expect(getChip('Triage')).toBeVisible();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'add tags' }));
+
+    expect(onOpenDialog).toHaveBeenCalledOnce();
+  });
+
+  it('removes a tag a rule added like any other tag', () => {
+    render(<TicketSidebarTags onOpenDialog={vi.fn()} />);
+
+    fireEvent.click(within(getChip('Failed')).getByLabelText('remove Failed'));
 
     expect(mutate).toHaveBeenCalledWith([manualTag]);
   });
 
   it('names the rule that added a rule tag on hover', async () => {
-    render(<TicketSidebarTags />);
+    render(<TicketSidebarTags onOpenDialog={vi.fn()} />);
 
     fireEvent.mouseOver(getChip('Failed'));
 

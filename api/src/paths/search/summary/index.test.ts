@@ -6,6 +6,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/
 import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
 import { SearchService } from '../../../services/search-service';
+import { UserService } from '../../../services/user-service';
 import * as search from './index';
 
 chai.use(sinonChai);
@@ -38,10 +39,11 @@ describe('searchSummary', () => {
     const requestHandler = search.searchSummary();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockGetSearchSummary).to.have.been.calledOnceWith({ keyword: 'moose' });
+    expect(mockGetSearchSummary).to.have.been.calledOnceWith({ keyword: 'moose' }, null);
     expect(dbConnectionObj.open).to.have.been.calledOnce;
     expect(dbConnectionObj.commit).to.have.been.calledOnce;
     expect(mockRes.setHeader).to.have.been.calledWith('Cache-Control', 'public, max-age=90');
+    expect(mockRes.setHeader).to.have.been.calledWith('Vary', 'Authorization');
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(mockSummary);
   });
@@ -94,5 +96,27 @@ describe('searchSummary', () => {
       expect((error as ApiError).message).to.equal('open failed');
       expect(dbConnectionObj.release).to.have.been.calledOnce;
     }
+  });
+
+  it('summarizes as the authenticated caller with a private cache header', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      systemUserId: () => 123
+    });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'getUserById').resolves({} as any);
+    const mockGetSearchSummary = sinon.stub(SearchService.prototype, 'getSearchSummary').resolves(mockSummary);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.keycloak_token = 'some-valid-token';
+    mockReq.query = { keyword: 'moose' };
+
+    await search.searchSummary()(mockReq, mockRes, mockNext);
+
+    expect(mockGetSearchSummary).to.have.been.calledOnceWith({ keyword: 'moose' }, 123);
+    expect(mockRes.setHeader).to.have.been.calledWith('Cache-Control', 'private, no-store');
+    expect(mockRes.setHeader).to.have.been.calledWith('Vary', 'Authorization');
   });
 });

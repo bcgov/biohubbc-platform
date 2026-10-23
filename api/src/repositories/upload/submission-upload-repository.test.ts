@@ -127,6 +127,19 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('tryLockSubmissionUploadIngestion', () => {
+    it('takes a non-blocking transaction lock keyed on the upload and returns whether it was acquired', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [{ locked: false }] });
+      const repo = new SubmissionUploadRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repo.tryLockSubmissionUploadIngestion('upload-1');
+
+      expect(result).to.be.false;
+      expect(sqlStub.firstCall.args[0].text).to.include('pg_try_advisory_xact_lock');
+      expect(sqlStub.firstCall.args[0].values).to.eql(['submission-upload-ingestion', 'upload-1', 4]);
+    });
+  });
+
   describe('getSubmissionUploadBySubmissionUuid', () => {
     it('throws ApiNotFoundError when no matching record found', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;

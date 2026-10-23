@@ -16,6 +16,7 @@ import {
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'node:stream';
+import { UPLOAD_STREAM_PART_SIZE_BYTES } from '../../constants/upload';
 
 export enum BucketType {
   MAIN = 'main',
@@ -169,6 +170,10 @@ export class ObjectStorageService {
   /**
    * Upload a stream to the specified bucket
    *
+   * Parts are 8 MiB with two uploading at once, so one upload buffers at most 16 MiB and
+   * concurrent archive media uploads stay within worker memory. With the 10,000-part S3
+   * limit this caps a single streamed object at about 78 GiB.
+   *
    * @param {BucketType} bucketType
    * @param {Readable} stream
    * @param {string} mimetype
@@ -194,7 +199,7 @@ export class ObjectStorageService {
         ContentType: mimetype,
         Metadata: metadata
       },
-      partSize: 64 * 1024 * 1024,
+      partSize: UPLOAD_STREAM_PART_SIZE_BYTES,
       queueSize: 2
     });
 

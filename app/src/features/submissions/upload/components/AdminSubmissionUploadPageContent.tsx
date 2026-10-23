@@ -64,8 +64,8 @@ export const AdminSubmissionUploadPageContent = ({ scope }: AdminSubmissionUploa
     queryFn: ({ signal }) => api.admin.getSubmissionUploadBlueprint(scope, { signal }),
     enabled: canReindex
   });
-  // An accepted upload's features are published and immutable; the server also refuses other ineligible uploads.
-  const isReindexDisabled = !uploadQuery.data || uploadQuery.data.decision === 'approved' || blueprintQuery.isPending;
+  // Only an undecided upload can be re-indexed: a decided upload's features are fixed, and the server refuses it.
+  const isReindexDisabled = uploadQuery.data?.decision !== 'pending' || blueprintQuery.isPending;
 
   useEffect(() => {
     if (isOutcomeTab) {

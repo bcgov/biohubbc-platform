@@ -1,3 +1,4 @@
+import { DERIVED_CACHE_RECOMPUTE_DELAY_SECONDS } from '../constants/queue';
 import { PROCESS_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../constants/submission-upload';
 import { IDBConnection } from '../database/db';
 import { DownloadStatusEnum } from '../models/download-status';
@@ -6,6 +7,7 @@ import { DownloadVersionRepository } from '../repositories/download/download-ver
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IApproveSubmissionUploadJobData } from './jobs/approve-submission-upload-job';
 import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
 import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submission-feature-closure-job';
 import { IEvaluateTicketTagRulesJobData } from './jobs/evaluate-ticket-tag-rules-job';
@@ -68,12 +70,14 @@ export type PublishJobResult =
  *
  * Singleton key is per-submission-upload.
  * pg-boss won't dequeue a new job for the same singleton key while the current one is active.
+ * Expiry matches the downstream feature-pipeline stages: streaming a large archive with media can
+ * take well over ten minutes, and pg-boss retries an expired job without stopping the original.
  */
 const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
   retryLimit: 2,
   retryDelay: 60,
   retryBackoff: true,
-  expireInSeconds: 60 * 10 // 10 minutes
+  expireInSeconds: 60 * 60 * 2 // 2 hours
 };
 
 /**
@@ -501,7 +505,7 @@ export const publishProcessDownloadVersionExportJob = async (
 };
 
 /**
- * Shared retry and timeout policy for reconciliation and indexing pipeline stages.
+ * Shared retry and timeout policy for reconciliation, indexing and approval pipeline stages.
  *
  * Each stage runs in one transaction that can take a long time for large uploads. pg-boss retries an expired job
  * without stopping its handler, so an expiry shorter than the stage leaves the original attempt running and its
@@ -627,13 +631,43 @@ export const publishIndexSubmissionFeaturesJob = async (
 };
 
 /**
- * Options for compute scope anchors jobs.
- * Anchor computation uses keyset-paginated scans and can be triggered many times
- * during admin policy edits. Delay the job briefly so repeated changes to the
- * same scope coalesce behind the per-scope singleton key.
+ * Queue a delayed derived-cache recompute, unless one is already queued under the same singleton key.
+ *
+ * The job starts `DERIVED_CACHE_RECOMPUTE_DELAY_SECONDS` after the first request, and the queue's `short` policy
+ * keeps one queued job per singleton key, so later requests before it starts are absorbed into it. The job reads
+ * the latest state when it runs, so it covers every change committed before it starts. The insert runs in the
+ * caller's transaction.
+ *
+ * @template T Job payload type.
+ * @param {IDBConnection} connection Caller's transaction.
+ * @param {string} queueName Queue to send to; its policy must be `short`.
+ * @param {T} data Job payload, used only when no job is queued for the key.
+ * @param {IPublishOptions} options Job options.
+ * @param {string} singletonKey Key identifying the recompute.
+ * @returns {Promise<string | null>} New job id, or null when an already-queued job absorbed this request.
  */
-const COMPUTE_SCOPE_ANCHORS_COOLDOWN_SECONDS = 20;
+async function sendDelayedRecomputeJob<T extends object>(
+  connection: IDBConnection,
+  queueName: string,
+  data: T,
+  options: IPublishOptions,
+  singletonKey: string
+): Promise<string | null> {
+  const boss = publisherDependencies.getPgBoss();
 
+  await boss.createQueue(queueName);
+
+  return boss.send(queueName, data, {
+    ...options,
+    startAfter: DERIVED_CACHE_RECOMPUTE_DELAY_SECONDS,
+    singletonKey,
+    db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+  });
+}
+
+/**
+ * Options for compute scope anchors jobs.
+ */
 const COMPUTE_SCOPE_ANCHORS_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
@@ -645,9 +679,10 @@ const COMPUTE_SCOPE_ANCHORS_OPTIONS: IPublishOptions = {
  * Publish a compute scope anchors job to the queue.
  *
  * Queues async anchor computation for a security scope. Each scope gets its
- * own delayed singleton job. The short cooldown coalesces bursts of policy or
- * security-rule edits for the same scope without dropping recomputes for other
- * scopes.
+ * own delayed singleton job, and each (scope, submission) pair for runs limited
+ * to one submission, so a burst of policy or security-rule edits coalesces into
+ * one queued recompute without dropping recomputes for other scopes or
+ * submissions.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
  * @param {IComputeScopeAnchorsJobData} data Job data containing securityScopeId
@@ -662,19 +697,22 @@ export const publishComputeScopeAnchorsJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...COMPUTE_SCOPE_ANCHORS_OPTIONS, ...options };
 
-    await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS);
+    // A whole-scope run and each submission-limited run coalesce separately: a queued run for one submission
+    // must not absorb a policy change or another submission's change, which it would not recompute.
+    const singletonKey =
+      data.submissionId === null
+        ? `scope-anchors-${data.securityScopeId}`
+        : `scope-anchors-${data.securityScopeId}-submission-${data.submissionId}`;
 
-    const startAfter = mergedOptions.startAfter ?? new Date(Date.now() + COMPUTE_SCOPE_ANCHORS_COOLDOWN_SECONDS * 1000);
-
-    const jobId = await boss.send(JobQueues.COMPUTE_SCOPE_ANCHORS, data, {
-      ...mergedOptions,
-      startAfter,
-      singletonKey: `scope-anchors-${data.securityScopeId}`,
-      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
-    });
+    const jobId = await sendDelayedRecomputeJob(
+      connection,
+      JobQueues.COMPUTE_SCOPE_ANCHORS,
+      data,
+      mergedOptions,
+      singletonKey
+    );
 
     if (jobId) {
       defaultLog.info({
@@ -689,7 +727,7 @@ export const publishComputeScopeAnchorsJob = async (
 
     defaultLog.warn({
       label: 'publishComputeScopeAnchorsJob',
-      message: 'Job not published (duplicate or throttled)',
+      message: 'Job not published; the queued job for this key was rescheduled',
       securityScopeId: data.securityScopeId
     });
 
@@ -722,8 +760,9 @@ const COMPUTE_SUBMISSION_FEATURE_CLOSURE_OPTIONS: IPublishOptions = {
  * Publish a compute submission feature closure job to the queue.
  *
  * Queues the async reachability-closure recompute for a submission upload. Uses the caller's
- * DB connection via pg-boss's `db` option so the job insert participates in
- * the same transaction — if the caller rolls back, the job is never visible.
+ * DB connection so the job insert participates in the same transaction — if the caller rolls back,
+ * the job is never visible. Delayed and coalesced per upload: a queued job reads feature state when it runs, so
+ * it covers every change committed before it starts.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
  * @param {IComputeSubmissionFeatureClosureJobData} data Upload scope.
@@ -738,19 +777,15 @@ export const publishComputeSubmissionFeatureClosureJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...COMPUTE_SUBMISSION_FEATURE_CLOSURE_OPTIONS, ...options };
 
-    await boss.createQueue(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
-
-    // Default to per-upload dedupe; callers may pass a revision-specific key when a later
-    // feature-state change for the same upload must enqueue its own recompute.
-    // Pass caller's connection via db option so job insert is part of the same transaction
-    const jobId = await boss.send(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE, data, {
-      ...mergedOptions,
-      singletonKey: mergedOptions.singletonKey ?? `closure-recompute-${data.submissionUploadId}`,
-      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
-    });
+    const jobId = await sendDelayedRecomputeJob(
+      connection,
+      JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE,
+      data,
+      mergedOptions,
+      `closure-recompute-${data.submissionUploadId}`
+    );
 
     if (jobId) {
       defaultLog.info({
@@ -765,7 +800,7 @@ export const publishComputeSubmissionFeatureClosureJob = async (
 
     defaultLog.warn({
       label: 'publishComputeSubmissionFeatureClosureJob',
-      message: 'Job not published (duplicate or throttled)',
+      message: 'Job not published; the queued job for this upload was rescheduled',
       submissionUploadId: data.submissionUploadId
     });
 
@@ -931,6 +966,66 @@ export const publishEvaluateTicketTagRulesJob = async (
       label: 'publishEvaluateTicketTagRulesJob',
       message: 'Failed to publish job',
       ticketId: data.ticketId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Publish an approve submission upload job to the queue.
+ *
+ * Queued in the same transaction that records the `approving` decision, so an upload can never be left
+ * `approving` without a durable job to finish the approval. One job per upload is queued at a time.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IApproveSubmissionUploadJobData} data Job data containing submissionUploadId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishApproveSubmissionUploadJob = async (
+  connection: IDBConnection,
+  data: IApproveSubmissionUploadJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = publisherDependencies.getPgBoss();
+    // Activation updates every feature row of the upload and its predecessors, so it uses the feature pipeline policy.
+    const mergedOptions = { ...FEATURE_PIPELINE_STAGE_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.APPROVE_SUBMISSION_UPLOAD);
+
+    const jobId = await boss.send(JobQueues.APPROVE_SUBMISSION_UPLOAD, data, {
+      ...mergedOptions,
+      singletonKey: `submission-upload-approve-${data.submissionUploadId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishApproveSubmissionUploadJob',
+        message: 'Approve submission upload job published',
+        jobId,
+        submissionUploadId: data.submissionUploadId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishApproveSubmissionUploadJob',
+      message: 'Job not published (duplicate or throttled)',
+      submissionUploadId: data.submissionUploadId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this submission upload' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishApproveSubmissionUploadJob',
+      message: 'Failed to publish job',
+      submissionUploadId: data.submissionUploadId,
       error
     });
     throw error;

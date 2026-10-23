@@ -22,6 +22,7 @@ describe('submission upload decision (integration)', function () {
   let connection: IDBConnection;
   let service: SubmissionUploadService;
   let publishClosureStub: sinon.SinonStub;
+  let publishApproveStub: sinon.SinonStub;
 
   before(() => initDBPool(defaultPoolConfig));
   beforeEach(async () => {
@@ -32,10 +33,13 @@ describe('submission upload decision (integration)', function () {
     const memberships = new ContributorSystemUserService(connection);
     await memberships.ensureContributorSystemUser(contributorId, connection.systemUserId());
     service = new SubmissionUploadService(connection);
-    // pg-boss is not running under test:db; the closure job publish is asserted, not executed.
+    // pg-boss is not running under test:db; job publishes are asserted, not executed.
     publishClosureStub = sinon
       .stub(SubmissionUploadService.dependencies, 'publishComputeSubmissionFeatureClosureJob')
       .resolves({ status: 'published', jobId: 'stub-job-id' });
+    publishApproveStub = sinon
+      .stub(SubmissionUploadService.dependencies, 'publishApproveSubmissionUploadJob')
+      .resolves({ status: 'published', jobId: 'stub-approve-job-id' });
   });
   afterEach(async () => {
     await connection.rollback();
@@ -100,7 +104,7 @@ describe('submission upload decision (integration)', function () {
     return result.rows[0].uuid;
   }
 
-  it('approval writes the decision and keys the closure job on the upload audit revision', async () => {
+  it('approval records approving and queues the approval job without activating features', async () => {
     const submissionId = await createTestSubmission(connection);
     const submissionUploadId = await createUpload(submissionId, 'indexed', true);
     const before = await readUpload(submissionUploadId);
@@ -112,17 +116,73 @@ describe('submission upload decision (integration)', function () {
 
     const result = await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
 
-    expect(result).to.eql({ submission_upload_id: submissionUploadId, decision: 'approved' });
+    expect(result).to.eql({ submission_upload_id: submissionUploadId, decision: 'approving' });
+    expect((await readUpload(submissionUploadId)).decision).to.equal('approving');
+    expect(publishApproveStub).to.have.been.calledOnce;
+    expect(publishApproveStub.firstCall.args[1]).to.eql({ submissionUploadId });
+    expect(publishClosureStub).not.to.have.been.called;
+
+    // Re-approving while the job is queued is idempotent and queues nothing more.
+    const again = await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
+    expect(again).to.eql({ submission_upload_id: submissionUploadId, decision: 'approving' });
+    expect(publishApproveStub).to.have.been.calledOnce;
+  });
+
+  it('applying a queued approval writes the decision and queues the closure job once', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const submissionUploadId = await createUpload(submissionId, 'indexed', true);
+    await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
+    const approving = await readUpload(submissionUploadId);
+
+    await service.applySubmissionUploadApproval(submissionUploadId);
+
     const after = await readUpload(submissionUploadId);
     expect(after.decision).to.equal('approved');
     const approvedUpload = await service.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
     expect(approvedUpload.decision).to.equal('approved');
-    expect(after.revision_count).to.be.greaterThan(before.revision_count);
+    expect(after.revision_count).to.be.greaterThan(approving.revision_count);
     expect(publishClosureStub).to.have.been.calledOnce;
     expect(publishClosureStub.firstCall.args[1]).to.eql({ submissionUploadId });
-    expect(publishClosureStub.firstCall.args[2]).to.eql({
-      singletonKey: `closure-recompute-${submissionUploadId}-${after.revision_count}`
-    });
+
+    // A duplicate job finds the upload already approved and changes nothing.
+    await service.applySubmissionUploadApproval(submissionUploadId);
+    expect((await readUpload(submissionUploadId)).revision_count).to.equal(after.revision_count);
+    expect(publishClosureStub).to.have.been.calledOnce;
+
+    const reapproved = await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
+    expect(reapproved).to.eql({ submission_upload_id: submissionUploadId, decision: 'approved' });
+    expect(publishApproveStub).to.have.been.calledOnce;
+  });
+
+  it('refuses other decisions while an approval is being applied', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const submissionUploadId = await createUpload(submissionId, 'indexed', true);
+    await service.updateSubmissionUploadDecision(submissionUploadId, { decision: 'approved' });
+
+    for (const decision of ['denied', 'pending'] as const) {
+      try {
+        await service.updateSubmissionUploadDecision(submissionUploadId, { decision });
+        expect.fail('Expected HTTP409');
+      } catch (error) {
+        expect(error).to.be.instanceOf(HTTP409);
+      }
+    }
+
+    expect((await readUpload(submissionUploadId)).decision).to.equal('approving');
+  });
+
+  it('reverting a failed approval returns only an approving upload to pending', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const approvingUploadId = await createUpload(submissionId, 'indexed', true);
+    const deniedUploadId = await createUpload(submissionId, 'indexed');
+    await service.updateSubmissionUploadDecision(approvingUploadId, { decision: 'approved' });
+    await service.updateSubmissionUploadDecision(deniedUploadId, { decision: 'denied' });
+
+    await service.revertSubmissionUploadApproval(approvingUploadId);
+    await service.revertSubmissionUploadApproval(deniedUploadId);
+
+    expect((await readUpload(approvingUploadId)).decision).to.equal('pending');
+    expect((await readUpload(deniedUploadId)).decision).to.equal('denied');
   });
 
   it('denial and reset round-trip on the decision column without queueing a closure recompute', async () => {
@@ -172,10 +232,13 @@ describe('submission upload decision (integration)', function () {
     const submissionId = await createTestSubmission(connection);
     const uuid = await submissionUuid(submissionId);
     const approvedUploadId = await createUpload(submissionId, 'indexed', true);
+    const approvingUploadId = await createUpload(submissionId, 'indexed', true);
     const deniedUploadId = await createUpload(submissionId, 'indexed');
     const deletedUploadId = await createUpload(submissionId, 'uploaded');
 
     await service.updateSubmissionUploadDecision(approvedUploadId, { decision: 'approved' });
+    await service.applySubmissionUploadApproval(approvedUploadId);
+    await service.updateSubmissionUploadDecision(approvingUploadId, { decision: 'approved' });
     await service.updateSubmissionUploadDecision(deniedUploadId, { decision: 'denied' });
     await service.deleteSubmissionUpload(uuid, deletedUploadId);
 
@@ -186,6 +249,8 @@ describe('submission upload decision (integration)', function () {
     expect(result.submissionId).to.equal(submissionId);
     expect(result.history.map((row) => [row.submissionUploadId, row.status])).to.have.deep.members([
       [approvedUploadId, 'approved'],
+      // An approval whose features are not yet published is still awaiting its outcome externally.
+      [approvingUploadId, 'submitted'],
       [deniedUploadId, 'denied'],
       [deletedUploadId, 'deleted']
     ]);

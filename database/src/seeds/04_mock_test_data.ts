@@ -549,14 +549,12 @@ const insertSearchString = (options: { submission_feature_id: number; property_n
     (
         submission_feature_id,
         blueprint_feature_type_property_id,
-        value,
-        create_user
+        value
     )
     SELECT
         sf.submission_feature_id,
         bftp.blueprint_feature_type_property_id,
-        LEFT($$${options.value}$$, 250),
-        1
+        LEFT($$${options.value}$$, 250)
     FROM submission_feature sf
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -582,14 +580,12 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     (
         submission_feature_id,
         blueprint_feature_type_property_id,
-        value,
-        create_user
+        value
     )
     SELECT
         sf.submission_feature_id,
         bftp.blueprint_feature_type_property_id,
-        ${faker.number.int({ min: 0, max: 100 })},
-        1
+        ${faker.number.int({ min: 0, max: 100 })}
     FROM submission_feature sf
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -610,15 +606,13 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
         submission_feature_id,
         blueprint_feature_type_property_id,
         date_value,
-        time_value,
-        create_user
+        time_value
     )
     SELECT
         sf.submission_feature_id,
         bftp.blueprint_feature_type_property_id,
         $$${date}$$::date,
-        NULL::time,
-        1
+        NULL::time
     FROM submission_feature sf
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -640,15 +634,13 @@ const insertSearchEndDatetime = (options: { submission_feature_id: number }) => 
         submission_feature_id,
         blueprint_feature_type_property_id,
         date_value,
-        time_value,
-        create_user
+        time_value
     )
     SELECT
         sf.submission_feature_id,
         bftp.blueprint_feature_type_property_id,
         $$${date}$$::date,
-        NULL::time,
-        1
+        NULL::time
     FROM submission_feature sf
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -667,8 +659,7 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
     (
         submission_feature_id,
         blueprint_feature_type_property_id,
-        value,
-        create_user
+        value
     )
     SELECT
         sf.submission_feature_id,
@@ -682,8 +673,7 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
                 [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
               )['features'][0]['geometry']
             )}'
-        ),
-        1
+        )
     FROM submission_feature sf
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -701,8 +691,7 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
     (
         submission_feature_id,
         blueprint_feature_type_property_id,
-        value,
-        create_user
+        value
     )
     SELECT
         sf.submission_feature_id,
@@ -714,8 +703,7 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
                 [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
               )['features'][0]['geometry']
             )}'
-        ),
-        1
+        )
     FROM submission_feature sf
     JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
     JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -766,8 +754,8 @@ export const insertTelemetryRecord = async (
   // are hardcoded to `name`/`count` property names, so we use inline SQL here
   // to target telemetry's specific property names.
   await knex.raw(
-    `INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?, 1
+    `INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value)
+     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?
      FROM submission_feature sf
      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
      JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -778,8 +766,8 @@ export const insertTelemetryRecord = async (
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?, 1
+    `INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value)
+     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?
      FROM submission_feature sf
      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
      JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
@@ -790,8 +778,8 @@ export const insertTelemetryRecord = async (
   );
 
   await knex.raw(
-    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
-     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time, 1
+    `INSERT INTO submission_feature_property_timestamp (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value)
+     SELECT sf.submission_feature_id, bftp.blueprint_feature_type_property_id, ?::timestamptz::date, ?::timestamptz::time
      FROM submission_feature sf
      JOIN submission_upload su ON su.submission_upload_id = sf.submission_upload_id
      JOIN blueprint_feature_type bft ON bft.blueprint_id = su.blueprint_id AND bft.feature_type_id = sf.feature_type_id AND bft.record_end_date IS NULL
