@@ -5,7 +5,7 @@ import { SkeletonHorizontalStack } from 'components/loading/SkeletonLoaders';
 import { SearchInput } from 'components/search/SearchInput';
 import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
 import { URL_PARAMS } from 'constants/query-params';
-import { SEARCH_PREVIEW_DEBOUNCE_MS, SEARCH_PREVIEW_PAGINATION } from 'constants/search';
+import { SEARCH_PREVIEW_DEBOUNCE_MS } from 'constants/search';
 import { useApi } from 'hooks/useApi';
 import useDebounce from 'hooks/useDebounce';
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -38,25 +38,17 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
   const navigate = useNavigate();
 
   const [searchValue, setSearchValue] = useState('');
-  // The keyword the preview shows; null until the user first types, when only the summary of everything is shown.
-  const [previewKeyword, setPreviewKeyword] = useState<string | null>(null);
+  // The keyword the preview summarizes; empty until the user first types, when the summary of everything is shown.
+  const [previewKeyword, setPreviewKeyword] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const recordsQuery = useQuery({
-    queryKey: searchQueryKeys.keywordRecords(previewKeyword ?? '', SEARCH_PREVIEW_PAGINATION),
-    queryFn: ({ signal }) =>
-      api.search.searchAll({ keyword: previewKeyword ?? '' }, SEARCH_PREVIEW_PAGINATION, { signal }),
-    enabled: previewKeyword !== null,
-    placeholderData: keepPreviousData
-  });
   const summaryQuery = useQuery({
-    queryKey: searchQueryKeys.keywordSummary(previewKeyword ?? ''),
-    queryFn: ({ signal }) => api.search.searchSummary({ keyword: previewKeyword ?? '' }, { signal }),
+    queryKey: searchQueryKeys.keywordSummary(previewKeyword),
+    queryFn: ({ signal }) => api.search.searchSummary({ keyword: previewKeyword }, { signal }),
     placeholderData: keepPreviousData
   });
-  const records = recordsQuery.data ?? null;
   const summary = summaryQuery.data ?? null;
 
   const debouncedSearch = useDebounce(setPreviewKeyword, SEARCH_PREVIEW_DEBOUNCE_MS);
@@ -88,20 +80,20 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
       }
 
       // ArrowDown focuses first item in listbox
-      if (e.key === 'ArrowDown' && (records || summary)) {
+      if (e.key === 'ArrowDown' && summary) {
         e.preventDefault();
         const firstItem = document.querySelector<HTMLButtonElement>('[data-search-item]:first-of-type');
         firstItem?.focus();
       }
     },
-    [debouncedSearch, navigate, searchValue, records, summary]
+    [debouncedSearch, navigate, searchValue, summary]
   );
 
   const handleFocus = useCallback(() => setIsDropdownOpen(true), []);
   const handleClickAway = useCallback(() => setIsDropdownOpen(false), []);
 
-  const shouldShowDropdown = isDropdownOpen && (records || summary);
-  const showLoading = !records && !summary && recordsQuery.isFetching && summaryQuery.isFetching;
+  const shouldShowDropdown = isDropdownOpen && summary;
+  const showLoading = !summary && summaryQuery.isFetching;
 
   return (
     <Stack gap={2}>
@@ -120,7 +112,6 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
             <Box position="absolute" top="100%" left={0} right={0} mt={1} zIndex={9999}>
               <SearchListbox
                 searchTerm={searchValue}
-                records={records}
                 summary={summary}
                 defaultFeatureTypeName={PRIORITY_FEATURE_TYPE.SPECIES_OBSERVATION}
                 isLoading={showLoading}

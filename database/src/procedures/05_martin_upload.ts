@@ -7,8 +7,8 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
 /**
  * Create the submission-upload spatial property vector tile function.
  *
- * Draws every spatial property of every ACTIVE submission feature that belongs to one submission
- * upload, for the administrative upload review map. It follows the `biohub.martin_feature` design
+ * Draws every spatial property of every submission feature that belongs to one submission upload,
+ * whatever its lifecycle, for the administrative upload review map. It follows the `biohub.martin_feature` design
  * rather than the `biohub.martin_search` one: the context string is not a lookup key, it carries the
  * submission id and the upload id directly, and it is trustworthy because the gateway only forwards
  * the `ctx` claim of a signed token it has verified. The mint endpoint is restricted to system
@@ -19,15 +19,11 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * protect: an administrator can already read every one of these geometries in full through
  * `GET /api/administrative/submission/{id}/upload/{id}/features/{id}/properties`. What is still
  * enforced is the shape of the request: the upload must belong to the submission named in the same
- * token, and the feature must still be active. Both are join conditions below.
+ * token, which is a join condition below.
  *
- * ACTIVE means `record_end_date IS NULL`, and deliberately NOT `record_effective_date <= now()`.
- * Features under validation review have never been published, so `record_effective_date` is NULL
- * for all of them and a published predicate would render an empty map. Reconciliation retires a
- * superseded upload's pending features by setting `record_end_date = now()`, so `IS NULL` is exactly
- * the set an administrator is reviewing. The predicate is written literally rather than as
- * `(record_end_date IS NULL OR now() < record_end_date)` because that literal form is what the
- * partial index `submission_feature_idx9` is defined on.
+ * No lifecycle predicate is applied. An upload's features are always viewable as a set: features
+ * under validation review have never been published, and features of an earlier upload may since
+ * have been ended or superseded, but all of them belong to the upload being viewed.
  *
  * The same predicate set is applied by
  * `SubmissionFeaturePropertyGeometryRepository.getSubmissionUploadGeometryExtent`, which decides
@@ -35,8 +31,8 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * or claims the upload has no spatial properties while tiles still render. Change both together.
  *
  * The context may end with a reconciliation outcome (`su:<submission>:<upload>:<outcome>`), which
- * limits the tile to the active features stored with that outcome. Without it every active feature
- * of the upload is drawn. The extent query takes the same optional outcome.
+ * limits the tile to the features stored with that outcome. Without it every feature of the upload
+ * is drawn. The extent query takes the same optional outcome.
  *
  * There is no low zoom clustering. `martin_search` clusters because its candidate set is the whole
  * corpus; here the candidate set is bounded by one upload's features whatever the zoom, and the
@@ -143,7 +139,7 @@ export async function seed(knex: Knex): Promise<void> {
           fp.display_name AS property_display_name,
           fp.name AS property_name
         -- Driven from submission_feature: the upload id is the selective predicate, served by the
-        -- partial index submission_feature_idx9, and each feature's
+        -- index submission_feature_idx4 on submission_upload_id, and each feature's
         -- geometries are then fetched by submission_feature_id. Driving from the geometry table's
         -- GIST index instead would make a low zoom tile scan every geometry in the envelope, which
         -- at zoom 4 is the whole province.
@@ -171,8 +167,6 @@ export async function seed(knex: Knex): Promise<void> {
           -- The submission is part of the token, so a token cannot be replayed against an upload id
           -- that belongs to a different submission than the one that was authorized.
           AND sf.submission_id = v_submission_id
-          -- Active, not published: see the function comment. Keep this literal form.
-          AND sf.record_end_date IS NULL
           AND (v_reconciliation IS NULL OR sf.reconciliation = v_reconciliation)
           AND g.value && v_candidates_4326
           AND NOT public.ST_IsEmpty(parts.part_4326)
@@ -188,7 +182,7 @@ export async function seed(knex: Knex): Promise<void> {
     -- Martin parses the function comment as TileJSON metadata and logs a warning if it is not valid
     -- JSON, so the description is provided as a TileJSON fragment rather than prose.
     COMMENT ON FUNCTION biohub.martin_upload(integer, integer, integer, json) IS
-      '{"description": "Spatial property vector tiles for every active submission feature of one submission upload. The submission and upload identifiers, and an optional reconciliation outcome, are carried by the verified token, and the upload to submission relationship is re-checked here."}';
+      '{"description": "Spatial property vector tiles for every submission feature of one submission upload, whatever its lifecycle. The submission and upload identifiers, and an optional reconciliation outcome, are carried by the verified token, and the upload to submission relationship is re-checked here."}';
 
     ----------------------------------------------------------------------------------------
     -- Grants

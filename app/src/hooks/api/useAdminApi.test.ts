@@ -115,20 +115,6 @@ describe('useAdminApi', () => {
     expect(mock.history.get[3].params).toEqual(pagination);
   });
 
-  it('gets paginated submission features from the administrative endpoint', async () => {
-    const mockResponse = {
-      features: [],
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
-    };
-
-    mock.onGet('/api/administrative/submission/1/features').reply(200, mockResponse);
-
-    const result = await useAdminApi(axios).getSubmissionFeatures(1, { page: 1, limit: 10 });
-
-    expect(result).toEqual(mockResponse);
-    expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
-  });
-
   it('gets a submission upload review', async () => {
     const submissionUploadId = '11111111-1111-4111-8111-111111111111';
     const submissionUploadReviewId = '22222222-2222-4222-8222-222222222222';
@@ -186,24 +172,6 @@ describe('useAdminApi', () => {
     await expect(
       useAdminApi(axios).updateSubmissionUploadReview(16, submissionUploadId, submissionUploadReviewId, 'completed')
     ).resolves.toEqual(mockResponse);
-  });
-
-  it('gets paginated features for a submission upload', async () => {
-    const submissionUploadId = '11111111-1111-4111-8111-111111111111';
-    const mockResponse = {
-      features: [],
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 25 }
-    };
-
-    mock.onGet(`/api/administrative/submission/16/upload/${submissionUploadId}/features`).reply(200, mockResponse);
-
-    const result = await useAdminApi(axios).getSubmissionUploadFeatures(16, submissionUploadId, {
-      page: 1,
-      limit: 25
-    });
-
-    expect(result).toEqual(mockResponse);
-    expect(mock.history.get[0].params).toEqual({ page: 1, limit: 25 });
   });
 
   it('gets an unpublished feature belonging to a submission upload', async () => {

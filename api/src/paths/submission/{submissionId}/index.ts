@@ -5,6 +5,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
+import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/submission/{submissionId}');
 
@@ -163,9 +164,10 @@ export function getSubmissionRecordWithSecurity(): RequestHandler {
     try {
       await connection.open();
 
+      const systemUserId = await getActiveSystemUserId(connection);
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+      const result = await submissionService.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, systemUserId);
 
       await connection.commit();
 

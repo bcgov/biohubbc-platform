@@ -60,6 +60,10 @@ export async function seed(knex: Knex): Promise<void> {
     -- when any closure ancestor carries an active security application — or, fail closed, when the
     -- reflexive closure self-loop is missing, because then the closure is not built and the feature
     -- cannot be proven unsecured.
+    --
+    -- Only the security assignment's lifecycle is checked. Ancestor feature lifecycle is deliberately
+    -- ignored: between approval and the asynchronous closure rebuild, the closure can still point a
+    -- child at a just-superseded parent, and that parent's security must keep applying to the child.
     ----------------------------------------------------------------------------------------
     CREATE OR REPLACE FUNCTION biohub.martin_feature_is_secured(p_submission_feature_id integer)
     RETURNS boolean
@@ -73,12 +77,10 @@ export async function seed(knex: Knex): Promise<void> {
           SELECT 1
           FROM biohub.submission_feature_closure c
           JOIN biohub.submission_feature_security sfs ON sfs.submission_feature_id = c.target_submission_feature_id
-          JOIN biohub.submission_feature sf_sec ON sf_sec.submission_feature_id = c.target_submission_feature_id
           WHERE c.source_submission_feature_id = p_submission_feature_id
             AND c.is_ancestor = true
-            AND sfs.record_end_date IS NULL
-            AND sf_sec.record_effective_date <= now()
-            AND (sf_sec.record_end_date IS NULL OR now() < sf_sec.record_end_date)
+            AND sfs.record_effective_date <= now()
+            AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
         )
         OR NOT EXISTS (
           SELECT 1
@@ -98,6 +100,10 @@ export async function seed(knex: Knex): Promise<void> {
     -- (NULL user) sees unsecured features only; an authenticated caller additionally sees features
     -- whose closure reaches a security-scope anchor held by one of their live teams. Evaluated live
     -- on every call, so revoking a membership takes effect on the next generated tile.
+    --
+    -- Anchors are an asynchronous cache, so the anchor's closure self-loop (which only current
+    -- features have), effective security, and scope URN match are revalidated here as
+    -- isAccessibleToUser does.
     ----------------------------------------------------------------------------------------
     CREATE OR REPLACE FUNCTION biohub.martin_feature_accessible(
       p_submission_feature_id integer,
@@ -117,6 +123,9 @@ export async function seed(knex: Knex): Promise<void> {
             SELECT 1
             FROM biohub.submission_feature_closure c
             JOIN biohub.security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
+            JOIN biohub.security_scope ss ON ss.security_scope_id = ssa.security_scope_id
+            JOIN biohub.submission_feature anchor_sf ON anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
+            JOIN biohub.feature_type anchor_ft ON anchor_ft.feature_type_id = anchor_sf.feature_type_id
             JOIN biohub.team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
             JOIN biohub.team t ON t.team_id = tss.team_id AND t.record_end_date IS NULL
             JOIN biohub.team_member tm ON tm.team_id = tss.team_id
@@ -124,6 +133,16 @@ export async function seed(knex: Knex): Promise<void> {
               AND tm.record_end_date IS NULL
             WHERE c.source_submission_feature_id = p_submission_feature_id
               AND c.is_ancestor = true
+              AND EXISTS (
+                SELECT 1
+                FROM biohub.submission_feature_closure closure_ready
+                WHERE closure_ready.source_submission_feature_id = anchor_sf.submission_feature_id
+                  AND closure_ready.target_submission_feature_id = anchor_sf.submission_feature_id
+              )
+              AND biohub.martin_feature_is_secured(anchor_sf.submission_feature_id)
+              AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
+              AND (ss.urn_feature_type = anchor_ft.name OR ss.urn_feature_type = '*')
+              AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
           )
         );
     $fn$;
@@ -222,8 +241,6 @@ export async function seed(knex: Knex): Promise<void> {
             JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND esf.record_effective_date <= now()
-              AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
                 (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
                 OR (
@@ -271,8 +288,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -313,8 +328,6 @@ export async function seed(knex: Knex): Promise<void> {
             JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND esf.record_effective_date <= now()
-              AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
                 (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
                 OR (
@@ -362,8 +375,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -404,8 +415,6 @@ export async function seed(knex: Knex): Promise<void> {
             JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND esf.record_effective_date <= now()
-              AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
                 (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
                 OR (
@@ -453,8 +462,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -494,8 +501,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -531,8 +536,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -592,8 +595,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.taxon tx ON tx.taxon_id = pv.taxon_id AND tx.record_end_date IS NULL
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -681,8 +682,6 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -725,8 +724,6 @@ export async function seed(knex: Knex): Promise<void> {
               AND cs.record_end_date IS NULL
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND esf.record_effective_date <= now()
-              AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
               AND (
                 (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
                 OR (
@@ -778,8 +775,6 @@ export async function seed(knex: Knex): Promise<void> {
             AND cs.record_end_date IS NULL
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND esf.record_effective_date <= now()
-            AND (esf.record_end_date IS NULL OR now() < esf.record_end_date)
             AND (
               (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
               OR (
@@ -922,19 +917,17 @@ export async function seed(knex: Knex): Promise<void> {
       WHERE g.value && p_envelope_4326
         AND sf.feature_type_id = p_feature_type_id
         AND (p_submission_ids IS NULL OR sf.submission_id = ANY(p_submission_ids))
-        AND (
-          p_submission_ids IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM biohub.submission_feature_closure submission_scope_closure
-            WHERE submission_scope_closure.source_submission_feature_id = sf.submission_feature_id
-              AND submission_scope_closure.target_submission_feature_id = sf.submission_feature_id
-          )
+        -- The closure holds only current features: approval deletes a submission's closure in the same transaction that
+        -- publishes and supersedes its features, and the rebuild writes self-loops for current features only. The
+        -- self-loop is therefore the current-feature check, and evidence reached through closure edges is current too.
+        AND EXISTS (
+          SELECT 1
+          FROM biohub.submission_feature_closure current_feature
+          WHERE current_feature.source_submission_feature_id = sf.submission_feature_id
+            AND current_feature.target_submission_feature_id = sf.submission_feature_id
         )
-        AND sf.record_effective_date <= now()
-        AND (sf.record_end_date IS NULL OR now() < sf.record_end_date)
         AND biohub.martin_feature_accessible(sf.submission_feature_id, p_system_user_id)
-        -- NULL expression = unfiltered browse-all: every accessible, active feature of the type.
+        -- NULL expression = unfiltered browse-all: every accessible, current feature of the type.
         AND (
           p_expression_id IS NULL
           OR biohub.martin_expression_matches(

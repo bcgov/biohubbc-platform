@@ -10,7 +10,7 @@ import {
   SubmissionFeaturePropertyGeometrySchema
 } from '../models/submission-feature-property-geometry';
 import { BaseRepository } from './base-repository';
-import { isSubmissionFeatureActive, isSubmissionFeaturePublished } from './sql-fragments';
+import { isSubmissionFeaturePublished } from './sql-fragments';
 
 export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository {
   /**
@@ -160,13 +160,11 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
   }
 
   /**
-   * Get the combined extent and count of the spatial properties of every ACTIVE submission feature
-   * belonging to one submission upload.
+   * Get the combined extent and count of the spatial properties of every submission feature belonging
+   * to one submission upload, whatever its lifecycle.
    *
-   * Active means not ended (`record_end_date IS NULL`), and deliberately NOT published: an upload
-   * under review has never been approved, so every one of its features has a null effective date
-   * and a published predicate would report no spatial properties for the whole upload. See
-   * {@link isSubmissionFeatureActive} for why the literal form matters to the planner.
+   * An upload's features are always viewable as a set: unpublished features of an upload under review,
+   * and ended or superseded features of an earlier upload, are all included.
    *
    * The joins here must stay aligned with `biohub.martin_upload`
    * (`database/src/procedures/05_martin_upload.ts`): this decides whether a map is offered and where
@@ -200,10 +198,6 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
           AND sf.submission_id = ${submissionId}
     `;
 
-    scope.append(`
-          AND ${isSubmissionFeatureActive('sf')}
-    `);
-
     if (reconciliation) {
       scope.append(SQL`
           AND sf.reconciliation = ${reconciliation}
@@ -214,7 +208,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
   }
 
   /**
-   * Get the spatial extent of one current feature within an upload, including unpublished review features.
+   * Get the spatial extent of one feature within an upload, whatever its lifecycle.
    *
    * @param {number} submissionId Submission boundary.
    * @param {string} submissionUploadId Upload boundary.
@@ -240,7 +234,6 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE sf.submission_id = ${submissionId}
         AND sf.submission_upload_id = ${submissionUploadId}::uuid
         AND sf.submission_feature_id = ${submissionFeatureId}
-        AND sf.record_end_date IS NULL
     `;
 
     const response = await this.connection.sql(query, SubmissionFeatureGeometryExtentSchema);

@@ -1,130 +1,13 @@
 import { Knex } from 'knex';
-import SQL from 'sql-template-strings';
 import { LANDING_PAGE_FEATURE_TYPES, PRIORITY_FEATURE_TYPE } from '../constants/feature-type';
 import { getKnex } from '../database/db';
-import {
-  SearchFeatureResult,
-  SearchSubmissionResult,
-  SearchSummaryFeature,
-  SearchSummarySubmission,
-  SearchSummaryTaxon,
-  SearchTaxonResult
-} from '../models/search';
+import { SearchSummaryFeature, SearchSummarySubmission, SearchSummaryTaxon, SearchTaxonResult } from '../models/search';
 import { SearchParams, SearchTaxonFilters, WithCount } from '../services/search-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isSubmissionFeatureCurrent } from './sql-fragments';
+import { buildSecurityFilter, isSubmissionFeatureCurrent } from './sql-fragments';
 
 export class SearchRepository extends BaseRepository {
-  /**
-   * Builds a query to find features matching a search term.
-   *
-   * Matches the keyword against four corpora — free-text string and paragraph properties, codeset code
-   * labels/descriptions, and taxon names/codes — and emits one row per matched feature. Only
-   * feature types in {@link LANDING_PAGE_FEATURE_TYPES} are eligible. The displayed `label`
-   * is the matched value itself, so the dropdown row always reflects *why* the feature
-   * surfaced. For types that store a canonical `name` in both `sf.data` and a `_string`
-   * property (e.g. study_area, sample_site, survey), a keyword that hits the name produces
-   * the name as the matched value — so the name-search UX is preserved.
-   *
-   * The code arm matches `c.label`, `c.key`, and `c.description`. Keys aren't necessarily
-   * numeric — many codesets use human-readable tokens — so they're worth searching despite
-   * the occasional bare-integer key. The taxon arm matches scientific/common name, BC taxon
-   * code, and ITIS TSN, and prefers the friendliest available label (`common_name` →
-   * scientific → BC code → TSN) as the matched value.
-   *
-   * @param {string} keyword - The search term to match against
-   * @return {Knex.QueryBuilder} Query builder for finding features
-   * @memberof SearchRepository
-   */
-  private _makeFindFeaturesQuery(keyword: string): Knex.QueryBuilder {
-    const knex = getKnex();
-    const pattern = `%${keyword}%`;
-
-    // String arm — match the free-text value.
-    const stringMatches = knex('submission_feature_property_string as p')
-      .select('p.submission_feature_id', knex.raw('p.value::text as matched_value'))
-      .whereILike('p.value', pattern);
-
-    // Paragraph arm — match the long free-text value.
-    const paragraphMatches = knex('submission_feature_property_paragraph as p')
-      .select('p.submission_feature_id', knex.raw('p.value::text as matched_value'))
-      .whereILike('p.value', pattern);
-
-    // Code arm — match the display label, key, or description. Keys aren't always numeric;
-    // many codesets use human-readable tokens worth searching.
-    const codeMatches = knex('submission_feature_property_code as p')
-      .join('contributor_codeset_code as c', 'c.contributor_codeset_code_id', 'p.contributor_codeset_code_id')
-      .select('p.submission_feature_id', knex.raw('c.label as matched_value'))
-      .whereNull('c.record_end_date')
-      .where((qb) => {
-        qb.whereILike('c.label', pattern).orWhereILike('c.key', pattern).orWhereILike('c.description', pattern);
-      });
-
-    // Taxon arm — match scientific/common name, BC code, or TSN. Prefer the friendliest
-    // available label for the fragment fallback (common name → scientific name → BC code → TSN).
-    const taxonMatches = knex('submission_feature_property_taxon as p')
-      .join('taxon as t', 't.taxon_id', 'p.taxon_id')
-      .select(
-        'p.submission_feature_id',
-        knex.raw(
-          'COALESCE(t.common_name, t.itis_scientific_name, t.bc_taxon_code, t.itis_tsn::text)::text as matched_value'
-        )
-      )
-      .whereNull('t.record_end_date')
-      .where((qb) => {
-        qb.whereILike('t.itis_scientific_name', pattern)
-          .orWhereILike('t.common_name', pattern)
-          .orWhereILike('t.bc_taxon_code', pattern)
-          .orWhereRaw('CAST(t.itis_tsn AS TEXT) ILIKE ?', [pattern]);
-      });
-
-    const matches = stringMatches.unionAll([paragraphMatches, codeMatches, taxonMatches]);
-
-    return knex
-      .from(matches.as('matches'))
-      .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
-      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .whereRaw(isSubmissionFeatureCurrent('sf'))
-      .whereIn('ft.name', [...LANDING_PAGE_FEATURE_TYPES, 'dataset'])
-      .groupBy('sf.submission_feature_id', 'sf.feature_type_id', 'ft.name')
-      .select(
-        'sf.submission_feature_id',
-        'sf.feature_type_id',
-        'ft.name as feature_type_name',
-        knex.raw('MIN(matches.matched_value) as label')
-      );
-  }
-
-  /**
-   * Builds a query to find submissions matching a search term.
-   *
-   * @param {string} keyword - The search term to match against
-   * @return {Knex.QueryBuilder} Query builder for finding submissions
-   * @memberof SearchRepository
-   */
-  private _makeFindSubmissionsQuery(keyword: string): Knex.QueryBuilder {
-    const knex = getKnex();
-    return knex('submission as s')
-      .leftJoin('submission_feature as sf', function () {
-        this.on('sf.submission_id', 's.submission_id').andOn(knex.raw(isSubmissionFeatureCurrent('sf')));
-      })
-      .leftJoin('submission_feature_property_string as sfps', 'sfps.submission_feature_id', 'sf.submission_feature_id')
-      .leftJoin(
-        'submission_feature_property_paragraph as sfpp',
-        'sfpp.submission_feature_id',
-        'sf.submission_feature_id'
-      )
-      .whereNull('s.record_end_date')
-      .where((qb) => {
-        qb.whereILike('s.name', `%${keyword}%`)
-          .orWhereILike('sfps.value', `%${keyword}%`)
-          .orWhereILike('sfpp.value', `%${keyword}%`);
-      })
-      .select('s.submission_id', 's.name', 's.description')
-      .distinct();
-  }
-
   /**
    * Builds a query to find local taxon records.
    *
@@ -192,50 +75,6 @@ export class SearchRepository extends BaseRepository {
   }
 
   /**
-   * Finds features matching the search term with pagination support.
-   * Returns paginated results with total count.
-   *
-   * @param {SearchParams} params - Object containing the search term
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
-   * @return {Promise<WithCount<SearchFeatureResult>>} Paginated feature results and total count
-   * @memberof SearchRepository
-   */
-  async findFeatures(params: SearchParams, pagination?: ApiPaginationOptions): Promise<WithCount<SearchFeatureResult>> {
-    const base = this._makeFindFeaturesQuery(params.keyword);
-
-    if (params.feature_type_name) {
-      base.where('ft.name', params.feature_type_name);
-    }
-
-    const jsonbObject = `jsonb_build_object('submission_feature_id', submission_feature_id, 'feature_type_id', feature_type_id, 'feature_type_name', feature_type_name, 'label', label)`;
-    const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
-
-    const result = await this.connection.knex(query);
-    return result.rows[0]?.result ?? { data: [], total: 0 };
-  }
-
-  /**
-   * Finds submissions matching the search term with pagination support.
-   * Returns paginated results with total count.
-   *
-   * @param {SearchParams} params - Object containing the search term
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
-   * @return {Promise<WithCount<SearchSubmissionResult>>} Paginated submission results and total count
-   * @memberof SearchRepository
-   */
-  async findSubmissions(
-    params: SearchParams,
-    pagination?: ApiPaginationOptions
-  ): Promise<WithCount<SearchSubmissionResult>> {
-    const base = this._makeFindSubmissionsQuery(params.keyword);
-    const jsonbObject = `jsonb_build_object('submission_id', submission_id, 'name', name, 'description', description)`;
-    const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
-
-    const result = await this.connection.knex(query);
-    return result.rows[0]?.result ?? { data: [], total: 0 };
-  }
-
-  /**
    * Finds local taxon records with pagination support.
    *
    * @param {SearchTaxonFilters} filters - Taxon search filters.
@@ -266,55 +105,59 @@ export class SearchRepository extends BaseRepository {
 
   /**
    * Returns a summary of features matching the search term, grouped by feature type.
-   * Only features with count > 0 are returned.
+   * Only features with count > 0 are returned, and only current features the caller can access are counted.
    *
    * @param {SearchParams} params - Object containing the search term
+   * @param {number | null} systemUserId - Caller identity, or null for anonymous (unsecured features only).
    * @return {Promise<SearchSummaryFeature[]>} Array of feature type summaries with counts
    * @memberof SearchRepository
    */
-  async findFeatureSummary(params: SearchParams): Promise<SearchSummaryFeature[]> {
+  async findFeatureSummary(params: SearchParams, systemUserId: number | null): Promise<SearchSummaryFeature[]> {
+    const knex = getKnex();
     const priorityTypes = Object.values(PRIORITY_FEATURE_TYPE);
     const allowedTypes = [...LANDING_PAGE_FEATURE_TYPES, 'dataset'];
     const pattern = `%${params.keyword}%`;
+    // buildSecurityFilter only returns null for unfiltered internal callers; fail closed if that ever changes.
+    const securityFilter = buildSecurityFilter(knex, systemUserId, 'sf.submission_feature_id') ?? knex.raw('false');
 
-    const query = SQL`
+    const query = knex.raw(
+      `
       WITH matching_ids AS (
         SELECT submission_feature_id
           FROM submission_feature_property_string
-         WHERE value ILIKE ${pattern}
+         WHERE value ILIKE ?
         UNION ALL
         SELECT submission_feature_id
           FROM submission_feature_property_paragraph
-         WHERE value ILIKE ${pattern}
+         WHERE value ILIKE ?
         UNION ALL
         SELECT p.submission_feature_id
           FROM submission_feature_property_code p
           JOIN contributor_codeset_code c ON c.contributor_codeset_code_id = p.contributor_codeset_code_id
          WHERE c.record_end_date IS NULL
-           AND (c.label ILIKE ${pattern} OR c.description ILIKE ${pattern})
+           AND (c.label ILIKE ? OR c.description ILIKE ?)
         UNION ALL
         SELECT p.submission_feature_id
           FROM submission_feature_property_taxon p
           JOIN taxon t ON t.taxon_id = p.taxon_id
          WHERE t.record_end_date IS NULL
-           AND ( t.itis_scientific_name ILIKE ${pattern}
-              OR t.common_name           ILIKE ${pattern}
-              OR t.bc_taxon_code         ILIKE ${pattern}
-              OR CAST(t.itis_tsn AS TEXT) ILIKE ${pattern} )
+           AND ( t.itis_scientific_name ILIKE ?
+              OR t.common_name           ILIKE ?
+              OR t.bc_taxon_code         ILIKE ?
+              OR CAST(t.itis_tsn AS TEXT) ILIKE ? )
       ),
       matching_features AS (
         SELECT DISTINCT sf.submission_feature_id, sf.feature_type_id
           FROM matching_ids m
          JOIN submission_feature sf ON sf.submission_feature_id = m.submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-    `;
-    query.append(` WHERE ${isSubmissionFeatureCurrent('sf')}`);
-    query.append(SQL`
-           AND ft.name = ANY(${allowedTypes}::text[])
+         WHERE ${isSubmissionFeatureCurrent('sf')}
+           AND ?
+           AND ft.name = ANY(?::text[])
       ),
       priority_types AS (
         SELECT feature_type_id, name FROM feature_type
-        WHERE name = ANY(${priorityTypes}::text[])
+        WHERE name = ANY(?::text[])
           AND record_end_date IS NULL
       )
       SELECT
@@ -325,9 +168,23 @@ export class SearchRepository extends BaseRepository {
       GROUP BY pt.name, pt.feature_type_id
       HAVING COUNT(mf.submission_feature_id) > 0
       ORDER BY total DESC
-    `);
+    `,
+      [
+        pattern,
+        pattern,
+        pattern,
+        pattern,
+        pattern,
+        pattern,
+        pattern,
+        pattern,
+        securityFilter,
+        allowedTypes,
+        priorityTypes
+      ]
+    );
 
-    const result = await this.connection.sql(query, SearchSummaryFeature);
+    const result = await this.connection.knex(query, SearchSummaryFeature);
 
     return result.rows;
   }

@@ -14,7 +14,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
-  SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
@@ -403,9 +402,9 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionIdWithSecurity')
         .resolves(mockResponse);
 
-      const response = await submissionService.getSubmissionRecordBySubmissionIdWithSecurity(1);
+      const response = await submissionService.getSubmissionRecordBySubmissionIdWithSecurity(1, 42);
 
-      expect(repo).to.be.calledOnce;
+      expect(repo).to.be.calledOnceWith(1, 42);
       expect(response).to.be.eql(mockResponse);
     });
   });
@@ -490,117 +489,6 @@ describe('SubmissionService', () => {
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
-    });
-  });
-
-  describe('getSubmissionFeaturesBySubmissionId', () => {
-    it('should return an array of submission features', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const submissionId = 1;
-
-      const mockSubmissionRecords: SubmissionFeatureRecordWithTypeAndSecurity[] = [
-        {
-          submission_feature_id: 1,
-          uuid: '111-234-345',
-          submission_id: submissionId,
-          urn: `urn:${submissionId}:survey:1`,
-          feature_type_id: 2,
-          source_id: 'source-id-1',
-          data: {},
-          parent_submission_feature_id: 4,
-          record_effective_date: '2020-01-01',
-          record_end_date: null,
-          create_date: '2020-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'survey',
-          submission_feature_security_ids: []
-        },
-        {
-          submission_feature_id: 2,
-          uuid: '222-234-345',
-          submission_id: submissionId,
-          urn: `urn:${submissionId}:survey:2`,
-          feature_type_id: 2,
-          source_id: 'source-id-2',
-          data: {},
-          parent_submission_feature_id: 1,
-          record_effective_date: '2020-01-01',
-          record_end_date: null,
-          create_date: '2020-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'observation',
-          submission_feature_security_ids: []
-        },
-        {
-          submission_feature_id: 3,
-          uuid: '333-234-345',
-          submission_id: submissionId,
-          urn: `urn:${submissionId}:survey:3`,
-          feature_type_id: 2,
-          source_id: 'source-id-3',
-          data: {},
-          parent_submission_feature_id: 1,
-          record_effective_date: '2020-01-01',
-          record_end_date: null,
-          create_date: '2020-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'observation',
-          submission_feature_security_ids: []
-        },
-        {
-          submission_feature_id: 4,
-          uuid: '444-234-345',
-          submission_id: submissionId,
-          urn: `urn:${submissionId}:survey:4`,
-          feature_type_id: 3,
-          source_id: 'source-id-4',
-          data: {},
-          parent_submission_feature_id: 1,
-          record_effective_date: '2020-01-01',
-          record_end_date: null,
-          create_date: '2020-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'artifact',
-          submission_feature_security_ids: []
-        }
-      ];
-
-      const getReviewedSubmissionsForAdminsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId')
-        .resolves(mockSubmissionRecords);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getSubmissionFeaturesBySubmissionId(submissionId);
-
-      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnceWith(submissionId);
-      expect(response).to.be.eql([
-        {
-          feature_type_name: 'survey',
-          features: [{ ...mockSubmissionRecords[0] }]
-        },
-        {
-          feature_type_name: 'observation',
-          features: [{ ...mockSubmissionRecords[1] }, { ...mockSubmissionRecords[2] }]
-        },
-        {
-          feature_type_name: 'artifact',
-          features: [{ ...mockSubmissionRecords[3] }]
-        }
-      ]);
     });
   });
 
@@ -692,29 +580,6 @@ describe('SubmissionService', () => {
 
       expect(getSubmissionRootFeatureStub).to.be.calledOnceWith(submissionId);
       expect(response).to.be.eql(submissionFeature);
-    });
-  });
-
-  describe('findSubmissionFeatures', () => {
-    it('finds and returns submission features', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const submissionFeaturesResponse: SubmissionFeatureRecord[] = [];
-
-      const findSubmissionFeaturesStub = sinon
-        .stub(SubmissionRepository.prototype, 'findSubmissionFeatures')
-        .resolves(submissionFeaturesResponse);
-
-      const criteria = {
-        submissionId: 1,
-        featureTypeNames: ['survey', 'artifact']
-      };
-
-      const response = await submissionService.findSubmissionFeatures(criteria);
-
-      expect(findSubmissionFeaturesStub).to.be.calledOnceWith(criteria);
-      expect(response).to.be.eql(submissionFeaturesResponse);
     });
   });
 });

@@ -44,10 +44,9 @@ describe('changedQueryKeys', () => {
     }
   );
 
-  it('discards keyword results and summaries as well as feature searches after upload approval', async () => {
+  it('discards keyword summaries as well as feature searches after upload approval', async () => {
     const client = createTestQueryClient();
     const reads = [
-      searchQueryKeys.keywordRecords('bear', { page: 1, limit: 10 }),
       searchQueryKeys.keywordSummary('bear'),
       searchQueryKeys.keywordSummary(''),
       searchQueryKeys.featureCount('observation', undefined, null)

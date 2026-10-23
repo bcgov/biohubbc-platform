@@ -22,8 +22,9 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * must re-check.
  *
  * What is still enforced here is the shape of the request rather than the identity of the caller: the
- * feature must belong to the submission named in the same token, and it must still be active. Both are
- * join conditions below, so a token minted before a feature was end-dated stops producing tiles.
+ * feature must belong to the submission named in the same token, and it must have been published. Both
+ * are join conditions below. A superseded feature stays published, so its detail page keeps rendering its
+ * map, matching the direct-ID detail, properties, and extent reads.
  *
  * SECURITY DEFINER with a pinned search_path: the function is owned by the migration role, which can
  * read the underlying tables, so the `martin` role needs EXECUTE on this function and nothing else —
@@ -125,7 +126,6 @@ export async function seed(knex: Knex): Promise<void> {
           -- that belongs to a different submission than the one that was authorized.
           AND sf.submission_id = v_submission_id
           AND sf.record_effective_date <= now()
-          AND (sf.record_end_date IS NULL OR now() < sf.record_end_date)
         -- The Blueprint assignment is what makes a geometry row nameable. It is joined at any lifecycle,
         -- as api/src/repositories/submission-feature-property-repository.ts does, so the map and the
         -- properties table label the same geometry the same way, including under a superseded Blueprint.
