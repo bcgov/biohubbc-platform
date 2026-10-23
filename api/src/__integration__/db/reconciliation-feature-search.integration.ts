@@ -224,10 +224,8 @@ describe('Reconciliation feature browsing (integration)', function () {
       `);
       await connection.sql(SQL`
         INSERT INTO submission_feature_property_artifact
-          (submission_feature_id, blueprint_feature_type_property_id, artifact_id, create_user)
-        VALUES (${feature}, ${property.assignments.animal}, ${
-        artifact.rows[0].artifact_id
-      }, ${connection.systemUserId()})
+          (submission_feature_id, blueprint_feature_type_property_id, artifact_id)
+        VALUES (${feature}, ${property.assignments.animal}, ${artifact.rows[0].artifact_id})
       `);
     }
     const page = await service.getReconciliationFeatures(scope, 'animal', {

@@ -8,6 +8,7 @@ import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEdit
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
 import { useTicketTimelineUploadActions } from './hooks/upload/useTicketTimelineUploadActions';
+import { useTicketUploadApprovalRefresh } from './hooks/upload/useTicketUploadApprovalRefresh';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
 
@@ -48,6 +49,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleConfirmSubmissionUploadDecisionUpdate,
     handleConfirmSubmissionUploadDecisionReset
   } = useTicketTimelineUploadActions();
+  useTicketUploadApprovalRefresh(ticket);
   const authStateContext = useAuthStateContext();
   const canViewSubmissionUploadStatusHistory = hasAtLeastOneValidValue(
     [SYSTEM_ROLE.SYSTEM_ADMIN],

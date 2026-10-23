@@ -5,10 +5,10 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { ApiConflictError, ApiNotFoundError } from '../errors/api-error';
 import { TagRule, TagRuleRequest } from '../models/tag-rule';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
-import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { ExpressionTreeService } from './expression-tree-service';
 import { TagRuleService } from './tag-rule-service';
 import { TagService } from './tag-service';
+import { TicketTagService } from './ticket-tag-service';
 
 chai.use(sinonChai);
 
@@ -118,7 +118,7 @@ describe('TagRuleService', () => {
   describe('deleteTagRule', () => {
     it('removes the rule tags only when asked', async () => {
       sinon.stub(TagRuleRepository.prototype, 'getTagRuleById').resolves(tagRule);
-      const removeTagsStub = sinon.stub(TicketTagRepository.prototype, 'deleteTicketTagsByTagRuleId').resolves();
+      const removeTagsStub = sinon.stub(TicketTagService.prototype, 'deleteTicketTagsByTagRuleId').resolves();
       const deleteStub = sinon.stub(TagRuleRepository.prototype, 'deleteTagRule').resolves();
 
       await service.deleteTagRule(tagId, tagRuleId, false);

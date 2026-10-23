@@ -182,12 +182,14 @@ describe('AdminSubmissionUploadPage', () => {
     expect(screen.getByRole('dialog')).toBeVisible();
   });
 
-  it('disables reindexing once the upload is accepted', async () => {
-    mocks.getUpload.mockResolvedValue({ ...upload, status: 'indexed', decision: 'approved' });
-    renderAt();
-    await waitFor(() => expect(mocks.getUpload).toHaveBeenCalled());
-    expect(await screen.findByRole('button', { name: 'Reindex' })).toBeDisabled();
-  });
+  for (const decision of ['approving', 'approved', 'denied'] as const) {
+    it(`disables reindexing once the upload's decision is ${decision}`, async () => {
+      mocks.getUpload.mockResolvedValue({ ...upload, status: 'indexed', decision });
+      renderAt();
+      await waitFor(() => expect(mocks.getUpload).toHaveBeenCalled());
+      expect(await screen.findByRole('button', { name: 'Reindex' })).toBeDisabled();
+    });
+  }
 
   it('hides reindexing from administrators who cannot reindex', async () => {
     mocks.roleNames = ['Data Administrator'];

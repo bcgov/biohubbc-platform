@@ -1,12 +1,12 @@
 import { EditDialog } from 'components/dialog/EditDialog';
-import { IBoardDetail, IBoardSummary } from 'interfaces/useBoardsApi.interface';
+import { IBoard } from 'interfaces/useBoardsApi.interface';
 import { BoardForm, IBoardFormValues } from '../form/BoardForm';
 import { BoardYupSchema } from '../form/BoardYupSchema';
 
 interface IBoardDialogProps {
   open: boolean;
   /** The board being edited; omitted to create a board. */
-  board?: IBoardSummary | IBoardDetail;
+  board?: IBoard;
   isLoading: boolean;
   /** Error from the last save, such as a duplicate name, shown in the dialog. */
   dialogError?: string;
@@ -16,12 +16,11 @@ interface IBoardDialogProps {
 
 const CreateBoardFormInitialValues: IBoardFormValues = {
   name: '',
-  description: null,
-  tags: []
+  description: null
 };
 
 /**
- * Dialog for creating a board or editing one's name, description and tags, using the shared `EditDialog`.
+ * Dialog for creating a board or editing one's name and description, using the shared `EditDialog`.
  *
  * @param {IBoardDialogProps} props The board being edited, if any, and the save and cancel handlers.
  * @returns {JSX.Element} The board dialog.
@@ -29,7 +28,7 @@ const CreateBoardFormInitialValues: IBoardFormValues = {
 export const BoardDialog = (props: IBoardDialogProps) => {
   const { open, board, isLoading, dialogError, onCancel, onSave } = props;
   const initialValues: IBoardFormValues = board
-    ? { name: board.name, description: board.description, tags: board.tags }
+    ? { name: board.name, description: board.description }
     : CreateBoardFormInitialValues;
 
   return (

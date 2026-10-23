@@ -21,7 +21,10 @@ describe('SubmissionFeatureRepository feature lookup', () => {
     expect(statement.text).to.include('sf.successor_submission_feature_id');
     expect(statement.text).to.include('c.client_id AS contributor_name');
     expect(statement.text).to.include('c.contributor_id = s.contributor_id');
-    expect(statement.text).not.to.include('record_effective_date');
+    expect(statement.text).not.to.include('sf.record_effective_date');
+    expect(statement.text).to.include('terminal.terminal_submission_feature_id');
+    expect(statement.text).to.include('parent.submission_upload_id = sf.submission_upload_id');
+    expect(statement.text).to.include('sfs.record_effective_date <= now()');
     expect(statement.values).to.eql([12, 16, '11111111-1111-4111-8111-111111111111']);
   });
 

@@ -1,5 +1,9 @@
 import { SQL } from 'sql-template-strings';
 import { z } from 'zod';
+import {
+  SUBMISSION_UPLOAD_INGESTION_LOCK_PREFIX,
+  SUBMISSION_UPLOAD_INGESTION_LOCK_SEED
+} from '../../constants/database-lock-keys';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
@@ -287,6 +291,28 @@ export class SubmissionUploadRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Try to take the per-upload ingestion advisory lock for the current transaction.
+   *
+   * The lock is released when the transaction commits or rolls back. It does not block:
+   * callers decide how to handle an upload whose ingestion is already running elsewhere.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<boolean>} True when the lock was acquired.
+   * @memberof SubmissionUploadRepository
+   */
+  async tryLockSubmissionUploadIngestion(submissionUploadId: string): Promise<boolean> {
+    const sqlStatement = SQL`
+      SELECT pg_try_advisory_xact_lock(
+        hashtextextended(${SUBMISSION_UPLOAD_INGESTION_LOCK_PREFIX} || ':' || ${submissionUploadId}::text, ${SUBMISSION_UPLOAD_INGESTION_LOCK_SEED})
+      ) AS locked;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, z.object({ locked: z.boolean() }));
+
+    return response.rows[0].locked;
   }
 
   /**

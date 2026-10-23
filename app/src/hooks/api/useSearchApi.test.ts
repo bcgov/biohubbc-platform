@@ -7,7 +7,6 @@ import {
   SearchFeatureResponse,
   SearchFeatureResultWithRelevancy,
   SearchPropertyResponse,
-  SearchResponse,
   SearchSummaryResponse,
   SearchTaxonResponse
 } from 'interfaces/useSearchApi.interface';
@@ -346,46 +345,6 @@ describe('useSearchApi', () => {
     });
   });
 
-  describe('searchAll', () => {
-    it('should make GET request to /api/search with query params', async () => {
-      const mockResponse: SearchResponse = {
-        features: {
-          data: [{ submission_feature_id: 1, label: 'Label', feature_type_id: 1, feature_type_name: 'survey' }],
-          total: 5000
-        },
-        submissions: { data: [], total: 1 },
-        taxonomy: { data: [], total: 0 }
-      };
-
-      mock.onGet('/api/search').reply(200, mockResponse);
-
-      const result = await api.searchAll({ keyword: 'test' }, { page: 1, limit: 10 });
-
-      expect(result).toEqual(mockResponse);
-      expect(mock.history.get[0].params).toEqual({ keyword: 'test', page: 1, limit: 10 });
-    });
-
-    it('should make GET request with feature_type_name filter', async () => {
-      const mockResponse: SearchResponse = {
-        features: { data: [], total: 0 },
-        submissions: { data: [], total: 0 },
-        taxonomy: { data: [], total: 0 }
-      };
-
-      mock.onGet('/api/search').reply(200, mockResponse);
-
-      const result = await api.searchAll({ keyword: 'moose', feature_type_name: 'survey' }, { page: 1, limit: 10 });
-
-      expect(result).toEqual(mockResponse);
-      expect(mock.history.get[0].params).toEqual({
-        keyword: 'moose',
-        feature_type_name: 'survey',
-        page: 1,
-        limit: 10
-      });
-    });
-  });
-
   describe('searchSummary', () => {
     it('should make GET request to /api/search/summary and return typed summary', async () => {
       const mockResponse: SearchSummaryResponse = {
@@ -403,27 +362,6 @@ describe('useSearchApi', () => {
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.get[0].params).toEqual({ keyword: 'moose' });
-    });
-
-    it('should return summary with feature_type_name filter', async () => {
-      const mockResponse: SearchSummaryResponse = {
-        features: [{ feature_type_name: PRIORITY_FEATURE_TYPE.SURVEY, total: 10 }],
-        submissions: { total: 5 },
-        taxonomy: { total: 8 }
-      };
-
-      mock.onGet('/api/search/summary').reply(200, mockResponse);
-
-      const result = await api.searchSummary({
-        keyword: 'wildlife',
-        feature_type_name: 'survey'
-      });
-
-      expect(result).toEqual(mockResponse);
-      expect(mock.history.get[0].params).toEqual({
-        keyword: 'wildlife',
-        feature_type_name: 'survey'
-      });
     });
   });
 });

@@ -3,24 +3,9 @@ import { ExpressionPredicateOperator } from 'interfaces/expression.interface';
 import { JsonValue } from 'types/json';
 import { ApiCursorResponseParams, ApiPaginationResponseParams } from 'types/pagination';
 
-/** Generic paginated result */
-interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-}
-
-/** Request parameters for simple feature search */
-export interface ISearchAllFilters {
+/** Request parameters for the keyword search summary */
+export interface ISearchSummaryFilters {
   keyword: string;
-  feature_type_name?: string;
-}
-
-/** Feature search result (for combined search) */
-export interface SearchFeatureResult {
-  submission_feature_id: number;
-  feature_type_id: number;
-  feature_type_name: string;
-  label: string;
 }
 
 /**
@@ -65,13 +50,6 @@ export interface SearchFeatureResultWithRelevancy {
   create_date: string;
 }
 
-/** Submission search result */
-export interface SearchSubmissionResult {
-  submission_id: number;
-  name: string;
-  description?: string | null;
-}
-
 /** Taxon search result */
 export interface SearchTaxonResult {
   taxon_id: number;
@@ -80,13 +58,6 @@ export interface SearchTaxonResult {
   common_name: string | null;
   rank: string | null;
   relevancy_score: number;
-}
-
-/** Combined search response */
-export interface SearchResponse {
-  features: PaginatedResult<SearchFeatureResult>;
-  submissions: PaginatedResult<SearchSubmissionResult>;
-  taxonomy: PaginatedResult<SearchTaxonResult>;
 }
 
 /** Base summary row type */

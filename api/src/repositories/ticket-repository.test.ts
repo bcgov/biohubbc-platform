@@ -112,6 +112,19 @@ describe('TicketRepository', () => {
     });
   });
 
+  describe('lockTicketSlugGeneration', () => {
+    it('takes the transaction-scoped slug generation lock in its own statement', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new TicketRepository(mockDBConnection);
+
+      await repo.lockTicketSlugGeneration();
+
+      expect(sqlStub).to.have.been.calledOnce;
+      expect(sqlStub.firstCall.args[0].text).to.include("pg_advisory_xact_lock(hashtext('ticket_slug_generation'))");
+    });
+  });
+
   describe('getNextTicketSlug', () => {
     it('throws when slug generation fails', async () => {
       const mockQueryResponse = Promise.resolve(mockQueryResult([]));
@@ -137,6 +150,7 @@ describe('TicketRepository', () => {
       const result = await repo.getNextTicketSlug();
 
       expect(sqlStub).to.have.been.calledWithMatch(sinon.match.any, TicketSlug);
+      expect(sqlStub.firstCall.args[0].text).not.to.include('pg_advisory_xact_lock');
       expect(result).to.equal('04900042');
     });
   });

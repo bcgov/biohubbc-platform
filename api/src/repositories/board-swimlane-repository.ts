@@ -2,8 +2,8 @@ import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { BoardSwimlane, BoardSwimlaneId, BoardSwimlanePayload } from '../models/board';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { activeBoardSwimlaneTagsJson } from './sql-fragments';
 
 const BOARD_SWIMLANE_COLUMNS = `
   bs.board_swimlane_id,
@@ -12,8 +12,7 @@ const BOARD_SWIMLANE_COLUMNS = `
   bs.description,
   bs.color,
   bs.sort_order,
-  bs.is_visible,
-  ${activeBoardSwimlaneTagsJson('bs.board_swimlane_id')} AS tags
+  bs.is_visible
 `;
 
 /**
@@ -21,7 +20,7 @@ const BOARD_SWIMLANE_COLUMNS = `
  */
 export class BoardSwimlaneRepository extends BaseRepository {
   /**
-   * Get the active swimlanes of a board with their active tags, in display order (sort_order, then id).
+   * Get the active swimlanes of a board, in display order (sort_order, then id).
    *
    * @param {string} boardId - Board UUID.
    * @returns {Promise<BoardSwimlane[]>} Active swimlanes of the board.
@@ -46,7 +45,54 @@ export class BoardSwimlaneRepository extends BaseRepository {
   }
 
   /**
-   * Get a single active swimlane that belongs to the given board, with its active tags.
+   * Get one page of the active swimlanes of a board. Without a sort, lanes are in display order
+   * (sort_order, then id); a sort is followed by the id, so pages never overlap.
+   *
+   * @param {string} boardId - Board UUID.
+   * @param {ApiPaginationOptions} [pagination] - Page, page size and sort.
+   * @returns {Promise<BoardSwimlane[]>} One page of the board's active swimlanes.
+   * @memberof BoardSwimlaneRepository
+   */
+  async getPaginatedBoardSwimlanes(boardId: string, pagination?: ApiPaginationOptions): Promise<BoardSwimlane[]> {
+    const knex = getKnex();
+    let query = knex('board_swimlane as bs')
+      .select(knex.raw(BOARD_SWIMLANE_COLUMNS))
+      .where('bs.board_id', boardId)
+      .whereNull('bs.record_end_date');
+    query = this.applyPagination(query, pagination);
+
+    if (!pagination?.sort) {
+      query = query.orderBy('bs.sort_order', 'asc');
+    }
+
+    query = query.orderBy('bs.board_swimlane_id', 'asc');
+
+    const response = await this.connection.knex(query, BoardSwimlane);
+
+    return response.rows;
+  }
+
+  /**
+   * Count the active swimlanes of a board.
+   *
+   * @param {string} boardId - Board UUID.
+   * @returns {Promise<number>} Number of active swimlanes.
+   * @memberof BoardSwimlaneRepository
+   */
+  async getBoardSwimlanesCount(boardId: string): Promise<number> {
+    const knex = getKnex();
+    const query = knex('board_swimlane')
+      .select(knex.raw('count(*)::integer as count'))
+      .where('board_id', boardId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query);
+
+    return response.rows[0]?.count ?? 0;
+  }
+
+  /**
+   * Get a single active swimlane that belongs to the given board.
    *
    * @param {string} boardId - Board UUID the swimlane must belong to.
    * @param {string} boardSwimlaneId - Board swimlane UUID.
@@ -101,7 +147,8 @@ export class BoardSwimlaneRepository extends BaseRepository {
   }
 
   /**
-   * Insert a swimlane at the end of a board (max active sort_order + 1, or 0 for the first lane).
+   * Insert a visible swimlane at the given sort_order, or else at the end of a board (max active sort_order + 1, or 0 for
+   * the first lane).
    *
    * @param {string} boardId - Board UUID.
    * @param {BoardSwimlanePayload} swimlane - Swimlane payload.
@@ -117,8 +164,8 @@ export class BoardSwimlaneRepository extends BaseRepository {
         ${swimlane.name}::varchar,
         ${swimlane.description}::varchar,
         ${swimlane.color}::varchar,
-        ${swimlane.is_visible}::boolean,
-        COALESCE(MAX(bs.sort_order) + 1, 0)
+        true,
+        COALESCE(${swimlane.sort_order ?? null}::integer, MAX(bs.sort_order) + 1, 0)
       FROM board_swimlane bs
       WHERE bs.board_id = ${boardId}
         AND bs.record_end_date IS NULL
@@ -154,7 +201,7 @@ export class BoardSwimlaneRepository extends BaseRepository {
         name: swimlane.name,
         description: swimlane.description,
         color: swimlane.color,
-        is_visible: swimlane.is_visible
+        ...(swimlane.sort_order !== undefined && { sort_order: swimlane.sort_order })
       })
       .where('board_swimlane_id', boardSwimlaneId)
       .where('board_id', boardId)

@@ -52,6 +52,7 @@ export const SUBMISSION_UPLOAD_TERMINAL_JOB_STATUS_ICON_COLORS: Partial<Record<S
 
 export const SUBMISSION_UPLOAD_DECISION_LABELS: Record<SubmissionUploadDecision, string> = {
   pending: 'Pending',
+  approving: 'Accepting',
   approved: 'Accepted',
   denied: 'Rejected'
 };
@@ -75,6 +76,7 @@ export const SUBMISSION_UPLOAD_ACTIVE_JOB_STATUS_CHIP_COLOR: ChipProps['color'] 
 
 export const SUBMISSION_UPLOAD_DECISION_CHIP_COLORS: Record<SubmissionUploadDecision, ChipProps['color']> = {
   pending: 'default',
+  approving: 'info',
   approved: 'success',
   denied: 'error'
 };

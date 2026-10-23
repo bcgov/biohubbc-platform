@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { SubmissionUploadDecision } from './submission-upload';
+import { RequestedSubmissionUploadDecision, SubmissionUploadDecision } from './submission-upload';
 
 /**
  * Payload for recording a human review decision on a submission upload.
  */
 export const UpdateSubmissionUploadDecision = z.object({
-  decision: SubmissionUploadDecision
+  decision: RequestedSubmissionUploadDecision
 });
 export type UpdateSubmissionUploadDecision = z.infer<typeof UpdateSubmissionUploadDecision>;
 
@@ -13,7 +13,7 @@ export type UpdateSubmissionUploadDecision = z.infer<typeof UpdateSubmissionUplo
  * Result of a decision write on `submission_upload`.
  *
  * `revision_count` is bumped by the audit trigger on every update and keys the closure recompute job
- * queued by an approval.
+ * queued when an approval is applied.
  */
 export const SubmissionUploadDecisionRow = z.object({
   submission_upload_id: z.string().uuid(),

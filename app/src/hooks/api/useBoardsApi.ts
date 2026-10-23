@@ -1,6 +1,19 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
-import { IBoardDetail, IBoardRequest, IBoardsQueryParams, IGetBoardsResponse } from 'interfaces/useBoardsApi.interface';
+import {
+  IBoardDetail,
+  IBoardRequest,
+  IBoardsQueryParams,
+  IBoardSwimlane,
+  IBoardSwimlaneRequest,
+  IBoardSwimlanesQueryParams,
+  IBoardTicketCreateRequest,
+  IBoardTicketRequest,
+  IBoardTickets,
+  IGetBoardsResponse,
+  IGetBoardSwimlanesResponse
+} from 'interfaces/useBoardsApi.interface';
 import { ITag, ITagRequest } from 'interfaces/useTagsApi.interface';
+import { ITicket } from 'interfaces/useTicketsApi.interface';
 
 /**
  * Returns a set of supported api methods for working with ticket boards. Every endpoint is administrative.
@@ -74,7 +87,8 @@ export const useBoardsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Create a tag and add it to a board. The tag is a regular tag, available to every ticket and board.
+   * Create a tag and link it to a board, so applying it to a ticket puts the ticket on the board. The tag is a regular
+   * tag, available to every ticket.
    *
    * @param {string} boardId
    * @param {ITagRequest} payload
@@ -86,12 +100,165 @@ export const useBoardsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Link an existing tag to a board. The tickets that have it are put on the board, and so are tickets it is applied to
+   * later.
+   *
+   * @param {string} boardId
+   * @param {string} tagId
+   * @return {*} {Promise<void>}
+   */
+  const addBoardTag = async (boardId: string, tagId: string): Promise<void> => {
+    await axios.put(`/api/administrative/boards/${boardId}/tags/${tagId}`);
+  };
+
+  /**
+   * Unlink a tag from a board, taking the tickets that have it off the board unless another of their tags is linked
+   * to it. The tag is not affected.
+   *
+   * @param {string} boardId
+   * @param {string} tagId
+   * @return {*} {Promise<void>}
+   */
+  const deleteBoardTag = async (boardId: string, tagId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/boards/${boardId}/tags/${tagId}`);
+  };
+
+  /**
+   * Get a board's open tickets grouped by lane.
+   *
+   * @param {string} boardId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {*} {Promise<IBoardTickets>} Every lane in display order with its tickets.
+   */
+  const getBoardTickets = async (
+    boardId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IBoardTickets> => {
+    const { data } = await axios.get<IBoardTickets>(`/api/administrative/boards/${boardId}/tickets`, options);
+
+    return data;
+  };
+
+  /**
+   * Create a ticket on a board, in its default lane, To Do.
+   *
+   * @param {string} boardId
+   * @param {IBoardTicketCreateRequest} payload The ticket's fields.
+   * @return {*} {Promise<ITicket>} The created ticket.
+   */
+  const createBoardTicket = async (boardId: string, payload: IBoardTicketCreateRequest): Promise<ITicket> => {
+    const { data } = await axios.post<ITicket>(`/api/administrative/boards/${boardId}/tickets`, payload);
+
+    return data;
+  };
+
+  /**
+   * Put a ticket on a board, or move it to another of the board's lanes. Without a lane, a ticket not on the board goes
+   * in its default lane, To Do, and a ticket on it stays in its lane.
+   *
+   * @param {string} boardId
+   * @param {string} ticketId
+   * @param {IBoardTicketRequest} payload The lane the ticket is moved in, if any.
+   * @return {*} {Promise<void>}
+   */
+  const updateBoardTicket = async (boardId: string, ticketId: string, payload: IBoardTicketRequest): Promise<void> => {
+    await axios.put(`/api/administrative/boards/${boardId}/tickets/${ticketId}`, payload);
+  };
+
+  /**
+   * Take a ticket off a board. The ticket itself is not affected.
+   *
+   * @param {string} boardId
+   * @param {string} ticketId
+   * @return {*} {Promise<void>}
+   */
+  const deleteBoardTicket = async (boardId: string, ticketId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/boards/${boardId}/tickets/${ticketId}`);
+  };
+
+  /**
+   * Get one page of a board's swimlanes, in display order unless a sort is given.
+   *
+   * @param {string} boardId
+   * @param {IBoardSwimlanesQueryParams} params Page and sort.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {*} {Promise<IGetBoardSwimlanesResponse>} The page of swimlanes with server pagination totals.
+   */
+  const getBoardSwimlanes = async (
+    boardId: string,
+    params: IBoardSwimlanesQueryParams,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<IGetBoardSwimlanesResponse> => {
+    const { data } = await axios.get<IGetBoardSwimlanesResponse>(`/api/administrative/boards/${boardId}/swimlanes`, {
+      params,
+      ...options
+    });
+
+    return data;
+  };
+
+  /**
+   * Create a swimlane at the end of a board.
+   *
+   * @param {string} boardId
+   * @param {IBoardSwimlaneRequest} payload
+   * @return {*} {Promise<IBoardSwimlane>} The created swimlane.
+   */
+  const createBoardSwimlane = async (boardId: string, payload: IBoardSwimlaneRequest): Promise<IBoardSwimlane> => {
+    const { data } = await axios.post<IBoardSwimlane>(`/api/administrative/boards/${boardId}/swimlanes`, payload);
+
+    return data;
+  };
+
+  /**
+   * Update a board's swimlane, replacing its tags with the given set.
+   *
+   * @param {string} boardId
+   * @param {string} boardSwimlaneId
+   * @param {IBoardSwimlaneRequest} payload
+   * @return {*} {Promise<IBoardSwimlane>} The updated swimlane.
+   */
+  const updateBoardSwimlane = async (
+    boardId: string,
+    boardSwimlaneId: string,
+    payload: IBoardSwimlaneRequest
+  ): Promise<IBoardSwimlane> => {
+    const { data } = await axios.put<IBoardSwimlane>(
+      `/api/administrative/boards/${boardId}/swimlanes/${boardSwimlaneId}`,
+      payload
+    );
+
+    return data;
+  };
+
+  /**
+   * Delete a board's swimlane, which must have no tickets.
+   *
+   * @param {string} boardId
+   * @param {string} boardSwimlaneId
+   * @return {*} {Promise<void>}
+   */
+  const deleteBoardSwimlane = async (boardId: string, boardSwimlaneId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/boards/${boardId}/swimlanes/${boardSwimlaneId}`);
+  };
+
   return {
     getBoards,
     createBoard,
     getBoard,
     updateBoard,
     deleteBoard,
-    createBoardTag
+    createBoardTag,
+    addBoardTag,
+    deleteBoardTag,
+    getBoardTickets,
+    createBoardTicket,
+    updateBoardTicket,
+    deleteBoardTicket,
+    getBoardSwimlanes,
+    createBoardSwimlane,
+    updateBoardSwimlane,
+    deleteBoardSwimlane
   };
 };

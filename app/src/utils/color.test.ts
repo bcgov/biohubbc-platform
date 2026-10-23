@@ -11,8 +11,13 @@ describe('getContrastTextColor', () => {
     expect(getContrastTextColor('#FCBA19')).toBe('#000000');
   });
 
-  it('uses whichever text contrasts more with a mid-tone background', () => {
-    expect(getContrastTextColor('#757575')).toBe('#FFFFFF');
-    expect(getContrastTextColor('#767676')).toBe('#000000');
+  it('uses white text on bold mid-tone backgrounds where it reads as bold text, though black contrasts more', () => {
+    expect(getContrastTextColor('#5A9E94')).toBe('#FFFFFF');
+    expect(getContrastTextColor('#1E90FF')).toBe('#FFFFFF');
+    expect(getContrastTextColor('#767676')).toBe('#FFFFFF');
+  });
+
+  it('uses black text once white falls below the bold text contrast minimum', () => {
+    expect(getContrastTextColor('#999999')).toBe('#000000');
   });
 });

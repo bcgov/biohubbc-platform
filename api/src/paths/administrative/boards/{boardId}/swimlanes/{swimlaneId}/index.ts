@@ -5,6 +5,7 @@ import { getDBConnection } from '../../../../../../database/db';
 import { BoardSwimlaneRequestSchema, BoardSwimlaneSchema } from '../../../../../../openapi/schemas/board';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
+import { BoardService } from '../../../../../../services/board-service';
 import { BoardSwimlaneService } from '../../../../../../services/board-swimlane-service';
 import { getLogger } from '../../../../../../utils/logger';
 
@@ -127,8 +128,8 @@ export function deleteBoardSwimlane(): RequestHandler {
     try {
       await connection.open();
 
-      const boardSwimlaneService = new BoardSwimlaneService(connection);
-      await boardSwimlaneService.deleteBoardSwimlane(req.params.boardId, req.params.swimlaneId);
+      const boardService = new BoardService(connection);
+      await boardService.deleteBoardSwimlane(req.params.boardId, req.params.swimlaneId);
 
       await connection.commit();
 

@@ -21,6 +21,10 @@ export class SubmissionFeatureRepository extends BaseRepository {
   /**
    * Get any feature row owned by an upload for administrative review.
    *
+   * Security is review-time security: the feature is secured when it or a parent within the same upload has an
+   * enforcing assignment, matching the upload review search. Published closure is not used because pending
+   * features have none.
+   *
    * @param {number} submissionId ID of the submission that owns the upload.
    * @param {string} submissionUploadId UUID of the submission upload.
    * @param {number} submissionFeatureId ID of the feature to return.
@@ -32,32 +36,62 @@ export class SubmissionFeatureRepository extends BaseRepository {
     submissionUploadId: string,
     submissionFeatureId: number
   ): Promise<SubmissionFeature> {
-    const response = await this.connection.sql(
-      SQL`
-        SELECT
-          sf.submission_feature_id,
-          sf.uuid,
-          sf.urn,
-          sf.create_date,
-          sf.submission_id,
-          sf.feature_type_id,
-          sf.source_id,
-          sf.successor_submission_feature_id,
-          ft.name AS feature_type_name,
-          s.name AS submission_name,
-          c.client_id AS contributor_name,
-          false AS secured,
-          ARRAY[]::varchar[] AS security_reasons
-        FROM submission_feature sf
-        JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-        JOIN submission s ON s.submission_id = sf.submission_id
-        JOIN contributor c ON c.contributor_id = s.contributor_id
-        WHERE sf.submission_feature_id = ${submissionFeatureId}
-          AND sf.submission_id = ${submissionId}
-          AND sf.submission_upload_id = ${submissionUploadId}::uuid;
-      `,
-      SubmissionFeature
+    const sqlStatement = SQL`
+      SELECT
+        sf.submission_feature_id,
+        sf.uuid,
+        sf.urn,
+        sf.create_date,
+        sf.submission_id,
+        sf.feature_type_id,
+        sf.source_id,
+        sf.successor_submission_feature_id,
+        terminal.terminal_submission_feature_id,
+        ft.name AS feature_type_name,
+        s.name AS submission_name,
+        c.client_id AS contributor_name,
+        cardinality(upload_security.security_reasons) > 0 AS secured,
+        upload_security.security_reasons
+      FROM submission_feature sf
+      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      JOIN submission s ON s.submission_id = sf.submission_id
+      JOIN contributor c ON c.contributor_id = s.contributor_id
+    `;
+    // The terminal fragment is raw, zero-placeholder SQL and must be appended as text.
+    sqlStatement.append(
+      `LEFT JOIN LATERAL ${buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id')} terminal ON true`
     );
+    sqlStatement.append(SQL`
+      JOIN LATERAL (
+        WITH RECURSIVE upload_ancestry AS (
+          SELECT sf.submission_feature_id, sf.parent_submission_feature_id, ARRAY[sf.submission_feature_id] AS path
+
+          UNION ALL
+
+          SELECT
+            parent.submission_feature_id,
+            parent.parent_submission_feature_id,
+            child.path || parent.submission_feature_id
+          FROM upload_ancestry child
+          JOIN submission_feature parent
+            ON parent.submission_feature_id = child.parent_submission_feature_id
+           AND parent.submission_upload_id = sf.submission_upload_id
+          WHERE NOT parent.submission_feature_id = ANY(child.path)
+        )
+        SELECT COALESCE(ARRAY_AGG(DISTINCT sr.name ORDER BY sr.name), ARRAY[]::varchar[]) AS security_reasons
+        FROM upload_ancestry ancestry
+        JOIN submission_feature_security sfs ON sfs.submission_feature_id = ancestry.submission_feature_id
+        JOIN security_rule sr ON sr.security_rule_id = sfs.security_rule_id AND sr.record_end_date IS NULL
+        JOIN security_category sc ON sc.security_category_id = sr.security_category_id AND sc.record_end_date IS NULL
+        WHERE sfs.record_effective_date <= now()
+          AND (sfs.record_end_date IS NULL OR now() < sfs.record_end_date)
+      ) upload_security ON true
+      WHERE sf.submission_feature_id = ${submissionFeatureId}
+        AND sf.submission_id = ${submissionId}
+        AND sf.submission_upload_id = ${submissionUploadId}::uuid;
+    `);
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeature);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission upload feature record', [
@@ -177,6 +211,7 @@ export class SubmissionFeatureRepository extends BaseRepository {
         sf.feature_type_id,
         sf.source_id,
         sf.successor_submission_feature_id,
+        terminal.terminal_submission_feature_id,
         ft.name as feature_type_name,
         s.name as submission_name,
         c.client_id as contributor_name,

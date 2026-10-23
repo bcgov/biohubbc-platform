@@ -11,24 +11,37 @@ import { BoardService } from '../../../services/board-service';
 import { BoardSwimlaneService } from '../../../services/board-swimlane-service';
 import { createBoard, GET, getBoards, POST } from './index';
 import { DELETE as boardDELETE, GET as boardGET, PUT as boardPUT, updateBoard } from './{boardId}';
-import { POST as swimlanePOST } from './{boardId}/swimlanes';
+import { getBoardSwimlanes, POST as swimlanePOST, GET as swimlanesGET } from './{boardId}/swimlanes';
 import { PUT as orderPUT, reorderBoardSwimlanes } from './{boardId}/swimlanes/order';
 import { DELETE as swimlaneDELETE, PUT as swimlanePUT, updateBoardSwimlane } from './{boardId}/swimlanes/{swimlaneId}';
-import { POST as boardTagPOST, createBoardTag } from './{boardId}/tags';
-import { getBoardTickets, GET as ticketsGET } from './{boardId}/tickets';
+import { POST as boardTagsPOST, createBoardTag } from './{boardId}/tags';
+import { DELETE as boardTagDELETE, PUT as boardTagPUT, deleteBoardTag, ensureBoardTag } from './{boardId}/tags/{tagId}';
+import { createBoardTicket, getBoardTickets, GET as ticketsGET, POST as ticketsPOST } from './{boardId}/tickets';
+import {
+  DELETE as boardTicketDELETE,
+  PUT as boardTicketPUT,
+  deleteBoardTicket,
+  ensureBoardTicket
+} from './{boardId}/tickets/{ticketId}';
 
 const operations = {
+  boardTagsPOST,
+  boardTagPUT,
+  boardTagDELETE,
   GET,
   POST,
   boardGET,
   boardPUT,
   boardDELETE,
+  swimlanesGET,
   swimlanePOST,
   swimlanePUT,
   swimlaneDELETE,
   orderPUT,
   ticketsGET,
-  boardTagPOST
+  ticketsPOST,
+  boardTicketPUT,
+  boardTicketDELETE
 };
 
 const boardId = '11111111-1111-1111-1111-111111111111';
@@ -39,7 +52,6 @@ const mockBoardDetail: BoardDetail = {
   name: 'Fisheries',
   description: null,
   create_date: '2026-10-19T00:00:00.000Z',
-  tags: [],
   swimlanes: []
 };
 
@@ -101,7 +113,7 @@ describe('paths/administrative/boards', () => {
     mockConnection();
     const createStub = sinon.stub(BoardService.prototype, 'createBoard').resolves(mockBoardDetail);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { name: 'Fisheries', description: null, tagIds: [] };
+    mockReq.body = { name: 'Fisheries', description: null };
 
     await createBoard()(mockReq, mockRes, mockNext);
 
@@ -115,7 +127,7 @@ describe('paths/administrative/boards', () => {
     const updateStub = sinon.stub(BoardService.prototype, 'updateBoard').resolves(mockBoardDetail);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { boardId };
-    mockReq.body = { name: 'Fisheries', description: null, tagIds: [] };
+    mockReq.body = { name: 'Fisheries', description: null };
 
     await updateBoard()(mockReq, mockRes, mockNext);
 
@@ -128,7 +140,7 @@ describe('paths/administrative/boards', () => {
     const updateStub = sinon.stub(BoardSwimlaneService.prototype, 'updateBoardSwimlane').resolves({} as any);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { boardId, swimlaneId };
-    mockReq.body = { name: 'Done', description: null, color: null, isVisible: false, boardTagIds: [] };
+    mockReq.body = { name: 'Done', description: null, color: null };
 
     await updateBoardSwimlane()(mockReq, mockRes, mockNext);
 
@@ -148,22 +160,117 @@ describe('paths/administrative/boards', () => {
     expect(mockRes.jsonValue).to.eql({ swimlanes: [] });
   });
 
-  it('createBoardTag creates the tag for the board in the route and returns 201', async () => {
-    const connection = mockConnection();
-    const createStub = sinon.stub(BoardService.prototype, 'createBoardTag').resolves({} as any);
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { boardId };
-    mockReq.body = { name: 'Fish', description: null, color: '#1A5A96' };
+  describe('getBoardSwimlanes', () => {
+    it("returns one page of the board's swimlanes with the total count", async () => {
+      mockConnection();
+      const pageStub = sinon.stub(BoardSwimlaneService.prototype, 'getPaginatedBoardSwimlanes').resolves([]);
+      sinon.stub(BoardSwimlaneService.prototype, 'getBoardSwimlanesCount').resolves(12);
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId };
+      mockReq.query = { page: '2', limit: '10', sort: 'sort_order', order: 'asc' };
 
-    await createBoardTag()(mockReq, mockRes, mockNext);
+      await getBoardSwimlanes()(mockReq, mockRes, mockNext);
 
-    sinon.assert.calledOnceWithExactly(createStub, boardId, mockReq.body);
-    expect(mockRes.statusValue).to.equal(201);
-    sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
+      sinon.assert.calledOnceWithExactly(pageStub, boardId, { page: 2, limit: 10, sort: 'sort_order', order: 'asc' });
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.eql({
+        swimlanes: [],
+        pagination: { total: 12, per_page: 10, current_page: 2, last_page: 2, sort: 'sort_order', order: 'asc' }
+      });
+    });
+  });
+
+  describe('createBoardTicket', () => {
+    it('creates the ticket on the board and returns 201', async () => {
+      mockConnection();
+      const ticket = { ticket_id: 'ticket-1' };
+      const createStub = sinon.stub(BoardService.prototype, 'createBoardTicket').resolves(ticket as never);
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId };
+      mockReq.body = { subject: 'Count fish', description: null, priority: 'medium' };
+
+      await createBoardTicket()(mockReq, mockRes, mockNext);
+
+      sinon.assert.calledOnceWithExactly(createStub, boardId, mockReq.body);
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.equal(ticket);
+    });
+  });
+
+  describe('board tags', () => {
+    const tagId = '55555555-5555-5555-5555-555555555555';
+
+    it('createBoardTag creates the tag for the board in the route and returns 201', async () => {
+      const connection = mockConnection();
+      const createStub = sinon.stub(BoardService.prototype, 'createBoardTag').resolves({} as never);
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId };
+      mockReq.body = { name: 'Fish', description: null, color: '#1A5A96' };
+
+      await createBoardTag()(mockReq, mockRes, mockNext);
+
+      sinon.assert.calledOnceWithExactly(createStub, boardId, mockReq.body);
+      expect(mockRes.statusValue).to.equal(201);
+      sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
+    });
+
+    it('ensureBoardTag links the tag and returns 204', async () => {
+      mockConnection();
+      const ensureStub = sinon.stub(BoardService.prototype, 'ensureBoardTag').resolves();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId, tagId };
+
+      await ensureBoardTag()(mockReq, mockRes, mockNext);
+
+      sinon.assert.calledOnceWithExactly(ensureStub, boardId, tagId);
+      expect(mockRes.statusValue).to.equal(204);
+    });
+
+    it('deleteBoardTag unlinks the tag and returns 204', async () => {
+      mockConnection();
+      const deleteStub = sinon.stub(BoardService.prototype, 'deleteBoardTag').resolves();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId, tagId };
+
+      await deleteBoardTag()(mockReq, mockRes, mockNext);
+
+      sinon.assert.calledOnceWithExactly(deleteStub, boardId, tagId);
+      expect(mockRes.statusValue).to.equal(204);
+    });
+  });
+
+  describe('board tickets', () => {
+    const ticketId = '44444444-4444-4444-4444-444444444444';
+
+    it('ensureBoardTicket puts the ticket in the lane and returns 204', async () => {
+      const connection = mockConnection();
+      const ensureStub = sinon.stub(BoardService.prototype, 'ensureBoardTicket').resolves();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId, ticketId };
+      mockReq.body = { boardSwimlaneId: swimlaneId };
+
+      await ensureBoardTicket()(mockReq, mockRes, mockNext);
+
+      sinon.assert.calledOnceWithExactly(ensureStub, boardId, ticketId, mockReq.body);
+      expect(mockRes.statusValue).to.equal(204);
+      sinon.assert.calledOnce(connection.commit as sinon.SinonStub);
+    });
+
+    it('deleteBoardTicket takes the ticket off the board and returns 204', async () => {
+      mockConnection();
+      const deleteStub = sinon.stub(BoardService.prototype, 'deleteBoardTicket').resolves();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params = { boardId, ticketId };
+
+      await deleteBoardTicket()(mockReq, mockRes, mockNext);
+
+      sinon.assert.calledOnceWithExactly(deleteStub, boardId, ticketId);
+      expect(mockRes.statusValue).to.equal(204);
+    });
   });
 
   describe('getBoardTickets', () => {
-    const boardTickets = { unsorted: [], swimlanes: [], hidden_ticket_count: 0 } as unknown as BoardTickets;
+    const boardTickets = { tickets: [], swimlanes: [] } as unknown as BoardTickets;
 
     const cases: [unknown, boolean][] = [
       [undefined, false],

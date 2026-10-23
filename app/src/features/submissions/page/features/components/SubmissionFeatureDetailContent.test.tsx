@@ -1,5 +1,6 @@
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ComponentProps } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 
@@ -22,6 +23,7 @@ const mockFeature: ISubmissionFeature = {
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
+  terminal_submission_feature_id: 10,
   data: {},
   secured: false,
   security_reasons: []
@@ -29,11 +31,17 @@ const mockFeature: ISubmissionFeature = {
 
 const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   feature: mockFeature,
+  submissionDetailBasePath: '/submission',
+  queryString: '?ft=observation',
   children: <h2>Properties</h2>
 };
 
 const renderComponent = (props?: Partial<ComponentProps<typeof SubmissionFeatureDetailContent>>) =>
-  render(<SubmissionFeatureDetailContent {...defaultProps} {...props} />);
+  render(
+    <MemoryRouter>
+      <SubmissionFeatureDetailContent {...defaultProps} {...props} />
+    </MemoryRouter>
+  );
 
 describe('SubmissionFeatureDetailContent', () => {
   it('renders the superseded banner when the feature has a successor', () => {
@@ -42,7 +50,26 @@ describe('SubmissionFeatureDetailContent', () => {
     });
 
     expect(getByText('This feature has been superseded')).toBeInTheDocument();
-    expect(getByText('This information has been updated with a newer version.')).toBeInTheDocument();
+    expect(getByText(/This information has been updated with a newer version\./)).toBeInTheDocument();
+  });
+
+  it('links the superseded banner to the current feature', () => {
+    const { getByRole } = renderComponent({
+      feature: { ...mockFeature, successor_submission_feature_id: 11, terminal_submission_feature_id: 12 }
+    });
+
+    expect(getByRole('link', { name: 'View the current version' })).toHaveAttribute(
+      'href',
+      '/submission/1/feature/12?ft=observation'
+    );
+  });
+
+  it('omits the current-version link when the successor chain has no current feature', () => {
+    const { queryByRole } = renderComponent({
+      feature: { ...mockFeature, successor_submission_feature_id: 11, terminal_submission_feature_id: null }
+    });
+
+    expect(queryByRole('link', { name: 'View the current version' })).toBeNull();
   });
 
   it('does not render the superseded banner when the feature has no successor', () => {

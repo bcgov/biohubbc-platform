@@ -621,7 +621,8 @@ async function processSubmissionArchiveEntry(
  *
  * Processing rules:
  * - `features/*.json` are parsed and batched to `ingestFeatureBatch`.
- *   Batching is bounded by both `featureBatchSize` and `featureMaxBatchBytes`.
+ *   Batching is bounded by both `featureBatchSize` and `featureMaxBatchBytes`, and one
+ *   batch persists while the next one parses.
  * - `codes/*.json` are parsed and sent to `ingestCodesets`.
  * - `files/*` entries are streamed to object storage and batched to `ingestMediaBatch`.
  * - Function resolves only after all in-flight media uploads complete and all
@@ -676,11 +677,51 @@ export async function streamSubmissionArchive(
   let pendingFeatureBytes = 0;
   let pendingUploadedFiles: IUploadedMediaFile[] = [];
   let pendingUploadedBytes = 0;
+  // The feature batch currently being persisted. It never rejects: a failure is recorded in
+  // `featureBatchError`, and every later flush and the final drain await the batch, then rethrow it.
+  let featureBatchInFlight: Promise<void> = Promise.resolve();
+  let featureBatchError: unknown = null;
+  // Rejects the archive's entry processing; assigned when that promise is created below.
+  let failArchive: (error: unknown) => void = () => undefined;
   const inFlightMediaUploads = new Set<Promise<void>>();
   const inFlightEntries = new Set<Promise<void>>();
 
   /**
-   * Flush buffered feature blocks to caller persistence callback.
+   * Persist one feature batch in the background, failing the archive as soon as it fails.
+   *
+   * @param {IFlattenedBlock[]} blocks Feature blocks to persist.
+   * @returns {Promise<void>} Resolves when the batch has persisted or its failure has been recorded.
+   */
+  const persistFeatureBatch = async (blocks: IFlattenedBlock[]): Promise<void> => {
+    try {
+      await ingestFeatureBatch(blocks);
+    } catch (error) {
+      // Nothing awaits a background batch until the next flush, so the failure is recorded for that
+      // flush or the final drain to rethrow, and the archive is failed now rather than later.
+      featureBatchError = error;
+      failArchive(error);
+    }
+  };
+
+  /**
+   * Wait for the feature batch in flight and rethrow its failure, if any.
+   *
+   * @returns {Promise<void>} Resolves when no batch is in flight and none has failed.
+   */
+  const awaitFeatureBatchInFlight = async (): Promise<void> => {
+    await featureBatchInFlight;
+
+    if (featureBatchError) {
+      throw featureBatchError;
+    }
+  };
+
+  /**
+   * Start persisting buffered feature blocks once the previous batch has finished.
+   *
+   * At most one batch persists while the archive stream parses the next one, so parsing
+   * overlaps database time while buffered memory stays bounded to two batches. A failed
+   * batch rejects the next flush or the final drain.
    */
   const flushPendingFeatures = async (): Promise<void> => {
     if (!pendingFeatureBlocks.length) {
@@ -690,7 +731,8 @@ export async function streamSubmissionArchive(
     const currentBlocks = pendingFeatureBlocks;
     pendingFeatureBlocks = [];
     pendingFeatureBytes = 0;
-    await ingestFeatureBatch(currentBlocks);
+    await awaitFeatureBatchInFlight();
+    featureBatchInFlight = persistFeatureBatch(currentBlocks);
   };
 
   /**
@@ -733,6 +775,8 @@ export async function streamSubmissionArchive(
   };
 
   const entryPromise = new Promise<void>((resolve, reject) => {
+    failArchive = reject;
+
     extract.on('entry', async (header, stream, next) => {
       const entryTask = processSubmissionArchiveEntry(header, stream, next, reject, {
         ingestFeatureEntry: async (entryValue, entryName, entryBytesEstimate) => {
@@ -783,6 +827,7 @@ export async function streamSubmissionArchive(
     await Promise.all(inFlightMediaUploads);
     await mediaStateQueue;
     await flushPendingFeatures();
+    await awaitFeatureBatchInFlight();
     await flushPendingMedia();
     defaultLog.debug({
       label: 'streamSubmissionArchive',
@@ -799,7 +844,7 @@ export async function streamSubmissionArchive(
     // Entry callbacks may still be committing feature/codeset batches when the
     // stream fails. Settle them before the caller can clean up or retry this upload.
     await Promise.allSettled([pipelinePromise, ...inFlightEntries]);
-    await Promise.allSettled([...inFlightMediaUploads, mediaStateQueue]);
+    await Promise.allSettled([...inFlightMediaUploads, mediaStateQueue, featureBatchInFlight]);
     if (
       gunzip &&
       error instanceof Error &&

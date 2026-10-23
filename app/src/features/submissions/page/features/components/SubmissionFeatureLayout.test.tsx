@@ -19,6 +19,7 @@ const mockFeature: ISubmissionFeature = {
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
+  terminal_submission_feature_id: 10,
   data: {},
   secured: false,
   security_reasons: []

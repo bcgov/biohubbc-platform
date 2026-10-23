@@ -23,34 +23,15 @@ export function isSubmissionFeaturePublished(alias: string): string {
 }
 
 /**
- * Predicate for a submission_feature occurrence that has not been ended, whether or not it has
- * ever been published.
- *
- * This is the third lifecycle tier, alongside {@link isSubmissionFeaturePublished} and
- * {@link isSubmissionFeatureCurrent}, and it exists for administrative reads of an upload under
- * review: those features have never been approved, so `record_effective_date` is NULL for all of
- * them and either published predicate would exclude every one. Reconciliation retires a superseded
- * upload's pending features by setting `record_end_date = now()`, so "not ended" is exactly the set
- * an administrator is reviewing.
- *
- * The literal `IS NULL` form is deliberate: it is the predicate the partial index
- * `submission_feature_idx5_active_submission_upload` is defined on, and the planner only uses a
- * partial index when the query repeats its predicate verbatim. Do not widen it to
- * `(record_end_date IS NULL OR now() < record_end_date)`.
- *
- * @param alias SQL alias for submission_feature.
- * @returns SQL predicate with zero placeholders.
- */
-export function isSubmissionFeatureActive(alias: string): string {
-  return `${alias}.record_end_date IS NULL`;
-}
-
-/**
  * Predicate for a current feature: published, not ended, and without a successor.
  *
- * Collection, search, and download paths use this predicate to exclude superseded features.
- * Direct ID lookups use {@link isSubmissionFeaturePublished} instead so previously published
- * features remain accessible.
+ * Lifecycle by read scope:
+ * - Submission collection, search, and download paths use this predicate to exclude superseded features. The closure
+ *   holds only current features, so a closure self-loop is an equivalent check.
+ * - Direct ID lookups use {@link isSubmissionFeaturePublished} instead so previously published features remain
+ *   accessible.
+ * - Upload-scoped reads apply no lifecycle predicate: every feature of an upload is viewable, including unpublished,
+ *   ended, and superseded features.
  *
  * @param alias SQL alias for submission_feature.
  * @returns SQL predicate with zero placeholders.
@@ -59,6 +40,46 @@ export function isSubmissionFeatureCurrent(alias: string): string {
   return `${isSubmissionFeaturePublished(
     alias
   )} AND (${alias}.record_end_date IS NULL OR now() < ${alias}.record_end_date) AND ${alias}.successor_submission_feature_id IS NULL`;
+}
+
+/**
+ * Parent source id of a submission_feature row, read from its submitted payload. Empty strings mean no parent.
+ *
+ * @param alias SQL alias for submission_feature.
+ * @returns SQL expression with zero placeholders.
+ */
+export function submissionFeatureParentSourceId(alias: string): string {
+  return `NULLIF(${alias}.data->>'parent', '')`;
+}
+
+/**
+ * Resolve a pending upload feature's parent source id to a parent submission_feature_id.
+ *
+ * Prefers a pending row from the child's own upload, falling back to the submission's current
+ * published rows. Ties resolve to the newest row. Returns NULL when no parent matches.
+ *
+ * @param childAlias SQL alias for the child submission_feature row.
+ * @returns Scalar subquery SQL with zero placeholders.
+ */
+export function resolveSubmissionFeatureParentId(childAlias: string): string {
+  return `(
+    SELECT parent.submission_feature_id
+    FROM submission_feature AS parent
+    WHERE parent.submission_id = ${childAlias}.submission_id
+      AND parent.source_id = ${submissionFeatureParentSourceId(childAlias)}
+      AND (
+        (
+          parent.submission_upload_id = ${childAlias}.submission_upload_id
+          AND parent.record_effective_date IS NULL
+          AND parent.record_end_date IS NULL
+        )
+        OR (${isSubmissionFeatureCurrent('parent')})
+      )
+    ORDER BY
+      (parent.submission_upload_id = ${childAlias}.submission_upload_id) DESC,
+      parent.submission_feature_id DESC
+    LIMIT 1
+  )`;
 }
 
 /**
@@ -381,73 +402,6 @@ export function activeTicketTagsJson(ticketIdExpr: string): string {
           AND tag_summary.record_end_date IS NULL
         WHERE tag_link.ticket_id = ${ticketIdExpr}
           AND tag_link.record_end_date IS NULL
-      ),
-      '[]'::json
-    )
-  `;
-}
-
-/**
- * JSON array of a board's active tags, as `[{ board_tag_id, tag_id, name, color }]` ordered by case-insensitive
- * name. Returns `[]` when the board has no active tags.
- *
- * @param boardIdExpr Trusted SQL expression for the board identifier (e.g. 'b.board_id').
- * @returns SQL scalar subquery with zero placeholders.
- */
-export function activeBoardTagsJson(boardIdExpr: string): string {
-  return `
-    COALESCE(
-      (
-        SELECT json_agg(
-          json_build_object(
-            'board_tag_id', board_tag_link.board_tag_id,
-            'tag_id', tag_summary.tag_id,
-            'name', tag_summary.name,
-            'color', tag_summary.color
-          )
-          ORDER BY lower(tag_summary.name), tag_summary.tag_id
-        )
-        FROM board_tag board_tag_link
-        JOIN tag tag_summary
-          ON tag_summary.tag_id = board_tag_link.tag_id
-          AND tag_summary.record_end_date IS NULL
-        WHERE board_tag_link.board_id = ${boardIdExpr}
-          AND board_tag_link.record_end_date IS NULL
-      ),
-      '[]'::json
-    )
-  `;
-}
-
-/**
- * JSON array of a board swimlane's active board tags, as `[{ board_tag_id, tag_id, name, color }]` ordered by
- * case-insensitive name. Returns `[]` when the swimlane has no active board tags.
- *
- * @param boardSwimlaneIdExpr Trusted SQL expression for the swimlane identifier (e.g. 'bs.board_swimlane_id').
- * @returns SQL scalar subquery with zero placeholders.
- */
-export function activeBoardSwimlaneTagsJson(boardSwimlaneIdExpr: string): string {
-  return `
-    COALESCE(
-      (
-        SELECT json_agg(
-          json_build_object(
-            'board_tag_id', board_tag_link.board_tag_id,
-            'tag_id', tag_summary.tag_id,
-            'name', tag_summary.name,
-            'color', tag_summary.color
-          )
-          ORDER BY lower(tag_summary.name), tag_summary.tag_id
-        )
-        FROM board_swimlane_tag swimlane_tag_link
-        JOIN board_tag board_tag_link
-          ON board_tag_link.board_tag_id = swimlane_tag_link.board_tag_id
-          AND board_tag_link.record_end_date IS NULL
-        JOIN tag tag_summary
-          ON tag_summary.tag_id = board_tag_link.tag_id
-          AND tag_summary.record_end_date IS NULL
-        WHERE swimlane_tag_link.board_swimlane_id = ${boardSwimlaneIdExpr}
-          AND swimlane_tag_link.record_end_date IS NULL
       ),
       '[]'::json
     )

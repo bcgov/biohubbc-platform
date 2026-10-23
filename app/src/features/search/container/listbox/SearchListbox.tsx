@@ -5,15 +5,13 @@ import { grey } from '@mui/material/colors';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { URL_PARAMS } from 'constants/query-params';
-import { SearchResponse, SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
+import { SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { buildSearchFeatureTypePath } from 'utils/routes';
-import { SearchResultsSection } from './record/SearchResultsSection';
 import { SearchSummarySection } from './summary/SearchSummarySection';
 
 export interface SearchListboxProps {
-  records: SearchResponse | null;
   summary: SearchSummaryResponse | null;
   searchTerm: string;
   defaultFeatureTypeName: string;
@@ -23,16 +21,15 @@ export interface SearchListboxProps {
 /**
  * Search preview listbox for the root search page.
  *
- * Use this inside `SearchContainer` to show a keyboard-navigable mix of the raw
- * search query, summary counts, and detailed preview records. The component
+ * Use this inside `SearchContainer` to show a keyboard-navigable list of the raw
+ * search query and summary counts. The component
  * owns navigation for selected rows so every item lands on the appropriate
  * feature-type result route with the current query preserved in URL params.
  *
- * @param {SearchListboxProps} props - Preview records, summary counts, current search term, and default feature route.
+ * @param {SearchListboxProps} props - Summary counts, current search term, and default feature route.
  * @returns {JSX.Element} Search preview listbox.
  */
 export const SearchListbox = ({
-  records,
   summary,
   searchTerm,
   defaultFeatureTypeName,
@@ -51,7 +48,7 @@ export const SearchListbox = ({
     [defaultFeatureTypeName, navigate, searchTerm]
   );
 
-  const hasResults = Boolean(searchTerm || summary || records);
+  const hasResults = Boolean(searchTerm || summary);
 
   return (
     <Box
@@ -108,15 +105,6 @@ export const SearchListbox = ({
               searchTerm={searchTerm}
               defaultFeatureTypeName={defaultFeatureTypeName}
               onItemSelect={navigateWithQuery}
-            />
-          )}
-
-          {/* Detailed records */}
-          {records && (
-            <SearchResultsSection
-              results={records}
-              defaultFeatureTypeName={defaultFeatureTypeName}
-              onSelect={navigateWithQuery}
             />
           )}
         </List>

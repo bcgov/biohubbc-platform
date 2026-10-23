@@ -2,12 +2,12 @@ import { IDBConnection } from '../database/db';
 import { TagRule, TagRuleEvaluation } from '../models/tag-rule';
 import { publishEvaluateTicketTagRulesJob } from '../queue/publisher';
 import { TagRuleRepository } from '../repositories/tag-rule-repository';
-import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { SubmissionUploadRepository } from '../repositories/upload/submission-upload-repository';
 import { optimizeExpression } from '../utils/expression-optimization';
 import { DBService } from './db-service';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { ExpressionTreeService } from './expression-tree-service';
+import { TicketTagService } from './ticket-tag-service';
 
 /**
  * Service that evaluates tag rules against a ticket.
@@ -23,16 +23,16 @@ export class TagRuleEvaluationService extends DBService {
   };
 
   tagRuleRepository: TagRuleRepository;
-  ticketTagRepository: TicketTagRepository;
   submissionUploadRepository: SubmissionUploadRepository;
+  ticketTagService: TicketTagService;
   expressionTreeService: ExpressionTreeService;
   expressionTreeNormalizationService: ExpressionTreeNormalizationService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.tagRuleRepository = new TagRuleRepository(connection);
-    this.ticketTagRepository = new TicketTagRepository(connection);
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
+    this.ticketTagService = new TicketTagService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.expressionTreeNormalizationService = new ExpressionTreeNormalizationService(connection);
   }
@@ -45,7 +45,8 @@ export class TagRuleEvaluationService extends DBService {
    *
    * Rules only add tags, and never a tag the ticket has ever had: an active tag is not added twice, and a removed tag
    * stays removed when the ticket is re-evaluated (for example after a reindex), whichever rule or admin added it.
-   * Evaluation is idempotent, so retried and duplicate jobs are harmless.
+   * Evaluation is idempotent, so retried and duplicate jobs are harmless. A tag a rule adds puts the ticket on the boards
+   * linked to it, in their default lanes, like a tag added by hand.
    *
    * @param {string} ticketId - Ticket UUID.
    * @returns {Promise<void>}
@@ -69,9 +70,11 @@ export class TagRuleEvaluationService extends DBService {
       .filter((rule) => matchingTagRuleIds.has(rule.tag_rule_id))
       .map((rule) => ({ tag_id: rule.tag_id, tag_rule_id: rule.tag_rule_id }));
 
-    if (ruleTicketTags.length) {
-      await this.ticketTagRepository.insertRuleTicketTags(ticketId, ruleTicketTags);
+    if (!ruleTicketTags.length) {
+      return;
     }
+
+    await this.ticketTagService.insertRuleTicketTags(ticketId, ruleTicketTags);
   }
 
   /**

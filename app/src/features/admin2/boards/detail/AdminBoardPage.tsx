@@ -8,7 +8,6 @@ import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
-import { AdminTicketsTicketsContent } from 'features/admin2/tickets/content/AdminTicketsTicketsContent';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { AdminPageLayout } from 'layouts/AdminPageLayout';
@@ -18,12 +17,18 @@ import { boardQueryKeys } from 'utils/query-keys/board-query-keys';
 import { BoardDialog } from '../dialog/BoardDialog';
 import { IBoardFormValues } from '../form/BoardForm';
 import { useSaveBoardMutation } from '../hooks/useSaveBoardMutation';
+import { AdminBoardSwimlanesContent } from './content/AdminBoardSwimlanesContent';
 import { AdminBoardTagsContent } from './content/AdminBoardTagsContent';
+import { AdminBoardTicketsContent } from './content/AdminBoardTicketsContent';
+
+type BoardTab = 'tickets' | 'swimlanes' | 'tags';
+
+const BOARD_TABS: BoardTab[] = ['tickets', 'swimlanes', 'tags'];
 
 /**
- * Administrative board page: the tickets on the board, which are the tickets with any of its tags, and the board's
- * tags, through URL-addressable tabs. Only the selected tab's table is mounted, so only it loads. The board's name,
- * description and tags are edited from the header.
+ * Administrative board page: the tickets on the board as a kanban of its swimlanes, the board's swimlanes, and the tags
+ * that put tickets on the board, through URL-addressable tabs. Only the selected tab's content is mounted, so only it loads. The board's name and description
+ * are edited from the header.
  *
  * @returns {JSX.Element} The board page.
  */
@@ -32,7 +37,7 @@ export const AdminBoardPage = () => {
   const dialogContext = useDialogContext();
   const { boardId } = useParams<{ boardId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'tags' ? 'tags' : 'tickets';
+  const activeTab = BOARD_TABS.find((tab) => tab === searchParams.get('tab')) ?? 'tickets';
   const [isBoardDialogOpen, setIsBoardDialogOpen] = useState(false);
 
   const boardQuery = useQuery({
@@ -108,6 +113,7 @@ export const AdminBoardPage = () => {
         }
         tabs={[
           { value: 'tickets', label: 'Tickets', id: 'board-tab-tickets', ariaControls: 'board-panel' },
+          { value: 'swimlanes', label: 'Swimlanes', id: 'board-tab-swimlanes', ariaControls: 'board-panel' },
           { value: 'tags', label: 'Tags', id: 'board-tab-tags', ariaControls: 'board-panel' }
         ]}
         activeTab={activeTab}
@@ -118,7 +124,8 @@ export const AdminBoardPage = () => {
         }}>
         <QueryErrorDialog error={boardQuery.error} label="board" />
         <Box id="board-panel" role="tabpanel" aria-labelledby={`board-tab-${activeTab}`}>
-          {activeTab === 'tickets' && <AdminTicketsTicketsContent boardId={boardId} />}
+          {activeTab === 'tickets' && <AdminBoardTicketsContent boardId={boardId} />}
+          {activeTab === 'swimlanes' && <AdminBoardSwimlanesContent boardId={boardId} />}
           {activeTab === 'tags' && <AdminBoardTagsContent boardId={boardId} />}
         </Box>
       </AdminPageLayout>

@@ -118,14 +118,24 @@ export const UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS = getNumberEnv('UPLOAD_PRESIGNE
 export const UPLOAD_FEATURE_BATCH_MAX_BYTES = getNumberEnv('UPLOAD_FEATURE_BATCH_MAX_BYTES', 8 * 1024 * 1024);
 
 /**
+ * Part size for server-side streamed uploads to object storage (archive media and download exports).
+ *
+ * Each in-flight streamed upload buffers up to two parts. With S3's 10,000 part limit this caps one
+ * streamed object at about 78 GiB.
+ */
+export const UPLOAD_STREAM_PART_SIZE_BYTES = 8 * 1024 * 1024; // 8 MiB
+
+/**
  * Maximum concurrent media uploads from `files/*` entries while streaming one archive.
  *
- * Higher values can improve throughput but increase memory/socket pressure.
+ * Archives with many small files are bound by per-object S3 round trips, so uploading
+ * several at once improves throughput substantially. Each streamed upload buffers at most
+ * two `UPLOAD_STREAM_PART_SIZE_BYTES` parts, so the default of 4 bounds media buffering at about 64 MiB.
  * Backward compatible fallback to legacy `SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY`.
  */
 export const UPLOAD_ARCHIVE_MEDIA_CONCURRENCY = getNumberEnv(
   ['UPLOAD_ARCHIVE_MEDIA_CONCURRENCY', 'SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY'],
-  1
+  4
 );
 
 /**

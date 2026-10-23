@@ -18,6 +18,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { ApiNotFoundError } from '../../errors/api-error';
 import { ExpressionTree } from '../../models/expression-tree';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
+import { BoardService } from '../../services/board-service';
 import { DataRequestService } from '../../services/data-request-service';
 import { TagRuleEvaluationService } from '../../services/tag-rule-evaluation-service';
 import { TagRuleService } from '../../services/tag-rule-service';
@@ -221,6 +222,28 @@ describe('Tag rule evaluation (integration)', function () {
       await tagRuleService.deleteTagRule(tagId, tagRuleId, true);
 
       expect((await ticketTagService.getTicketTags(ticketId)).tags).to.eql([]);
+    });
+
+    it("takes the ticket off the rule tag's boards when the rule's tags are removed, unless another tag keeps it", async () => {
+      const boardService = new BoardService(connection);
+      await addFeature('elk');
+      const tagId = await createTag('Removed');
+      const keptTagId = await createTag('Kept');
+      const tagRuleId = await createRule(tagId, equalsExpression('elk'));
+      const removedBoard = await boardService.createBoard({ name: `Removed-${runId}`, description: null });
+      const keptBoard = await boardService.createBoard({ name: `Kept-${runId}`, description: null });
+      await boardService.ensureBoardTag(removedBoard.board_id, tagId);
+      await boardService.ensureBoardTag(keptBoard.board_id, tagId);
+      await boardService.ensureBoardTag(keptBoard.board_id, keptTagId);
+      await ticketTagService.replaceTicketTags(ticketId, [keptTagId]);
+      await evaluate(ticketId);
+
+      await tagRuleService.deleteTagRule(tagId, tagRuleId, true);
+
+      const boardTickets = await connection.sql(SQL`
+        SELECT board_id FROM board_ticket WHERE ticket_id = ${ticketId} AND record_end_date IS NULL
+      `);
+      expect(boardTickets.rows.map((row) => row.board_id)).to.eql([keptBoard.board_id]);
     });
 
     it("lists only the tag's rules, a page at a time, and scopes rule access to the tag", async () => {

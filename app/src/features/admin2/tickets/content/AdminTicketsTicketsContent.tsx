@@ -29,24 +29,17 @@ import { EditTicketDialog } from 'features/admin/tickets/components/dialog/edit/
 import { ITicketFormValues } from 'features/admin/tickets/components/dialog/form/TicketForm';
 import { TicketsContainer } from 'features/admin/tickets/list/TicketsContainer';
 
-interface IAdminTicketsTicketsContentProps {
-  /** Lists only the tickets on this board: those with any of its tags. Omitted to list every ticket. */
-  boardId?: string;
-}
-
 /**
- * Tickets tab of the administrative tickets page and of a board's page: the paginated ticket list, filterable by tag,
- * with create, edit, status and remove actions. Each ticket opens its own page.
+ * Tickets tab of the administrative tickets page: the paginated ticket list, filterable by tag, with create, edit,
+ * status and remove actions. Each ticket opens its own page.
  *
  * Creating and editing refresh the server-sorted list once pending list mutations settle. Status toggles update
  * optimistically in place. Each change also refreshes the ticket's other cached copies: its detail pages, the
  * portal's lists and this list's other pages.
  *
- * @param {IAdminTicketsTicketsContentProps} props The board whose tickets are listed, if any.
  * @returns {JSX.Element} The tickets list and its dialogs.
  */
-export const AdminTicketsTicketsContent = (props: IAdminTicketsTicketsContentProps) => {
-  const { boardId } = props;
+export const AdminTicketsTicketsContent = () => {
   const api = useApi();
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
@@ -61,9 +54,6 @@ export const AdminTicketsTicketsContent = (props: IAdminTicketsTicketsContentPro
   const listParams: ITicketsQueryParams = { search: grid.debouncedSearchTerm, ...grid.apiPagination };
   if (tagFilter.length) {
     listParams.tag_ids = tagFilter.map((tag) => tag.tag_id);
-  }
-  if (boardId) {
-    listParams.board_id = boardId;
   }
   const ticketsQueryKey = ticketQueryKeys.list('admin', listParams);
   const ticketsQuery = useQuery({

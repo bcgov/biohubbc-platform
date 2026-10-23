@@ -79,9 +79,10 @@ export function useTileFunctionFixture(featureTypeName: string): TileFunctionFix
 /** A point in BC that the tile fixtures are placed at. */
 export const TILE_TEST_POINT = { lng: -123.36, lat: 48.43 };
 
-/** One decoded MVT feature: its MVT feature id plus decoded properties. */
+/** One decoded MVT feature: its MVT feature id, geometry type (1 point, 2 line, 3 polygon) and properties. */
 export interface DecodedTileFeature {
   id: number | undefined;
+  type: number;
   properties: Record<string, unknown>;
 }
 
@@ -144,12 +145,11 @@ export async function addTestGeometry(
 ): Promise<number> {
   const result = await connection.sql(
     SQL`
-      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
       VALUES (
         ${submissionFeatureId},
         ${blueprintFeatureTypePropertyId},
-        public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326),
-        ${connection.systemUserId()}
+        public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326)
       )
       RETURNING submission_feature_property_geometry_id;
     `,
@@ -218,7 +218,7 @@ export function decodeTile(tile: Buffer): Record<string, DecodedTileFeature[]> {
 
     for (let index = 0; index < layer.length; index++) {
       const feature = layer.feature(index);
-      layers[name].push({ id: feature.id, properties: feature.properties });
+      layers[name].push({ id: feature.id, type: feature.type, properties: feature.properties });
     }
   }
 
@@ -303,4 +303,18 @@ export function buildWktGeometries(lng = TILE_TEST_POINT.lng, lat = TILE_TEST_PO
     `MULTILINESTRING((${lng} ${lat}, ${lng + 0.001} ${lat + 0.001}))`,
     `MULTIPOLYGON(((${lng} ${lat}, ${lng + 0.001} ${lat}, ${lng + 0.001} ${lat + 0.001}, ${lng} ${lat})))`
   ];
+}
+
+/**
+ * One geometry collection that mixes a point, a line and a polygon near a point, as ingestion stores a
+ * GeoJSON FeatureCollection whose features have different geometry types.
+ *
+ * @param {number} [lng]
+ * @param {number} [lat]
+ * @return {string} WKT of the collection.
+ */
+export function buildMixedGeometryCollectionWkt(lng = TILE_TEST_POINT.lng, lat = TILE_TEST_POINT.lat): string {
+  return `GEOMETRYCOLLECTION(POINT(${lng} ${lat}), LINESTRING(${lng} ${lat}, ${lng + 0.001} ${
+    lat + 0.001
+  }), POLYGON((${lng} ${lat}, ${lng + 0.001} ${lat}, ${lng + 0.001} ${lat + 0.001}, ${lng} ${lat})))`;
 }
