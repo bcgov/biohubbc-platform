@@ -1,10 +1,8 @@
 import { ANONYMOUS_SEARCH_FEATURE_SECURITY_CONTEXT } from '../constants/security';
 import { IDBConnection } from '../database/db';
-import { ApiNotFoundError } from '../errors/api-error';
 import { ExpressionTree } from '../models/expression-tree';
 import { NormalizedExpressionTree } from '../models/expression-tree-internal';
 import { SearchFeatureProperty } from '../models/feature-property';
-import { ReconciliationFeaturePage, ReconciliationFeatureScope } from '../models/reconciliation';
 import {
   SearchFeatureFilters,
   SearchFeaturePage,
@@ -59,7 +57,7 @@ export class SearchFeatureService extends DBService {
    * ownership.
    *
    * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
-   * @param {SubmissionUploadFeatureTypeFilters} filters Optional reconciliation outcome to count.
+   * @param {SubmissionUploadFeatureTypeFilters} filters Reconciliation outcome to count.
    * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
    * @returns {Promise<SubmissionUploadFeatureTypesResponse>} Feature types and pagination totals, including empty
    * pages.
@@ -80,55 +78,6 @@ export class SearchFeatureService extends DBService {
     const total = await this.searchFeatureRepository.countSubmissionUploadFeatureTypes(scope, filters);
 
     return { feature_types: featureTypes, pagination: makePaginationResponse(total, pagination) };
-  }
-
-  /**
-   * Browse one feature type within an immutable reconciliation outcome.
-   * @param {ReconciliationFeatureScope} scope Required submission, upload, and outcome.
-   * @param {string} featureType Selected feature type.
-   * @param {ApiCursorPaginationOptions} cursorPagination Requested page and sort.
-   * @returns {Promise<ReconciliationFeaturePage>} Hydrated page and columns.
-   */
-  async getReconciliationFeatures(
-    scope: ReconciliationFeatureScope,
-    featureType: string,
-    cursorPagination: ApiCursorPaginationOptions
-  ): Promise<ReconciliationFeaturePage> {
-    await this.validateReconciliationUpload(scope);
-    const pagination = ensureCompleteCursorPaginationOptions(cursorPagination);
-    const [rows, properties] = await Promise.all([
-      this.searchFeatureRepository.getReconciliationFeatures(scope, featureType, {
-        ...pagination,
-        limit: pagination.limit + 1
-      }),
-      this.searchFeatureRepository.getFeatureTypeProperties(featureType)
-    ]);
-    const isPrevious = pagination.boundary?.direction === 'previous';
-    const hasLookahead = rows.length > pagination.limit;
-    const features = isPrevious ? rows.slice(-pagination.limit) : rows.slice(0, pagination.limit);
-    return {
-      features,
-      properties,
-      pagination: this.buildSearchFeatureCursorPagination(
-        features,
-        pagination,
-        isPrevious || hasLookahead,
-        pagination.boundary?.direction === 'next' || (isPrevious && hasLookahead)
-      )
-    };
-  }
-
-  /**
-   * Check upload ownership before exposing reconciliation data.
-   * @param {ReconciliationFeatureScope} scope Requested upload and submission.
-   * @returns {Promise<void>} Resolves when the upload belongs to the submission.
-   * @throws {ApiNotFoundError} When the upload belongs to another submission.
-   */
-  private async validateReconciliationUpload(scope: ReconciliationFeatureScope): Promise<void> {
-    const upload = await this.submissionUploadService.getSubmissionUpload(scope.submissionUploadId);
-    if (upload.submission_id !== scope.submissionId) {
-      throw new ApiNotFoundError('Submission upload not found');
-    }
   }
 
   /**

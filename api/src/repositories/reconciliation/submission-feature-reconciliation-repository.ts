@@ -1,6 +1,13 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../../database/db';
 import { CountResult } from '../../models/count';
-import { ReconciliationCountRow, ReconciliationCounts } from '../../models/reconciliation';
+import {
+  ReconciliationCountRow,
+  ReconciliationCounts,
+  ReconciliationFeatureData,
+  ReconciliationFeatureScope
+} from '../../models/reconciliation';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 import { resolveSubmissionFeatureParentId } from '../sql-fragments';
 
@@ -248,6 +255,33 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
       counts[row.reconciliation] = row.count;
     }
     return counts;
+  }
+
+  /**
+   * List one page of an upload's features with one reconciliation outcome and their raw submitted data, across the
+   * complete feature lifecycle.
+   *
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {ApiPaginationOptions} pagination Page size, offset and sort order.
+   * @returns {Promise<ReconciliationFeatureData[]>} One page of feature identifiers and raw jsonb data.
+   * @memberof SubmissionFeatureReconciliationRepository
+   */
+  async getReconciliationFeatureData(
+    scope: ReconciliationFeatureScope,
+    pagination: ApiPaginationOptions
+  ): Promise<ReconciliationFeatureData[]> {
+    const knex = getKnex();
+    const query = knex('submission_feature')
+      .select('submission_feature_id', 'data')
+      .where('submission_id', scope.submissionId)
+      .where('submission_upload_id', scope.submissionUploadId)
+      .where('reconciliation', scope.reconciliation)
+      .orderBy('submission_feature_id', pagination.order ?? 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, ReconciliationFeatureData);
+    return response.rows;
   }
 
   /**

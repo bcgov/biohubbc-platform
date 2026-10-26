@@ -1,26 +1,26 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
-import { getDBConnection } from '../../../../../../../database/db';
-import { ReconciliationType } from '../../../../../../../models/reconciliation';
+import { SYSTEM_ROLE } from '../../../../../../../../../../constants/roles';
+import { getDBConnection } from '../../../../../../../../../../database/db';
+import { ReconciliationType } from '../../../../../../../../../../models/reconciliation';
 import {
   SUBMISSION_UPLOAD_FEATURE_TYPE_SORT_COLUMNS,
   SubmissionUploadFeatureTypeFilters,
   SubmissionUploadScope
-} from '../../../../../../../models/submission-upload';
-import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
+} from '../../../../../../../../../../models/submission-upload';
+import { defaultErrorResponses } from '../../../../../../../../../../openapi/schemas/http-responses';
 import {
   paginationRequestQueryParamSchema,
   paginationResponseSchema
-} from '../../../../../../../openapi/schemas/pagination';
-import { submissionUploadParameters } from '../../../../../../../openapi/schemas/submission-upload';
-import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
-import { SearchFeatureService } from '../../../../../../../services/search-feature-service';
-import { getLogger } from '../../../../../../../utils/logger';
-import { makePaginationOptionsFromRequest } from '../../../../../../../utils/pagination';
+} from '../../../../../../../../../../openapi/schemas/pagination';
+import { reconciliationFeatureParameters } from '../../../../../../../../../../openapi/schemas/reconciliation';
+import { authorizeRequestHandler } from '../../../../../../../../../../request-handlers/security/authorization';
+import { SearchFeatureService } from '../../../../../../../../../../services/search-feature-service';
+import { getLogger } from '../../../../../../../../../../utils/logger';
+import { makePaginationOptionsFromRequest } from '../../../../../../../../../../utils/pagination';
 
 const defaultLog = getLogger(
-  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/feature-types'
+  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/reconciliation/{reconciliation}/features/types'
 );
 
 export const GET: Operation = [
@@ -37,18 +37,11 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    'List the feature types stored in a submission upload with the number of features of each, optionally limited to one reconciliation outcome.',
+    'List the feature types of the features with one stored reconciliation outcome in a submission upload, with the number of features of each.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
-    ...submissionUploadParameters,
-    {
-      description: 'Count only features with this stored reconciliation outcome.',
-      in: 'query',
-      name: 'reconciliation',
-      required: false,
-      schema: { type: 'string', enum: ReconciliationType.options }
-    },
+    ...reconciliationFeatureParameters,
     ...paginationRequestQueryParamSchema.filter((parameter) => parameter.name !== 'sort'),
     {
       in: 'query',
@@ -104,7 +97,7 @@ export function listSubmissionUploadFeatureTypes(): RequestHandler {
         submissionUploadId: req.params.submissionUploadId
       };
       const filters: SubmissionUploadFeatureTypeFilters = {
-        reconciliation: (req.query.reconciliation as ReconciliationType | undefined) ?? null
+        reconciliation: req.params.reconciliation as ReconciliationType
       };
       const pagination = makePaginationOptionsFromRequest(req);
       const service = new SearchFeatureService(connection);

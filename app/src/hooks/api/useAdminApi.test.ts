@@ -69,13 +69,39 @@ describe('useAdminApi', () => {
     const signal = new AbortController().signal;
     const response = { feature_types: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
     const pagination = { page: 2, limit: 10, sort: 'count', order: 'desc' as const };
-    mock.onGet('/api/administrative/submission/7/upload/upload-1/feature-types').reply(200, response);
+    mock
+      .onGet('/api/administrative/submission/7/upload/upload-1/reconciliation/unmodified/features/types')
+      .reply(200, response);
     expect(
-      await useAdminApi(axios).listSubmissionUploadFeatureTypes(scope, { reconciliation: 'unmodified' }, pagination, {
-        signal
-      })
+      await useAdminApi(axios).listSubmissionUploadFeatureTypes(
+        { ...scope, reconciliation: 'unmodified' },
+        pagination,
+        {
+          signal
+        }
+      )
     ).toEqual(response);
-    expect(mock.history.get[0].params).toEqual({ reconciliation: 'unmodified', ...pagination });
+    expect(mock.history.get[0].params).toEqual(pagination);
+    expect(mock.history.get[0].signal).toBe(signal);
+  });
+
+  it('requests one page of raw reconciliation feature data', async () => {
+    const signal = new AbortController().signal;
+    const response = { features: [], pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 } };
+    const pagination = { page: 1, limit: 10, sort: 'submission_feature_id', order: 'asc' as const };
+    mock
+      .onGet('/api/administrative/submission/7/upload/upload-1/reconciliation/modified/features')
+      .reply(200, response);
+    expect(
+      await useAdminApi(axios).getReconciliationFeatureData(
+        { submissionId: 7, submissionUploadId: 'upload-1', reconciliation: 'modified' },
+        pagination,
+        {
+          signal
+        }
+      )
+    ).toEqual(response);
+    expect(mock.history.get[0].params).toEqual(pagination);
     expect(mock.history.get[0].signal).toBe(signal);
   });
 
