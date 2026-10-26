@@ -33,11 +33,10 @@ export const AdminSubmissionUploadReconciliation = ({
   const grid = useServerPaginatedGridState({ defaultSort: { field: 'feature_type_name', sort: 'asc' } });
   const { handlePaginationChange } = grid;
   const { pageSize } = grid.paginationModel;
-  const filters = { reconciliation: scope.reconciliation };
   const featureTypesQuery = useQuery({
-    queryKey: submissionUploadQueryKeys.featureTypes(scope, filters, grid.apiPagination),
-    queryFn: ({ signal }) => api.admin.listSubmissionUploadFeatureTypes(scope, filters, grid.apiPagination, { signal }),
-    placeholderData: keepPreviousDataWithin(submissionUploadQueryKeys.featureTypesAll(scope, filters))
+    queryKey: submissionUploadQueryKeys.featureTypes(scope, grid.apiPagination),
+    queryFn: ({ signal }) => api.admin.listSubmissionUploadFeatureTypes(scope, grid.apiPagination, { signal }),
+    placeholderData: keepPreviousDataWithin(submissionUploadQueryKeys.featureTypesAll(scope))
   });
 
   // The grid outlives the outcome it shows, so each outcome starts from its first page.

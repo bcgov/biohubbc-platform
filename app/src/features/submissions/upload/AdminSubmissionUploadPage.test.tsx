@@ -233,7 +233,6 @@ describe('AdminSubmissionUploadPage', () => {
     expect(mocks.listFeatureTypes).toHaveBeenCalledTimes(1);
     expect(mocks.listFeatureTypes).toHaveBeenCalledWith(
       { ...scope, reconciliation },
-      { reconciliation },
       { page: 1, limit: 10, sort: 'feature_type_name', order: 'asc' },
       { signal: expect.any(AbortSignal) }
     );
@@ -279,7 +278,7 @@ describe('AdminSubmissionUploadPage', () => {
   });
 
   it('pages feature types on the server and returns to the first page for another outcome', async () => {
-    mocks.listFeatureTypes.mockImplementation(async (_scope, _filters, pagination) => ({
+    mocks.listFeatureTypes.mockImplementation(async (_scope, pagination) => ({
       feature_types: [{ feature_type_name: pagination.page === 2 ? 'habitat' : 'animal', count: 1 }],
       pagination: { total: 12, current_page: pagination.page, last_page: 2, per_page: 10 }
     }));
@@ -289,7 +288,6 @@ describe('AdminSubmissionUploadPage', () => {
     expect(await screen.findByRole('gridcell', { name: 'Habitat' })).toBeVisible();
     expect(mocks.listFeatureTypes).toHaveBeenLastCalledWith(
       { ...scope, reconciliation: 'new' },
-      { reconciliation: 'new' },
       expect.objectContaining({ page: 2, limit: 10 }),
       { signal: expect.any(AbortSignal) }
     );
@@ -297,7 +295,6 @@ describe('AdminSubmissionUploadPage', () => {
     await waitFor(() =>
       expect(mocks.listFeatureTypes).toHaveBeenLastCalledWith(
         { ...scope, reconciliation: 'modified' },
-        { reconciliation: 'modified' },
         expect.objectContaining({ page: 1, limit: 10 }),
         { signal: expect.any(AbortSignal) }
       )

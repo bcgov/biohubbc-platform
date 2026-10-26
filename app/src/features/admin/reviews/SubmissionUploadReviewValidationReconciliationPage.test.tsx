@@ -7,13 +7,14 @@ import { render } from 'test-helpers/test-utils';
 import { SubmissionUploadReviewValidationReconciliationPage } from './SubmissionUploadReviewValidationReconciliationPage';
 
 vi.mock('react-router-dom', () => vi.importActual('react-router'));
-const mocks = vi.hoisted(() => ({ getReview: vi.fn(), count: vi.fn(), setSnackbar: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getReview: vi.fn(), count: vi.fn(), featureData: vi.fn(), setSnackbar: vi.fn() }));
 vi.mock('hooks/useContext', () => ({ useDialogContext: () => ({ setSnackbar: mocks.setSnackbar }) }));
 vi.mock('hooks/useApi', () => ({
   useApi: () => ({
     admin: {
       getSubmissionUploadReview: mocks.getReview,
-      listSubmissionUploadFeatureTypes: mocks.count
+      listSubmissionUploadFeatureTypes: mocks.count,
+      getReconciliationFeatureData: mocks.featureData
     }
   })
 }));
@@ -62,30 +63,56 @@ describe('SubmissionUploadReviewValidationReconciliationPage', () => {
     ['new', 'New', 'new'],
     ['unchanged', 'Unchanged', 'unmodified'],
     ['changed', 'Changed', 'modified']
-  ])(
-    'renders the %s outcome with a single tab, breadcrumbs, and feature types table',
-    async (route, label, outcome) => {
-      renderPage(`/${route}`);
-      expect(await screen.findByRole('heading', { name: label })).toBeVisible();
-      expect(screen.getAllByRole('tab')).toHaveLength(1);
-      expect(screen.getByRole('tab', { name: 'Feature types' })).toBeVisible();
-      expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('href', reviewPath);
-      expect(screen.getByRole('link', { name: 'Submission' })).toHaveAttribute('href', '/admin/submissions/16');
-      expect(await screen.findByRole('columnheader', { name: 'Feature type' })).toBeVisible();
-      const animalRow = screen.getByRole('gridcell', { name: 'Animal' }).closest('[role="row"]') as HTMLElement;
-      expect(within(animalRow).getByRole('gridcell', { name: '2' })).toBeVisible();
-      expect(screen.getByRole('gridcell', { name: 'Survey' })).toBeVisible();
-      expect(mocks.count).toHaveBeenCalledWith(
-        { submissionId: 16, submissionUploadId: uploadId, reconciliation: outcome },
-        { reconciliation: outcome },
-        { page: 1, limit: 10, sort: 'feature_type_name', order: 'asc' },
-        { signal: expect.any(AbortSignal) }
-      );
-    }
-  );
+  ])('renders the %s outcome with its tabs, breadcrumbs, and feature types table', async (route, label, outcome) => {
+    renderPage(`/${route}`);
+    expect(await screen.findByRole('heading', { name: label })).toBeVisible();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getByRole('tab', { name: 'Feature types' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Features' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Validation' })).toHaveAttribute('href', reviewPath);
+    expect(screen.getByRole('link', { name: 'Submission' })).toHaveAttribute('href', '/admin/submissions/16');
+    expect(await screen.findByRole('columnheader', { name: 'Feature type' })).toBeVisible();
+    const animalRow = screen.getByRole('gridcell', { name: 'Animal' }).closest('[role="row"]') as HTMLElement;
+    expect(within(animalRow).getByRole('gridcell', { name: '2' })).toBeVisible();
+    expect(screen.getByRole('gridcell', { name: 'Survey' })).toBeVisible();
+    expect(mocks.count).toHaveBeenCalledWith(
+      { submissionId: 16, submissionUploadId: uploadId, reconciliation: outcome },
+      { page: 1, limit: 10, sort: 'feature_type_name', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
+    expect(mocks.featureData).not.toHaveBeenCalled();
+  });
+
+  it('shows one page of the outcome features with their raw data on the Features tab', async () => {
+    mocks.featureData.mockResolvedValue({
+      features: [{ submission_feature_id: 41, data: { id: 'site-1', type: 'site', properties: { name: 'North' } } }],
+      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+    });
+    renderPage('/changed');
+    fireEvent.click(await screen.findByRole('tab', { name: 'Features' }));
+
+    expect(await screen.findByRole('gridcell', { name: '41' })).toBeVisible();
+    expect(screen.getByText(/"name": "North"/)).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Features' })).toHaveAttribute('aria-selected', 'true');
+    expect(mocks.featureData).toHaveBeenCalledWith(
+      { submissionId: 16, submissionUploadId: uploadId, reconciliation: 'modified' },
+      { page: 1, limit: 10, sort: 'submission_feature_id', order: 'asc' },
+      { signal: expect.any(AbortSignal) }
+    );
+  });
+
+  it('opens the Features tab from the URL without loading feature types', async () => {
+    mocks.featureData.mockResolvedValue({
+      features: [],
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+    });
+    renderPage('/new?tab=features');
+    expect(await screen.findByText('No features found.')).toBeVisible();
+    expect(mocks.count).not.toHaveBeenCalled();
+  });
 
   it('pages and sorts feature types on the server, keeping the current page visible while the next loads', async () => {
-    mocks.count.mockImplementation(async (_scope, _filters, pagination) => ({
+    mocks.count.mockImplementation(async (_scope, pagination) => ({
       feature_types: [{ feature_type_name: pagination.page === 2 ? 'type_11' : 'type_01', count: 1 }],
       pagination: { total: 12, current_page: pagination.page, last_page: 2, per_page: 10 }
     }));
@@ -94,20 +121,14 @@ describe('SubmissionUploadReviewValidationReconciliationPage', () => {
     expect(screen.queryByRole('gridcell', { name: 'Type 11' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
     expect(await screen.findByRole('gridcell', { name: 'Type 11' })).toBeVisible();
-    expect(mocks.count).toHaveBeenLastCalledWith(
-      expect.anything(),
-      { reconciliation: 'new' },
-      expect.objectContaining({ page: 2, limit: 10 }),
-      { signal: expect.any(AbortSignal) }
-    );
+    expect(mocks.count).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ page: 2, limit: 10 }), {
+      signal: expect.any(AbortSignal)
+    });
     fireEvent.click(screen.getByRole('columnheader', { name: 'Features' }));
     await waitFor(() =>
-      expect(mocks.count).toHaveBeenLastCalledWith(
-        expect.anything(),
-        { reconciliation: 'new' },
-        expect.objectContaining({ sort: 'count' }),
-        { signal: expect.any(AbortSignal) }
-      )
+      expect(mocks.count).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ sort: 'count' }), {
+        signal: expect.any(AbortSignal)
+      })
     );
   });
 

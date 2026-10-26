@@ -1,7 +1,7 @@
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { render } from 'test-helpers/test-utils';
+import { render, within } from 'test-helpers/test-utils';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 
 // The map owns its own data loading and is covered by its own suite; this one is about the page layout.
@@ -76,6 +76,22 @@ describe('SubmissionFeatureDetailContent', () => {
     const { queryByText } = renderComponent();
 
     expect(queryByText('This feature has been superseded')).toBeNull();
+  });
+
+  it('lists the direct successor in About', () => {
+    const { getByRole } = renderComponent({
+      feature: { ...mockFeature, successor_submission_feature_id: 11, terminal_submission_feature_id: 12 }
+    });
+
+    const successorRow = getByRole('gridcell', { name: 'Successor' }).closest('[role="row"]') as HTMLElement;
+    expect(within(successorRow).getByRole('gridcell', { name: '11' })).toBeInTheDocument();
+  });
+
+  it('leaves the successor blank in About when the feature has none', () => {
+    const { getByRole } = renderComponent();
+
+    const successorRow = getByRole('gridcell', { name: 'Successor' }).closest('[role="row"]') as HTMLElement;
+    expect(within(successorRow).getAllByRole('gridcell')[1]).toHaveTextContent('');
   });
 
   describe('detail sections', () => {
