@@ -1,11 +1,16 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { ContributorCodesetScope } from '../models/contributor-codeset';
 import {
+  AdministrativeContributorCodesetCode,
+  AdministrativeContributorCodesetCodeSchema,
   ContributorCodesetCode,
   ContributorCodesetCodeSchema,
   CreateContributorCodesetCode
 } from '../models/contributor-codeset-code';
+import { CountResult } from '../models/count';
 import { ContributorCodesetCodeIdentity } from '../services/contributor-codeset-code-service.interface';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 export class ContributorCodesetCodeRepository extends BaseRepository {
@@ -237,5 +242,70 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
     return response.rows;
+  }
+
+  /**
+   * List a page of one code category's values, including ended values. Values are returned only when the code
+   * category belongs to the scoped contributor.
+   *
+   * @param {ContributorCodesetScope} scope - Code category and the contributor that owns it.
+   * @param {ApiPaginationOptions} pagination - Requested page and sort.
+   * @return {Promise<AdministrativeContributorCodesetCode[]>} Code values on the requested page.
+   * @memberof ContributorCodesetCodeRepository
+   */
+  async listAdministrativeContributorCodesetCodes(
+    scope: ContributorCodesetScope,
+    pagination: ApiPaginationOptions
+  ): Promise<AdministrativeContributorCodesetCode[]> {
+    const knex = getKnex();
+    const columns: Record<string, string> = {
+      key: 'ccc.key',
+      label: 'ccc.label',
+      external_id: 'ccc.external_id',
+      record_end_date: 'ccc.record_end_date'
+    };
+    const query = knex('contributor_codeset_code as ccc')
+      .join('contributor_codeset as cc', 'cc.contributor_codeset_id', 'ccc.contributor_codeset_id')
+      .select(
+        'ccc.contributor_codeset_code_id',
+        'ccc.contributor_codeset_id',
+        'cc.label as codeset_label',
+        'ccc.key',
+        'ccc.label',
+        'ccc.description',
+        'ccc.external_id',
+        'ccc.record_end_date'
+      )
+      .where('cc.contributor_id', scope.contributorId)
+      .where('ccc.contributor_codeset_id', scope.contributorCodesetId)
+      .orderBy(columns[pagination.sort ?? ''] ?? 'ccc.key', pagination.order ?? 'asc')
+      .orderBy('ccc.contributor_codeset_code_id', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, AdministrativeContributorCodesetCodeSchema);
+
+    return response.rows;
+  }
+
+  /**
+   * Count one code category's values, including ended values. Values are counted only when the code category belongs
+   * to the scoped contributor.
+   *
+   * @param {ContributorCodesetScope} scope - Code category and the contributor that owns it.
+   * @return {Promise<number>} Total code values.
+   * @memberof ContributorCodesetCodeRepository
+   */
+  async countAdministrativeContributorCodesetCodes(scope: ContributorCodesetScope): Promise<number> {
+    const knex = getKnex();
+    const query = knex('contributor_codeset_code as ccc')
+      .join('contributor_codeset as cc', 'cc.contributor_codeset_id', 'ccc.contributor_codeset_id')
+      .select(knex.raw('count(*)::integer as count'))
+      .where('cc.contributor_id', scope.contributorId)
+      .where('ccc.contributor_codeset_id', scope.contributorCodesetId);
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
   }
 }

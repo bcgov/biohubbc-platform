@@ -211,8 +211,8 @@ export type SubmissionUploadFeatureType = z.infer<typeof SubmissionUploadFeature
 
 /** Filters of the administrative submission upload feature type list. */
 export interface SubmissionUploadFeatureTypeFilters {
-  /** Stored reconciliation outcome whose features are counted, or null for every feature of the upload. */
-  reconciliation: ReconciliationType | null;
+  /** Stored reconciliation outcome whose features are counted. */
+  reconciliation: ReconciliationType;
 }
 
 export interface SubmissionUploadFeatureTypesResponse {

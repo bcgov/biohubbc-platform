@@ -6,12 +6,18 @@ import { ContributorDetailPage } from './ContributorDetailPage';
 vi.mock('hooks/useApi');
 const get = vi.fn();
 const list = vi.fn();
+const listCodesets = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
   list.mockResolvedValue({ contributor_users: [], pagination: { total: 0, last_page: 1 } });
+  listCodesets.mockResolvedValue({ codesets: [], pagination: { total: 0, last_page: 1 } });
   vi.mocked(useApi).mockReturnValue({
-    contributors: { getContributor: get, listContributorUsers: list }
+    contributors: {
+      getContributor: get,
+      listContributorUsers: list,
+      listContributorCodesets: listCodesets
+    }
   } as unknown as ReturnType<typeof useApi>);
 });
 
@@ -47,9 +53,25 @@ it('loads contributor details and scopes relationship management to the route id
   expect(metadata.queryByText('Status')).not.toBeInTheDocument();
   expect(metadata.queryByText(/^(create|update)_/)).not.toBeInTheDocument();
   expect(screen.queryByRole('tabpanel', { name: 'Users' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'Codesets' }));
+  const codesets = within(screen.getByRole('tabpanel', { name: 'Codesets' }));
+  expect(await codesets.findByRole('heading', { name: /Codesets/ })).toBeVisible();
   fireEvent.click(screen.getByRole('tab', { name: 'Users' }));
   expect(screen.getByRole('tabpanel', { name: 'Users' })).toBeVisible();
   expect(list).toHaveBeenCalledTimes(1);
+});
+
+it('opens the tab named in the URL so other pages can link back to it', async () => {
+  get.mockResolvedValue({ contributor_id: 7, client_id: 'SIMS', description: null, record_end_date: null });
+  render(
+    <MemoryRouter initialEntries={['/admin/users/contributor/7?tab=codesets']}>
+      <Routes>
+        <Route path="/admin/users/contributor/:contributorId" element={<ContributorDetailPage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+  expect(await screen.findByRole('tab', { name: 'Codesets' })).toHaveAttribute('aria-selected', 'true');
+  await waitFor(() => expect(listCodesets).toHaveBeenCalledWith(7, expect.objectContaining({ page: 1 })));
 });
 
 it('shows a recoverable error for a missing contributor', async () => {

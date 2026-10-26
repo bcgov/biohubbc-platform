@@ -109,4 +109,23 @@ describe('SubmissionFeatureReconciliationRepository', () => {
     expect(text).to.not.include('record_effective_date');
     expect(text).to.not.include('record_end_date');
   });
+
+  it('pages one outcome of an upload by feature id with its raw data, across the complete feature lifecycle', async () => {
+    const rows = [{ submission_feature_id: 5, data: { id: 'A', type: 'survey', properties: {} } }];
+    const knex = sinon.stub().resolves(mockQueryResult(rows, 1));
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ knex }));
+
+    expect(
+      await repository.getReconciliationFeatureData(
+        { submissionId: 9, submissionUploadId: 'upload-id', reconciliation: 'modified' },
+        { page: 3, limit: 10, order: 'desc' }
+      )
+    ).to.eql(rows);
+    const { sql, bindings } = knex.firstCall.args[0].toSQL();
+    expect(sql).to.include('"submission_feature_id", "data"');
+    expect(sql).to.include('order by "submission_feature_id" desc');
+    expect(sql).to.not.include('record_effective_date');
+    expect(sql).to.not.include('record_end_date');
+    expect(bindings).to.eql([9, 'upload-id', 'modified', 10, 20]);
+  });
 });

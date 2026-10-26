@@ -4,13 +4,13 @@ import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET, listSubmissionUploadFeatureTypes } from '.';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../__mocks__/db';
-import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
-import * as db from '../../../../../../../database/db';
-import { ApiNotFoundError } from '../../../../../../../errors/api-error';
-import { HTTP403 } from '../../../../../../../errors/http-error';
-import { authorizationDependencies } from '../../../../../../../request-handlers/security/authorization';
-import { SearchFeatureService } from '../../../../../../../services/search-feature-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../../../../__mocks__/db';
+import { SYSTEM_ROLE } from '../../../../../../../../../../constants/roles';
+import * as db from '../../../../../../../../../../database/db';
+import { ApiNotFoundError } from '../../../../../../../../../../errors/api-error';
+import { HTTP403 } from '../../../../../../../../../../errors/http-error';
+import { authorizationDependencies } from '../../../../../../../../../../request-handlers/security/authorization';
+import { SearchFeatureService } from '../../../../../../../../../../services/search-feature-service';
 
 chai.use(sinonChai);
 
@@ -78,8 +78,8 @@ describe('administrative submission upload feature type list', () => {
     };
     const list = sinon.stub(SearchFeatureService.prototype, 'listSubmissionUploadFeatureTypes').resolves(response);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionId: '7', submissionUploadId };
-    mockReq.query = { reconciliation: 'unmodified', page: '2', limit: '10', sort: 'count', order: 'desc' };
+    mockReq.params = { submissionId: '7', submissionUploadId, reconciliation: 'unmodified' };
+    mockReq.query = { page: '2', limit: '10', sort: 'count', order: 'desc' };
     await listSubmissionUploadFeatureTypes()(mockReq, mockRes, mockNext);
     expect(list).to.have.been.calledOnceWithExactly(
       { submissionId: 7, submissionUploadId },
@@ -92,19 +92,6 @@ describe('administrative submission upload feature type list', () => {
     expect(connection.release).to.have.been.calledOnce;
   });
 
-  it('lists every outcome when no reconciliation outcome is requested', async () => {
-    const connection = getMockDBConnection({ commit: sinon.stub().resolves(), release: sinon.stub() });
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
-    const list = sinon.stub(SearchFeatureService.prototype, 'listSubmissionUploadFeatureTypes').resolves({
-      feature_types: [],
-      pagination: { total: 0, per_page: 25, current_page: 1, last_page: 1 }
-    });
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionId: '7', submissionUploadId };
-    await listSubmissionUploadFeatureTypes()(mockReq, mockRes, mockNext);
-    expect(list.firstCall.args[1]).to.eql({ reconciliation: null });
-  });
-
   it('rolls back and releases the connection when the upload does not belong to the submission', async () => {
     const connection = getMockDBConnection({
       commit: sinon.stub(),
@@ -115,7 +102,7 @@ describe('administrative submission upload feature type list', () => {
     const failure = new ApiNotFoundError('Submission upload not found');
     sinon.stub(SearchFeatureService.prototype, 'listSubmissionUploadFeatureTypes').rejects(failure);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { submissionId: '7', submissionUploadId };
+    mockReq.params = { submissionId: '7', submissionUploadId, reconciliation: 'new' };
     let caught: unknown;
     try {
       await listSubmissionUploadFeatureTypes()(mockReq, mockRes, mockNext);

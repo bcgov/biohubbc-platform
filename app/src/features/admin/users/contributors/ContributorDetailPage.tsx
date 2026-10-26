@@ -5,12 +5,15 @@ import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { refreshChangedQueries } from 'utils/query-client';
 import { useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
 import { ContributorAbout } from './content/ContributorAbout';
+import { ContributorCodesetPanel } from './content/ContributorCodesetPanel';
 import { ContributorUserPanel } from './content/ContributorUserPanel';
 import { ContributorDialog } from './dialog/ContributorDialog';
 
-type ContributorDetailTab = 'users' | 'metadata';
+type ContributorDetailTab = 'users' | 'codesets' | 'metadata';
+
+const CONTRIBUTOR_DETAIL_TABS: ContributorDetailTab[] = ['users', 'codesets', 'metadata'];
 
 /**
  * Contributor details and scoped relationship administration.
@@ -19,7 +22,11 @@ type ContributorDetailTab = 'users' | 'metadata';
 export const ContributorDetailPage = () => {
   const { contributorId } = useParams();
   const api = useApi();
-  const [activeTab, setActiveTab] = useState<ContributorDetailTab>('users');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The tab is kept in the URL so pages linked from a tab, such as a codeset, can link back to it.
+  const requestedTab = CONTRIBUTOR_DETAIL_TABS.find((tab) => tab === searchParams.get('tab'));
+  const activeTab = requestedTab ?? 'users';
+  const handleTabChange = (value: ContributorDetailTab) => setSearchParams(value === 'users' ? {} : { tab: value });
   const [isEditing, setIsEditing] = useState(false);
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -67,6 +74,12 @@ export const ContributorDetailPage = () => {
         tabs={[
           { value: 'users', label: 'Users', id: 'contributor-users-tab', ariaControls: 'contributor-users-panel' },
           {
+            value: 'codesets',
+            label: 'Codesets',
+            id: 'contributor-codesets-tab',
+            ariaControls: 'contributor-codesets-panel'
+          },
+          {
             value: 'metadata',
             label: 'About',
             id: 'contributor-metadata-tab',
@@ -74,7 +87,7 @@ export const ContributorDetailPage = () => {
           }
         ]}
         activeTab={activeTab}
-        onTabChange={setActiveTab}>
+        onTabChange={handleTabChange}>
         <Stack gap={3}>
           {Boolean(query.error) && (
             <Alert severity="error" action={<SecondaryButton onClick={handleRefresh}>Retry</SecondaryButton>}>
@@ -94,6 +107,11 @@ export const ContributorDetailPage = () => {
                   contributor={contributor}
                 />
               </Box>
+              {activeTab === 'codesets' && (
+                <Box role="tabpanel" id="contributor-codesets-panel" aria-labelledby="contributor-codesets-tab">
+                  <ContributorCodesetPanel contributor={contributor} />
+                </Box>
+              )}
               {activeTab === 'metadata' && (
                 <Box role="tabpanel" id="contributor-metadata-panel" aria-labelledby="contributor-metadata-tab">
                   <ContributorAbout contributor={contributor} />

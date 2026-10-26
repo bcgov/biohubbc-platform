@@ -107,16 +107,21 @@ export interface ReconciliationFeatureScope {
   reconciliation: ReconciliationType;
 }
 
+/** A stored reconciliation feature and its raw submitted jsonb payload. */
+export interface ReconciliationFeatureData {
+  submission_feature_id: number;
+  data: Record<string, unknown>;
+}
+
+export interface ReconciliationFeatureDataResponse {
+  features: ReconciliationFeatureData[];
+  pagination: ApiPaginationResponseParams;
+}
+
 /** A feature type stored in an upload and the number of its features. */
 export interface SubmissionUploadFeatureType {
   feature_type_name: string;
   count: number;
-}
-
-/** Filters of the administrative submission upload feature type list. */
-export interface SubmissionUploadFeatureTypeFilters {
-  /** Count only features with this stored reconciliation outcome. Every feature is counted when omitted. */
-  reconciliation?: ReconciliationType;
 }
 
 export interface SubmissionUploadFeatureTypesResponse {

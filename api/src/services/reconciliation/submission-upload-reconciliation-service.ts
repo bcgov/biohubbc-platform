@@ -1,9 +1,15 @@
 import { IDBConnection } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP500 } from '../../errors/http-error';
-import { ReconciliationCounts } from '../../models/reconciliation';
+import {
+  ReconciliationCounts,
+  ReconciliationFeatureDataPage,
+  ReconciliationFeatureScope
+} from '../../models/reconciliation';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { getLogger } from '../../utils/logger';
+import { makePaginationResponse } from '../../utils/pagination';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
@@ -106,6 +112,30 @@ export class SubmissionUploadReconciliationService extends DBService {
     return this.submissionFeatureReconciliationRepository.getSubmissionFeatureReconciliationOverviewCounts(
       submissionUploadId
     );
+  }
+
+  /**
+   * Get one page of an upload's features with one reconciliation outcome and their raw submitted data.
+   *
+   * The total is the outcome's stored overview count, which covers the same complete feature lifecycle as the page.
+   *
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {ApiPaginationOptions} pagination Page size, offset and sort order.
+   * @returns {Promise<ReconciliationFeatureDataPage>} Raw feature data and pagination totals.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @memberof SubmissionUploadReconciliationService
+   */
+  async getReconciliationFeatureData(
+    scope: ReconciliationFeatureScope,
+    pagination: ApiPaginationOptions
+  ): Promise<ReconciliationFeatureDataPage> {
+    const counts = await this.getSubmissionFeatureReconciliationCounts(scope.submissionId, scope.submissionUploadId);
+    const features = await this.submissionFeatureReconciliationRepository.getReconciliationFeatureData(
+      scope,
+      pagination
+    );
+
+    return { features, pagination: makePaginationResponse(counts[scope.reconciliation], pagination) };
   }
 
   /**

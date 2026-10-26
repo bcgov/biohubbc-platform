@@ -1,7 +1,16 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { ContributorCodeset, ContributorCodesetSchema, CreateContributorCodeset } from '../models/contributor-codeset';
+import {
+  AdministrativeContributorCodeset,
+  AdministrativeContributorCodesetSchema,
+  ContributorCodeset,
+  ContributorCodesetSchema,
+  ContributorCodesetScope,
+  CreateContributorCodeset
+} from '../models/contributor-codeset';
+import { CountResult } from '../models/count';
 import { ContributorCodesetIdentity } from '../services/contributor-codeset-service.interface';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 export class ContributorCodesetRepository extends BaseRepository {
@@ -194,5 +203,93 @@ export class ContributorCodesetRepository extends BaseRepository {
     const response = await this.connection.knex(query, ContributorCodesetSchema);
 
     return response.rows;
+  }
+
+  /**
+   * List a page of a contributor's code categories, including ended categories.
+   *
+   * @param {number} contributorId - Contributor that owns the code categories.
+   * @param {ApiPaginationOptions} pagination - Requested page and sort.
+   * @return {Promise<AdministrativeContributorCodeset[]>} Code categories on the requested page.
+   * @memberof ContributorCodesetRepository
+   */
+  async listAdministrativeContributorCodesets(
+    contributorId: number,
+    pagination: ApiPaginationOptions
+  ): Promise<AdministrativeContributorCodeset[]> {
+    const knex = getKnex();
+    const columns: Record<string, string> = {
+      key: 'key',
+      label: 'label',
+      external_id: 'external_id',
+      record_end_date: 'record_end_date'
+    };
+    const query = knex('contributor_codeset')
+      .select([
+        'contributor_codeset_id',
+        'contributor_id',
+        'key',
+        'label',
+        'description',
+        'external_id',
+        'record_end_date'
+      ])
+      .where('contributor_id', contributorId)
+      .orderBy(columns[pagination.sort ?? ''] ?? 'key', pagination.order ?? 'asc')
+      .orderBy('contributor_codeset_id', 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, AdministrativeContributorCodesetSchema);
+
+    return response.rows;
+  }
+
+  /**
+   * Count a contributor's code categories, including ended categories.
+   *
+   * @param {number} contributorId - Contributor that owns the code categories.
+   * @return {Promise<number>} Total code categories.
+   * @memberof ContributorCodesetRepository
+   */
+  async countAdministrativeContributorCodesets(contributorId: number): Promise<number> {
+    const knex = getKnex();
+    const query = knex('contributor_codeset')
+      .select(knex.raw('count(*)::integer as count'))
+      .where('contributor_id', contributorId);
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
+  }
+
+  /**
+   * Get one of a contributor's code categories, including an ended category.
+   *
+   * @param {ContributorCodesetScope} scope - Code category and the contributor that owns it.
+   * @return {Promise<AdministrativeContributorCodeset | undefined>} The code category, or undefined when the contributor
+   * has no such code category.
+   * @memberof ContributorCodesetRepository
+   */
+  async getAdministrativeContributorCodeset(
+    scope: ContributorCodesetScope
+  ): Promise<AdministrativeContributorCodeset | undefined> {
+    const knex = getKnex();
+    const query = knex('contributor_codeset')
+      .select([
+        'contributor_codeset_id',
+        'contributor_id',
+        'key',
+        'label',
+        'description',
+        'external_id',
+        'record_end_date'
+      ])
+      .where('contributor_id', scope.contributorId)
+      .where('contributor_codeset_id', scope.contributorCodesetId);
+
+    const response = await this.connection.knex(query, AdministrativeContributorCodesetSchema);
+
+    return response.rows[0];
   }
 }
