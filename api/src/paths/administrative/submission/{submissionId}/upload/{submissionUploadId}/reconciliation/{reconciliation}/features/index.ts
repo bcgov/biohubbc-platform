@@ -2,61 +2,88 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../../../database/db';
-import { ReconciliationFeatureScope, ReconciliationType } from '../../../../../../../../../models/reconciliation';
-import { defaultErrorResponses } from '../../../../../../../../../openapi/schemas/http-responses';
-import { cursorPaginationRequestBodySchema } from '../../../../../../../../../openapi/schemas/pagination';
 import {
-  reconciliationFeaturePageSchema,
-  reconciliationFeatureParameters
-} from '../../../../../../../../../openapi/schemas/reconciliation';
+  RECONCILIATION_FEATURE_DATA_SORT_COLUMNS,
+  ReconciliationFeatureScope,
+  ReconciliationType
+} from '../../../../../../../../../models/reconciliation';
+import { defaultErrorResponses } from '../../../../../../../../../openapi/schemas/http-responses';
+import {
+  paginationRequestQueryParamSchema,
+  paginationResponseSchema
+} from '../../../../../../../../../openapi/schemas/pagination';
+import { reconciliationFeatureParameters } from '../../../../../../../../../openapi/schemas/reconciliation';
 import { authorizeRequestHandler } from '../../../../../../../../../request-handlers/security/authorization';
-import { SearchFeatureService } from '../../../../../../../../../services/search-feature-service';
-import { makeCursorPaginationOptionsFromBody } from '../../../../../../../../../utils/pagination';
-import { registerRequestCancellation } from '../../../../../../../../../utils/request-cancellation';
-import { validateSearchFeatureType } from '../../../../../../../../../utils/search-feature-validation';
+import { SubmissionUploadReconciliationService } from '../../../../../../../../../services/reconciliation/submission-upload-reconciliation-service';
+import { getLogger } from '../../../../../../../../../utils/logger';
+import { makePaginationOptionsFromRequest } from '../../../../../../../../../utils/pagination';
 
-export const POST: Operation = [
+const defaultLog = getLogger(
+  'paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/reconciliation/{reconciliation}/features'
+);
+
+export const GET: Operation = [
   authorizeRequestHandler(() => ({
     and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
   })),
-  getReconciliationFeatures()
+  getReconciliationFeatureData()
 ];
 
-POST.apiDoc = {
-  description: 'Read stored reconciliation features across the complete upload lifecycle.',
+GET.apiDoc = {
+  description:
+    'List the raw submitted jsonb data of the features with one stored reconciliation outcome in a submission upload, across the complete upload lifecycle.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
-  parameters: reconciliationFeatureParameters,
-  requestBody: {
-    required: true,
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['featureType'],
-          properties: { featureType: { type: 'string', minLength: 1 }, pagination: cursorPaginationRequestBodySchema }
-        }
-      }
+  parameters: [
+    ...reconciliationFeatureParameters,
+    ...paginationRequestQueryParamSchema.filter((parameter) => parameter.name !== 'sort'),
+    {
+      in: 'query',
+      name: 'sort',
+      schema: { type: 'string', enum: RECONCILIATION_FEATURE_DATA_SORT_COLUMNS, default: 'submission_feature_id' }
     }
-  },
+  ],
   responses: {
     200: {
-      description: 'Reconciliation features.',
-      content: { 'application/json': { schema: reconciliationFeaturePageSchema } }
+      description: 'A page of raw reconciliation feature data.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            required: ['features', 'pagination'],
+            additionalProperties: false,
+            properties: {
+              features: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['submission_feature_id', 'data'],
+                  properties: {
+                    submission_feature_id: { type: 'integer', minimum: 1 },
+                    data: { type: 'object', description: 'Raw submitted feature jsonb.' }
+                  }
+                }
+              },
+              pagination: paginationResponseSchema
+            }
+          }
+        }
+      }
     },
     ...defaultErrorResponses
   }
 };
 
 /**
- * Read a reconciliation cursor page within an administrator-owned transaction.
- * @returns {RequestHandler} Handler with cancellation and transaction cleanup.
+ * List raw reconciliation feature data for system administrators.
+ *
+ * @returns {RequestHandler} Handler with the standard transaction and connection lifecycle.
  */
-export function getReconciliationFeatures(): RequestHandler {
+export function getReconciliationFeatureData(): RequestHandler {
   return async (req, res) => {
-    const cancellation = registerRequestCancellation(res);
-    const connection = getDBConnection(req.keycloak_token, { signal: cancellation.signal });
+    const connection = getDBConnection(req.keycloak_token);
+
     try {
       await connection.open();
       const scope: ReconciliationFeatureScope = {
@@ -64,18 +91,16 @@ export function getReconciliationFeatures(): RequestHandler {
         submissionUploadId: req.params.submissionUploadId,
         reconciliation: req.params.reconciliation as ReconciliationType
       };
-      const service = new SearchFeatureService(connection);
-      const featureType = validateSearchFeatureType(req.body.featureType);
-      const pagination = makeCursorPaginationOptionsFromBody(req);
-      const result = await service.getReconciliationFeatures(scope, featureType, pagination);
+      const pagination = makePaginationOptionsFromRequest(req);
+      const service = new SubmissionUploadReconciliationService(connection);
+      const result = await service.getReconciliationFeatureData(scope, pagination);
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {
-      cancellation.unregister();
+      defaultLog.error({ label: 'getReconciliationFeatureData', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
-      cancellation.unregister();
       await connection.release();
     }
   };
