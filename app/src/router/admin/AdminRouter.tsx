@@ -16,6 +16,7 @@ import { PolicyDetailPage } from 'features/admin/policies/PolicyDetailPage';
 import { SubmissionUploadReviewPage } from 'features/admin/reviews/SubmissionUploadReviewPage';
 import { SubmissionReviewFeaturePage } from 'features/admin/reviews/SubmissionReviewFeaturePage';
 import { ContributorDetailPage } from 'features/admin/users/contributors/ContributorDetailPage';
+import { ContributorCodesetDetailPage } from 'features/admin/users/contributors/codesets/ContributorCodesetDetailPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -141,6 +142,21 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <ContributorDetailPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="users/contributor/:contributorId/codeset/:contributorCodesetId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Codeset" description="View a contributor codeset and its codes" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <ContributorCodesetDetailPage />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>

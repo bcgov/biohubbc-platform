@@ -1,8 +1,11 @@
 import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
+import { ContributorCodesetScope } from '../models/contributor-codeset';
 import { ContributorCodesetCode, CreateContributorCodesetCode } from '../models/contributor-codeset-code';
 import { ContributorCodesetCodeRepository } from '../repositories/contributor-codeset-code-repository';
 import { hasSameContributorCodeDefinition, makeSlug } from '../utils/contributor-codeset';
+import { makePaginationResponse } from '../utils/pagination';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { ContributorCodesetCodeIdentity } from './contributor-codeset-code-service.interface';
 import { DBService } from './db-service';
 
@@ -181,5 +184,24 @@ export class ContributorCodesetCodeService extends DBService {
         ]);
       }
     }
+  }
+
+  /**
+   * List a page of one code category's values, including ended values, with pagination metadata. A code category
+   * that does not belong to the scoped contributor has no values.
+   *
+   * @param {ContributorCodesetScope} scope - Code category and the contributor that owns it.
+   * @param {ApiPaginationOptions} pagination - Requested page and sort.
+   * @return {*} Code values on the requested page and pagination metadata.
+   * @memberof ContributorCodesetCodeService
+   */
+  async listAdministrativeContributorCodesetCodes(scope: ContributorCodesetScope, pagination: ApiPaginationOptions) {
+    const codes = await this.contributorCodesetCodeRepository.listAdministrativeContributorCodesetCodes(
+      scope,
+      pagination
+    );
+    const count = await this.contributorCodesetCodeRepository.countAdministrativeContributorCodesetCodes(scope);
+
+    return { codes, pagination: makePaginationResponse(count, pagination) };
   }
 }
