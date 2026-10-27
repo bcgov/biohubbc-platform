@@ -22,9 +22,16 @@ DO $$ BEGIN
  ASSERT EXISTS(SELECT FROM bcgw.wld_observations_public WHERE feature_id=1 AND taxon_id IS NULL AND count='2' AND latitude='51'), 'typed values authoritative';
  ASSERT EXISTS(SELECT FROM bcgw.wld_incidental_public WHERE feature_id=399 AND taxon_id IS NULL), 'missing taxon has no raw fallback';
 END $$;
--- Multiple indexed values are serialized in property-row order, without multiplying the feature.
-INSERT INTO biohub.submission_feature_property_number(submission_feature_id,feature_type_property_id,value) VALUES (1,108,3);
-DO $$ BEGIN ASSERT (SELECT count FROM bcgw.wld_observations_public WHERE feature_id=1)='2;3'; END $$;
+-- Duplicate scalar counts are invalid rather than serialized or silently selected.
+DO $$ BEGIN
+ INSERT INTO biohub.submission_feature_property_number(submission_feature_id,feature_type_property_id,value) VALUES (1,108,3);
+ BEGIN
+   PERFORM count FROM bcgw.wld_observations_public WHERE feature_id=1;
+   RAISE EXCEPTION 'expected duplicate count to fail';
+ EXCEPTION WHEN cardinality_violation THEN NULL;
+ END;
+ DELETE FROM biohub.submission_feature_property_number WHERE submission_feature_id=1 AND feature_type_property_id=108 AND value=3;
+END $$;
 -- A partial observation timestamp does not borrow the missing component from a period.
 INSERT INTO biohub.submission_feature_property_timestamp(submission_feature_id,feature_type_property_id,date_value,time_value)
 VALUES (11,102,'2021-01-01',NULL),(13,102,NULL,'06:07:08');
@@ -79,7 +86,7 @@ INSERT INTO biohub.submission_feature_property_string(submission_feature_id,feat
 VALUES (1,115,'prints'),(1,115,'tracks');
 DO $$ BEGIN
  ASSERT (SELECT count(*) FROM bcgw.wld_observations_public WHERE feature_id=1)=1;
- ASSERT EXISTS(SELECT FROM bcgw.wld_observations_public WHERE feature_id=1 AND count='2;3' AND sign='tracks;prints;tracks');
+ ASSERT EXISTS(SELECT FROM bcgw.wld_observations_public WHERE feature_id=1 AND count=2 AND sign='tracks;prints;tracks');
  ASSERT EXISTS(SELECT FROM bcgw.wld_telemetry_all WHERE feature_id=600 AND taxon_id='900000;900000' AND sex IS NULL);
 END $$;
 -- The fixed metadata lookup must reject an ambiguous assignment, never choose MAX(id).
@@ -94,23 +101,21 @@ DO $$ BEGIN
  DELETE FROM biohub.feature_type_property WHERE feature_type_property_id=99999;
 END $$;
 -- Partial datetime components are serialized independently; no fallback fills a missing component.
-INSERT INTO biohub.submission_feature_property_timestamp(submission_feature_id,feature_type_property_id,date_value,time_value)
-VALUES (11,102,'2022-02-03','12:34:56');
+UPDATE biohub.submission_feature_property_timestamp SET date_value='2022-02-03', time_value='12:34:56' WHERE submission_feature_id=11 AND feature_type_property_id=102;
 SET LOCAL DateStyle TO 'SQL, DMY';
 DO $$ BEGIN
  ASSERT EXISTS(SELECT FROM bcgw.wld_incidental_public WHERE feature_id=11
-   AND date='2021-01-01;2022-02-03' AND time='12:34:56' AND year='2021;2022');
+   AND date=DATE '2022-02-03' AND time='12:34:56' AND year='2022');
 END $$;
 SET LOCAL DateStyle TO 'ISO, MDY';
 -- Telemetry properties aggregate separately even when two fields contain multiple values.
 INSERT INTO biohub.submission_feature_property_number(submission_feature_id,feature_type_property_id,value)
 VALUES (600,409,2.5);
-INSERT INTO biohub.submission_feature_property_timestamp(submission_feature_id,feature_type_property_id,date_value,time_value)
-VALUES (600,402,'2020-01-02','03:04:05');
+UPDATE biohub.submission_feature_property_timestamp SET date_value='2020-01-02', time_value='03:04:05' WHERE submission_feature_id=600 AND feature_type_property_id=402;
 DO $$ BEGIN
  ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_public WHERE feature_id=600)=1;
  ASSERT EXISTS(SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND dop='1.5;2.5'
-   AND date LIKE '%;2020-01-02' AND taxon_id='900000;900000');
+   AND date=DATE '2020-01-02' AND taxon_id='900000;900000');
 END $$;
 
 -- Related telemetry metadata must also come from closure-backed features.
@@ -125,3 +130,26 @@ DO $$ BEGIN
    AND animal_id IS NULL AND device_key IS NULL AND taxon_id IS NULL AND sex IS NULL AND eco_unit IS NULL),
    'missing closure deployment leaves telemetry without related metadata';
 END $$;
+
+-- Scalar dates and coordinates reject duplicates rather than multiplying export rows.
+SAVEPOINT duplicate_scalars;
+INSERT INTO biohub.submission_feature_property_timestamp(submission_feature_id,feature_type_property_id,date_value,time_value)
+VALUES (11,102,'2023-01-01',NULL);
+DO $$ BEGIN
+ BEGIN
+   PERFORM date FROM bcgw.wld_incidental_public WHERE feature_id=11;
+   RAISE EXCEPTION 'expected duplicate timestamp to fail';
+ EXCEPTION WHEN cardinality_violation THEN NULL;
+ END;
+END $$;
+ROLLBACK TO SAVEPOINT duplicate_scalars;
+INSERT INTO biohub.submission_feature_property_number(submission_feature_id,feature_type_property_id,value)
+VALUES (1,105,51.1234567890123456789),(1,105,52),(1,106,-121);
+DO $$ BEGIN
+ BEGIN
+   PERFORM latitude FROM bcgw.wld_observations_public WHERE feature_id=1;
+   RAISE EXCEPTION 'expected duplicate latitude to fail';
+ EXCEPTION WHEN cardinality_violation THEN NULL;
+ END;
+END $$;
+ROLLBACK TO SAVEPOINT duplicate_scalars;

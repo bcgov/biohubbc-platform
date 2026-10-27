@@ -126,13 +126,12 @@ export async function up(knex: Knex): Promise<void> {
   );
   const numberColumns = numbers
     .map(
-      ([name, property]) => `string_agg((p.value::${
-        property.cast
-      })::text, ';' ORDER BY p.submission_feature_property_number_id)
-      FILTER (WHERE p.feature_type_property_id = ids.${quoteIdentifier(name)}) AS ${quoteIdentifier(property.column)}`
+      ([name, property]) => `(SELECT p.value::${property.cast}
+        FROM biohub.submission_feature_property_number p
+        WHERE p.submission_feature_id = sf.submission_feature_id
+          AND p.feature_type_property_id = ids.${quoteIdentifier(name)}) AS ${quoteIdentifier(property.column)}`
     )
     .join(',\n          ');
-  const numberIds = numbers.map(([name]) => `ids.${quoteIdentifier(name)}`).join(', ');
 
   await knex.raw(`--sql
     -- One row per eligible feature. This ordinary view stores no snapshot.
@@ -285,18 +284,20 @@ export async function up(knex: Knex): Promise<void> {
       ) observation_ids ON true
       LEFT JOIN LATERAL (
         SELECT ${numberColumns}
-        FROM biohub.submission_feature_property_number p
-        WHERE p.submission_feature_id = sf.submission_feature_id
-          AND p.feature_type_property_id IN (${numberIds})
       ) numbers ON true
       LEFT JOIN LATERAL (
-        SELECT count(*) > 0 AS present,
-          string_agg(to_char(p.date_value, 'YYYY-MM-DD'), ';' ORDER BY p.submission_feature_property_timestamp_id) AS date,
-          string_agg(p.time_value::text, ';' ORDER BY p.submission_feature_property_timestamp_id) AS time,
-          string_agg(EXTRACT(YEAR FROM p.date_value)::int::text, ';' ORDER BY p.submission_feature_property_timestamp_id) AS year
-        FROM biohub.submission_feature_property_timestamp p
+        SELECT EXISTS (SELECT 1 FROM biohub.submission_feature_property_timestamp p
         WHERE p.submission_feature_id = sf.submission_feature_id
-          AND p.feature_type_property_id = ids.observation_timestamp
+          AND p.feature_type_property_id = ids.observation_timestamp) AS present,
+          (SELECT p.date_value FROM biohub.submission_feature_property_timestamp p
+        WHERE p.submission_feature_id = sf.submission_feature_id
+          AND p.feature_type_property_id = ids.observation_timestamp) AS date,
+          (SELECT p.time_value::text FROM biohub.submission_feature_property_timestamp p
+        WHERE p.submission_feature_id = sf.submission_feature_id
+          AND p.feature_type_property_id = ids.observation_timestamp) AS time,
+          (SELECT EXTRACT(YEAR FROM p.date_value)::int::text FROM biohub.submission_feature_property_timestamp p
+        WHERE p.submission_feature_id = sf.submission_feature_id
+          AND p.feature_type_property_id = ids.observation_timestamp) AS year
       ) timestamp ON true
       LEFT JOIN labels ON labels.submission_feature_id = sf.submission_feature_id
       WHERE COALESCE(t.has_allowed_taxon, true)
@@ -306,19 +307,21 @@ export async function up(knex: Knex): Promise<void> {
         sf.taxon_id, sf.scientific_name, sf.common_name, sf.observation_ids, sf.is_secured,
         site.source_submission_feature_id IS NOT NULL AS has_sample_site,
         sf.sign, sf.sex, sf.life_stage, sf.count,
-        CASE WHEN sf.has_timestamp THEN sf.date ELSE to_char(period.date_value, 'YYYY-MM-DD') END AS date,
+        CASE WHEN sf.has_timestamp THEN sf.date ELSE period.date_value END AS date,
         CASE WHEN sf.has_timestamp THEN sf.time ELSE period.time_value::text END AS time,
         CASE WHEN sf.has_timestamp THEN sf.year ELSE EXTRACT(YEAR FROM period.date_value)::int::text END AS year,
         CASE WHEN sf.latitude IS NOT NULL AND sf.longitude IS NOT NULL THEN sf.latitude
-          ELSE COALESCE(own_location.latitude, public.ST_Y(site.point)::text) END AS latitude,
+          ELSE COALESCE(own_location.latitude, public.ST_Y(site.point)::double precision) END AS latitude,
         CASE WHEN sf.latitude IS NOT NULL AND sf.longitude IS NOT NULL THEN sf.longitude
-          ELSE COALESCE(own_location.longitude, public.ST_X(site.point)::text) END AS longitude
+          ELSE COALESCE(own_location.longitude, public.ST_X(site.point)::double precision) END AS longitude
       FROM observation_properties sf
       LEFT JOIN selected_sites site ON site.source_submission_feature_id = sf.submission_feature_id
       LEFT JOIN LATERAL (
-        SELECT string_agg(public.ST_Y(COALESCE(l.point, site.point))::text, ';' ORDER BY l.submission_feature_property_geometry_id) AS latitude,
-          string_agg(public.ST_X(COALESCE(l.point, site.point))::text, ';' ORDER BY l.submission_feature_property_geometry_id) AS longitude
-        FROM locations l WHERE l.submission_feature_id = sf.submission_feature_id
+        SELECT
+          (SELECT public.ST_Y(COALESCE(l.point, site.point))::double precision
+            FROM locations l WHERE l.submission_feature_id = sf.submission_feature_id) AS latitude,
+          (SELECT public.ST_X(COALESCE(l.point, site.point))::double precision
+            FROM locations l WHERE l.submission_feature_id = sf.submission_feature_id) AS longitude
       ) own_location ON true
       LEFT JOIN selected_sample_periods period ON period.source_submission_feature_id = sf.submission_feature_id
     )

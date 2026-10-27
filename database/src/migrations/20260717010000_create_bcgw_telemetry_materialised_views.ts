@@ -265,24 +265,18 @@ export async function up(knex: Knex): Promise<void> {
           WHERE c.source_submission_feature_id = sf.submission_feature_id AND c.is_ancestor
             AND sfs.record_end_date IS NULL AND secured.record_effective_date <= NOW()
         ) AS is_secured,
-        timestamp.date, timestamp.time, timestamp.year, geometry.latitude, geometry.longitude, dop.value AS dop
+        timestamp.date_value AS date, timestamp.time_value::text AS time,
+        EXTRACT(YEAR FROM timestamp.date_value)::int::text AS year,
+        geometry.latitude, geometry.longitude, dop.value AS dop
       FROM current_features sf CROSS JOIN property_ids ids
+      JOIN biohub.submission_feature_property_timestamp timestamp
+        ON timestamp.submission_feature_id = sf.submission_feature_id
+        AND timestamp.feature_type_property_id = ids.telemetry_timestamp
+        AND timestamp.date_value + COALESCE(timestamp.time_value, TIME '00:00')
+          <= LOCALTIMESTAMP - INTERVAL '3 months'
       LEFT JOIN LATERAL (
-        SELECT count(*) > 0 AS present,
-          string_agg(to_char(p.date_value, 'YYYY-MM-DD'), ';' ORDER BY p.submission_feature_property_timestamp_id) AS date,
-          string_agg(p.time_value::text, ';' ORDER BY p.submission_feature_property_timestamp_id) AS time,
-          string_agg(EXTRACT(YEAR FROM p.date_value)::int::text, ';' ORDER BY p.submission_feature_property_timestamp_id) AS year
-        FROM biohub.submission_feature_property_timestamp p
-        WHERE p.submission_feature_id = sf.submission_feature_id
-          AND p.feature_type_property_id = ids.telemetry_timestamp
-          AND p.date_value + COALESCE(p.time_value, TIME '00:00') <= LOCALTIMESTAMP - INTERVAL '3 months'
-      ) timestamp ON true
-      LEFT JOIN LATERAL (
-        SELECT string_agg(public.ST_Y(p.value)::text, ';' ORDER BY p.submission_feature_property_geometry_id) AS latitude,
-          string_agg(public.ST_X(p.value)::text, ';' ORDER BY p.submission_feature_property_geometry_id) AS longitude
-        FROM biohub.submission_feature_property_geometry p
-        WHERE p.submission_feature_id = sf.submission_feature_id
-          AND p.feature_type_property_id = ids.telemetry_geometry
+        SELECT (SELECT public.ST_Y(p.value)::double precision FROM biohub.submission_feature_property_geometry p WHERE p.submission_feature_id = sf.submission_feature_id AND p.feature_type_property_id = ids.telemetry_geometry) AS latitude,
+          (SELECT public.ST_X(p.value)::double precision FROM biohub.submission_feature_property_geometry p WHERE p.submission_feature_id = sf.submission_feature_id AND p.feature_type_property_id = ids.telemetry_geometry) AS longitude
       ) geometry ON true
       LEFT JOIN LATERAL (
         SELECT ${numberColumns}
@@ -290,7 +284,7 @@ export async function up(knex: Knex): Promise<void> {
         WHERE p.submission_feature_id = sf.submission_feature_id
           AND p.feature_type_property_id IN (${numberIds})
       ) dop ON true
-      WHERE sf.feature_type = ${quoteLiteral(featureTypes.telemetry)} AND timestamp.present
+      WHERE sf.feature_type = ${quoteLiteral(featureTypes.telemetry)}
     )
     SELECT sf.submission_feature_id AS feature_id, a.taxon_id, a.scientific_name, a.common_name,
       d.animal_id, a.sex, eu.value AS eco_unit, d.device_key,

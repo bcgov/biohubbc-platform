@@ -60,7 +60,8 @@ multirow contract differs from the current one-row-per-feature contract.
 - Every participating domain feature must occur as a closure source. Closure includes drafts, so publication dates, active windows and active feature types are checked separately.
 - Closure ancestry alone propagates security; feature references do not. Missing self-links fail closed for public exports while remaining flagged in all exports.
 - Properties come from normalized typed tables and active metadata. Missing metadata produces NULL; ambiguous fixed assignments raise an error. Code labels require active codes and codesets.
-- Independent multivalued properties are aggregated separately in property-row order. Repeated equal values are retained. Taxon exclusions apply per value; missing active taxon lookups have no JSON fallback.
+- Counts, observation timestamps and coordinates use scalar lookups; duplicate values raise a cardinality error when queried. Telemetry joins its timestamp row directly and applies the age cutoff once; each fix is expected to have one timestamp. Export dates use `date`, counts use `integer`, and coordinates use `double precision`.
+- Other multivalued properties are aggregated separately in property-row order. Repeated equal values are retained. Taxon exclusions apply per value; missing active taxon lookups have no JSON fallback.
 - Site selection prefers usable geometry, then ancestry and feature ID. A site without geometry still establishes membership. Period selection prefers ancestry and feature ID; property IDs break ties.
 - Observation location precedence is coordinates, own geometry, then selected site. Timestamp fallback applies only when no observation timestamp row exists; partial timestamps remain partial.
 - Telemetry uses stored local date/time components and a three-calendar-month cutoff. Date-only timestamps use midnight; time-only timestamps cannot satisfy the cutoff. Original ingestion timezone offsets cannot be recovered.

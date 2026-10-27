@@ -43,12 +43,12 @@
       },
       {
         "name": "count",
-        "type": "text",
+        "type": "integer",
         "comment": "Count value for the observation"
       },
       {
         "name": "date",
-        "type": "text",
+        "type": "date",
         "comment": "The date portion of the observation timestamp"
       },
       {
@@ -63,12 +63,12 @@
       },
       {
         "name": "latitude",
-        "type": "text",
+        "type": "double precision",
         "comment": "The latitude of the observation location"
       },
       {
         "name": "longitude",
-        "type": "text",
+        "type": "double precision",
         "comment": "The longitude of the observation location"
       },
       {
@@ -135,7 +135,7 @@
       },
       {
         "name": "date",
-        "type": "text",
+        "type": "date",
         "comment": "The date portion of the GPS location timestamp"
       },
       {
@@ -150,12 +150,12 @@
       },
       {
         "name": "latitude",
-        "type": "text",
+        "type": "double precision",
         "comment": "The latitude of the GPS location"
       },
       {
         "name": "longitude",
-        "type": "text",
+        "type": "double precision",
         "comment": "The longitude of the GPS location"
       },
       {

@@ -57,9 +57,9 @@ module.exports = function comparisonSql() {
       SELECT feature_id FROM baseline.${old.name} GROUP BY feature_id HAVING count(*) = 1)`;
     comparisonSql += `DO $$ BEGIN ASSERT NOT EXISTS (
       (SELECT ${legacyColumns} FROM baseline.${old.name} WHERE ${eligible}
-        EXCEPT ALL SELECT * FROM bcgw.${old.name} WHERE ${eligible})
+        EXCEPT ALL SELECT ${legacyColumns} FROM bcgw.${old.name} WHERE ${eligible})
       UNION ALL
-      (SELECT * FROM bcgw.${old.name} WHERE ${eligible}
+      (SELECT ${legacyColumns} FROM bcgw.${old.name} WHERE ${eligible}
         EXCEPT ALL SELECT ${legacyColumns} FROM baseline.${old.name} WHERE ${eligible})
     ), '${old.name}: single-valued legacy comparison'; END $$;\n`;
   }
