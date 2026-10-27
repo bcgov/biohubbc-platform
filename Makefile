@@ -488,3 +488,20 @@ trace-api: ## Runs ts-trace to find typescript compilation issues and hotspots i
 ## ------------------------------------------------------------------------------
 help: ## Display this help screen.
 	@grep -h -E '^[0-9a-zA-Z_-]+:.*?##.*$$|^##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[33m%-20s\033[0m %s\n", $$1, $$2}' | awk 'BEGIN {FS = "## "}; {printf "\033[36m%-1s\033[0m %s\n", $$2, $$1}'
+
+## ------------------------------------------------------------------------------
+## Running Cronjobs
+## ------------------------------------------------------------------------------
+cronjob: | build-cronjob run-cronjob ## Builds the database and setup images, then runs the materialized-view refresh once
+
+build-cronjob: ## Builds the database, migration setup, and materialized-view refresh images
+	@echo "==============================================="
+	@echo "Make: build-cronjob - building database, setup, and materialized-view refresh images"
+	@echo "==============================================="
+	@docker compose build db db_setup materialized-view-refresh
+
+run-cronjob: ## Runs the materialized-view refresh container
+	@echo "==============================================="
+	@echo "Make: run-cronjob - running materialized-view refresh"
+	@echo "==============================================="
+	@docker compose up -d materialized-view-refresh

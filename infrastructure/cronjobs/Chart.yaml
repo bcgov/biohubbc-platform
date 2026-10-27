@@ -1,0 +1,6 @@
+apiVersion: v2
+name: materialized-view-refresh
+description: Periodically refreshes BC Geographic Warehouse intended materialized views
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

@@ -1,0 +1,75 @@
+{{- if .Values.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "materialized-view-refresh.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "materialized-view-refresh.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: database-maintenance
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  timeZone: {{ .Values.cronjob.timeZone | quote }}
+  suspend: {{ .Values.cronjob.suspend }}
+  concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.cronjob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.cronjob.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.cronjob.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.cronjob.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ include "materialized-view-refresh.name" . }}
+            app.kubernetes.io/component: database-maintenance
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: refresh-materialized-views
+              image: "{{ .Values.image.repository }}:{{ required "Set image.tag to the database setup build tag" .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: DB_HOST
+                  value: {{ required "Set database.host in the environment values" .Values.database.host | quote }}
+                - name: DB_PORT
+                  value: {{ .Values.database.port | quote }}
+                - name: DB_DATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ required "Set database.dbNameSecretName" .Values.database.dbNameSecretName }}
+                      key: {{ .Values.database.secretKeys.database }}
+                - name: DB_ADMIN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ required "Set database.adminSecretName" .Values.database.adminSecretName }}
+                      key: {{ .Values.database.secretKeys.username }}
+                - name: DB_ADMIN_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ required "Set database.adminSecretName" .Values.database.adminSecretName }}
+                      key: {{ .Values.database.secretKeys.password }}
+                {{- if .Values.database.tls.enabled }}
+                - name: PG_SSL_CA_PATH
+                  value: "/etc/pg-ssl/{{ .Values.database.tls.caSecretKey }}"
+                {{- end }}
+              command: ["npm", "run", "refresh-materialized-views"]
+              {{- if .Values.database.tls.enabled }}
+              volumeMounts:
+                - name: pg-root-ca
+                  mountPath: /etc/pg-ssl
+                  readOnly: true
+              {{- end }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+          {{- if .Values.database.tls.enabled }}
+          volumes:
+            - name: pg-root-ca
+              secret:
+                secretName: {{ .Values.database.tls.caSecretName }}
+                items:
+                  - key: {{ .Values.database.tls.caSecretKey }}
+                    path: {{ .Values.database.tls.caSecretKey }}
+          {{- end }}
+{{- end }}
