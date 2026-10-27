@@ -22,6 +22,9 @@ vi.mock('features/admin/policies/PolicyDetailPage', () => ({
 vi.mock('features/admin/users/contributors/ContributorDetailPage', () => ({
   ContributorDetailPage: () => <div data-testid="contributor-detail-page">Contributor Details</div>
 }));
+vi.mock('features/admin/users/contributors/codesets/ContributorCodesetDetailPage', () => ({
+  ContributorCodesetDetailPage: () => <div data-testid="contributor-codeset-detail-page">Codeset Details</div>
+}));
 
 vi.mock('features/admin2/users/AdminUsersPage', () => ({
   AdminUsersPage: () => <div data-testid="manage-users-page">Manage Users Page</div>
@@ -219,7 +222,8 @@ describe('AdminRouter access guards', () => {
   for (const [path, testId] of [
     ['/admin/users', 'manage-users-page'],
     ['/admin/users?tab=contributors', 'manage-users-page'],
-    ['/admin/users/contributor/123', 'contributor-detail-page']
+    ['/admin/users/contributor/123', 'contributor-detail-page'],
+    ['/admin/users/contributor/123/codeset/45', 'contributor-codeset-detail-page']
   ]) {
     it(`allows system administrators to access ${path}`, async () => {
       const page = renderAdminRouter(getMockAuthState({ base: SystemAdminAuthState }), path);

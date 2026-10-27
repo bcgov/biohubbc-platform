@@ -47,3 +47,31 @@ export interface IContributorSystemUserOption {
   display_name: string | null;
   record_end_date: string | null;
 }
+
+export interface IContributorCodeset {
+  contributor_codeset_id: number;
+  contributor_id: number;
+  key: string;
+  label: string;
+  description: string | null;
+  external_id: string | null;
+  record_end_date: string | null;
+}
+export interface IContributorCodesetCode {
+  contributor_codeset_code_id: number;
+  contributor_codeset_id: number;
+  codeset_label: string;
+  key: string;
+  label: string;
+  description: string | null;
+  external_id: string | null;
+  record_end_date: string | null;
+}
+export interface IContributorCodesetsResponse {
+  codesets: IContributorCodeset[];
+  pagination: ApiPaginationResponseParams;
+}
+export interface IContributorCodesetCodesResponse {
+  codes: IContributorCodesetCode[];
+  pagination: ApiPaginationResponseParams;
+}
