@@ -408,9 +408,6 @@ export const insertObservationRecord = async (
   const submission_feature_id = response.rows[0].submission_feature_id;
 
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
   if (taxonTsn) {
     await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxonTsn })}`);
