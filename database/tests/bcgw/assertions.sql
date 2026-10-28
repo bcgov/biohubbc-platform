@@ -1,9 +1,9 @@
 DO $checks$
 BEGIN
-  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=2 AND secured='Y'), 'secured root retained in all';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=2 AND secured IS TRUE), 'secured root retained in all';
   ASSERT NOT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id IN (2,3,5)), 'root, ancestor and missing self-link excluded';
-  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=3 AND secured='Y'), 'ancestor security';
-  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=5 AND secured='Y'), 'missing self-link fails closed';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=3 AND secured IS TRUE), 'ancestor security';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_observations_all WHERE feature_id=5 AND secured IS TRUE), 'missing self-link fails closed';
   ASSERT EXISTS (SELECT FROM bcgw.wld_observations_public WHERE feature_id=4), 'property security does not propagate';
   ASSERT NOT EXISTS (SELECT FROM bcgw.wld_incidental_all WHERE feature_id=6), 'missing closure candidate excluded';
   ASSERT (SELECT count(*) FROM bcgw.wld_incidental_public WHERE feature_id IN (7,8))=2, 'future and deleted sites do not link';
@@ -27,11 +27,11 @@ BEGIN
   ASSERT (SELECT count(*) FROM bcgw.wld_incidental_public WHERE feature_id=320)=1, 'normalized FK identifies one active taxon';
   ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_public WHERE feature_id=600)=1, 'exact cutoff included, multiple animals serialized into one feature row';
   ASSERT NOT EXISTS (SELECT FROM bcgw.wld_telemetry_all WHERE feature_id IN (601,610,611)), 'too recent, missing candidate and null timestamp excluded';
-  ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_all WHERE feature_id=602 AND secured='Y')=1, 'just older cutoff and root security';
+  ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_all WHERE feature_id=602 AND secured IS TRUE)=1, 'just older cutoff and root security';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=603 AND animal_id IS NULL AND taxon_id IS NULL), 'missing deployment retained';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=604), 'telemetry property security does not propagate';
   ASSERT NOT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id IN (602,605,606)), 'telemetry security exclusions';
-  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_all WHERE feature_id=606 AND secured='Y'), 'telemetry missing self-link';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_all WHERE feature_id=606 AND secured IS TRUE), 'telemetry missing self-link';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND eco_unit='A::1;B::2' AND device_key='vendor::device' AND sex='Female;Female' AND dop='1.5'), 'distinct ordered ecological units across relation directions and parents';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=607 AND latitude IS NULL), 'missing telemetry geometry remains null';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=608 AND longitude='-119'), 'stored telemetry point';

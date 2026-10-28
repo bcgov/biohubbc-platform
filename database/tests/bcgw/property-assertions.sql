@@ -105,7 +105,7 @@ UPDATE biohub.submission_feature_property_timestamp SET date_value='2022-02-03',
 SET LOCAL DateStyle TO 'SQL, DMY';
 DO $$ BEGIN
  ASSERT EXISTS(SELECT FROM bcgw.wld_incidental_public WHERE feature_id=11
-   AND date=DATE '2022-02-03' AND time='12:34:56' AND year='2022');
+   AND date=DATE '2022-02-03' AND time='12:34:56' AND year=2022);
 END $$;
 SET LOCAL DateStyle TO 'ISO, MDY';
 -- Telemetry properties aggregate separately even when two fields contain multiple values.

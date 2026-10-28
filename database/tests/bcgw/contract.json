@@ -53,12 +53,12 @@
       },
       {
         "name": "time",
-        "type": "text",
+        "type": "time without time zone",
         "comment": "The time portion of the observation timestamp"
       },
       {
         "name": "year",
-        "type": "text",
+        "type": "integer",
         "comment": "The year of the observation"
       },
       {
@@ -83,8 +83,8 @@
       },
       {
         "name": "secured",
-        "type": "text",
-        "comment": "The indicator of whether the feature is secured (Y) or not (N)"
+        "type": "boolean",
+        "comment": "Whether the feature is secured (true) or not (false)"
       },
       {
         "name": "source",
@@ -140,12 +140,12 @@
       },
       {
         "name": "time",
-        "type": "text",
+        "type": "time without time zone",
         "comment": "The time portion of the GPS location timestamp"
       },
       {
         "name": "year",
-        "type": "text",
+        "type": "integer",
         "comment": "The year that the GPS location was recorded"
       },
       {
@@ -175,8 +175,8 @@
       },
       {
         "name": "secured",
-        "type": "text",
-        "comment": "The indicator of whether the feature is secured (Y) or not (N)"
+        "type": "boolean",
+        "comment": "Whether the feature is secured (true) or not (false)"
       },
       {
         "name": "source",

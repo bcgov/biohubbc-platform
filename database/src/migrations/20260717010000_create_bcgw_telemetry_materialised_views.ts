@@ -51,8 +51,8 @@ const exportColumns: Record<string, { comment: string; expression?: string }> = 
   submission_id: { comment: 'Submission identifier under which the feature was submitted' },
   submission_name: { comment: 'Submission name under which the feature was submitted' },
   secured: {
-    comment: 'The indicator of whether the feature is secured (Y) or not (N)',
-    expression: "CASE WHEN is_secured THEN 'Y' ELSE 'N' END"
+    comment: 'Whether the feature is secured (true) or not (false)',
+    expression: 'is_secured'
   },
   source: { comment: 'A hyperlink to the source feature in the Biodiversity Hub portal' }
 };
@@ -265,8 +265,8 @@ export async function up(knex: Knex): Promise<void> {
           WHERE c.source_submission_feature_id = sf.submission_feature_id AND c.is_ancestor
             AND sfs.record_end_date IS NULL AND secured.record_effective_date <= NOW()
         ) AS is_secured,
-        timestamp.date_value AS date, timestamp.time_value::text AS time,
-        EXTRACT(YEAR FROM timestamp.date_value)::int::text AS year,
+        timestamp.date_value AS date, timestamp.time_value AS time,
+        EXTRACT(YEAR FROM timestamp.date_value)::int AS year,
         geometry.latitude, geometry.longitude, dop.value AS dop
       FROM current_features sf CROSS JOIN property_ids ids
       JOIN biohub.submission_feature_property_timestamp timestamp
@@ -275,8 +275,9 @@ export async function up(knex: Knex): Promise<void> {
         AND timestamp.date_value + COALESCE(timestamp.time_value, TIME '00:00')
           <= LOCALTIMESTAMP - INTERVAL '3 months'
       LEFT JOIN LATERAL (
-        SELECT (SELECT public.ST_Y(p.value)::double precision FROM biohub.submission_feature_property_geometry p WHERE p.submission_feature_id = sf.submission_feature_id AND p.feature_type_property_id = ids.telemetry_geometry) AS latitude,
-          (SELECT public.ST_X(p.value)::double precision FROM biohub.submission_feature_property_geometry p WHERE p.submission_feature_id = sf.submission_feature_id AND p.feature_type_property_id = ids.telemetry_geometry) AS longitude
+        -- Telemetry has one point, stored as either a Point or a GeometryCollection.
+        SELECT (SELECT public.ST_Y(public.ST_GeometryN(public.ST_CollectionExtract(p.value, 1), 1))::double precision FROM biohub.submission_feature_property_geometry p WHERE p.submission_feature_id = sf.submission_feature_id AND p.feature_type_property_id = ids.telemetry_geometry) AS latitude,
+          (SELECT public.ST_X(public.ST_GeometryN(public.ST_CollectionExtract(p.value, 1), 1))::double precision FROM biohub.submission_feature_property_geometry p WHERE p.submission_feature_id = sf.submission_feature_id AND p.feature_type_property_id = ids.telemetry_geometry) AS longitude
       ) geometry ON true
       LEFT JOIN LATERAL (
         SELECT ${numberColumns}

@@ -8,19 +8,19 @@ DO $$ BEGIN
      (SELECT feature_id FROM bcgw.wld_observations_all UNION ALL SELECT feature_id FROM bcgw.wld_incidental_all))
  ), 'every domain observation appears in an export';
  ASSERT NOT EXISTS (
-   (SELECT * FROM bcgw.wld_observations_public EXCEPT ALL SELECT * FROM bcgw.wld_observations_all WHERE secured='N')
+   (SELECT * FROM bcgw.wld_observations_public EXCEPT ALL SELECT * FROM bcgw.wld_observations_all WHERE secured IS FALSE)
    UNION ALL
-   (SELECT * FROM bcgw.wld_observations_all WHERE secured='N' EXCEPT ALL SELECT * FROM bcgw.wld_observations_public)
+   (SELECT * FROM bcgw.wld_observations_all WHERE secured IS FALSE EXCEPT ALL SELECT * FROM bcgw.wld_observations_public)
  ), 'public observations are the unsecured subset';
  ASSERT NOT EXISTS (
-   (SELECT * FROM bcgw.wld_incidental_public EXCEPT ALL SELECT * FROM bcgw.wld_incidental_all WHERE secured='N')
+   (SELECT * FROM bcgw.wld_incidental_public EXCEPT ALL SELECT * FROM bcgw.wld_incidental_all WHERE secured IS FALSE)
    UNION ALL
-   (SELECT * FROM bcgw.wld_incidental_all WHERE secured='N' EXCEPT ALL SELECT * FROM bcgw.wld_incidental_public)
+   (SELECT * FROM bcgw.wld_incidental_all WHERE secured IS FALSE EXCEPT ALL SELECT * FROM bcgw.wld_incidental_public)
  ), 'public incidental observations are the unsecured subset';
  ASSERT NOT EXISTS (
-   (SELECT * FROM bcgw.wld_telemetry_public EXCEPT ALL SELECT * FROM bcgw.wld_telemetry_all WHERE secured='N')
+   (SELECT * FROM bcgw.wld_telemetry_public EXCEPT ALL SELECT * FROM bcgw.wld_telemetry_all WHERE secured IS FALSE)
    UNION ALL
-   (SELECT * FROM bcgw.wld_telemetry_all WHERE secured='N' EXCEPT ALL SELECT * FROM bcgw.wld_telemetry_public)
+   (SELECT * FROM bcgw.wld_telemetry_all WHERE secured IS FALSE EXCEPT ALL SELECT * FROM bcgw.wld_telemetry_public)
  ), 'public telemetry is the unsecured subset';
 END $$;
 -- All exports reflect base-table changes immediately.

@@ -77,8 +77,8 @@ const exportColumns: Record<string, { comment: string; expression?: string }> = 
   submission_id: { comment: 'Submission identifier under which the feature was submitted' },
   submission_name: { comment: 'Submission name under which the feature was submitted' },
   secured: {
-    comment: 'The indicator of whether the feature is secured (Y) or not (N)',
-    expression: "CASE WHEN is_secured THEN 'Y' ELSE 'N' END"
+    comment: 'Whether the feature is secured (true) or not (false)',
+    expression: 'is_secured'
   },
   source: { comment: 'A hyperlink to the source feature in the Biodiversity Hub portal' }
 };
@@ -292,10 +292,10 @@ export async function up(knex: Knex): Promise<void> {
           (SELECT p.date_value FROM biohub.submission_feature_property_timestamp p
         WHERE p.submission_feature_id = sf.submission_feature_id
           AND p.feature_type_property_id = ids.observation_timestamp) AS date,
-          (SELECT p.time_value::text FROM biohub.submission_feature_property_timestamp p
+          (SELECT p.time_value FROM biohub.submission_feature_property_timestamp p
         WHERE p.submission_feature_id = sf.submission_feature_id
           AND p.feature_type_property_id = ids.observation_timestamp) AS time,
-          (SELECT EXTRACT(YEAR FROM p.date_value)::int::text FROM biohub.submission_feature_property_timestamp p
+          (SELECT EXTRACT(YEAR FROM p.date_value)::int FROM biohub.submission_feature_property_timestamp p
         WHERE p.submission_feature_id = sf.submission_feature_id
           AND p.feature_type_property_id = ids.observation_timestamp) AS year
       ) timestamp ON true
@@ -308,8 +308,8 @@ export async function up(knex: Knex): Promise<void> {
         site.source_submission_feature_id IS NOT NULL AS has_sample_site,
         sf.sign, sf.sex, sf.life_stage, sf.count,
         CASE WHEN sf.has_timestamp THEN sf.date ELSE period.date_value END AS date,
-        CASE WHEN sf.has_timestamp THEN sf.time ELSE period.time_value::text END AS time,
-        CASE WHEN sf.has_timestamp THEN sf.year ELSE EXTRACT(YEAR FROM period.date_value)::int::text END AS year,
+        CASE WHEN sf.has_timestamp THEN sf.time ELSE period.time_value END AS time,
+        CASE WHEN sf.has_timestamp THEN sf.year ELSE EXTRACT(YEAR FROM period.date_value)::int END AS year,
         CASE WHEN sf.latitude IS NOT NULL AND sf.longitude IS NOT NULL THEN sf.latitude
           ELSE COALESCE(own_location.latitude, public.ST_Y(site.point)::double precision) END AS latitude,
         CASE WHEN sf.latitude IS NOT NULL AND sf.longitude IS NOT NULL THEN sf.longitude
