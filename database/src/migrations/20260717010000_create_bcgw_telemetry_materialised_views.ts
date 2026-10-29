@@ -28,7 +28,7 @@ const properties: Record<string, PropertyMapping> = {
   unit_value: { featureType: 'unit', property: 'ecological_unit_value', kind: 'string' },
   telemetry_timestamp: { featureType: 'telemetry', property: 'timestamp', kind: 'datetime' },
   telemetry_geometry: { featureType: 'telemetry', property: 'geometry', kind: 'spatial' },
-  telemetry_dop: { featureType: 'telemetry', property: 'dop', kind: 'number', column: 'value', cast: 'numeric' },
+  telemetry_dop: { featureType: 'telemetry', property: 'dop', kind: 'number', column: 'value', cast: 'integer' },
   sex: { featureType: 'animal', property: 'sex', kind: 'label', column: 'sex' }
 };
 
@@ -98,13 +98,14 @@ export async function up(knex: Knex): Promise<void> {
   );
   const numberColumns = numbers
     .map(
-      ([name, property]) => `string_agg((p.value::${
-        property.cast
-      })::text, ';' ORDER BY p.submission_feature_property_number_id)
-      FILTER (WHERE p.feature_type_property_id = ids.${quoteIdentifier(name)}) AS ${quoteIdentifier(property.column)}`
+      ([name, property]) => `(SELECT p.value::${property.cast}
+        FROM biohub.submission_feature_property_number p
+        WHERE p.submission_feature_id = sf.submission_feature_id
+          AND p.feature_type_property_id = ids.${quoteIdentifier(name)}
+        ORDER BY p.submission_feature_property_number_id
+        LIMIT 1) AS ${quoteIdentifier(property.column)}`
     )
     .join(',\n          ');
-  const numberIds = numbers.map(([name]) => `ids.${quoteIdentifier(name)}`).join(', ');
 
   await knex.raw(`--sql
     -- One row per eligible feature. This ordinary view stores no snapshot.
@@ -281,9 +282,6 @@ export async function up(knex: Knex): Promise<void> {
       ) geometry ON true
       LEFT JOIN LATERAL (
         SELECT ${numberColumns}
-        FROM biohub.submission_feature_property_number p
-        WHERE p.submission_feature_id = sf.submission_feature_id
-          AND p.feature_type_property_id IN (${numberIds})
       ) dop ON true
       WHERE sf.feature_type = ${quoteLiteral(featureTypes.telemetry)}
     )

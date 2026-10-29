@@ -160,7 +160,7 @@
       },
       {
         "name": "dop",
-        "type": "text",
+        "type": "integer",
         "comment": "The dilution of precision of the GPS location"
       },
       {

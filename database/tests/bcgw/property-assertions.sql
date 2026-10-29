@@ -108,13 +108,13 @@ DO $$ BEGIN
    AND date=DATE '2022-02-03' AND time='12:34:56' AND year=2022);
 END $$;
 SET LOCAL DateStyle TO 'ISO, MDY';
--- Telemetry properties aggregate separately even when two fields contain multiple values.
+-- DOP uses the first stored value, cast to integer, even when multiple values exist.
 INSERT INTO biohub.submission_feature_property_number(submission_feature_id,feature_type_property_id,value)
 VALUES (600,409,2.5);
 UPDATE biohub.submission_feature_property_timestamp SET date_value='2020-01-02', time_value='03:04:05' WHERE submission_feature_id=600 AND feature_type_property_id=402;
 DO $$ BEGIN
  ASSERT (SELECT count(*) FROM bcgw.wld_telemetry_public WHERE feature_id=600)=1;
- ASSERT EXISTS(SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND dop='1.5;2.5'
+ ASSERT EXISTS(SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND dop=2
    AND date=DATE '2020-01-02' AND taxon_id='900000;900000');
 END $$;
 
