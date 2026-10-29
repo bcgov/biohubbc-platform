@@ -316,4 +316,23 @@ export class FeatureTypeRepository extends BaseRepository {
 
     return response.rows[0];
   }
+
+  /**
+   * Get the identifiers, among those supplied, of feature types that are not retired.
+   *
+   * @param {number[]} featureTypeIds - Feature type identifiers to check.
+   * @return {Promise<{ feature_type_id: number }[]>} Active feature type identifiers.
+   * @memberof FeatureTypeRepository
+   */
+  async getActiveFeatureTypeIds(featureTypeIds: number[]): Promise<{ feature_type_id: number }[]> {
+    const knex = getKnex();
+    const query = knex('feature_type')
+      .select('feature_type_id')
+      .whereIn('feature_type_id', featureTypeIds)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, FeatureType.pick({ feature_type_id: true }));
+
+    return response.rows;
+  }
 }

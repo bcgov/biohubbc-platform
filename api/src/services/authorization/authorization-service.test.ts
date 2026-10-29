@@ -9,6 +9,7 @@ import * as db from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../models/system-user';
 import { ContributorService } from '../contributor-service';
 import { DownloadService } from '../download/download-service';
+import { FormService } from '../form-service';
 import { UserService } from '../user-service';
 import {
   AuthorizationScheme,
@@ -1020,5 +1021,33 @@ describe('getSystemUserWithRoles', function () {
     const result = await authorizationService.getSystemUserWithRoles();
 
     expect(result).to.equal(userObjectMock);
+  });
+});
+
+describe('authorizeByForm', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('delegates anonymous form authorization with a null system user ID', async () => {
+    const formAccessStub = sinon.stub(FormService.prototype, 'isUserAuthorizedForForm').resolves(true);
+    const authorizationService = new AuthorizationService(getMockDBConnection());
+
+    const result = await authorizationService.authorizeByForm({ discriminator: 'Form', slug: 'caribou' });
+
+    expect(result).to.be.true;
+    expect(formAccessStub).to.have.been.calledOnceWith('caribou', null);
+  });
+
+  it('delegates authenticated form authorization with the current system user ID', async () => {
+    const formAccessStub = sinon.stub(FormService.prototype, 'isUserAuthorizedForForm').resolves(false);
+    const authorizationService = new AuthorizationService(getMockDBConnection(), {
+      systemUser: { system_user_id: 42, record_end_date: null } as SystemUserExtended
+    });
+
+    const result = await authorizationService.authorizeByForm({ discriminator: 'Form', slug: 'caribou' });
+
+    expect(result).to.be.false;
+    expect(formAccessStub).to.have.been.calledOnceWith('caribou', 42);
   });
 });

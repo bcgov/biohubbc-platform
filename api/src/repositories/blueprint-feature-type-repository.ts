@@ -1,7 +1,13 @@
 import { Knex } from 'knex';
+import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiNotFoundError } from '../errors/api-error';
-import { BlueprintCompositionFilters, BlueprintFeatureTypeAssignment } from '../models/blueprint-composition';
+import {
+  BlueprintCompositionFilters,
+  BlueprintFeatureTypeAssignment,
+  BlueprintFeatureTypeKey,
+  EnsureBlueprintFeatureType
+} from '../models/blueprint-composition';
 import { CountResult } from '../models/count';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -178,5 +184,59 @@ export class BlueprintFeatureTypeRepository extends BaseRepository {
       [blueprintId, sourceBlueprintId]
     );
     await this.connection.knex(query);
+  }
+
+  /**
+   * Ensure each feature type has an active membership in the blueprint with the given sort, in one statement.
+   * Existing active memberships keep their identifiers.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param featureTypes Feature types and their sort order.
+   * @returns Active membership identifiers of the supplied feature types.
+   */
+  async ensureBlueprintFeatureTypes(
+    blueprintId: number,
+    featureTypes: EnsureBlueprintFeatureType[]
+  ): Promise<BlueprintFeatureTypeKey[]> {
+    if (!featureTypes.length) {
+      return [];
+    }
+
+    const featureTypeIds = featureTypes.map((featureType) => featureType.featureTypeId);
+    const sorts = featureTypes.map((featureType) => featureType.sort);
+
+    const sqlStatement = SQL`
+      INSERT INTO blueprint_feature_type (blueprint_id, feature_type_id, sort)
+      SELECT ${blueprintId}, requested.feature_type_id, requested.sort
+      FROM unnest(${featureTypeIds}::integer[], ${sorts}::integer[]) AS requested(feature_type_id, sort)
+      ON CONFLICT (blueprint_id, feature_type_id) WHERE record_end_date IS NULL
+      DO UPDATE SET sort = EXCLUDED.sort
+      RETURNING blueprint_feature_type_id, feature_type_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, BlueprintFeatureTypeKey);
+
+    return response.rows;
+  }
+
+  /**
+   * End the active memberships of a blueprint whose feature type is not retained. An empty list ends every active
+   * membership of that blueprint only.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param featureTypeIds Feature types to retain.
+   * @param date Database lifecycle date shared with child deletion.
+   * @returns Resolves after persistence.
+   */
+  async deleteBlueprintFeatureTypesNotIn(blueprintId: number, featureTypeIds: number[], date: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE blueprint_feature_type
+      SET record_end_date = ${date}
+      WHERE blueprint_id = ${blueprintId}
+        AND record_end_date IS NULL
+        AND NOT (feature_type_id = ANY(${featureTypeIds}::integer[]));
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 }

@@ -173,3 +173,22 @@ describe('FeaturePropertyRepository', () => {
     });
   });
 });
+
+describe('FeaturePropertyRepository.getActiveFeaturePropertyTypes', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('selects the type of the supplied feature properties that are not retired', async () => {
+    const rows = [{ feature_property_id: 1, type_name: 'number' }];
+    const knexStub = sinon.stub().resolves({ rowCount: 1, rows });
+    const repository = new FeaturePropertyRepository(getMockDBConnection({ knex: knexStub }));
+
+    const result = await repository.getActiveFeaturePropertyTypes([1]);
+
+    const { sql } = knexStub.firstCall.args[0].toSQL().toNative();
+    expect(result).to.eql(rows);
+    expect(sql).to.include('join "feature_property_type"');
+    expect(sql).to.include('"fp"."record_end_date" is null');
+  });
+});

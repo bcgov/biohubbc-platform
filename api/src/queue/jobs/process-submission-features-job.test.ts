@@ -8,6 +8,8 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
+import { FormSubmissionService } from '../../services/form-submission-service';
+import { FormSubmissionIngestionService } from '../../services/ingestion/form-submission-ingestion-service';
 import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { IValidationError, ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
@@ -72,6 +74,25 @@ describe('process-submission-features-job', () => {
       sinon
         .stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId')
         .resolves([{ upload_archive_id: 'archive-1' }]);
+      sinon.stub(FormSubmissionService.prototype, 'findFormSubmissionUploadFeatures').resolves(null);
+    });
+
+    it('ingests the features a form submit stored instead of a tarball', async () => {
+      const features = [{ id: 'row-1', type: 'observation', properties: {}, content: [], parent: null }];
+      (FormSubmissionService.prototype.findFormSubmissionUploadFeatures as sinon.SinonStub).resolves(features);
+      const formIngestStub = sinon
+        .stub(FormSubmissionIngestionService.prototype, 'ingestFormSubmissionUpload')
+        .resolves({ valid: true, errors: [] });
+      const tarballIngestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
+      sinon
+        .stub(processSubmissionFeaturesJobDependencies, 'publishReconcileSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      await processSubmissionFeaturesJobHandler([createMockJob()]);
+
+      expect(formIngestStub.calledOnce).to.be.true;
+      expect(formIngestStub.firstCall.args[1]).to.eql(features);
+      expect(tarballIngestStub.called).to.be.false;
     });
 
     it('transitions uploaded -> ingesting -> ingested and publishes index job', async () => {

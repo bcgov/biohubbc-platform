@@ -2,6 +2,7 @@ import {
   mdiAccountOutline,
   mdiCogOutline,
   mdiCubeOutline,
+  mdiFormSelect,
   mdiHandBackRightOutline,
   mdiLockOutline,
   mdiTicketOutline
@@ -37,6 +38,12 @@ const ADMIN_SECTIONS = [
     icon: mdiHandBackRightOutline,
     to: '/admin/data-requests',
     validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]
+  },
+  {
+    label: 'Forms',
+    icon: mdiFormSelect,
+    to: '/admin/forms',
+    validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN]
   },
   {
     label: 'Configuration',

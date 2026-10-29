@@ -3,6 +3,8 @@ import { PROCESS_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../../constant
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SubmissionUpload } from '../../models/submission-upload';
+import { FormSubmissionService } from '../../services/form-submission-service';
+import { FormSubmissionIngestionService } from '../../services/ingestion/form-submission-ingestion-service';
 import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
@@ -133,7 +135,8 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
  * Execute ingestion and normalize ingest results into process-stage outcomes.
  *
  * Flow:
- * - Run ingestion in a bounded transaction.
+ * - Run ingestion in a bounded transaction: the features a form submit stored with the upload, or else the upload's
+ *   tarball.
  * - Return `ok` when ingest succeeds.
  * - Map validation-shaped ingest failures into `invalid` outcomes (non-retryable business failure).
  * - Re-throw unexpected/system errors so pg-boss retries the job.
@@ -147,10 +150,16 @@ async function executeProcessSubmissionFeaturesIngestion(
   jobId: string
 ): Promise<ProcessSubmissionFeatureOutcome> {
   const ingestStart = Date.now();
-  const submissionIngestionService = new SubmissionIngestionService();
 
   try {
-    const ingestionResult = await submissionIngestionService.ingestSubmissionUpload(submissionUpload);
+    // A form submit stores its features with the upload; every other upload ingests its tarball.
+    const formFeatures = await withConnection(async (connection) => {
+      const formSubmissionService = new FormSubmissionService(connection);
+      return formSubmissionService.findFormSubmissionUploadFeatures(submissionUpload.submission_upload_id);
+    });
+    const ingestionResult = formFeatures
+      ? await new FormSubmissionIngestionService().ingestFormSubmissionUpload(submissionUpload, formFeatures)
+      : await new SubmissionIngestionService().ingestSubmissionUpload(submissionUpload);
 
     defaultLog.debug({
       label: 'executeProcessSubmissionFeaturesIngestion',

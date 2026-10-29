@@ -105,3 +105,31 @@ describe('BlueprintFeatureTypePropertyService', () => {
     sinon.assert.calledWithExactly(repository.updateBlueprintFeatureTypeProperty, 1, 4, { requiredValue: false });
   });
 });
+
+describe('BlueprintFeatureTypePropertyService composition sync', () => {
+  afterEach(() => sinon.restore());
+
+  it('ensures property memberships through the repository', async () => {
+    const service = new BlueprintFeatureTypePropertyService(getMockDBConnection());
+    const rows = [{ blueprint_feature_type_property_id: 20, blueprint_feature_type_id: 10, feature_property_id: 200 }];
+    const ensure = sinon
+      .stub(service.blueprintFeatureTypePropertyRepository, 'ensureBlueprintFeatureTypeProperties')
+      .resolves(rows);
+    const properties = [{ blueprintFeatureTypeId: 10, featurePropertyId: 200, sort: 0 }];
+
+    expect(await service.ensureBlueprintFeatureTypeProperties(properties)).to.eql(rows);
+    sinon.assert.calledWithExactly(ensure, properties);
+  });
+
+  it('ends property memberships that are not retained through the repository', async () => {
+    const service = new BlueprintFeatureTypePropertyService(getMockDBConnection());
+    const end = sinon
+      .stub(service.blueprintFeatureTypePropertyRepository, 'deleteBlueprintFeatureTypePropertiesNotIn')
+      .resolves();
+    const pairs = [{ blueprintFeatureTypeId: 10, featurePropertyId: 200 }];
+
+    await service.deleteBlueprintFeatureTypePropertiesNotIn(4, pairs, '2026-10-29');
+
+    sinon.assert.calledWithExactly(end, 4, pairs, '2026-10-29');
+  });
+});
