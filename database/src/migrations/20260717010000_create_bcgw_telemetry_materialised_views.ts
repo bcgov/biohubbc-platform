@@ -28,7 +28,7 @@ const properties: Record<string, PropertyMapping> = {
   unit_value: { featureType: 'unit', property: 'ecological_unit_value', kind: 'string' },
   telemetry_timestamp: { featureType: 'telemetry', property: 'timestamp', kind: 'datetime' },
   telemetry_geometry: { featureType: 'telemetry', property: 'geometry', kind: 'spatial' },
-  telemetry_dop: { featureType: 'telemetry', property: 'dop', kind: 'number', column: 'value', cast: 'integer' },
+  telemetry_dop: { featureType: 'telemetry', property: 'dop', kind: 'number', column: 'value', cast: 'numeric' },
   sex: { featureType: 'animal', property: 'sex', kind: 'label', column: 'sex' }
 };
 

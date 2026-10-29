@@ -32,7 +32,7 @@ BEGIN
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=604), 'telemetry property security does not propagate';
   ASSERT NOT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id IN (602,605,606)), 'telemetry security exclusions';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_all WHERE feature_id=606 AND secured IS TRUE), 'telemetry missing self-link';
-  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND eco_unit='A::1;B::2' AND device_key='vendor::device' AND sex='Female;Female' AND dop=2), 'distinct ordered ecological units across relation directions and parents';
+  ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=600 AND eco_unit='A::1;B::2' AND device_key='vendor::device' AND sex='Female;Female' AND dop=1.5), 'distinct ordered ecological units across relation directions and parents';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=607 AND latitude IS NULL), 'missing telemetry geometry remains null';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=608 AND longitude='-119'), 'stored telemetry point';
   ASSERT EXISTS (SELECT FROM bcgw.wld_telemetry_public WHERE feature_id=609 AND longitude='-118'), 'stored telemetry point from collection';
