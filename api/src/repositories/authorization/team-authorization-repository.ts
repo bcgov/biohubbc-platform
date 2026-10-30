@@ -2,6 +2,8 @@ import { Knex } from 'knex';
 import { getKnex } from '../../database/db';
 import {
   DataRequestRecord,
+  FormRecord,
+  FormSubmissionRecord,
   SubmissionRecord,
   SubmissionUploadRecord,
   TicketRecord
@@ -163,6 +165,63 @@ export class TeamAuthorizationRepository extends BaseRepository {
       .limit(1);
 
     const response = await this.connection.knex(query, SubmissionRecord);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Find a form administration team membership for a user through an active form's slug.
+   *
+   * @param {number} systemUserId
+   * @param {string} formSlug Form slug.
+   * @return {Promise<FormRecord | null>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async findTeamMembershipByForm(systemUserId: number, formSlug: string): Promise<FormRecord | null> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select('f.form_id', 'tm.record_end_date')
+      .from('form as f')
+      .join('team as team', 'team.team_id', 'f.team_id')
+      .join('team_member as tm', 'tm.team_id', 'f.team_id')
+      .where('f.slug', formSlug)
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('f.record_end_date')
+      .whereNull('team.record_end_date')
+      .whereNull('tm.record_end_date')
+      .limit(1);
+
+    const response = await this.connection.knex(query, FormRecord);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Find a team membership for a user through a form submission.
+   *
+   * @param {number} systemUserId
+   * @param {string} formSubmissionUuid Form submission identifier.
+   * @return {Promise<FormSubmissionRecord | null>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async findTeamMembershipByFormSubmission(
+    systemUserId: number,
+    formSubmissionUuid: string
+  ): Promise<FormSubmissionRecord | null> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select('fs.form_submission_id', 'tm.record_end_date')
+      .from('form_submission as fs')
+      .join('team as team', 'team.team_id', 'fs.team_id')
+      .join('team_member as tm', 'tm.team_id', 'fs.team_id')
+      .where('fs.uuid', formSubmissionUuid)
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('fs.record_end_date')
+      .whereNull('team.record_end_date')
+      .whereNull('tm.record_end_date')
+      .limit(1);
+
+    const response = await this.connection.knex(query, FormSubmissionRecord);
     return response.rows[0] ?? null;
   }
 

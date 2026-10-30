@@ -3,7 +3,10 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError, ApiValidationError } from '../errors/api-error';
 import {
   BlueprintFeaturePropertyFilters,
+  BlueprintFeatureTypePropertyKey,
+  BlueprintFeatureTypePropertyPair,
   CreateBlueprintFeaturePropertyAssignment,
+  EnsureBlueprintFeatureTypeProperty,
   UpdateBlueprintFeaturePropertyAssignment
 } from '../models/blueprint-composition';
 import { BlueprintFeatureTypePropertyRepository } from '../repositories/blueprint-feature-type-property-repository';
@@ -164,6 +167,39 @@ export class BlueprintFeatureTypePropertyService extends DBService {
     await this.blueprintFeatureTypePropertyRepository.copyBlueprintFeatureTypeProperties(
       sourceBlueprintId,
       blueprintId
+    );
+  }
+
+  /**
+   * Ensure each property has an active membership in its blueprint feature type with the given sort. The caller must
+   * hold the blueprint administration lock and have validated that the blueprint is editable.
+   *
+   * @param properties Property memberships and their sort order.
+   * @returns Active membership identifiers of the supplied properties.
+   */
+  async ensureBlueprintFeatureTypeProperties(
+    properties: EnsureBlueprintFeatureTypeProperty[]
+  ): Promise<BlueprintFeatureTypePropertyKey[]> {
+    return this.blueprintFeatureTypePropertyRepository.ensureBlueprintFeatureTypeProperties(properties);
+  }
+
+  /**
+   * End the active property memberships of an editable blueprint that are not retained.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param pairs Property memberships to retain.
+   * @param date Database lifecycle date shared with parent deletion.
+   * @returns Resolves after persistence.
+   */
+  async deleteBlueprintFeatureTypePropertiesNotIn(
+    blueprintId: number,
+    pairs: BlueprintFeatureTypePropertyPair[],
+    date: string
+  ): Promise<void> {
+    await this.blueprintFeatureTypePropertyRepository.deleteBlueprintFeatureTypePropertiesNotIn(
+      blueprintId,
+      pairs,
+      date
     );
   }
 }

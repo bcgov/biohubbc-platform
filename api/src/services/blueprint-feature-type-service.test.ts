@@ -68,3 +68,25 @@ describe('BlueprintFeatureTypeService', () => {
     sinon.assert.notCalled(repository.insertBlueprintFeatureType);
   });
 });
+
+describe('BlueprintFeatureTypeService composition sync', () => {
+  afterEach(() => sinon.restore());
+
+  it('ensures feature types through the repository', async () => {
+    const service = new BlueprintFeatureTypeService(getMockDBConnection());
+    const rows = [{ blueprint_feature_type_id: 10, feature_type_id: 100 }];
+    const ensure = sinon.stub(service.blueprintFeatureTypeRepository, 'ensureBlueprintFeatureTypes').resolves(rows);
+
+    expect(await service.ensureBlueprintFeatureTypes(4, [{ featureTypeId: 100, sort: 0 }])).to.eql(rows);
+    sinon.assert.calledWithExactly(ensure, 4, [{ featureTypeId: 100, sort: 0 }]);
+  });
+
+  it('ends feature types that are not retained through the repository', async () => {
+    const service = new BlueprintFeatureTypeService(getMockDBConnection());
+    const end = sinon.stub(service.blueprintFeatureTypeRepository, 'deleteBlueprintFeatureTypesNotIn').resolves();
+
+    await service.deleteBlueprintFeatureTypesNotIn(4, [100], '2026-10-29');
+
+    sinon.assert.calledWithExactly(end, 4, [100], '2026-10-29');
+  });
+});

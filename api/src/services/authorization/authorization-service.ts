@@ -5,6 +5,7 @@ import { getUserGuid } from '../../utils/keycloak-utils';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import { DownloadService } from '../download/download-service';
+import { FormService } from '../form-service';
 import { UploadService } from '../upload/upload-service';
 import { UserService } from '../user-service';
 import { TeamAuthorizationService } from './team-authorization-service';
@@ -43,6 +44,15 @@ export interface AuthorizeByDownload {
   downloadId: string;
 }
 
+/**
+ * Authorization rule that checks access to the form addressed by a slug: open for a public form, otherwise limited to
+ * members of a linked team. Anonymous requests are allowed to reach this check.
+ */
+export interface AuthorizeByForm {
+  discriminator: 'Form';
+  slug: string;
+}
+
 /** Authorization rule for upload completion by its creator with owning-contributor access. */
 export interface AuthorizeByUpload {
   discriminator: 'Upload';
@@ -74,6 +84,14 @@ export type TeamAuthorizationEntity =
   | {
       entity: 'submission';
       submissionUuid: string;
+    }
+  | {
+      entity: 'form';
+      formSlug: string;
+    }
+  | {
+      entity: 'form_submission';
+      formSubmissionUuid: string;
     };
 
 export type AuthorizeByTeam = TeamAuthorizationEntity & {
@@ -111,6 +129,7 @@ export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
   | AuthorizeByDownload
+  | AuthorizeByForm
   | AuthorizeByUpload
   | AuthorizeByContributor
   | AuthorizeByTeam
@@ -133,6 +152,7 @@ export class AuthorizationService extends DBService {
   _uploadService: UploadService;
   _userService = new UserService(this.connection);
   _downloadService = new DownloadService(this.connection);
+  _formService = new FormService(this.connection);
   _systemUser: SystemUserExtended | undefined = undefined;
   _keycloakToken: object | undefined = undefined;
   _contributorId: number | undefined = undefined;
@@ -185,6 +205,8 @@ export class AuthorizationService extends DBService {
             return this.authorizeBySystemUser();
           case 'Download':
             return this.authorizeByDownload(authorizeRule);
+          case 'Form':
+            return this.authorizeByForm(authorizeRule);
           case 'Upload':
             return this.authorizeByUpload(authorizeRule);
           case 'Contributor':
@@ -276,6 +298,25 @@ export class AuthorizationService extends DBService {
     const user = await this.getCachedSystemUser();
 
     return this._downloadService.isUserAuthorizedForDownload(authorizeRule.downloadId, user?.system_user_id ?? null);
+  }
+
+  /**
+   * Check whether the current request can access the form addressed by a slug.
+   *
+   * A public form is open to anyone. Any other form requires the current user to belong to a linked team. Anonymous
+   * requests are allowed to reach this check.
+   *
+   * @param {AuthorizeByForm} authorizeRule
+   * @returns {Promise<boolean>}
+   */
+  async authorizeByForm(authorizeRule: AuthorizeByForm): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
+    }
+
+    const user = await this.getCachedSystemUser();
+
+    return this._formService.isUserAuthorizedForForm(authorizeRule.slug, user?.system_user_id ?? null);
   }
 
   /**

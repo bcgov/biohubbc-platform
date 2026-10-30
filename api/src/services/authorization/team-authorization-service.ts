@@ -26,6 +26,8 @@ export class TeamAuthorizationService extends DBService {
    * - `data_request`: membership in the data-request visibility team.
    * - `submission_upload`: membership in the upload's dedicated access team.
    * - `submission`: membership in the submission's team, resolved by its explicitly named ID or UUID.
+   * - `form`: membership in the form administration team, resolved by the active form's slug.
+   * - `form_submission`: membership in the form submission's team.
    *
    * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
@@ -62,6 +64,17 @@ export class TeamAuthorizationService extends DBService {
                 systemUserId,
                 entity.submissionUuid
               );
+        break;
+
+      case 'form':
+        record = await this.teamAuthorizationRepository.findTeamMembershipByForm(systemUserId, entity.formSlug);
+        break;
+
+      case 'form_submission':
+        record = await this.teamAuthorizationRepository.findTeamMembershipByFormSubmission(
+          systemUserId,
+          entity.formSubmissionUuid
+        );
         break;
 
       default:
