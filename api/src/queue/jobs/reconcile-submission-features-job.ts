@@ -26,40 +26,45 @@ export interface IReconcileSubmissionFeaturesJobData {
 export const reconcileSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IReconcileSubmissionFeaturesJobData> = async (
   jobs
 ) => {
-  for (const job of jobs) {
-    const { submissionUploadId } = job.data;
-    await withConnection(async (connection) => {
-      const submissionUploadService = new SubmissionUploadService(connection);
-      const upload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
-      if (!RECONCILE_START_STATUSES.includes(upload.status)) {
-        return;
-      }
-
-      const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(connection);
-      const invalidSourceIdentityFeatureCount =
-        await submissionUploadReconciliationService.validateSubmissionFeatureSourceIdentity(submissionUploadId);
-      if (invalidSourceIdentityFeatureCount > 0) {
-        await submissionUploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
-        return;
-      }
-
-      const predecessorSubmissionUploadId = await submissionUploadReconciliationService.reconcileSubmissionFeatures(
-        submissionUploadId
-      );
-      const submissionFeatureSecurityService = new SubmissionFeatureSecurityService(connection);
-      await submissionFeatureSecurityService.copySubmissionFeatureSecurityToSuccessors(
-        submissionUploadId,
-        predecessorSubmissionUploadId
-      );
-      if (predecessorSubmissionUploadId) {
-        await submissionUploadReconciliationService.endPendingSubmissionFeatures(predecessorSubmissionUploadId);
-      }
-      await submissionUploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
-      await reconcileSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
-        submissionUploadId
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { submissionUploadId } = job.data;
+      // Ingestion has just bulk-inserted this upload's rows; refresh statistics before planning reconciliation.
+      await withConnection(async (connection) => {
+        const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(connection);
+        await submissionUploadReconciliationService.analyzeSubmissionFeatures();
       });
-    });
-  }
+
+      await withConnection(async (connection) => {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        const upload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
+        if (!RECONCILE_START_STATUSES.includes(upload.status)) {
+          return;
+        }
+
+        const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(connection);
+        const invalidSourceIdentityFeatureCount =
+          await submissionUploadReconciliationService.validateSubmissionFeatureSourceIdentity(submissionUploadId);
+        if (invalidSourceIdentityFeatureCount > 0) {
+          await submissionUploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
+          return;
+        }
+
+        const predecessorSubmissionUploadId = await submissionUploadReconciliationService.reconcileSubmissionFeatures(
+          submissionUploadId
+        );
+        const submissionFeatureSecurityService = new SubmissionFeatureSecurityService(connection);
+        await submissionFeatureSecurityService.copySubmissionFeatureSecurityToSuccessors(submissionUploadId);
+        if (predecessorSubmissionUploadId) {
+          await submissionUploadReconciliationService.endPendingSubmissionFeatures(predecessorSubmissionUploadId);
+        }
+        await submissionUploadService.transitionSubmissionUploadToReconciled(submissionUploadId);
+        await reconcileSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
+          submissionUploadId
+        });
+      });
+    })
+  );
 };
 
 /**

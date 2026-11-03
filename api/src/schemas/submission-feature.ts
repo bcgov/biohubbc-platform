@@ -17,6 +17,7 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         'feature_type_id',
         'source_id',
         'successor_submission_feature_id',
+        'terminal_submission_feature_id',
         'feature_type_name',
         'submission_name',
         'contributor_name',
@@ -60,6 +61,12 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
           type: 'integer',
           nullable: true,
           description: 'Identifier of the newer feature that supersedes this feature, when one exists.'
+        },
+        terminal_submission_feature_id: {
+          type: 'integer',
+          nullable: true,
+          description:
+            "Identifier of the current feature at the end of this feature's successor chain (this feature's own identifier when it is current), or null when the feature has never been published."
         },
         feature_type_name: {
           type: 'string',

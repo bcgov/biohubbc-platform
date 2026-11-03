@@ -1,6 +1,10 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
-import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../models/submission-upload';
+import {
+  RequestedSubmissionUploadDecision,
+  SubmissionUploadDecision,
+  SubmissionUploadJobStatus
+} from '../../models/submission-upload';
 import { SubmissionUploadHistoryStatus } from '../../models/submission-upload-decision';
 
 /**
@@ -77,7 +81,7 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     blueprint_id: {
       type: 'integer',
       description:
-        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
+        'Optional Blueprint to index this upload against. Must be currently available or be the submission default Blueprint. Defaults to the submission default Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -197,7 +201,7 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     blueprint_id: {
       type: 'integer',
       description:
-        'Optional Blueprint to index this upload against. Defaults to the prior upload Blueprint, or the system default Blueprint for a new submission.'
+        'Optional Blueprint to index this upload against. Must be currently available or be the submission default Blueprint. Defaults to the submission default Blueprint, or the system default Blueprint for a new submission.'
     }
   }
 };
@@ -218,7 +222,8 @@ export const SubmissionUploadDecisionResponseSchema: OpenAPIV3.SchemaObject = {
     decision: {
       type: 'string',
       enum: SubmissionUploadDecision.options,
-      description: 'The human review decision on the submission upload.'
+      description:
+        'The human review decision on the submission upload. An approval returns approving until its features have been published.'
     }
   }
 };
@@ -312,8 +317,25 @@ export const UpdateSubmissionUploadDecisionRequestSchema: OpenAPIV3.SchemaObject
   properties: {
     decision: {
       type: 'string',
-      enum: SubmissionUploadDecision.options,
+      enum: RequestedSubmissionUploadDecision.options,
       description: 'The new decision for the submission upload; pending clears a prior decision.'
+    }
+  }
+};
+
+/**
+ * Request body for re-indexing a submission upload
+ */
+export const ReindexSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['blueprintId'],
+  properties: {
+    blueprintId: {
+      type: 'integer',
+      minimum: 1,
+      description:
+        "Blueprint to index the upload with: the upload's current blueprint, the submission's default blueprint, or an available blueprint."
     }
   }
 };

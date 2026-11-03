@@ -44,6 +44,7 @@ export class PropertySearchService extends DBService {
 
     return {
       string: results.filter((result) => result.feature_property_type === 'string'),
+      paragraph: results.filter((result) => result.feature_property_type === 'paragraph'),
       number: results.filter((result) => result.feature_property_type === 'number'),
       boolean: results.filter((result) => result.feature_property_type === 'boolean'),
       datetime: results.filter((result) => result.feature_property_type === 'datetime'),

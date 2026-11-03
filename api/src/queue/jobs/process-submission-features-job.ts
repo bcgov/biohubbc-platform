@@ -372,8 +372,14 @@ async function cleanupFailedProcessSubmissionFeatures(submissionUploadId: string
  *
  * Responsibilities:
  * - Iterate pg-boss batch jobs.
+ * - Hold the per-upload ingestion lock for the whole stage on a dedicated connection.
  * - Run the process-stage orchestrator per job.
  * - Re-throw on failure so pg-boss applies configured retries.
+ *
+ * pg-boss does not stop a handler when its job expires, so an expired job's retry can start while
+ * the original attempt is still streaming. The lock connection holds a transaction that only takes the
+ * advisory lock, so it writes nothing and is released by the rollback or commit that ends it. A retry
+ * that cannot acquire the lock throws before touching any rows, and pg-boss retries it later.
  *
  * Final terminal `failed` status is intentionally deferred to the DLQ handler after retries are exhausted.
  *
@@ -387,58 +393,70 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
     batchSize: jobs.length
   });
 
-  for (const job of jobs) {
-    const submissionUpload = job.data;
-    const {
-      submission_upload_id: submissionUploadId,
-      submission_id: submissionId,
-      upload_id: uploadId
-    } = submissionUpload;
-    const jobMetadata = job as PgBoss.JobWithMetadata<SubmissionUpload>;
+  await Promise.all(
+    jobs.map(async (job) => {
+      const submissionUpload = job.data;
+      const {
+        submission_upload_id: submissionUploadId,
+        submission_id: submissionId,
+        upload_id: uploadId
+      } = submissionUpload;
+      const jobMetadata = job as PgBoss.JobWithMetadata<SubmissionUpload>;
 
-    defaultLog.info({
-      label: 'processSubmissionFeaturesJobHandler',
-      message: 'Processing submission features job',
-      jobId: job.id,
-      submissionUploadId,
-      submissionId,
-      uploadId,
-      retryCount: jobMetadata.retryCount,
-      startedOn: jobMetadata.startedOn
-    });
-
-    try {
-      await runProcessSubmissionFeaturesStage(job);
-    } catch (error) {
-      try {
-        await cleanupFailedProcessSubmissionFeatures(submissionUploadId, job.id);
-      } catch (cleanupError) {
-        // Cleanup must not hide the original processing error; retry flow still relies on original throw.
-        defaultLog.error({
-          label: 'cleanupFailedProcessSubmissionFeatures',
-          message: 'Failed to clean up pending submission features after process-stage failure',
-          jobId: job.id,
-          submissionUploadId,
-          error: toErrorMetadata(cleanupError)
-        });
-      }
-
-      defaultLog.error({
+      defaultLog.info({
         label: 'processSubmissionFeaturesJobHandler',
-        message: 'Process submission features job failed; allowing pg-boss retry',
+        message: 'Processing submission features job',
         jobId: job.id,
         submissionUploadId,
         submissionId,
         uploadId,
         retryCount: jobMetadata.retryCount,
-        error: toErrorMetadata(error)
+        startedOn: jobMetadata.startedOn
       });
 
-      // Rethrow so pg-boss can apply configured retries.
-      // Final terminal status ('failed') is persisted by the DLQ handler once retries are exhausted.
-      throw error;
-    }
-  }
+      await withConnection(async (lockConnection) => {
+        const submissionUploadService = new SubmissionUploadService(lockConnection);
+        const isLocked = await submissionUploadService.tryLockSubmissionUploadIngestion(submissionUploadId);
+
+        if (!isLocked) {
+          // Another attempt is still ingesting this upload. Throw without cleanup so its rows are untouched.
+          throw new Error(`Submission upload ${submissionUploadId} is already being ingested by another job`);
+        }
+
+        try {
+          await runProcessSubmissionFeaturesStage(job);
+        } catch (error) {
+          try {
+            await cleanupFailedProcessSubmissionFeatures(submissionUploadId, job.id);
+          } catch (cleanupError) {
+            // Cleanup must not hide the original processing error; retry flow still relies on original throw.
+            defaultLog.error({
+              label: 'cleanupFailedProcessSubmissionFeatures',
+              message: 'Failed to clean up pending submission features after process-stage failure',
+              jobId: job.id,
+              submissionUploadId,
+              error: toErrorMetadata(cleanupError)
+            });
+          }
+
+          defaultLog.error({
+            label: 'processSubmissionFeaturesJobHandler',
+            message: 'Process submission features job failed; allowing pg-boss retry',
+            jobId: job.id,
+            submissionUploadId,
+            submissionId,
+            uploadId,
+            retryCount: jobMetadata.retryCount,
+            error: toErrorMetadata(error)
+          });
+
+          // Rethrow so pg-boss can apply configured retries.
+          // Final terminal status ('failed') is persisted by the DLQ handler once retries are exhausted.
+          throw error;
+        }
+      });
+    })
+  );
 };
 
 /**

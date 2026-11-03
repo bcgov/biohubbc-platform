@@ -159,6 +159,11 @@ export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
       enum: ['requested', 'reviewed', 'approved', 'denied'],
       description: 'Lifecycle state of the policy'
     },
+    record_end_date: {
+      type: 'string',
+      nullable: true,
+      description: 'When the policy ends, or null when it has no end date'
+    },
     statements: {
       type: 'array',
       items: PolicyStatementWithExpressionSchema,

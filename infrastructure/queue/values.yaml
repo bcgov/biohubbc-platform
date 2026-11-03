@@ -52,6 +52,7 @@ app:
   itisSolr: "https://services.itis.gov"
   itisTsnLookupBatchSize: "100"
   itisTsnLookupDelayMs: "1000"
+  itisRequestTimeoutMs: "30000"
 
   # Logging
   logging:

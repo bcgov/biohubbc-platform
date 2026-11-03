@@ -427,6 +427,96 @@ describe('biohub-tar-parser', () => {
       expect(featureBatchSizes).to.deep.equal([1, 1]);
     });
 
+    it('parses the next feature batch while at most one batch persists', async () => {
+      const tarBuffer = await createTestTar(
+        ['a', 'b', 'c'].map((suffix) => ({
+          name: `features/survey-${suffix}.json`,
+          content: JSON.stringify([
+            { id: `feature-${suffix}`, type: 'survey', properties: {}, content: [], parent: null }
+          ])
+        }))
+      );
+
+      const parseSpy = sinon.spy(JSON, 'parse');
+      const isEntryParsed = (featureId: string) =>
+        parseSpy.getCalls().some((call) => typeof call.args[0] === 'string' && call.args[0].includes(featureId));
+      let activeBatches = 0;
+      let maxActiveBatches = 0;
+      const persistedFeatureIds: string[] = [];
+
+      const result = await streamSubmissionArchive(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        featureBatchSize: 1,
+        featureMaxBatchBytes: 1024 * 1024,
+        mediaBatchSize: 100,
+        mediaMaxBatchBytes: 1024 * 1024,
+        mediaConcurrency: 2,
+        ingestFeatureBatch: async (blocks) => {
+          activeBatches += 1;
+          maxActiveBatches = Math.max(maxActiveBatches, activeBatches);
+
+          if (blocks[0].id === 'feature-a') {
+            // Hold the first batch until the archive has parsed the next entry; without overlap this never happens.
+            const deadline = Date.now() + 2000;
+            while (!isEntryParsed('feature-b')) {
+              if (Date.now() > deadline) {
+                throw new Error('next entry was not parsed while the first batch persisted');
+              }
+              await new Promise((resolve) => setTimeout(resolve, 5));
+            }
+          }
+
+          persistedFeatureIds.push(...blocks.map((block) => block.id));
+          activeBatches -= 1;
+        },
+        ingestCodesets: async () => undefined,
+        ingestMediaBatch: async () => undefined
+      });
+
+      expect(result.featureCount).to.equal(3);
+      expect(maxActiveBatches).to.equal(1);
+      expect(persistedFeatureIds).to.deep.equal(['feature-a', 'feature-b', 'feature-c']);
+    });
+
+    it('rejects and settles the in-flight feature batch when it fails', async () => {
+      const tarBuffer = await createTestTar(
+        ['a', 'b'].map((suffix) => ({
+          name: `features/survey-${suffix}.json`,
+          content: JSON.stringify([
+            { id: `feature-${suffix}`, type: 'survey', properties: {}, content: [], parent: null }
+          ])
+        }))
+      );
+
+      const batchError = new Error('insert failed');
+      let batchCalls = 0;
+
+      try {
+        await streamSubmissionArchive(bufferToStream(tarBuffer), {
+          objectStorageService: new ObjectStorageService(),
+          s3KeyPrefix: 'submissions/42/media',
+          featureBatchSize: 1,
+          featureMaxBatchBytes: 1024 * 1024,
+          mediaBatchSize: 100,
+          mediaMaxBatchBytes: 1024 * 1024,
+          mediaConcurrency: 2,
+          ingestFeatureBatch: async () => {
+            batchCalls += 1;
+            throw batchError;
+          },
+          ingestCodesets: async () => undefined,
+          ingestMediaBatch: async () => undefined
+        });
+        expect.fail('expected an error');
+      } catch (error) {
+        expect(error).to.equal(batchError);
+      }
+
+      // The failed batch blocks every later batch from starting.
+      expect(batchCalls).to.equal(1);
+    });
+
     it('uses GNU sparse PAX name as the media archive path', async () => {
       const tarBuffer = await createTarWithSparseMediaEntry();
       const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();

@@ -228,7 +228,15 @@ export async function createAssignedFeatureProperty(
 }
 
 /** A `feature_property_type` name whose values are stored in one of the typed property tables. */
-export type TypedPropertyTypeName = 'string' | 'number' | 'boolean' | 'datetime' | 'taxon' | 'code' | 'spatial';
+export type TypedPropertyTypeName =
+  | 'string'
+  | 'paragraph'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'taxon'
+  | 'code'
+  | 'spatial';
 
 /**
  * Insert a pending submission feature: it has no effective date, so it is absent from published closure until
@@ -277,6 +285,8 @@ export async function addPropertyValue(
   const statements: Record<TypedPropertyTypeName, string> = {
     string:
       'INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
+    paragraph:
+      'INSERT INTO submission_feature_property_paragraph (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
     number:
       'INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value) VALUES ($1, $2, $3)',
     boolean:
@@ -335,20 +345,16 @@ export async function insertSubmissionFeaturePropertyFeature(
   blueprintFeatureTypePropertyId: number,
   referencedSubmissionFeatureId: number
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
-
   await connection.sql(SQL`
     INSERT INTO submission_feature_property_feature (
       submission_feature_id,
       blueprint_feature_type_property_id,
-      referenced_submission_feature_id,
-      create_user
+      referenced_submission_feature_id
     )
     VALUES (
       ${sourceSubmissionFeatureId},
       ${blueprintFeatureTypePropertyId},
-      ${referencedSubmissionFeatureId},
-      ${systemUserId}
+      ${referencedSubmissionFeatureId}
     );
   `);
 }
@@ -408,12 +414,11 @@ export async function addStringProperty(
   propertyName: string,
   value: string
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
   const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-    VALUES (${submissionFeatureId}, ${bftpId}, ${value}, ${systemUserId});
+    INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${value});
   `);
 }
 
@@ -424,12 +429,11 @@ export async function addCodeProperty(
   propertyName: string,
   contributorCodesetCodeId: number
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
   const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
-    VALUES (${submissionFeatureId}, ${bftpId}, ${contributorCodesetCodeId}, ${systemUserId});
+    INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${contributorCodesetCodeId});
   `);
 }
 
@@ -440,12 +444,11 @@ export async function addTaxonProperty(
   propertyName: string,
   taxonId: number
 ): Promise<void> {
-  const systemUserId = connection.systemUserId();
   const bftpId = await getBlueprintFeatureTypePropertyId(connection, submissionFeatureId, propertyName);
 
   await connection.sql(SQL`
-    INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id, create_user)
-    VALUES (${submissionFeatureId}, ${bftpId}, ${taxonId}, ${systemUserId});
+    INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id)
+    VALUES (${submissionFeatureId}, ${bftpId}, ${taxonId});
   `);
 }
 

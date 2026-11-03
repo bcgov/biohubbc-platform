@@ -1,6 +1,9 @@
 import { AxiosInstance } from 'axios';
 import {
   IContributor,
+  IContributorCodeset,
+  IContributorCodesetCodesResponse,
+  IContributorCodesetsResponse,
   IContributorSystemUserOption,
   IContributorUser,
   IContributorInput,
@@ -123,6 +126,54 @@ export const useContributorsApi = (axios: AxiosInstance) => {
     });
     return data;
   };
+  /**
+   * List a contributor's codesets, including ended codesets.
+   * @param contributorId - Contributor that owns the codesets.
+   * @param pagination - Requested page.
+   * @returns Codesets and pagination metadata.
+   */
+  const listContributorCodesets = async (
+    contributorId: number,
+    pagination: ApiPaginationRequestOptions
+  ): Promise<IContributorCodesetsResponse> => {
+    const { data } = await axios.get(`/api/administrative/contributors/${contributorId}/codesets`, {
+      params: pagination
+    });
+    return data;
+  };
+  /**
+   * Get one of a contributor's codesets, including an ended codeset.
+   * @param contributorId - Contributor that owns the codeset.
+   * @param contributorCodesetId - Codeset identifier.
+   * @returns The codeset.
+   */
+  const getContributorCodeset = async (
+    contributorId: number,
+    contributorCodesetId: number
+  ): Promise<IContributorCodeset> => {
+    const { data } = await axios.get(
+      `/api/administrative/contributors/${contributorId}/codesets/${contributorCodesetId}`
+    );
+    return data;
+  };
+  /**
+   * List the codes of one of a contributor's codesets, including ended codes.
+   * @param contributorId - Contributor that owns the codeset.
+   * @param contributorCodesetId - Codeset whose codes are listed.
+   * @param pagination - Requested page.
+   * @returns Codes and pagination metadata.
+   */
+  const listContributorCodesetCodes = async (
+    contributorId: number,
+    contributorCodesetId: number,
+    pagination: ApiPaginationRequestOptions
+  ): Promise<IContributorCodesetCodesResponse> => {
+    const { data } = await axios.get(
+      `/api/administrative/contributors/${contributorId}/codesets/${contributorCodesetId}/codes`,
+      { params: pagination }
+    );
+    return data;
+  };
   return {
     listSystemUserOptions,
     listContributors,
@@ -133,6 +184,9 @@ export const useContributorsApi = (axios: AxiosInstance) => {
     listContributorUsers,
     getContributorUser,
     createContributorUser,
-    deleteContributorUser
+    deleteContributorUser,
+    listContributorCodesets,
+    getContributorCodeset,
+    listContributorCodesetCodes
   };
 };

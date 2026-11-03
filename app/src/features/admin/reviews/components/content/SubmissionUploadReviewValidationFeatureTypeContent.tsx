@@ -1,4 +1,3 @@
-import Container from '@mui/material/Container';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -42,20 +41,16 @@ export const SubmissionUploadReviewValidationFeatureTypeContent = ({
   }, [propertiesQuery.error, setSnackbar]);
 
   return (
-    <>
-      <SubmissionUploadReviewValidationFeatureTypeHeader
-        submissionId={submissionId}
-        review={review}
-        featureType={featureType}
-        outcomeRoute={outcomeRoute}
+    <SubmissionUploadReviewValidationFeatureTypeHeader
+      submissionId={submissionId}
+      review={review}
+      featureType={featureType}
+      outcomeRoute={outcomeRoute}>
+      <SubmissionUploadReviewFeatureTypePropertiesTable
+        properties={propertiesQuery.data?.properties ?? []}
+        isLoading={propertiesQuery.isLoading}
+        hasError={propertiesQuery.isError}
       />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <SubmissionUploadReviewFeatureTypePropertiesTable
-          properties={propertiesQuery.data?.properties ?? []}
-          isLoading={propertiesQuery.isLoading}
-          hasError={propertiesQuery.isError}
-        />
-      </Container>
-    </>
+    </SubmissionUploadReviewValidationFeatureTypeHeader>
   );
 };

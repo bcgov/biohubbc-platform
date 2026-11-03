@@ -48,6 +48,7 @@ vi.mock('hooks/useContext', () => ({
 const emptySearchPropertyResponse: SearchPropertyResponse = {
   properties: {
     string: [],
+    paragraph: [],
     number: [],
     boolean: [],
     datetime: [],
@@ -77,6 +78,7 @@ const defaultSearchPropertyResponse: SearchPropertyResponse = {
         relevancy_score: 5
       }
     ],
+    paragraph: [],
     number: [
       {
         feature_property_id: 2,
@@ -230,6 +232,7 @@ describe('ExpressionBuilder', () => {
     searchPropertiesMock.mockResolvedValue({
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -305,6 +308,7 @@ describe('ExpressionBuilder', () => {
     searchPropertiesMock.mockResolvedValue({
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -387,6 +391,7 @@ describe('ExpressionBuilder', () => {
             relevancy_score: 4
           }
         ],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -449,6 +454,7 @@ describe('ExpressionBuilder', () => {
     searchPropertiesMock.mockResolvedValue({
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -561,6 +567,7 @@ describe('ExpressionBuilder', () => {
       ...emptySearchPropertyResponse,
       properties: {
         ...emptySearchPropertyResponse.properties,
+        paragraph: [],
         number: [
           {
             feature_property_id: 3,
@@ -620,6 +627,7 @@ describe('ExpressionBuilder', () => {
     searchPropertiesMock.mockResolvedValue({
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -678,6 +686,7 @@ describe('ExpressionBuilder', () => {
     searchPropertiesMock.mockResolvedValue({
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -742,6 +751,7 @@ describe('ExpressionBuilder', () => {
     searchPropertiesMock.mockResolvedValueOnce({
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -851,6 +861,7 @@ describe('ExpressionBuilder', () => {
             relevancy_score: 5
           }
         ],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -896,6 +907,7 @@ describe('ExpressionBuilder', () => {
             relevancy_score: 5
           }
         ],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -958,6 +970,7 @@ describe('ExpressionBuilder', () => {
     const emptyPropertyResponse: SearchPropertyResponse = {
       properties: {
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -1058,6 +1071,7 @@ describe('ExpressionBuilder', () => {
             relevancy_score: 2
           }
         ],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],
@@ -1164,6 +1178,7 @@ describe('ExpressionBuilder', () => {
               relevancy_score: 4
             }
           ],
+          paragraph: [],
           number: [],
           boolean: [],
           datetime: [],
@@ -1192,6 +1207,7 @@ describe('ExpressionBuilder', () => {
               relevancy_score: 3
             }
           ],
+          paragraph: [],
           number: [],
           boolean: [],
           datetime: [],

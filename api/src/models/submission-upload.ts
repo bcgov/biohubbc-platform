@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ApiPaginationResults } from '../zod-schema/pagination';
+import { ReconciliationType } from './reconciliation';
 import { SubmissionUploadReview } from './submission-upload-review';
 import { TicketSubmissionValidation } from './submission-validation';
 import { UploadArtifactRoleEnum } from './upload-artifact';
@@ -20,9 +21,18 @@ export type SubmissionUploadJobStatus = z.infer<typeof SubmissionUploadJobStatus
 
 /**
  * Human review decision on a submission upload, independent of its processing status.
+ *
+ * `approving` records an accepted approval whose feature activation is queued; the approval job moves it to
+ * `approved` once the upload's features are published.
  */
-export const SubmissionUploadDecision = z.enum(['pending', 'approved', 'denied']);
+export const SubmissionUploadDecision = z.enum(['pending', 'approving', 'approved', 'denied']);
 export type SubmissionUploadDecision = z.infer<typeof SubmissionUploadDecision>;
+
+/**
+ * Review decision an administrator can request. `approving` is only ever set by the approval workflow.
+ */
+export const RequestedSubmissionUploadDecision = SubmissionUploadDecision.exclude(['approving']);
+export type RequestedSubmissionUploadDecision = z.infer<typeof RequestedSubmissionUploadDecision>;
 
 /**
  * SubmissionUpload table schema
@@ -59,6 +69,23 @@ export type AdminSubmissionUpload = z.infer<typeof AdminSubmissionUpload>;
 
 export interface AdminSubmissionUploadsResponse {
   uploads: AdminSubmissionUpload[];
+  pagination: ApiPaginationResults;
+}
+
+/** Filters of the administrative list of every submission's uploads. */
+export interface AdminSubmissionUploadListFilters {
+  keyword?: string;
+}
+
+/** Active upload fields shown in the administrative list of every upload, with the submission each belongs to. */
+export const AdminSubmissionUploadListItem = AdminSubmissionUpload.extend({
+  submission_id: z.number(),
+  submission_name: z.string()
+});
+export type AdminSubmissionUploadListItem = z.infer<typeof AdminSubmissionUploadListItem>;
+
+export interface AdminSubmissionUploadListResponse {
+  uploads: AdminSubmissionUploadListItem[];
   pagination: ApiPaginationResults;
 }
 
@@ -163,4 +190,32 @@ export interface StartSubmissionArchiveUploadInput {
   comment: string | null;
   requestedBlueprintId?: number | null;
   archiveFormat?: SubmissionArchiveFormat;
+}
+
+/** Submission and upload ownership boundary for administrative browsing. */
+export interface SubmissionUploadScope {
+  submissionId: number;
+  submissionUploadId: string;
+}
+
+/** Sortable columns of the administrative submission upload feature type list. */
+export const SUBMISSION_UPLOAD_FEATURE_TYPE_SORT_COLUMNS = ['feature_type_name', 'count'];
+
+/** A feature type stored in an upload and the number of its features, including historical rows. */
+export const SubmissionUploadFeatureType = z.object({
+  feature_type_name: z.string(),
+  count: z.number().int().nonnegative()
+});
+
+export type SubmissionUploadFeatureType = z.infer<typeof SubmissionUploadFeatureType>;
+
+/** Filters of the administrative submission upload feature type list. */
+export interface SubmissionUploadFeatureTypeFilters {
+  /** Stored reconciliation outcome whose features are counted. */
+  reconciliation: ReconciliationType;
+}
+
+export interface SubmissionUploadFeatureTypesResponse {
+  feature_types: SubmissionUploadFeatureType[];
+  pagination: ApiPaginationResults;
 }

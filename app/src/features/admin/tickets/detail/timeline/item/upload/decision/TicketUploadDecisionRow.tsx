@@ -8,7 +8,7 @@ import {
 import { ITicketUploadDecisionRowProps } from '../TicketUploadTimelineItem.interface';
 
 /**
- * Displays the upload final decision action or finalized status.
+ * Displays the upload final decision action or finalized status. An approval still being applied is shown disabled.
  *
  * @param {ITicketUploadDecisionRowProps} props
  * @return {*}
@@ -36,10 +36,12 @@ export const TicketUploadDecisionRow = (props: ITicketUploadDecisionRowProps) =>
           </Button>
         </Stack>
       ) : (
+        // An approval still being published cannot be reset until it completes.
         <Button
           size="small"
           variant="contained"
           color={finalDecisionButtonColor}
+          disabled={upload.decision === 'approving'}
           onClick={() => onResetDecision(upload)}>
           {SUBMISSION_UPLOAD_DECISION_LABELS[upload.decision]}
         </Button>

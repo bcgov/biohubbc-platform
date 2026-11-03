@@ -2,7 +2,7 @@ import { grey } from '@mui/material/colors';
 import { DataGrid, type DataGridProps, type GridValidRowModel } from '@mui/x-data-grid';
 import { SkeletonTable } from 'components/loading/SkeletonLoaders';
 import React, { useCallback } from 'react';
-import StyledDataGridOverlay from './StyledDataGridOverlay';
+import StyledDataGridOverlay, { DATA_GRID_OVERLAY_HEIGHT } from './StyledDataGridOverlay';
 
 export type ICustomDataGridProps<R extends GridValidRowModel = GridValidRowModel> = DataGridProps<R> & {
   noRowsMessage?: string;
@@ -39,6 +39,8 @@ const CustomDataGrid = <R extends GridValidRowModel = GridValidRowModel>(props: 
         (theme) => {
           return {
             height: '100%',
+            // The grid reserves this height for its body when it has no rows, matching the overlay it shows there.
+            '--DataGrid-overlayHeight': `${DATA_GRID_OVERLAY_HEIGHT}px`,
             bgcolor: theme.palette.background.paper,
             display: 'flex',
             flexDirection: 'column',

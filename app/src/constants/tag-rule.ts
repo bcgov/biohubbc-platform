@@ -1,0 +1,3 @@
+export const TAG_RULE_NAME_MAX_LENGTH = 100;
+
+export const TAG_RULE_DESCRIPTION_MAX_LENGTH = 500;

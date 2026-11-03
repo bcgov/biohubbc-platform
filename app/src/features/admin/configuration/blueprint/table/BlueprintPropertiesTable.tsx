@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { mdiDotsVertical, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { GridColDef } from '@mui/x-data-grid';
@@ -72,7 +73,14 @@ export const BlueprintPropertiesTable = ({
     <PageSection
       addButtonSize="small"
       id="blueprint-properties"
-      label="Properties"
+      label={
+        <>
+          Properties{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }
       addLabel="Assign"
       onAdd={onCreate}
       headerContent={

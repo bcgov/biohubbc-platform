@@ -32,10 +32,9 @@ export interface ITileExtentMapProps {
 }
 
 /**
- * Map section for a subject with a fixed extent: a submission feature's spatial properties, or those of every active
- * feature of a submission upload.
+ * Map section for a subject with a fixed extent, such as a submission feature's spatial properties.
  *
- * Owns everything the two subjects have in common: attaching the tile token, composing the basemap with the geometry
+ * Owns everything such subjects have in common: attaching the tile token, composing the basemap with the geometry
  * layers and framing the map on the session's extent; the loading, empty, error and ready states are
  * {@link TileSessionFrame}'s. The caller owns the session (which decides what is being mapped) and the wording.
  *

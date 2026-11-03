@@ -825,7 +825,7 @@ async function computeAnchorsForSubmission(connection: IDBConnection, submission
 
     let afterId = 0;
     while (true) {
-      const batch = await scopeRepo.computeAnchorBatch(scope.security_scope_id, urn, afterId);
+      const batch = await scopeRepo.computeAnchorBatch(scope.security_scope_id, urn, afterId, null);
       if (!batch) {
         break;
       }

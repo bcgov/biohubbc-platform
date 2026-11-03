@@ -194,6 +194,8 @@ export function getPredicateTableConfig(predicate: InternalTypedPredicate): { ta
   switch (predicate.type) {
     case 'string':
       return { tableName: 'submission_feature_property_string', valueColumn: 'p.value' };
+    case 'paragraph':
+      return { tableName: 'submission_feature_property_paragraph', valueColumn: 'p.value' };
     case 'number':
       return { tableName: 'submission_feature_property_number', valueColumn: 'p.value' };
     case 'boolean':
@@ -337,6 +339,7 @@ function applyExpressionPredicateOperator(
 
   switch (predicate.type) {
     case 'string':
+    case 'paragraph':
       return applyStringExpressionOperator(query, valueColumn, predicate.operator, predicate.value);
     case 'number':
       return applyComparableExpressionOperator(query, valueColumn, predicate.operator, predicate.value);

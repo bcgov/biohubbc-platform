@@ -1,4 +1,3 @@
-import Container from '@mui/material/Container';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { EditPolicyStatementDialog } from 'features/admin/policies/components/EditPolicyStatementDialog';
@@ -61,10 +60,7 @@ export const PolicyDetailPage = () => {
             isSavingPolicyStatus={isSavingPolicyStatus}
             onEditPolicy={openEditPolicyDialog}
             onPolicyStatusChange={handlePolicyStatusChange}
-            onTabChange={setActiveTab}
-          />
-
-          <Container maxWidth="xl" sx={{ py: 4 }}>
+            onTabChange={setActiveTab}>
             <ComponentSwitch<PolicyDetailTab>
               switch={activeTab}
               components={{
@@ -87,7 +83,7 @@ export const PolicyDetailPage = () => {
                 teams: <PolicyTeams policyId={policy.policy_id} />
               }}
             />
-          </Container>
+          </PolicyHeader>
 
           <PolicyExpressionDialog
             open={isCreateExpressionDialogOpen}

@@ -51,6 +51,38 @@ export const SecurityCategoriesListResponseSchema: OpenAPIV3.SchemaObject = {
 /**
  * Schema for a security category (admin CRUD response).
  */
+export const SecurityCategoryDetailsSchema: OpenAPIV3.SchemaObject = {
+  title: 'SecurityCategoryDetails',
+  type: 'object',
+  required: ['security_category_id', 'name', 'description', 'create_date', 'created_by_name'],
+  properties: {
+    security_category_id: {
+      type: 'integer',
+      description: 'Unique identifier for the security category'
+    },
+    name: {
+      type: 'string',
+      maxLength: 100,
+      description: 'Name of the security category'
+    },
+    description: {
+      type: 'string',
+      maxLength: 500,
+      nullable: true,
+      description: 'Description of the security category'
+    },
+    create_date: {
+      type: 'string',
+      description: 'When the security category was created'
+    },
+    created_by_name: {
+      type: 'string',
+      nullable: true,
+      description: 'Name of the user who created the security category'
+    }
+  }
+};
+
 export const SecurityCategorySchema: OpenAPIV3.SchemaObject = {
   title: 'SecurityCategory',
   type: 'object',

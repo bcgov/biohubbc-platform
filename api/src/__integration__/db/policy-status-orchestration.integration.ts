@@ -32,6 +32,7 @@ import { SecurityScopeService } from '../../services/access-policy/security-scop
 import { TeamPolicyService } from '../../services/access-policy/team-policy-service';
 import { DataRequestService } from '../../services/data-request-service';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
+import { TagRuleEvaluationService } from '../../services/tag-rule-evaluation-service';
 import { addTeamMember, createPolicy, createPolicyStatement, createTeam } from '../helpers/test-rbac-helpers';
 import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 
@@ -61,6 +62,10 @@ describe('Policy status orchestration (integration)', function () {
   });
 
   beforeEach(async () => {
+    // pg-boss is not running in the `make test-db` environment; tag rule evaluation is queued, not run, here.
+    sinon
+      .stub(TagRuleEvaluationService.dependencies, 'publishEvaluateTicketTagRulesJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
     // `connection.open()` begins the implicit transaction; afterEach's
     // `connection.rollback()` discards every write made during the test.
     connection = getAPIUserDBConnection();
@@ -217,7 +222,7 @@ describe('Policy status orchestration (integration)', function () {
 
     // The anchor-computation job for the materialized scope is published exactly once.
     expect(publisherStub.callCount).to.equal(1);
-    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0] });
+    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0], submissionId: null });
 
     // Sanity: cache row points at the same scope_id that the statement was mapped to.
     const teamScopeIds = await getTeamSecurityScopeIds(teamId);
@@ -251,7 +256,7 @@ describe('Policy status orchestration (integration)', function () {
     expect(scopeIds).to.have.length(1);
 
     expect(publisherStub.callCount).to.equal(1);
-    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0] });
+    expect(publisherStub.firstCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0], submissionId: null });
   });
 
   // ── I3: PolicyService.updatePolicy(approved → reviewed) ungrants all teams ─
@@ -794,7 +799,7 @@ describe('Policy status orchestration (integration)', function () {
     await teamPolicyService.createTeamPolicy({ team_id: teamB, policy_id: policyId });
 
     expect(publisherStub.callCount - setupCalls).to.equal(1);
-    expect(publisherStub.lastCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0] });
+    expect(publisherStub.lastCall.args[1]).to.deep.equal({ securityScopeId: scopeIds[0], submissionId: null });
 
     // (b) A metadata-only updatePolicy (no status, no statement set change)
     // must not publish. The orchestration short-circuits at the

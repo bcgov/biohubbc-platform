@@ -1,4 +1,4 @@
-import { Alert, Chip, Skeleton, Stack } from '@mui/material';
+import { Alert, Chip, Skeleton, Stack, Typography } from '@mui/material';
 import { GridColDef } from '@mui/x-data-grid';
 import { SecondaryButton } from 'components/button/SecondaryButton';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
@@ -76,7 +76,14 @@ export const ContributorUserPanel = ({ contributor }: { contributor: IContributo
   return (
     <PageSection
       id="contributor_users"
-      label="Users"
+      label={
+        <>
+          Users{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({query.data?.pagination.total ?? 0})
+          </Typography>
+        </>
+      }
       onAdd={contributor.record_end_date ? undefined : () => setAdding(true)}
       addLabel="Add Contributor User"
       headerContent={

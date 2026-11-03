@@ -1,24 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 
 /**
- * Schema for paginated data with count.
- */
-export const paginatedDataSchema = (itemSchema: OpenAPIV3.SchemaObject): OpenAPIV3.SchemaObject => ({
-  type: 'object',
-  properties: {
-    data: {
-      type: 'array',
-      items: itemSchema
-    },
-    total: {
-      type: 'integer',
-      minimum: 0
-    }
-  },
-  required: ['data', 'total']
-});
-
-/**
  * Schema for simple count object.
  */
 export const countSchema: OpenAPIV3.SchemaObject = {

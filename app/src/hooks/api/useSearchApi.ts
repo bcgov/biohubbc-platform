@@ -1,13 +1,12 @@
 import { AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import {
-  ISearchAllFilters,
+  ISearchSummaryFilters,
   ISearchPropertyFilters,
   ISearchTaxonFilters,
   SearchFeatureCountResponse,
   SearchFeatureResponse,
   SearchPropertyResponse,
-  SearchResponse,
   SearchSummaryResponse,
   SearchTaxonResponse
 } from 'interfaces/useSearchApi.interface';
@@ -118,38 +117,14 @@ export const useSearchApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch all published features with optional search terms and pagination.
-   *
-   * @param {ISearchAllFilters} params
-   * @param {ApiPaginationRequestOptions} pagination
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @return {Promise<SearchResponse>}
-   */
-  const searchAll = async (
-    params?: ISearchAllFilters,
-    pagination?: ApiPaginationRequestOptions,
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<SearchResponse> => {
-    const mergedParams = { ...params, ...pagination };
-
-    const { data } = await axios.get<SearchResponse>('api/search', {
-      params: mergedParams,
-      paramsSerializer: (params) => qs.stringify(params),
-      ...options
-    });
-
-    return data;
-  };
-
-  /**
    * Fetch summary counts for features, submissions, and taxonomy based on search terms.
    *
-   * @param {ISearchAllFilters} params
+   * @param {ISearchSummaryFilters} params
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @returns {Promise<SearchSummaryResponse>} - Returns counts of matching features, submissions, and taxonomy.
    */
   const searchSummary = async (
-    params?: ISearchAllFilters,
+    params?: ISearchSummaryFilters,
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SearchSummaryResponse> => {
     const { data } = await axios.get<SearchSummaryResponse>('api/search/summary', {
@@ -164,7 +139,6 @@ export const useSearchApi = (axios: AxiosInstance) => {
   return {
     searchFeatures,
     countFeatures,
-    searchAll,
     searchProperties,
     searchTaxon,
     searchSummary

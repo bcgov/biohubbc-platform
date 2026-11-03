@@ -60,8 +60,6 @@ describe('SubmissionFeatureRepository (integration)', function () {
     featureTypeName: string;
     parentFeatureId?: number;
   }): Promise<number> {
-    const systemUserId = connection.systemUserId();
-
     const result = await connection.sql(SQL`
       INSERT INTO submission_feature (
         submission_id,
@@ -70,8 +68,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
         parent_submission_feature_id,
         data,
         data_byte_size,
-        record_effective_date,
-        create_user
+        record_effective_date
       )
       VALUES (
         ${params.submissionId},
@@ -80,8 +77,7 @@ describe('SubmissionFeatureRepository (integration)', function () {
         ${params.parentFeatureId ?? null},
         '{}'::jsonb,
         500,
-        now(),
-        ${systemUserId}
+        now()
       )
       RETURNING submission_feature_id;
     `);

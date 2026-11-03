@@ -27,6 +27,8 @@ import { buildExpressionTreeFeatureIdsSubquery } from '../../repositories/expres
 import { ExpressionTreeNormalizationService } from '../../services/expression-tree-normalization-service';
 import { ExpressionTreeService } from '../../services/expression-tree-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { createAssignedFeatureProperty } from '../helpers/test-feature-property-helpers';
 import { addTeamMember, createTeam, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -119,12 +121,11 @@ describe('Tile search function (integration)', function () {
    */
   const addPointToFeature = async (featureId: number, lng: number, lat: number): Promise<void> => {
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
       VALUES (
         ${featureId},
         ${geometryProperty.blueprint_feature_type_property_id},
-        public.ST_SetSRID(public.ST_MakePoint(${lng}, ${lat}), 4326),
-        ${connection.systemUserId()}
+        public.ST_SetSRID(public.ST_MakePoint(${lng}, ${lat}), 4326)
       );
     `);
   };
@@ -315,8 +316,8 @@ describe('Tile search function (integration)', function () {
   /** Insert a typed number property value on a feature. */
   const setNumberValue = async (featureId: number, property: PropertyIds, value: number): Promise<void> => {
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-      VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
+      INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value)
+      VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value});
     `);
   };
 
@@ -455,6 +456,25 @@ describe('Tile search function (integration)', function () {
       }
     });
 
+    it('excludes superseded features from submission-scoped and unscoped tiles', async () => {
+      const superseded = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+      const submissionId = await submissionOf(superseded);
+      const successor = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'successor' });
+      await addPointToFeature(successor, TEST_LNG, TEST_LAT);
+      // Approval ends and links the predecessor; the closure rebuild then holds only the current successor.
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now(), successor_submission_feature_id = ${successor}
+        WHERE submission_feature_id = ${superseded};
+      `);
+      await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+
+      for (const context of [await createContext({ submissionIds: [submissionId] }), await createContext({})]) {
+        expect(await canSee(context, superseded)).to.equal(false);
+        expect(await canSee(context, successor)).to.equal(true);
+      }
+    });
+
     it('returns no scoped results when the submission closure is missing', async () => {
       const feature = await createFeatureWithPoint(TEST_LNG, TEST_LAT, false);
       const submissionIds = [await submissionOf(feature)];
@@ -584,27 +604,33 @@ describe('Tile search function (integration)', function () {
   describe('expression evaluation', () => {
     const setStringValue = async (featureId: number, property: PropertyIds, value: string): Promise<void> => {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
+        INSERT INTO submission_feature_property_string (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value});
+      `);
+    };
+
+    const setParagraphValue = async (featureId: number, property: PropertyIds, value: string): Promise<void> => {
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_property_paragraph (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value});
       `);
     };
 
     const setTimestampValue = async (featureId: number, property: PropertyIds, isoDate: string): Promise<void> => {
       await connection.sql(SQL`
         INSERT INTO submission_feature_property_timestamp (
-          submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user
+          submission_feature_id, blueprint_feature_type_property_id, date_value, time_value
         )
         VALUES (
-          ${featureId}, ${property.blueprint_feature_type_property_id}, ${isoDate}::date, '00:00:00'::time,
-          ${connection.systemUserId()}
+          ${featureId}, ${property.blueprint_feature_type_property_id}, ${isoDate}::date, '00:00:00'::time
         );
       `);
     };
 
     const setBooleanValue = async (featureId: number, property: PropertyIds, value: boolean): Promise<void> => {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_boolean (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value}, ${connection.systemUserId()});
+        INSERT INTO submission_feature_property_boolean (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (${featureId}, ${property.blueprint_feature_type_property_id}, ${value});
       `);
     };
 
@@ -746,6 +772,37 @@ describe('Tile search function (integration)', function () {
         await expectParity(tree('AND', [predicate(stringProperty, 'StartsWith', 'wood')]), all, [caribou]);
         await expectParity(tree('AND', [predicate(stringProperty, 'EndsWith', 'bou')]), all, [caribou]);
         await expectParity(tree('AND', [predicate(stringProperty, 'NotEquals', 'Moose')]), all, [caribou]);
+      });
+
+      it('paragraph operators', async () => {
+        const { featurePropertyId, assignments } = await createAssignedFeatureProperty(connection, 'paragraph', [
+          FEATURE_TYPE
+        ]);
+        const paragraphProperty: PropertyIds = {
+          feature_property_id: featurePropertyId,
+          blueprint_feature_type_property_id: assignments[FEATURE_TYPE]
+        };
+
+        // The caribou notes exceed the 250-character string limit; the moose notes stay within the predicate value
+        // limit so equality can target them.
+        const caribouNotes = `Woodland Caribou ${'tracked along the ridge. '.repeat(15)}near the lake`;
+        const mooseNotes = 'Moose browsing in the willow flats at dusk';
+
+        const caribou = await createFeatureWithPoint(TEST_LNG, TEST_LAT);
+        const moose = await createFeatureWithPoint(TEST_LNG + 0.0005, TEST_LAT);
+        const bare = await createFeatureWithPoint(TEST_LNG, TEST_LAT + 0.0005);
+
+        await setParagraphValue(caribou, paragraphProperty, caribouNotes);
+        await setParagraphValue(moose, paragraphProperty, mooseNotes);
+
+        const all = [caribou, moose, bare];
+
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'Equals', mooseNotes)]), all, [moose]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'Contains', 'ridge')]), all, [caribou]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'StartsWith', 'wood')]), all, [caribou]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'EndsWith', 'dusk')]), all, [moose]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'NotEquals', mooseNotes)]), all, [caribou]);
+        await expectParity(tree('AND', [predicate(paragraphProperty, 'Exists')]), all, [caribou, moose]);
       });
 
       it('timestamp operators', async function () {
@@ -934,12 +991,11 @@ describe('Tile search function (integration)', function () {
         const featureId = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'geom' });
 
         await connection.sql(SQL`
-          INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+          INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
           VALUES (
             ${featureId},
             ${geometryProperty.blueprint_feature_type_property_id},
-            public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326),
-            ${connection.systemUserId()}
+            public.ST_SetSRID(public.ST_GeomFromText(${wkt}), 4326)
           );
         `);
 
@@ -953,6 +1009,56 @@ describe('Tile search function (integration)', function () {
 
       // Every geometry type survives clipping and MVT encoding.
       expect(await renderTile(contextId)).to.be.greaterThan(0);
+    });
+
+    it('encodes every part of a geometry collection that mixes points, lines and polygons', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const contextId = await createContext({});
+      // Geometry types of the tile's features (1 point, 2 line, 3 polygon). Other fixtures may share the tile, so
+      // the collection's parts are what the tile gains when it is added.
+      const featureTypes = async (): Promise<number[]> => {
+        const tile = await renderTileBytes(contextId);
+        if (!tile) {
+          return [];
+        }
+
+        const layer = new VectorTile(new Protobuf(tile)).layers.features;
+        const types: number[] = [];
+
+        for (let index = 0; index < (layer?.length ?? 0); index++) {
+          types.push(layer.feature(index).type);
+        }
+
+        return types;
+      };
+      const before = await featureTypes();
+
+      const featureId = await createTestFeature(connection, submissionId, FEATURE_TYPE, { name: 'mixed' });
+      const mixedWkt = `GEOMETRYCOLLECTION(POINT(${TEST_LNG} ${TEST_LAT}), LINESTRING(${TEST_LNG} ${TEST_LAT}, ${
+        TEST_LNG + 0.001
+      } ${TEST_LAT + 0.001}), POLYGON((${TEST_LNG} ${TEST_LAT}, ${TEST_LNG + 0.001} ${TEST_LAT}, ${TEST_LNG + 0.001} ${
+        TEST_LAT + 0.001
+      }, ${TEST_LNG} ${TEST_LAT})))`;
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (
+          ${featureId},
+          ${geometryProperty.blueprint_feature_type_property_id},
+          public.ST_SetSRID(public.ST_GeomFromText(${mixedWkt}), 4326)
+        );
+      `);
+      await connection.sql(SQL`
+        INSERT INTO submission_feature_closure (source_submission_feature_id, target_submission_feature_id, is_ancestor)
+        VALUES (${featureId}, ${featureId}, true) ON CONFLICT DO NOTHING;
+      `);
+
+      const added = await featureTypes();
+      for (const type of before) {
+        added.splice(added.indexOf(type), 1);
+      }
+
+      // The collection's point, line and polygon each become their own tile feature.
+      expect(added.sort((a, b) => a - b)).to.eql([1, 2, 3]);
     });
 
     it('returns an empty tile where nothing matches', async () => {

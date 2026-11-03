@@ -307,6 +307,7 @@ export function timeStringToMillis(s: string): number {
 export function propertyTypeToParquetType(typeName: string): FieldDefinition['type'] {
   switch (typeName) {
     case 'string':
+    case 'paragraph':
       return 'UTF8';
     case 'number':
       return 'DOUBLE';
@@ -466,7 +467,7 @@ function encodePropertyValue(prop: CsvPropertyDefinition, value: unknown): unkno
       // lands as a one-element list rather than crashing the writer mid-file.
       return Array.isArray(value) ? value : [String(value)];
     default:
-      // string, number, boolean, code, taxon, artifact_key — pass through directly
+      // string, paragraph, number, boolean, code, taxon, artifact_key — pass through directly
       return value;
   }
 }

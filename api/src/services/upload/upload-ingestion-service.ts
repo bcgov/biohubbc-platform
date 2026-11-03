@@ -56,13 +56,16 @@ export class UploadIngestionService extends DBService {
   async createSubmissionArchiveUpload(input: CreateSubmissionArchiveUploadInput): Promise<PresignedUploadUrlResponse> {
     const systemUserId = this.connection.systemUserId();
     const submitterSystemUserIds = await this.resolveSubmissionUploadSubmitters(input.submitters ?? []);
+    // The Blueprint of a new submission's first upload becomes the default for its later uploads.
+    const defaultBlueprintId = await this.submissionUploadService.resolveBlueprintIdForNewSubmission(input.blueprintId);
     const submission: ICreateSubmission = {
       uuid: v4(),
       system_user_id: systemUserId,
       contributor_id: input.contributorId,
       name: input.name,
       description: input.description,
-      comment: input.comment
+      comment: input.comment,
+      default_blueprint_id: defaultBlueprintId
     };
     return this.startArchiveUpload(
       input.bytes,
@@ -123,7 +126,7 @@ export class UploadIngestionService extends DBService {
    * @param {ICreateSubmission} submission
    * @param {number[]} [submitterSystemUserIds] Optional additional people who may access this submission and upload.
    * @param {number | null} [requestedBlueprintId] Optional Blueprint to pin the upload to; defaults to
-   * the system default Blueprint when omitted (new submissions have no prior upload to inherit from).
+   * the new submission's default Blueprint when omitted.
    * @param {SubmissionArchiveFormat} [archiveFormat] Archive encoding; defaults to uncompressed TAR.
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
@@ -160,7 +163,7 @@ export class UploadIngestionService extends DBService {
    * Requires prior middleware authorization for submission-team access or administrator access.
    * Validates owning-contributor membership before changing the submission.
    * Resolves additional submitters and adds them to both teams.
-   * The Blueprint defaults to the submission's most recent prior upload Blueprint when omitted.
+   * The Blueprint defaults to the submission's default Blueprint when omitted.
    *
    * @param {CreateExistingSubmissionArchiveUploadInput} input - Submission UUID, archive size, optional
    * submitter identities, and optional Blueprint selection.
@@ -199,7 +202,7 @@ export class UploadIngestionService extends DBService {
    *
    * @param {StartSubmissionArchiveUploadInput} input - Submission identity, archive metadata, ticket users,
    * upload access-team members, and comment. The Blueprint resolves from the requested value,
-   * most recent prior upload, or system default. Archive encoding defaults to uncompressed TAR.
+   * the submission's default, or system default. Archive encoding defaults to uncompressed TAR.
    * @returns {Promise<PresignedUploadUrlResponse>} The archive upload session and presigned part URLs.
    */
   async _startArchiveUploadForSubmission(
@@ -216,7 +219,7 @@ export class UploadIngestionService extends DBService {
       archiveFormat = 'tar'
     } = input;
 
-    // 0. Pin the Blueprint this upload will be indexed with (provided → prior upload → default).
+    // 0. Pin the Blueprint this upload will be indexed with (provided → submission default → system default).
     const blueprint_id = await this.submissionUploadService.resolveBlueprintIdForUpload(
       submissionId,
       requestedBlueprintId

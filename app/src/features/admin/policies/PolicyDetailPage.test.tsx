@@ -349,9 +349,11 @@ describe('PolicyDetailPage', () => {
 
     await waitFor(() => {
       expect(getByRole('heading', { name: 'Sensitive Wildlife Policy' })).toBeVisible();
-      expect(getByText('Policy')).toBeVisible();
+      expect(getByRole('link', { name: 'Administration' })).toHaveAttribute('href', '/admin');
+      expect(getByRole('link', { name: 'Data Requests' })).toHaveAttribute('href', '/admin/data-requests');
+      expect(getByRole('link', { name: 'Policies' })).toHaveAttribute('href', '/admin/data-requests?tab=policies');
       expect(getByText('Policy description')).toBeVisible();
-      expect(getByRole('heading', { name: 'Expressions' })).toBeVisible();
+      expect(getByRole('heading', { name: /^Expressions \(\d+\)$/ })).toBeVisible();
       expect(getByRole('tab', { name: 'Expressions' })).toBeVisible();
       expect(getByRole('tab', { name: 'Statements' })).toBeVisible();
       expect(getByRole('tab', { name: 'Teams' })).toBeVisible();

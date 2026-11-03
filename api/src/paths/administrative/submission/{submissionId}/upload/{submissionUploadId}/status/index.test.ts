@@ -54,6 +54,59 @@ describe('submission upload decision handler', () => {
     expect(mockRes.jsonValue).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approved' });
   });
 
+  it('responds 202 when the approval is queued for the approval job', async () => {
+    const connection = stubConnection();
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId').resolves();
+    sinon
+      .stub(SubmissionUploadService.prototype, 'updateSubmissionUploadDecision')
+      .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving' });
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
+    mockReq.body = { decision: 'approved' };
+
+    await updateSubmissionUploadDecision()(mockReq, mockRes, mockNext);
+
+    expect(connection.commit).to.have.been.calledOnce;
+    expect(mockRes.statusValue).to.equal(202);
+    expect(mockRes.jsonValue).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving' });
+  });
+
+  it('responds 202 to a repeat approval request while an earlier approval is still being applied', async () => {
+    stubConnection();
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId').resolves();
+    sinon
+      .stub(SubmissionUploadService.prototype, 'updateSubmissionUploadDecision')
+      .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving' });
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
+    mockReq.body = { decision: 'approved' };
+
+    await updateSubmissionUploadDecision()(mockReq, mockRes, mockNext);
+    await updateSubmissionUploadDecision()(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(202);
+    expect(mockRes.jsonValue).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approving' });
+  });
+
+  it('responds 200 to an approval request once the approval has already been applied', async () => {
+    stubConnection();
+    sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId').resolves();
+    sinon
+      .stub(SubmissionUploadService.prototype, 'updateSubmissionUploadDecision')
+      .resolves({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approved' });
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
+    mockReq.body = { decision: 'approved' };
+
+    await updateSubmissionUploadDecision()(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({ submission_upload_id: SUBMISSION_UPLOAD_ID, decision: 'approved' });
+  });
+
   it('rolls back and rethrows when the decision is refused', async () => {
     const connection = stubConnection();
     sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadBySubmissionId').resolves();

@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -56,7 +57,14 @@ export const SelectedFeatureRulesPanel = (props: SelectedFeatureRulesPanelProps)
   return (
     <PageSection
       id="selected-feature-rules"
-      label="Security Rules"
+      label={
+        <>
+          Security Rules{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({props.rowCount})
+          </Typography>
+        </>
+      }
       headerContent={
         <Button size="small" color="primary" variant="text" onClick={props.onReset}>
           Reset

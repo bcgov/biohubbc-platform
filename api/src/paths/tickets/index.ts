@@ -81,7 +81,12 @@ export function getTicketsForUser(): RequestHandler {
       const teamMemberService = new TeamMemberService(connection);
       const teamIds = await teamMemberService.getTeamIdsBySystemUserId(systemUserId);
 
-      const filters: TicketFilters = { ...req.query, team_ids: teamIds };
+      // Build filters explicitly: admin-only filters such as tag_ids must never be accepted from portal requests.
+      const filters: TicketFilters = {
+        team_ids: teamIds,
+        status: req.query.status as TicketFilters['status'],
+        search: req.query.search as string | undefined
+      };
 
       const ticketService = new TicketService(connection);
       const [tickets, count] = await Promise.all([

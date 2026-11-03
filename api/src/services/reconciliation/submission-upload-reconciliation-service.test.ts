@@ -75,6 +75,43 @@ describe('SubmissionUploadReconciliationService', () => {
     }
   });
 
+  it('pages raw feature data with the outcome overview count as its total', async () => {
+    stubUpload();
+    sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getSubmissionFeatureReconciliationOverviewCounts')
+      .resolves({ new: 4, modified: 12, unmodified: 7 });
+    const features = [{ submission_feature_id: 5, data: { id: 'A' } }];
+    const getData = sinon
+      .stub(SubmissionFeatureReconciliationRepository.prototype, 'getReconciliationFeatureData')
+      .resolves(features);
+    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
+    const scope = { submissionId: 9, submissionUploadId: UPLOAD_ID, reconciliation: 'modified' as const };
+    const pagination = { page: 2, limit: 10 };
+
+    expect(await service.getReconciliationFeatureData(scope, pagination)).to.eql({
+      features,
+      pagination: { total: 12, per_page: 10, current_page: 2, last_page: 2, sort: undefined, order: undefined }
+    });
+    expect(getData).to.have.been.calledOnceWithExactly(scope, pagination);
+  });
+
+  it('rejects raw feature data when the upload belongs to another submission', async () => {
+    stubUpload();
+    const getData = sinon.stub(SubmissionFeatureReconciliationRepository.prototype, 'getReconciliationFeatureData');
+    const service = new SubmissionUploadReconciliationService(getMockDBConnection());
+
+    try {
+      await service.getReconciliationFeatureData(
+        { submissionId: 10, submissionUploadId: UPLOAD_ID, reconciliation: 'new' },
+        { page: 1, limit: 10 }
+      );
+      expect.fail('Expected submission upload ownership check to fail');
+    } catch (error) {
+      expect((error as Error).message).to.equal('Submission upload not found');
+    }
+    expect(getData).to.not.have.been.called;
+  });
+
   it('activates the stored reconciliation during approval', async () => {
     stubUpload();
     const getCounts = sinon

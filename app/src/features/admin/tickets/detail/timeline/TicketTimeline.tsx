@@ -1,6 +1,5 @@
 import { EditDialog } from 'components/dialog/EditDialog';
 import { SYSTEM_ROLE } from 'constants/roles';
-import { EditPolicyDialog } from 'features/admin/policies/components/EditPolicyDialog';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { hasAtLeastOneValidValue } from 'utils/authUtils';
 import { TicketCommentEditForm } from './comment/edit/TicketCommentEditForm';
@@ -9,6 +8,7 @@ import { TicketCommentEditFormYupSchema } from './comment/edit/TicketCommentEdit
 import { useTicketTimelineCommentActions } from './hooks/comment/useTicketTimelineCommentActions';
 import { useTicketTimelineDataRequestActions } from './hooks/data-request/useTicketTimelineDataRequestActions';
 import { useTicketTimelineUploadActions } from './hooks/upload/useTicketTimelineUploadActions';
+import { useTicketUploadApprovalRefresh } from './hooks/upload/useTicketUploadApprovalRefresh';
 import { TicketTimelineItems } from './item/TicketTimelineItems';
 import { ITicketTimelineProps } from './TicketTimeline.interface';
 
@@ -17,13 +17,14 @@ import { ITicketTimelineProps } from './TicketTimeline.interface';
  *
  * Shared by the admin ticket page and the portal ticket page. The upload processing history comes
  * from an admin-only endpoint, so the status row is expandable only for system administrators;
- * every other viewer sees the current status alone.
+ * every other viewer sees the current status alone. Tag history is administrative too: the timeline
+ * shows the tag events its page passes in, and loads none itself.
  *
  * @param {ITicketTimelineProps} props
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { ticket } = props;
+  const { ticket, tagEvents } = props;
   const {
     selectedComment,
     isEditCommentDialogOpen,
@@ -38,16 +39,9 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
   } = useTicketTimelineCommentActions();
   const {
     updatingDataRequestId,
-    isEditPolicyDialogOpen,
-    selectedPolicy,
-    isLoadingPolicy,
-    isSavingPolicy,
     handleConfirmDataRequestStatusUpdate,
     handleConfirmResetToReviewed,
-    handleOpenPolicyDialog,
-    handleOpenPolicyDetailPage,
-    handleClosePolicyDialog,
-    handleSavePolicy
+    handleOpenDataRequestPage
   } = useTicketTimelineDataRequestActions();
   const {
     handleCreateSubmissionUploadReview,
@@ -55,6 +49,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     handleConfirmSubmissionUploadDecisionUpdate,
     handleConfirmSubmissionUploadDecisionReset
   } = useTicketTimelineUploadActions();
+  useTicketUploadApprovalRefresh(ticket);
   const authStateContext = useAuthStateContext();
   const canViewSubmissionUploadStatusHistory = hasAtLeastOneValidValue(
     [SYSTEM_ROLE.SYSTEM_ADMIN],
@@ -65,12 +60,12 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     <>
       <TicketTimelineItems
         ticket={ticket}
+        tagEvents={tagEvents}
         updatingDataRequestId={updatingDataRequestId}
         onArtifactLinkClick={handleTicketArtifactDownload}
         onEditComment={handleOpenEditCommentDialog}
         onDeleteComment={handleConfirmDeleteComment}
-        onViewPolicy={handleOpenPolicyDialog}
-        onViewFinalizedPolicy={handleOpenPolicyDetailPage}
+        onViewRequest={handleOpenDataRequestPage}
         onConfirmDataRequestStatusUpdate={handleConfirmDataRequestStatusUpdate}
         onConfirmResetToReviewed={handleConfirmResetToReviewed}
         canViewSubmissionUploadStatusHistory={canViewSubmissionUploadStatusHistory}
@@ -79,16 +74,6 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         onConfirmSubmissionUploadDecisionUpdate={handleConfirmSubmissionUploadDecisionUpdate}
         onConfirmSubmissionUploadDecisionReset={handleConfirmSubmissionUploadDecisionReset}
       />
-
-      {selectedPolicy && (
-        <EditPolicyDialog
-          open={isEditPolicyDialogOpen}
-          isLoading={isLoadingPolicy || isSavingPolicy}
-          policy={selectedPolicy}
-          onCancel={handleClosePolicyDialog}
-          onSave={handleSavePolicy}
-        />
-      )}
 
       {selectedComment && (
         <EditDialog<ITicketCommentEditFormValues>

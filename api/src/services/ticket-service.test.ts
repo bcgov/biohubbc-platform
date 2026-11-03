@@ -11,12 +11,14 @@ import { TicketReference } from '../models/ticket-reference';
 import { TicketStatus } from '../models/ticket-status';
 import { TicketCommentRepository } from '../repositories/ticket-comment-repository';
 import { TicketRepository } from '../repositories/ticket-repository';
+import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketService } from './ticket-service';
 import { TicketStatusService } from './ticket-status-service';
 import { TicketSystemUserService } from './ticket-system-user-service';
+import { TicketTagService } from './ticket-tag-service';
 import { SubmissionUploadService } from './upload/submission-upload-service';
 
 chai.use(sinonChai);
@@ -49,6 +51,7 @@ describe('TicketService', () => {
     it('creates team, ticket and initial status history', async () => {
       const generatedTeamId = '99999999-9999-9999-9999-999999999999';
       const createdTicket: Ticket = { ...mockTicket, team_id: generatedTeamId };
+      const lockSlugStub = sinon.stub(TicketRepository.prototype, 'lockTicketSlugGeneration').resolves();
       const getNextTicketSlugStub = sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {
         team_id: generatedTeamId,
@@ -70,6 +73,8 @@ describe('TicketService', () => {
         })
       );
       expect(getNextTicketSlugStub).to.have.been.calledOnce;
+      expect(lockSlugStub).to.have.been.calledOnce;
+      expect(lockSlugStub).to.have.been.calledBefore(getNextTicketSlugStub);
       expect(insertTicketStub).to.have.been.calledWith(
         sinon.match({
           subject: 'A ticket',
@@ -86,6 +91,7 @@ describe('TicketService', () => {
     it('passes system user ids to createTeam when provided', async () => {
       const generatedTeamId = '99999999-9999-9999-9999-999999999999';
       const createdTicket: Ticket = { ...mockTicket, team_id: generatedTeamId };
+      sinon.stub(TicketRepository.prototype, 'lockTicketSlugGeneration').resolves();
       sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {
         team_id: generatedTeamId,
@@ -110,6 +116,7 @@ describe('TicketService', () => {
     });
 
     it('throws when insert fails', async () => {
+      sinon.stub(TicketRepository.prototype, 'lockTicketSlugGeneration').resolves();
       sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {
         team_id: mockTicket.team_id,
@@ -197,8 +204,12 @@ describe('TicketService', () => {
         .stub(TicketSystemUserService.prototype, 'getActiveTicketSystemUsersByTicketId')
         .resolves([]);
 
+      const getTicketTagsStub = sinon.stub(TicketTagService.prototype, 'getTicketTags');
+
       const result = await service.getTicket(mockTicket.ticket_id);
 
+      // Ticket detail is shared with portal users, so it must never load admin-only tags or tag events.
+      expect(getTicketTagsStub).to.not.have.been.called;
       expect(getTicketStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getStatusLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getCommentLogStub).to.have.been.calledWith(mockTicket.ticket_id);
@@ -287,6 +298,17 @@ describe('TicketService', () => {
       expect(getDataRequestsStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(deleteDataRequestStub).to.not.have.been.called;
       expect(deleteStub).to.have.been.calledWith(mockTicket.ticket_id);
+    });
+
+    it('soft deletes the ticket tag links before the ticket', async () => {
+      const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
+      const deleteTicketTagsStub = sinon.stub(TicketTagRepository.prototype, 'deleteTicketTagsByTicketId').resolves();
+
+      await service.deleteTicket(mockTicket.ticket_id);
+
+      expect(deleteTicketTagsStub).to.have.been.calledOnceWith(mockTicket.ticket_id);
+      expect(deleteTicketTagsStub).to.have.been.calledBefore(deleteStub);
     });
 
     it('deletes resolved data requests before soft deleting a ticket', async () => {

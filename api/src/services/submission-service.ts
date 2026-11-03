@@ -1,28 +1,39 @@
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
-import { HTTP403 } from '../errors/http-error';
-import { SubmissionFeatureForReview, SubmissionFilters, SubmissionSummary } from '../models/submission';
+import { ApiNotFoundError } from '../errors/api-error';
+import { HTTP400, HTTP403 } from '../errors/http-error';
+import { Blueprint } from '../models/blueprint';
+import {
+  AdminSubmissionListFilters,
+  AdminSubmissionListResponse,
+  SubmissionFeatureForReview,
+  SubmissionFilters,
+  SubmissionSummary
+} from '../models/submission';
+import { BlueprintRepository } from '../repositories/blueprint-repository';
 import {
   ICreateSubmission,
   ISubmissionModel,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
-  SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
-  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository
 } from '../repositories/submission-repository';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { BlueprintService } from './blueprint-service';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
+  blueprintRepository: BlueprintRepository;
+  blueprintService: BlueprintService;
   teamService: TeamService;
   userService: UserService;
 
@@ -30,6 +41,8 @@ export class SubmissionService extends DBService {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
+    this.blueprintRepository = new BlueprintRepository(connection);
+    this.blueprintService = new BlueprintService(connection);
     this.teamService = new TeamService(connection);
     this.userService = new UserService(connection);
   }
@@ -91,6 +104,73 @@ export class SubmissionService extends DBService {
       ...submissionData,
       team_id: team.team_id
     });
+  }
+
+  /**
+   * Find the blueprint a submission's next upload uses when the upload request does not name one.
+   *
+   * The submission's own default applies even after that blueprint is retired. A submission without one falls back
+   * to the system default blueprint.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<number | null>} The default `blueprint_id`, or null when neither default exists.
+   * @memberof SubmissionService
+   */
+  async findSubmissionDefaultBlueprintId(submissionId: number): Promise<number | null> {
+    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+
+    if (submission.default_blueprint_id != null) {
+      return submission.default_blueprint_id;
+    }
+
+    return this.blueprintRepository.findDefaultBlueprintId();
+  }
+
+  /**
+   * Get the blueprint a submission's next upload uses when the upload request does not name one.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @returns {Promise<Blueprint>} The submission's default blueprint, including a retired one.
+   * @throws {ApiNotFoundError} When neither the submission nor the system has a default blueprint.
+   * @memberof SubmissionService
+   */
+  async getSubmissionDefaultBlueprint(submissionId: number): Promise<Blueprint> {
+    const defaultBlueprintId = await this.findSubmissionDefaultBlueprintId(submissionId);
+
+    if (defaultBlueprintId === null) {
+      throw new ApiNotFoundError('Default Blueprint not found', [
+        'SubmissionService->getSubmissionDefaultBlueprint',
+        `submission_id ${submissionId} has no default Blueprint and no active default Blueprint exists`
+      ]);
+    }
+
+    return this.blueprintService.getBlueprint(defaultBlueprintId);
+  }
+
+  /**
+   * Change the blueprint a submission's future uploads use when the upload request does not name one.
+   *
+   * Existing uploads keep the blueprint they were created with. The new default must be available now; it keeps
+   * applying to this submission if it is retired later.
+   *
+   * @param {number} submissionId Submission identifier.
+   * @param {number} blueprintId The submission's new default blueprint.
+   * @returns {Promise<void>} Resolves after the submission's default blueprint has been changed.
+   * @throws {HTTP400} When the requested blueprint is not available.
+   * @throws {ApiNotFoundError} When the submission does not exist.
+   * @memberof SubmissionService
+   */
+  async updateSubmissionDefaultBlueprint(submissionId: number, blueprintId: number): Promise<void> {
+    const availableBlueprintId = await this.blueprintRepository.findActiveBlueprintById(blueprintId);
+
+    if (availableBlueprintId === null) {
+      throw new HTTP400('Requested Blueprint is not available', [
+        'SubmissionService->updateSubmissionDefaultBlueprint',
+        `blueprint_id ${blueprintId} does not exist or is no longer available for new uploads`
+      ]);
+    }
+
+    await this.submissionRepository.updateSubmissionDefaultBlueprint(submissionId, availableBlueprintId);
   }
 
   /**
@@ -253,33 +333,21 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Get all submissions that are pending security review (are unreviewed).
+   * Get one page of every active submission in the system for administrators, with the total matching the filters.
    *
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @param {AdminSubmissionListFilters} filters - Optional keyword matched against the submission name.
+   * @param {ApiPaginationOptions} pagination - Page, page size and sort.
+   * @returns {Promise<AdminSubmissionListResponse>} The page of submissions and its pagination totals.
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
-  }
+  async getAdminSubmissionList(
+    filters: AdminSubmissionListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionListResponse> {
+    const submissions = await this.submissionRepository.getAdminSubmissionList(filters, pagination);
+    const total = await this.submissionRepository.getAdminSubmissionCount(filters);
 
-  /**
-   * Get all submissions that have completed security review (are reviewed).
-   *
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
-   * @memberof SubmissionService
-   */
-  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getReviewedSubmissionsForAdmins();
-  }
-
-  /**
-   * Get all submissions that have completed security review and are published.
-   *
-   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
-   * @memberof SubmissionService
-   */
-  async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getPublishedSubmissionsForAdmins();
+    return { submissions, pagination: makePaginationResponse(total, pagination) };
   }
 
   /**
@@ -314,12 +382,16 @@ export class SubmissionService extends DBService {
   /**
    * Get a submission record by id (with security status).
    *
-   * @param {number} submissionId
-   * @returns {Promise<SubmissionRecordWithSecurity>}
+   * @param {number} submissionId Submission identifier.
+   * @param {number | null} systemUserId Caller identity used to filter feature type tabs, or null for anonymous.
+   * @returns {Promise<SubmissionRecordWithSecurity>} Submission metadata, visible feature types, and security status.
    * @memberof SubmissionService
    */
-  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
-    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+  async getSubmissionRecordBySubmissionIdWithSecurity(
+    submissionId: number,
+    systemUserId: number | null
+  ): Promise<SubmissionRecordWithSecurity> {
+    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, systemUserId);
   }
 
   /**
@@ -335,100 +407,32 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Retrieves submission feature records with type, name, and security data included.
-   *
-   * @param {number} submissionId
-   * @returns {Promise<
-   *     {
-   *       feature_type_name: string;
-   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
-   *     }[]
-   *   >}
-   * @memberof SubmissionService
-   */
-  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
-    {
-      feature_type_name: string;
-      features: SubmissionFeatureRecordWithTypeAndSecurity[];
-    }[]
-  > {
-    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
-
-    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
-
-    for (const feature of uncategorizedFeatures) {
-      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
-
-      if (featureCategoryArray) {
-        // Append to existing array of matching feature type
-        categorizedFeatures[feature.feature_type_name] = featureCategoryArray.concat(feature);
-      } else {
-        // Create new array for feature type
-        categorizedFeatures[feature.feature_type_name] = [feature];
-      }
-    }
-
-    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
-      feature_type_name: featureType,
-      features: submissionFeatures
-    }));
-
-    return submissionFeatures;
-  }
-
-  /**
    * Fetch the flattened array of features in the given submission with optional pagination
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
+   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
    * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting options.
-   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
-   * @returns {Promise<SubmissionFeatureForReview[]>} Active submission features visible to the requesting user.
+   * @returns {Promise<SubmissionFeatureForReview[]>} Current submission features visible to the requesting user.
    * @memberof SubmissionService
    */
   async getSubmissionFeatures(
     submissionId: number,
-    pagination?: ApiPaginationOptions,
-    systemUserId?: number | null
+    systemUserId: number | null,
+    pagination?: ApiPaginationOptions
   ): Promise<SubmissionFeatureForReview[]> {
-    return this.submissionRepository.getSubmissionFeatures(submissionId, pagination, systemUserId);
+    return this.submissionRepository.getSubmissionFeatures(submissionId, systemUserId, pagination);
   }
 
   /**
    * Fetch the total count of features in the given submission
    *
    * @param {number} submissionId ID of the submission whose features should be counted.
-   * @param {number | null} [systemUserId] Optional user context; omit only for administrative queries.
-   * @returns {Promise<number>} Number of matching active submission features visible to the requesting user.
+   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
+   * @returns {Promise<number>} Number of current submission features visible to the requesting user.
    * @memberof SubmissionService
    */
-  async getSubmissionFeaturesCount(submissionId: number, systemUserId?: number | null): Promise<number> {
+  async getSubmissionFeaturesCount(submissionId: number, systemUserId: number | null): Promise<number> {
     return this.submissionRepository.getSubmissionFeaturesCount(submissionId, systemUserId);
-  }
-
-  /**
-   * Get all paginated features belonging to one submission upload.
-   *
-   * @param {string} submissionUploadId UUID of the submission upload.
-   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting parameters.
-   * @returns {Promise<SubmissionFeatureForReview[]>} Features belonging to the upload.
-   * @memberof SubmissionService
-   */
-  async getSubmissionUploadFeatures(
-    submissionUploadId: string,
-    pagination?: ApiPaginationOptions
-  ): Promise<SubmissionFeatureForReview[]> {
-    return this.submissionRepository.getSubmissionUploadFeatures(submissionUploadId, pagination);
-  }
-
-  /**
-   * Count all features belonging to one submission upload.
-   *
-   * @param {string} submissionUploadId UUID of the submission upload.
-   * @returns {Promise<number>} Number of features belonging to the upload.
-   * @memberof SubmissionService
-   */
-  async getSubmissionUploadFeaturesCount(submissionUploadId: string): Promise<number> {
-    return this.submissionRepository.getSubmissionUploadFeaturesCount(submissionUploadId);
   }
 
   /**
@@ -469,24 +473,5 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
     return this.submissionRepository.getSubmissionRootFeature(submissionId);
-  }
-
-  /**
-   * Find and return all submission feature records that match the provided criteria.
-   *
-   * @param {{
-   *     submissionId?: number;
-   *     systemUserId?: number;
-   *     featureTypeNames?: string[];
-   *   }} [criteria]
-   * @returns {Promise<SubmissionFeatureRecord[]>}
-   * @memberof SubmissionService
-   */
-  async findSubmissionFeatures(criteria?: {
-    submissionId?: number;
-    systemUserId?: number;
-    featureTypeNames?: string[];
-  }): Promise<SubmissionFeatureRecord[]> {
-    return this.submissionRepository.findSubmissionFeatures(criteria);
   }
 }

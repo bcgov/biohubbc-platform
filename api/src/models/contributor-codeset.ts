@@ -18,3 +18,16 @@ export interface CreateContributorCodeset {
   description?: string | null;
   external_id?: string | null;
 }
+
+/** Administrative code category fields, including ended categories. */
+export const AdministrativeContributorCodesetSchema = ContributorCodesetSchema.extend({
+  record_end_date: z.string().nullable()
+});
+
+export type AdministrativeContributorCodeset = z.infer<typeof AdministrativeContributorCodesetSchema>;
+
+/** A code category, scoped to the contributor that owns it. */
+export interface ContributorCodesetScope {
+  contributorId: number;
+  contributorCodesetId: number;
+}

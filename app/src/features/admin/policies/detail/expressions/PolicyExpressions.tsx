@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { mdiDotsVertical, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
@@ -93,7 +94,18 @@ export const PolicyExpressions = ({ expressions, onCreate, onEdit, onDelete }: P
   ];
 
   return (
-    <PageSection id="policy-expressions" label="Expressions" addLabel="Create Expression" onAdd={onCreate}>
+    <PageSection
+      id="policy-expressions"
+      label={
+        <>
+          Expressions{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({expressions.rowCount})
+          </Typography>
+        </>
+      }
+      addLabel="Create Expression"
+      onAdd={onCreate}>
       <ServerPaginatedDataGrid<IPolicyExpression>
         dataTestId="policy-expressions-table"
         rows={expressions.rows}

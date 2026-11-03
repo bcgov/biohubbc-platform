@@ -1,18 +1,8 @@
 import SQL from 'sql-template-strings';
 import { FeatureType } from '../../models/feature-type';
+import { SubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
-import { isSubmissionFeatureCurrent } from '../sql-fragments';
-
-type SubmissionFeatureIngestionRecord = {
-  submissionId: number;
-  submissionUploadId: string;
-  sourceId: string;
-  featureTypeId: number;
-  data: unknown;
-  dataByteSize: number;
-  contentHash: string;
-  universalId?: string;
-};
+import { resolveSubmissionFeatureParentId, submissionFeatureParentSourceId } from '../sql-fragments';
 
 /**
  * A repository class for ingestion-related data access.
@@ -83,6 +73,10 @@ export class FeatureIngestionRepository extends BaseRepository {
   /**
    * Bulk insert uploaded feature rows directly into submission_feature.
    *
+   * Identifiers are drawn from the identity sequence in the statement so `urn`
+   * (`urn:<submission_id>:<feature_type_name>:<submission_feature_id>`) is written with the row, which skips
+   * the per-row `submission_feature_urn` trigger that only fires when `urn` is unset.
+   *
    * @param {SubmissionFeatureIngestionRecord[]} records Feature records prepared from the shallow-validated upload batch.
    * @returns {Promise<number>} Number of feature rows inserted.
    * @memberof FeatureIngestionRepository
@@ -96,13 +90,42 @@ export class FeatureIngestionRepository extends BaseRepository {
     const submissionUploadIds = records.map((record) => record.submissionUploadId);
     const sourceIds = records.map((record) => record.sourceId);
     const featureTypeIds = records.map((record) => record.featureTypeId);
-    const dataValues = records.map((record) => JSON.stringify(record.data));
+    const featureTypeNames = records.map((record) => record.featureTypeName);
+    const dataValues = records.map((record) => record.dataJson);
     const dataByteSizes = records.map((record) => record.dataByteSize);
     const contentHashes = records.map((record) => record.contentHash);
-    const universalIds = records.map((record) => record.universalId ?? null);
+    const universalIds = records.map((record) => record.universalId);
 
+    // nextval() is volatile, so the CTE is materialized and every row draws its own identifier.
     const sqlStatement = SQL`
+      WITH staged AS (
+        SELECT
+          nextval(pg_get_serial_sequence('submission_feature', 'submission_feature_id'))::integer AS submission_feature_id,
+          batch.*
+        FROM unnest(
+          ${submissionIds}::integer[],
+          ${submissionUploadIds}::uuid[],
+          ${sourceIds}::text[],
+          ${featureTypeIds}::integer[],
+          ${featureTypeNames}::text[],
+          ${dataValues}::text[],
+          ${dataByteSizes}::bigint[],
+          ${contentHashes}::text[],
+          ${universalIds}::text[]
+        ) AS batch(
+          submission_id,
+          submission_upload_id,
+          source_id,
+          feature_type_id,
+          feature_type_name,
+          data_text,
+          data_byte_size,
+          content_hash,
+          universal_id
+        )
+      )
       INSERT INTO submission_feature (
+        submission_feature_id,
         submission_id,
         submission_upload_id,
         parent_submission_feature_id,
@@ -111,38 +134,23 @@ export class FeatureIngestionRepository extends BaseRepository {
         data,
         data_byte_size,
         content_hash,
-        universal_id
+        universal_id,
+        urn
       )
+      OVERRIDING SYSTEM VALUE
       SELECT
+        staged.submission_feature_id,
         staged.submission_id,
         staged.submission_upload_id,
         NULL,
         staged.source_id,
         staged.feature_type_id,
-        parsed.data,
+        staged.data_text::jsonb,
         staged.data_byte_size,
         staged.content_hash,
-        staged.universal_id
-      FROM unnest(
-        ${submissionIds}::integer[],
-        ${submissionUploadIds}::uuid[],
-        ${sourceIds}::text[],
-        ${featureTypeIds}::integer[],
-        ${dataValues}::text[],
-        ${dataByteSizes}::bigint[],
-        ${contentHashes}::text[],
-        ${universalIds}::text[]
-      ) AS staged(
-        submission_id,
-        submission_upload_id,
-        source_id,
-        feature_type_id,
-        data_text,
-        data_byte_size,
-        content_hash,
-        universal_id
-      )
-      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
+        staged.universal_id,
+        concat('urn:', staged.submission_id, ':', staged.feature_type_name, ':', staged.submission_feature_id)
+      FROM staged;
     `;
 
     const response = await this.connection.sql(sqlStatement);
@@ -169,16 +177,16 @@ export class FeatureIngestionRepository extends BaseRepository {
   /**
    * Resolve parent feature references for rows belonging to one upload.
    *
-   * Shallow ingestion stores raw feature payloads first. The indexing stage then
-   * resolves `data.parent` source identifiers to persisted `submission_feature_id`
-   * values after all rows for the upload have been inserted.
+   * Reconciliation resolves parents when it classifies the upload, so on a first indexing run this
+   * changes no rows. It re-resolves on re-index, which reuses the reconciled rows, and only rewrites
+   * rows whose resolved parent differs from the stored one.
    *
-   * Resolution prefers a pending row produced by the current upload, falling back to
-   * the submission's current published rows. Ties resolve to the newest row.
+   * Resolution prefers a pending row produced by the current upload, falling back to the
+   * submission's current published rows. Ties resolve to the newest row.
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
    * @param {number} submissionId The submission the upload belongs to.
-   * @returns {Promise<void>} Resolves after parent identifiers have been updated for the upload rows.
+   * @returns {Promise<void>} Resolves after changed parent identifiers have been updated for the upload rows.
    * @memberof FeatureIngestionRepository
    */
   async updateSubmissionFeatureParentsBySubmissionUploadId(
@@ -186,31 +194,26 @@ export class FeatureIngestionRepository extends BaseRepository {
     submissionId: number
   ): Promise<void> {
     const sqlStatement = SQL`
-      UPDATE submission_feature AS child
-      SET parent_submission_feature_id = (
-        SELECT parent.submission_feature_id
-        FROM submission_feature AS parent
-        WHERE parent.submission_id = ${submissionId}
-          AND parent.source_id = child.data->>'parent'
-          AND (
-            (
-              parent.submission_upload_id = ${submissionUploadId}::uuid
-              AND parent.record_effective_date IS NULL
-              AND parent.record_end_date IS NULL
-            )
-            OR (`;
-    sqlStatement.append(isSubmissionFeatureCurrent('parent'));
-    sqlStatement.append(SQL`)
-        )
-        ORDER BY
-          (parent.submission_upload_id = ${submissionUploadId}::uuid) DESC,
-          parent.submission_feature_id DESC
-        LIMIT 1
+      WITH resolved AS (
+        SELECT
+          child.submission_feature_id,
+          `;
+    sqlStatement.append(resolveSubmissionFeatureParentId('child'));
+    sqlStatement.append(SQL` AS parent_submission_feature_id
+        FROM submission_feature AS child
+        WHERE child.submission_upload_id = ${submissionUploadId}::uuid
+          AND child.submission_id = ${submissionId}
+          AND `);
+    sqlStatement.append(submissionFeatureParentSourceId('child'));
+    sqlStatement.append(SQL` IS NOT NULL
+          AND child.record_effective_date IS NULL
+          AND child.record_end_date IS NULL
       )
-      WHERE child.submission_upload_id = ${submissionUploadId}::uuid
-        AND child.data->>'parent' IS NOT NULL
-        AND child.record_effective_date IS NULL
-        AND child.record_end_date IS NULL;`);
+      UPDATE submission_feature AS child
+      SET parent_submission_feature_id = resolved.parent_submission_feature_id
+      FROM resolved
+      WHERE child.submission_feature_id = resolved.submission_feature_id
+        AND child.parent_submission_feature_id IS DISTINCT FROM resolved.parent_submission_feature_id;`);
 
     await this.connection.sql(sqlStatement);
   }

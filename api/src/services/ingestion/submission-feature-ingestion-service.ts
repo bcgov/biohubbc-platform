@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { IFlattenedBlock } from '../../models/submission-feature';
+import { IFlattenedBlock, SubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { computeSubmissionFeatureContentHash } from '../../utils/feature-content-hash';
 import { getLogger } from '../../utils/logger';
@@ -54,23 +54,29 @@ export class SubmissionFeatureIngestionService extends DBService {
 
     let droppedUnknownTypeCount = 0;
 
-    const records = features.flatMap((feature) => {
+    const records = features.flatMap((feature): SubmissionFeatureIngestionRecord[] => {
       const featureTypeId = knownFeatureTypeMap.get(feature.type);
       if (!featureTypeId) {
         droppedUnknownTypeCount += 1;
         return [];
       }
 
-      return {
-        submissionId,
-        submissionUploadId,
-        sourceId: feature.id,
-        featureTypeId,
-        data: feature,
-        dataByteSize: Buffer.byteLength(JSON.stringify(feature)),
-        contentHash: computeSubmissionFeatureContentHash(feature),
-        universalId: feature.universal_id
-      };
+      // Serialize once: the same string is stored and measured.
+      const dataJson = JSON.stringify(feature);
+
+      return [
+        {
+          submissionId,
+          submissionUploadId,
+          sourceId: feature.id,
+          featureTypeId,
+          featureTypeName: feature.type,
+          dataJson,
+          dataByteSize: Buffer.byteLength(dataJson),
+          contentHash: computeSubmissionFeatureContentHash(feature),
+          universalId: feature.universal_id ?? null
+        }
+      ];
     });
 
     if (droppedUnknownTypeCount > 0) {

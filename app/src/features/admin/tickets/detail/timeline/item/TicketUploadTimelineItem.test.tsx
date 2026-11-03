@@ -133,4 +133,13 @@ describe('TicketUploadTimelineItem', () => {
       description: null
     });
   });
+
+  it('shows an approval still being applied as a disabled decision that cannot be reset', () => {
+    render(<TicketUploadTimelineItem {...baseProps} upload={{ ...upload, decision: 'approving' }} />, {
+      wrapper: MemoryRouter
+    });
+
+    expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accepting' })).toBeDisabled();
+  });
 });

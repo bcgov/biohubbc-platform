@@ -167,9 +167,9 @@ const insertMockRelatedSubmissionFeatures = async (
   telemetryIds: number[]
 ): Promise<void> => {
   const relationshipRows = [
-    { source_feature_id: sampleSiteIds[0], target_feature_id: telemetryIds[0], create_user: 1 },
-    { source_feature_id: sampleSiteIds[0], target_feature_id: telemetryIds[1], create_user: 1 },
-    { source_feature_id: sampleSiteIds[1], target_feature_id: telemetryIds[1], create_user: 1 }
+    { source_feature_id: sampleSiteIds[0], target_feature_id: telemetryIds[0] },
+    { source_feature_id: sampleSiteIds[0], target_feature_id: telemetryIds[1] },
+    { source_feature_id: sampleSiteIds[1], target_feature_id: telemetryIds[1] }
   ];
 
   await knex('submission_feature_feature')

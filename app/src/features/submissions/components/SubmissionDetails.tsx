@@ -28,12 +28,15 @@ export const SubmissionDetails = ({ submission }: SubmissionDetailsProps) => {
 
   return (
     <Container maxWidth="xl">
-      <Stack spacing={3} py={4}>
+      {/* Header, banner, and first section spacing matches the search results page. */}
+      <Stack spacing={2} pt={2} pb={4}>
         {hasSecuredFeatures && (
           <AlertBanner icon={<Icon path={mdiLock} size={0.9} />}>Some of the features are secured.</AlertBanner>
         )}
-        <SubmissionFeatures submissionId={submission.submission_id} featureTypes={submission.feature_types} />
-        <SubmissionAbout submission={submission} />
+        <Stack spacing={3}>
+          <SubmissionFeatures submissionId={submission.submission_id} featureTypes={submission.feature_types} />
+          <SubmissionAbout submission={submission} />
+        </Stack>
       </Stack>
     </Container>
   );

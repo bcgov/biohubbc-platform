@@ -38,6 +38,7 @@ describe('reconcile-submission-features-job', () => {
       status: 'ingested'
     });
     sinon.stub(SubmissionFeatureSecurityService.prototype, 'copySubmissionFeatureSecurityToSuccessors').resolves();
+    sinon.stub(SubmissionUploadReconciliationService.prototype, 'analyzeSubmissionFeatures').resolves();
   }
 
   it('routes a valid reconciliation directly to indexing', async () => {
@@ -55,6 +56,9 @@ describe('reconcile-submission-features-job', () => {
 
     expect(reconciled).to.have.been.calledWith('upload-1');
     expect(publish).to.have.been.calledOnce;
+    expect(SubmissionUploadReconciliationService.prototype.analyzeSubmissionFeatures).to.have.been.calledOnce;
+    // Statistics are refreshed in their own transaction, before the reconciliation transaction.
+    expect(db.dbDependencies.getAPIUserDBConnection).to.have.been.calledTwice;
   });
 
   it('ends pending features from the predecessor after reconciliation', async () => {
@@ -74,7 +78,7 @@ describe('reconcile-submission-features-job', () => {
     expect(endFeatures).to.have.been.calledOnceWithExactly('upload-0');
     expect(
       SubmissionFeatureSecurityService.prototype.copySubmissionFeatureSecurityToSuccessors
-    ).to.have.been.calledOnceWithExactly('upload-1', 'upload-0');
+    ).to.have.been.calledOnceWithExactly('upload-1');
   });
 
   it('marks invalid source identity without reconciling or indexing', async () => {

@@ -19,7 +19,7 @@ import {
 } from './expression-predicate-sql';
 import { applySearchQueryOptions } from './search-feature-pagination-sql';
 
-/** The submission and upload whose current features an expression is evaluated over. */
+/** The submission and upload whose features an expression is evaluated over. */
 interface SubmissionUploadScope {
   submissionId: number;
   submissionUploadId: string;
@@ -82,22 +82,22 @@ export function buildSubmissionUploadFeatureIdsSubquery(
 }
 
 /**
- * Builds the upload boundary for one `submission_feature` alias: the feature belongs to the submission and upload and is
- * current. Every feature an evaluation reads, whether evidence, walked relative or anchor, must satisfy it, which keeps
- * parent and reference edges that leave the upload out of the graph.
+ * Builds the upload boundary for one `submission_feature` alias: the feature belongs to the submission and upload. Every
+ * feature in the upload is in scope whatever its lifecycle, so an upload's superseded or ended features stay viewable.
+ * Every feature an evaluation reads, whether evidence, walked relative or anchor, must satisfy it, which keeps parent
+ * and reference edges that leave the upload out of the graph.
  *
- * @param {string} alias Alias exposing `submission_id`, `submission_upload_id` and `record_end_date`.
+ * @param {string} alias Alias exposing `submission_id` and `submission_upload_id`.
  * @param {SubmissionUploadScope} scope Upload being evaluated.
  * @param {Knex} knex Knex instance used to build the condition.
  * @returns {Knex.Raw} Boolean SQL condition.
  */
 function buildUploadScopeCondition(alias: string, scope: SubmissionUploadScope, knex: Knex): Knex.Raw {
-  return knex.raw('??.submission_id = ? AND ??.submission_upload_id = ? AND ??.record_end_date IS NULL', [
+  return knex.raw('??.submission_id = ? AND ??.submission_upload_id = ?', [
     alias,
     scope.submissionId,
     alias,
-    scope.submissionUploadId,
-    alias
+    scope.submissionUploadId
   ]);
 }
 
@@ -218,7 +218,7 @@ function buildUploadAndEqualityMatchIdsQuery(
 }
 
 /**
- * Builds the evidence for one predicate or compatible group: the current upload features carrying a matching value.
+ * Builds the evidence for one predicate or compatible group: the upload features carrying a matching value.
  *
  * Candidates are limited to the feature types holding the property's assignments, the only types that can carry its
  * values, collected once so the filter applies as the upload's features are read; each candidate is then probed for a
@@ -350,7 +350,7 @@ function buildUploadAncestorsWalk(scope: SubmissionUploadScope, knex: Knex): Kne
     ) hop
     CROSS JOIN LATERAL (
       SELECT reached.submission_feature_id, reached.parent_submission_feature_id, reached.feature_type_id,
-        reached.submission_id, reached.submission_upload_id, reached.record_end_date
+        reached.submission_id, reached.submission_upload_id
       FROM submission_feature reached
       WHERE reached.submission_feature_id = hop.submission_feature_id
       OFFSET 0
@@ -362,12 +362,12 @@ function buildUploadAncestorsWalk(scope: SubmissionUploadScope, knex: Knex): Kne
     FROM upload_ancestors walk
     CROSS JOIN LATERAL (
       SELECT parent.submission_feature_id, parent.parent_submission_feature_id, parent.feature_type_id,
-        parent.submission_id, parent.submission_upload_id, parent.record_end_date
+        parent.submission_id, parent.submission_upload_id
       FROM submission_feature parent
       WHERE parent.submission_feature_id = walk.parent_submission_feature_id
       UNION ALL
       SELECT referenced.submission_feature_id, referenced.parent_submission_feature_id, referenced.feature_type_id,
-        referenced.submission_id, referenced.submission_upload_id, referenced.record_end_date
+        referenced.submission_id, referenced.submission_upload_id
       FROM submission_feature_property_feature property_feature
       JOIN submission_feature referenced
         ON referenced.submission_feature_id = property_feature.referenced_submission_feature_id
@@ -384,10 +384,10 @@ function buildUploadAncestorsWalk(scope: SubmissionUploadScope, knex: Knex): Kne
  * Builds the recursive walk from the evidence to every feature that reaches it: its descendants and the features
  * referring to it, transitively and in any combination.
  *
- * Children are found through `submission_feature_idx10` (current features by parent) and referrers through the
- * reference index on `referenced_submission_feature_id`. Each step is fenced like the ancestor walk, with only the key
- * condition (and the partial index's `record_end_date IS NULL`) inside the fence and the upload boundary applied to its
- * result. `UNION` removes repeated states, which also ends walks around reference cycles.
+ * Children are found through `submission_feature_idx10` (features by parent) and referrers through the reference index
+ * on `referenced_submission_feature_id`. Each step is fenced like the ancestor walk, with only the key condition inside
+ * the fence and the upload boundary applied to its result. `UNION` removes repeated states, which also ends walks around
+ * reference cycles.
  *
  * @param {SubmissionUploadScope} scope Upload being evaluated.
  * @param {Knex} knex Knex instance used to build the query.
@@ -411,7 +411,7 @@ function buildUploadDescendantsWalk(scope: SubmissionUploadScope, knex: Knex): K
 }
 
 /**
- * Builds the fenced lookup of a feature's current children and of the features referring to it.
+ * Builds the fenced lookup of a feature's children and of the features referring to it.
  *
  * @param {string} sourceAlias Alias of the walk row whose `submission_feature_id` is looked up; a fixed identifier.
  * @returns {string} Subquery SQL returning the related features with their boundary columns.
@@ -419,13 +419,12 @@ function buildUploadDescendantsWalk(scope: SubmissionUploadScope, knex: Knex): K
 function buildUploadChildrenAndReferrersSql(sourceAlias: 'evidence' | 'walk'): string {
   return `
       SELECT child.submission_feature_id, child.feature_type_id,
-        child.submission_id, child.submission_upload_id, child.record_end_date
+        child.submission_id, child.submission_upload_id
       FROM submission_feature child
       WHERE child.parent_submission_feature_id = ${sourceAlias}.submission_feature_id
-        AND child.record_end_date IS NULL
       UNION ALL
       SELECT referrer.submission_feature_id, referrer.feature_type_id,
-        referrer.submission_id, referrer.submission_upload_id, referrer.record_end_date
+        referrer.submission_id, referrer.submission_upload_id
       FROM submission_feature_property_feature property_feature
       JOIN submission_feature referrer ON referrer.submission_feature_id = property_feature.submission_feature_id
       WHERE property_feature.referenced_submission_feature_id = ${sourceAlias}.submission_feature_id
@@ -437,8 +436,9 @@ function buildUploadChildrenAndReferrersSql(sourceAlias: 'evidence' | 'walk'): s
  *
  * Each ID is resolved by a fenced primary-key lookup and the upload boundary is applied to the result, so resolving the
  * matches costs one probe per match even when stale statistics underestimate them. The evidence and every walk step
- * already hold to the boundary; checking it again here guarantees the evaluator only returns, and screening only
- * assigns, current features of the upload, whatever path produced the ID.
+ * already hold to the boundary; checking it again here guarantees the evaluator only returns features of the upload,
+ * whatever path produced the ID. `record_end_date` stays projected so security writes can narrow matches to active
+ * features.
  *
  * @param {Knex.QueryBuilder} matches Query returning unique matching `submission_feature_id` values.
  * @param {SubmissionUploadScope} scope Upload being evaluated.

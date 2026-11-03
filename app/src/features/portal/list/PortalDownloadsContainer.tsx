@@ -35,7 +35,7 @@ const columns: GridColDef<DownloadRecord>[] = [
     sortable: false,
     renderCell: (params) => (
       <Typography variant="body2" noWrap title={params.value || ''}>
-        {params.value || '—'}
+        {params.value}
       </Typography>
     )
   },

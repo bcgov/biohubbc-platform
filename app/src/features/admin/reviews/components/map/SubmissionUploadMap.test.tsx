@@ -7,6 +7,8 @@ import { SubmissionUploadMap } from './SubmissionUploadMap';
 
 const mocks = vi.hoisted(() => ({
   createSubmissionUploadTileSession: vi.fn(),
+  mounts: vi.fn(),
+  fitBounds: vi.fn(),
   slippyMapProps: [] as Record<string, any>[],
   bcBasemap: {
     mode: 'bc',
@@ -38,14 +40,25 @@ vi.mock('components/map/useBcBasemap', () => ({
   useBcBasemap: () => mocks.bcBasemap
 }));
 
-// SlippyMap is exercised by its own suite, and the shared session/state machinery by the feature map suite; here we
-// only care what the upload map asks for and hands on.
-vi.mock('components/map/SlippyMap', () => ({
-  SlippyMap: (props: Record<string, any>) => {
-    mocks.slippyMapProps.push(props);
-    return <div data-testid="slippy-map-stub" />;
-  }
-}));
+// SlippyMap is exercised by its own suite, and the shared session machinery by the feature map suite; here we only
+// care what the upload map asks for and hands on. The stub reports itself loaded on mount, as the real map does.
+vi.mock('components/map/SlippyMap', async () => {
+  const { useEffect, useImperativeHandle } = await import('react');
+  return {
+    SlippyMap: (props: Record<string, any>) => {
+      mocks.slippyMapProps.push(props);
+      useImperativeHandle(props.ref, () => ({ fitBounds: mocks.fitBounds }));
+      const { onMapLoad } = props;
+      useEffect(() => {
+        mocks.mounts();
+      }, []);
+      useEffect(() => {
+        onMapLoad?.();
+      }, [onMapLoad]);
+      return <div data-testid="slippy-map-stub" />;
+    }
+  };
+});
 
 const SUBMISSION_ID = 16;
 const SUBMISSION_UPLOAD_ID = '11111111-1111-4111-8111-111111111111';
@@ -73,7 +86,7 @@ const latestMapProps = () => mocks.slippyMapProps[mocks.slippyMapProps.length - 
 const renderReadyMap = async (session = buildSession()) => {
   mocks.createSubmissionUploadTileSession.mockResolvedValue(session);
   const result = renderMap();
-  await waitFor(() => expect(screen.getByTestId('submission-upload-map')).toBeInTheDocument());
+  await waitFor(() => expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID]).toBeDefined());
   return result;
 };
 
@@ -99,6 +112,26 @@ describe('SubmissionUploadMap', () => {
         SUBMISSION_UPLOAD_ID,
         expect.objectContaining({ signal: expect.anything() })
       );
+    });
+
+    it('requests a session limited to a reconciliation outcome and words the empty state for it', async () => {
+      mocks.createSubmissionUploadTileSession.mockResolvedValue({ has_spatial_properties: false });
+
+      render(
+        <SubmissionUploadMap
+          submissionId={SUBMISSION_ID}
+          submissionUploadId={SUBMISSION_UPLOAD_ID}
+          reconciliation="modified"
+        />
+      );
+
+      await waitFor(() => expect(screen.getByTestId('submission-upload-map-empty')).toBeInTheDocument());
+      expect(mocks.createSubmissionUploadTileSession).toHaveBeenCalledWith(
+        SUBMISSION_ID,
+        SUBMISSION_UPLOAD_ID,
+        expect.objectContaining({ reconciliation: 'modified' })
+      );
+      expect(screen.getByText('No features with this outcome have spatial properties.')).toBeInTheDocument();
     });
 
     it('builds the vector source from the returned template, keyed to the upload', async () => {
@@ -161,11 +194,47 @@ describe('SubmissionUploadMap', () => {
     it("fits the combined extent of the upload's spatial properties", async () => {
       await renderReadyMap(buildSession({ bbox: [-126.5, 49.25, -121.75, 51.5] }));
 
-      expect(latestMapProps().mapOptions.bounds).toEqual([
-        [-126.5, 49.25],
-        [-121.75, 51.5]
-      ]);
-      expect(latestMapProps().mapOptions.fitBoundsOptions.maxZoom).toBe(MAP_FIT_MAX_ZOOM);
+      await waitFor(() => expect(mocks.fitBounds).toHaveBeenCalledTimes(1));
+      expect(mocks.fitBounds).toHaveBeenCalledWith(
+        [
+          [-126.5, 49.25],
+          [-121.75, 51.5]
+        ],
+        expect.objectContaining({ maxZoom: MAP_FIT_MAX_ZOOM, duration: 0 })
+      );
+      expect(screen.queryByTestId('submission-upload-map-loading')).not.toBeInTheDocument();
+    });
+
+    it('keeps one map mounted when the outcome changes, replacing its source and re-framing the new extent', async () => {
+      mocks.createSubmissionUploadTileSession.mockImplementation(async (_submissionId, _uploadId, options) =>
+        buildSession({ bbox: options.reconciliation === 'modified' ? [-124, 50, -123, 51] : [-125, 48, -120, 52] })
+      );
+      const view = (reconciliation: 'new' | 'modified') => (
+        <SubmissionUploadMap
+          submissionId={SUBMISSION_ID}
+          submissionUploadId={SUBMISSION_UPLOAD_ID}
+          reconciliation={reconciliation}
+        />
+      );
+      const { rerender } = render(view('new'));
+      await waitFor(() => expect(mocks.fitBounds).toHaveBeenCalledTimes(1));
+      const firstSource = latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0];
+
+      rerender(view('modified'));
+
+      await waitFor(() => expect(mocks.fitBounds).toHaveBeenCalledTimes(2));
+      expect(mocks.fitBounds).toHaveBeenLastCalledWith(
+        [
+          [-124, 50],
+          [-123, 51]
+        ],
+        expect.objectContaining({ duration: 300 })
+      );
+      expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0]).not.toBe(firstSource);
+      expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0]).toContain('modified');
+      expect(mocks.mounts).toHaveBeenCalledTimes(1);
+      // The retained map is never covered by the initial loading state again.
+      expect(screen.queryByTestId('submission-upload-map-loading')).not.toBeInTheDocument();
     });
   });
 
@@ -175,10 +244,8 @@ describe('SubmissionUploadMap', () => {
 
       renderMap();
 
-      const frame = screen.getByTestId('submission-upload-map-loading');
-      expect(frame).toBeInTheDocument();
-      expect(frame).toHaveStyle({ height: `${MAP_SECTION_HEIGHT}px` });
-      expect(screen.queryByTestId('submission-upload-map')).not.toBeInTheDocument();
+      expect(screen.getByTestId('submission-upload-map-loading')).toBeInTheDocument();
+      expect(screen.getByTestId('submission-upload-map')).toHaveStyle({ height: `${MAP_SECTION_HEIGHT}px` });
     });
 
     it('reports an upload with no spatial properties, without initializing a source', async () => {
@@ -188,7 +255,31 @@ describe('SubmissionUploadMap', () => {
 
       await waitFor(() => expect(screen.getByTestId('submission-upload-map-empty')).toBeInTheDocument());
       expect(screen.getByText('This upload has no spatial properties.')).toBeInTheDocument();
+      // No map is built, so no basemap tiles are requested for a subject with nothing to draw.
       expect(mocks.slippyMapProps).toHaveLength(0);
+      expect(mocks.mounts).not.toHaveBeenCalled();
+    });
+
+    it('keeps a mounted map beneath the empty state when a later outcome has no spatial properties', async () => {
+      mocks.createSubmissionUploadTileSession.mockImplementation(async (_submissionId, _uploadId, options) =>
+        options.reconciliation === 'modified' ? { has_spatial_properties: false } : buildSession()
+      );
+      const view = (reconciliation: 'new' | 'modified') => (
+        <SubmissionUploadMap
+          submissionId={SUBMISSION_ID}
+          submissionUploadId={SUBMISSION_UPLOAD_ID}
+          reconciliation={reconciliation}
+        />
+      );
+      const { rerender } = render(view('new'));
+      await waitFor(() => expect(mocks.fitBounds).toHaveBeenCalledTimes(1));
+
+      rerender(view('modified'));
+
+      await waitFor(() => expect(screen.getByTestId('submission-upload-map-empty')).toBeInTheDocument());
+      expect(screen.getByTestId('slippy-map-stub')).toBeInTheDocument();
+      expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID]).toBeUndefined();
+      expect(mocks.mounts).toHaveBeenCalledTimes(1);
     });
 
     it('reports a failure in place with a retry that re-requests the session', async () => {
@@ -206,8 +297,10 @@ describe('SubmissionUploadMap', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
       });
 
-      await waitFor(() => expect(screen.getByTestId('submission-upload-map')).toBeInTheDocument());
+      await waitFor(() => expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID]).toBeDefined());
+      expect(screen.queryByTestId('submission-upload-map-error')).not.toBeInTheDocument();
       expect(mocks.createSubmissionUploadTileSession).toHaveBeenCalledTimes(2);
+      expect(mocks.mounts).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -42,6 +42,24 @@ export interface IFlattenedBlock {
 }
 
 /**
+ * Shallow-validated submission feature prepared for a bulk ingestion insert.
+ *
+ * The payload is serialized once by the caller: `dataJson` is stored as `data`, and `dataByteSize`
+ * is its UTF-8 byte length.
+ */
+export interface SubmissionFeatureIngestionRecord {
+  submissionId: number;
+  submissionUploadId: string;
+  sourceId: string;
+  featureTypeId: number;
+  featureTypeName: string;
+  dataJson: string;
+  dataByteSize: number;
+  contentHash: string;
+  universalId: string | null;
+}
+
+/**
  * Submission record schema
  * Now includes a reference to the artifact security record
  */

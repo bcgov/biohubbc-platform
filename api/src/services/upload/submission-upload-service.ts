@@ -1,12 +1,17 @@
-import { ACTIVE_UPLOAD_PROCESSING_STAGES } from '../../constants/submission-upload';
+import { ACTIVE_UPLOAD_PROCESSING_STAGES, REINDEX_START_STATUSES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError, ApiGeneralError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400, HTTP409 } from '../../errors/http-error';
+import { Blueprint } from '../../models/blueprint';
 import {
+  AdminSubmissionUpload,
+  AdminSubmissionUploadListFilters,
+  AdminSubmissionUploadListResponse,
   AdminSubmissionUploadsResponse,
   CreateSubmissionUpload,
   SubmissionUpload,
   SubmissionUploadFilters,
+  SubmissionUploadScope,
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
@@ -16,7 +21,11 @@ import {
   UpdateSubmissionUploadDecision
 } from '../../models/submission-upload-decision';
 import { SubmissionUploadProcessingStatusHistoryItem } from '../../models/submission-upload-processing-status';
-import { publishComputeSubmissionFeatureClosureJob } from '../../queue/publisher';
+import {
+  publishApproveSubmissionUploadJob,
+  publishComputeSubmissionFeatureClosureJob,
+  publishIndexSubmissionFeaturesJob
+} from '../../queue/publisher';
 import { BlueprintRepository } from '../../repositories/blueprint-repository';
 import { SubmissionUploadProcessingStatusRepository } from '../../repositories/upload/submission-upload-processing-status-repository';
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
@@ -25,6 +34,7 @@ import { makePaginationResponse } from '../../utils/pagination';
 import { getSupersededProcessingStatuses } from '../../utils/submission-upload-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
+import { BlueprintService } from '../blueprint-service';
 import { DBService } from '../db-service';
 import { SubmissionUploadReconciliationService } from '../reconciliation/submission-upload-reconciliation-service';
 import { SubmissionFeatureClosureService } from '../submission-feature-closure-service';
@@ -50,6 +60,7 @@ export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
   submissionUploadProcessingStatusRepository: SubmissionUploadProcessingStatusRepository;
   blueprintRepository: BlueprintRepository;
+  blueprintService: BlueprintService;
   submissionFeatureService: SubmissionFeatureService;
   teamService: TeamService;
   submissionService: SubmissionService;
@@ -57,7 +68,9 @@ export class SubmissionUploadService extends DBService {
 
   /** Mutable dependency bag used by tests to stub queue publication under ESM. */
   static readonly dependencies = {
-    publishComputeSubmissionFeatureClosureJob
+    publishApproveSubmissionUploadJob,
+    publishComputeSubmissionFeatureClosureJob,
+    publishIndexSubmissionFeaturesJob
   };
 
   /**
@@ -71,6 +84,7 @@ export class SubmissionUploadService extends DBService {
     this.submissionUploadRepository = new SubmissionUploadRepository(connection);
     this.submissionUploadProcessingStatusRepository = new SubmissionUploadProcessingStatusRepository(connection);
     this.blueprintRepository = new BlueprintRepository(connection);
+    this.blueprintService = new BlueprintService(connection);
     this.submissionFeatureService = new SubmissionFeatureService(connection);
     this.teamService = new TeamService(connection);
     this.submissionService = new SubmissionService(connection);
@@ -95,54 +109,143 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Resolve the Blueprint a new upload should be pinned to.
+   * Retrieve a bounded page of the active uploads of every active submission for the administrative submissions page.
    *
-   * Resolution order:
-   * 1. If a `blueprint_id` was supplied, validate it is currently available (`record_end_date IS
-   *    NULL`) and use it. An unavailable id is a client error (HTTP 400).
-   * 2. Otherwise inherit the most recent prior upload's Blueprint for the same submission, so
-   *    re-submissions stay stable when the system default Blueprint changes.
-   * 3. Otherwise (no prior upload) fall back to the active default Blueprint.
-   *
-   * @param {number} submissionId - The submission the upload belongs to.
-   * @param {number | null} [requestedBlueprintId] - Optional caller-supplied Blueprint id.
-   * @returns {Promise<number>} - The resolved `blueprint_id` to store on the upload.
-   * @throws {HTTP400} If a requested Blueprint id is not available.
-   * @throws {ApiGeneralError} If no Blueprint can be resolved (no prior upload and no default).
+   * @param {AdminSubmissionUploadListFilters} filters Optional keyword matched against the submission name.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<AdminSubmissionUploadListResponse>} Uploads and pagination totals, including empty pages.
    * @memberof SubmissionUploadService
    */
-  async resolveBlueprintIdForUpload(submissionId: number, requestedBlueprintId?: number | null): Promise<number> {
+  async getAdminSubmissionUploadList(
+    filters: AdminSubmissionUploadListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUploadListResponse> {
+    const uploads = await this.submissionUploadRepository.getAdminSubmissionUploadList(filters, pagination);
+    const total = await this.submissionUploadRepository.getAdminSubmissionUploadCount(filters);
+
+    return { uploads, pagination: makePaginationResponse(total, pagination) };
+  }
+
+  /**
+   * Get one active upload of a submission for the administrative upload page.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @returns {Promise<AdminSubmissionUpload>} The upload record, including its status and decision.
+   * @throws {ApiNotFoundError} When the upload is not an active upload of the submission.
+   * @memberof SubmissionUploadService
+   */
+  async getAdminSubmissionUpload(scope: SubmissionUploadScope): Promise<AdminSubmissionUpload> {
+    return this.submissionUploadRepository.getAdminSubmissionUpload(scope);
+  }
+
+  /**
+   * Resolve the Blueprint a new submission starts with: it becomes the submission's default and pins its first upload.
+   *
+   * Resolution order:
+   * 1. If a `blueprint_id` was supplied, validate it is currently available and use it. An unavailable id is a
+   *    client error (HTTP 400).
+   * 2. Otherwise use the active system default Blueprint.
+   *
+   * @param {number | null} [requestedBlueprintId] - Optional caller-supplied Blueprint id.
+   * @returns {Promise<number>} - The resolved `blueprint_id` to store as the submission's default.
+   * @throws {HTTP400} If a requested Blueprint id is not available.
+   * @throws {ApiGeneralError} If no Blueprint can be resolved (none requested and no system default).
+   * @memberof SubmissionUploadService
+   */
+  async resolveBlueprintIdForNewSubmission(requestedBlueprintId?: number | null): Promise<number> {
     if (requestedBlueprintId != null) {
-      const blueprintId = await this.blueprintRepository.findActiveBlueprintById(requestedBlueprintId);
-
-      if (blueprintId === null) {
-        throw new HTTP400('Requested Blueprint is not available', [
-          'SubmissionUploadService->resolveBlueprintIdForUpload',
-          `blueprint_id ${requestedBlueprintId} does not exist or is no longer available for new uploads`
-        ]);
-      }
-
-      return blueprintId;
-    }
-
-    const priorBlueprintId = await this.submissionUploadRepository.findMostRecentBlueprintIdBySubmissionId(
-      submissionId
-    );
-
-    if (priorBlueprintId !== null) {
-      return priorBlueprintId;
+      return this.getAvailableBlueprintId(requestedBlueprintId);
     }
 
     const defaultBlueprintId = await this.blueprintRepository.findDefaultBlueprintId();
 
     if (defaultBlueprintId === null) {
       throw new ApiGeneralError('No default Blueprint is configured', [
-        'SubmissionUploadService->resolveBlueprintIdForUpload',
-        `submission_id ${submissionId} has no prior upload and no active default Blueprint exists`
+        'SubmissionUploadService->resolveBlueprintIdForNewSubmission',
+        'no Blueprint was requested and no active default Blueprint exists'
       ]);
     }
 
     return defaultBlueprintId;
+  }
+
+  /**
+   * Resolve the Blueprint a new upload should be pinned to. Once stored on the upload it never changes.
+   *
+   * Resolution order:
+   * 1. If a `blueprint_id` was supplied, use it when it is the submission's own default Blueprint (grandfathered
+   *    in, even if since retired) or is currently available. Any other id is a client error (HTTP 400).
+   * 2. Otherwise use the submission's default Blueprint, whether or not it has since been retired, so
+   *    re-submissions stay stable when the system default Blueprint changes.
+   * 3. Otherwise (the submission has no default) fall back to the active system default Blueprint.
+   *
+   * @param {number} submissionId - The submission the upload belongs to.
+   * @param {number | null} [requestedBlueprintId] - Optional caller-supplied Blueprint id.
+   * @returns {Promise<number>} - The resolved `blueprint_id` to store on the upload.
+   * @throws {HTTP400} If a requested Blueprint id is neither the submission's default nor available.
+   * @throws {ApiGeneralError} If no Blueprint can be resolved (no submission default and no system default).
+   * @memberof SubmissionUploadService
+   */
+  async resolveBlueprintIdForUpload(submissionId: number, requestedBlueprintId?: number | null): Promise<number> {
+    if (requestedBlueprintId != null) {
+      const submission = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+      if (submission.default_blueprint_id === requestedBlueprintId) {
+        return requestedBlueprintId;
+      }
+
+      return this.getAvailableBlueprintId(requestedBlueprintId);
+    }
+
+    const defaultBlueprintId = await this.submissionService.findSubmissionDefaultBlueprintId(submissionId);
+
+    if (defaultBlueprintId === null) {
+      throw new ApiGeneralError('No default Blueprint is configured', [
+        'SubmissionUploadService->resolveBlueprintIdForUpload',
+        `submission_id ${submissionId} has no default Blueprint and no active default Blueprint exists`
+      ]);
+    }
+
+    return defaultBlueprintId;
+  }
+
+  /**
+   * Validate that a caller-supplied Blueprint is currently available for new uploads.
+   *
+   * @private
+   * @param {number} requestedBlueprintId - Caller-supplied Blueprint id.
+   * @returns {Promise<number>} - The available `blueprint_id`.
+   * @throws {HTTP400} If the Blueprint does not exist or is not available.
+   * @memberof SubmissionUploadService
+   */
+  private async getAvailableBlueprintId(requestedBlueprintId: number): Promise<number> {
+    const blueprintId = await this.blueprintRepository.findActiveBlueprintById(requestedBlueprintId);
+
+    if (blueprintId === null) {
+      throw new HTTP400('Requested Blueprint is not available', [
+        'SubmissionUploadService->getAvailableBlueprintId',
+        `blueprint_id ${requestedBlueprintId} does not exist or is no longer available for new uploads`
+      ]);
+    }
+
+    return blueprintId;
+  }
+
+  /**
+   * Get the blueprint an active upload is pinned to, including a blueprint that has since been retired.
+   *
+   * @param {SubmissionUploadScope} scope - Submission and upload ownership boundary.
+   * @returns {Promise<Blueprint>} - The upload's blueprint.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadBlueprint(scope: SubmissionUploadScope): Promise<Blueprint> {
+    const upload = await this.submissionUploadRepository.getSubmissionUploadBySubmissionId(
+      scope.submissionId,
+      scope.submissionUploadId
+    );
+
+    return this.blueprintService.getBlueprint(upload.blueprint_id);
   }
 
   /**
@@ -168,6 +271,20 @@ export class SubmissionUploadService extends DBService {
    */
   async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
     return this.submissionUploadRepository.getSubmissionUploadWithLock(submissionUploadId);
+  }
+
+  /**
+   * Try to take the per-upload ingestion lock for the current transaction.
+   *
+   * Process-stage workers hold this for the full ingestion so a retried job cannot run
+   * alongside an earlier attempt that is still persisting the same upload.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<boolean>} True when the lock was acquired.
+   * @memberof SubmissionUploadService
+   */
+  async tryLockSubmissionUploadIngestion(submissionUploadId: string): Promise<boolean> {
+    return this.submissionUploadRepository.tryLockSubmissionUploadIngestion(submissionUploadId);
   }
 
   /**
@@ -516,15 +633,17 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Record a human review decision and apply its submission-feature lifecycle effects.
+   * Record a human review decision on a submission upload.
    *
    * The upload row is locked first so a decision cannot race processing transitions or a concurrent
-   * decision. Approval activates the upload's features and queues the closure recompute; `pending`
-   * and `denied` are refused once any of the upload's features has been activated.
+   * decision. Approval is recorded as `approving` and applied by the approval job, which activates the
+   * upload's features; while it is `approving`, re-approving is idempotent and every other decision is
+   * refused. `pending` and `denied` are refused once any of the upload's features has been activated.
    *
    * @param {string} submissionUploadId Submission upload identifier.
    * @param {UpdateSubmissionUploadDecision} data Requested decision.
-   * @returns {Promise<SubmissionUploadDecisionResult>} Persisted decision.
+   * @returns {Promise<SubmissionUploadDecisionResult>} Persisted decision; `approving` while an approval is queued.
+   * @throws {HTTP409} When a non-approval decision is requested while an approval is being applied.
    * @memberof SubmissionUploadService
    */
   async updateSubmissionUploadDecision(
@@ -534,7 +653,11 @@ export class SubmissionUploadService extends DBService {
     const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
 
     if (data.decision === 'approved') {
-      return this.approveSubmissionUpload(upload);
+      return this.requestSubmissionUploadApproval(upload);
+    }
+
+    if (upload.decision === 'approving') {
+      throw new HTTP409('Submission upload approval is being applied and cannot be changed until it completes');
     }
 
     await this.assertSubmissionUploadHasNoActivatedFeatures(upload.submission_upload_id);
@@ -543,18 +666,53 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Validate and apply an approval, or return the existing decision idempotently.
+   * Apply a queued approval: activate the upload's reconciled features, invalidate the submission's closure,
+   * record `approved` and queue the closure rebuild.
    *
-   * @param {SubmissionUpload} upload Locked submission upload.
-   * @returns {Promise<SubmissionUploadDecisionResult>} Approved decision.
+   * Called by the approval job in its own transaction. The upload row is locked, and an upload that is no
+   * longer `approving` is skipped, so a duplicate or retried job never applies an approval twice. The
+   * approval preconditions are asserted again because the request that recorded `approving` committed
+   * before this transaction began.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves after the approval is applied, after a superseded upload is returned to
+   *   `pending`, or immediately when there is none to apply.
+   * @throws {HTTP400} When the upload no longer meets the approval preconditions.
    * @memberof SubmissionUploadService
    */
-  private async approveSubmissionUpload(upload: SubmissionUpload): Promise<SubmissionUploadDecisionResult> {
-    if (upload.decision === 'approved') {
-      return { submission_upload_id: upload.submission_upload_id, decision: upload.decision };
+  async applySubmissionUploadApproval(submissionUploadId: string): Promise<void> {
+    const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
+
+    if (upload.decision !== 'approving') {
+      defaultLog.info({
+        label: 'applySubmissionUploadApproval',
+        message: 'Skipping approval because the upload is not approving',
+        submissionUploadId,
+        decision: upload.decision
+      });
+
+      return;
+    }
+
+    // A newer upload can supersede this one after approval was requested. Retrying can never succeed, so
+    // return it to pending straight away; the newer upload was reconciled against its pending features.
+    if (upload.successor_submission_upload_id) {
+      defaultLog.warn({
+        label: 'applySubmissionUploadApproval',
+        message: 'Returning approval to pending because a newer upload superseded the upload',
+        submissionUploadId,
+        successorSubmissionUploadId: upload.successor_submission_upload_id
+      });
+
+      await this.submissionUploadRepository.updateSubmissionUploadDecision(submissionUploadId, 'pending');
+
+      return;
     }
 
     await this.assertSubmissionUploadCanBeApproved(upload);
+
+    // Not a constructor member: SubmissionUploadReconciliationService constructs a SubmissionUploadService, so
+    // creating it in this constructor would recurse.
     const submissionUploadReconciliationService = new SubmissionUploadReconciliationService(this.connection);
     await submissionUploadReconciliationService.activateSubmissionUploadReconciliation(upload.submission_upload_id);
 
@@ -563,32 +721,160 @@ export class SubmissionUploadService extends DBService {
     // self-loops. Until the asynchronous rebuild commits, canonical authorization fails closed.
     await this.submissionFeatureClosureService.invalidateClosureForSubmission(upload.submission_id);
 
-    const approved = await this.submissionUploadRepository.updateSubmissionUploadDecision(
-      upload.submission_upload_id,
-      'approved'
-    );
+    await this.submissionUploadRepository.updateSubmissionUploadDecision(upload.submission_upload_id, 'approved');
 
-    await this.publishSubmissionFeatureClosure(upload, approved.revision_count);
-
-    return { submission_upload_id: approved.submission_upload_id, decision: approved.decision };
+    await SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob(this.connection, {
+      submissionUploadId: upload.submission_upload_id
+    });
   }
 
   /**
-   * Queue closure recomputation for one approved feature-state revision.
+   * Return an upload whose approval could not be applied to `pending`.
    *
-   * @param {SubmissionUpload} upload Approved submission upload.
-   * @param {number} closureRevision Upload audit revision after the approval write, making the queued job idempotent.
-   * @returns {Promise<void>} Resolves after the closure recomputation job has been queued transactionally.
+   * Called after the approval job exhausted its retries. Each failed attempt rolled back, so the upload's
+   * features were never activated. Uploads that are not `approving` are left unchanged.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<void>} Resolves after a still-approving upload has been returned to `pending`.
    * @memberof SubmissionUploadService
    */
-  private async publishSubmissionFeatureClosure(upload: SubmissionUpload, closureRevision: number): Promise<void> {
-    await SubmissionUploadService.dependencies.publishComputeSubmissionFeatureClosureJob(
-      this.connection,
-      {
-        submissionUploadId: upload.submission_upload_id
-      },
-      { singletonKey: `closure-recompute-${upload.submission_upload_id}-${closureRevision}` }
+  async revertSubmissionUploadApproval(submissionUploadId: string): Promise<void> {
+    const upload = await this.getSubmissionUploadWithLock(submissionUploadId);
+
+    if (upload.decision !== 'approving') {
+      return;
+    }
+
+    await this.submissionUploadRepository.updateSubmissionUploadDecision(submissionUploadId, 'pending');
+  }
+
+  /**
+   * Re-index an unapproved upload, optionally against a different blueprint.
+   *
+   * Returns the upload to `reconciled` and queues the index job in the caller's transaction, so the request either
+   * commits both or neither. The index job then rebuilds the upload's validation errors, property rows and
+   * relationships in one transaction, recomputes closure and re-runs automatic security screening. Reconciled features
+   * are reused unchanged.
+   *
+   * The current status is checked before taking the row lock, so a request for an upload that a processing job is
+   * still working on is rejected straight away instead of waiting for the job's transaction to commit.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {number} blueprintId Blueprint to index with: the upload's current blueprint (even if since retired), the
+   *   submission's default blueprint, or an available blueprint.
+   * @returns {Promise<void>} Resolves after the upload is returned to `reconciled` and its index job is queued.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @throws {HTTP409} When the upload is approved, decided, superseded, or not in a re-indexable status.
+   * @throws {HTTP400} When the requested blueprint cannot be used.
+   * @memberof SubmissionUploadService
+   */
+  async reindexSubmissionUpload(scope: SubmissionUploadScope, blueprintId: number): Promise<void> {
+    const { submissionId, submissionUploadId } = scope;
+
+    const upload = await this.submissionUploadRepository.getSubmissionUploadBySubmissionId(
+      submissionId,
+      submissionUploadId
     );
+    this.assertSubmissionUploadStatusCanBeReindexed(upload);
+
+    const lockedUpload = await this.assertSubmissionUploadCanBeChanged(submissionUploadId);
+    await this.assertSubmissionUploadCanBeReindexed(scope, lockedUpload);
+
+    if (blueprintId !== lockedUpload.blueprint_id) {
+      const resolvedBlueprintId = await this.resolveBlueprintIdForUpload(submissionId, blueprintId);
+      await this.submissionUploadRepository.updateSubmissionUploadBlueprint(submissionUploadId, resolvedBlueprintId);
+    }
+
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'reconciled', REINDEX_START_STATUSES);
+    await SubmissionUploadService.dependencies.publishIndexSubmissionFeaturesJob(this.connection, {
+      submissionUploadId
+    });
+  }
+
+  /**
+   * Assert that an upload's status allows re-indexing.
+   *
+   * @param {SubmissionUpload} upload Submission upload.
+   * @returns {void}
+   * @throws {HTTP409} When the upload is still processing or never reached a re-indexable status.
+   * @memberof SubmissionUploadService
+   */
+  private assertSubmissionUploadStatusCanBeReindexed(upload: SubmissionUpload): void {
+    if (!REINDEX_START_STATUSES.includes(upload.status)) {
+      throw new HTTP409(`Submission upload cannot be re-indexed while its status is ${upload.status}`);
+    }
+  }
+
+  /**
+   * Assert that a locked upload can be re-indexed.
+   *
+   * Only unapproved, undecided and current uploads can be re-indexed: published feature state is immutable, and a
+   * superseded upload's pending features have already been ended. A failed upload can be re-indexed only when it
+   * failed after reconciliation, because indexing reuses the reconciled features.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @param {SubmissionUpload} lockedUpload Locked submission upload.
+   * @returns {Promise<void>} Resolves when the upload can be re-indexed.
+   * @throws {HTTP409} When the upload is decided, superseded, or not in a re-indexable status.
+   * @memberof SubmissionUploadService
+   */
+  private async assertSubmissionUploadCanBeReindexed(
+    scope: SubmissionUploadScope,
+    lockedUpload: SubmissionUpload
+  ): Promise<void> {
+    this.assertSubmissionUploadStatusCanBeReindexed(lockedUpload);
+
+    if (lockedUpload.decision !== 'pending') {
+      throw new HTTP409(`Submission upload cannot be re-indexed after it was ${lockedUpload.decision}`);
+    }
+
+    if (lockedUpload.successor_submission_upload_id) {
+      throw new HTTP409('Submission upload has been superseded by a newer upload');
+    }
+
+    if (lockedUpload.status !== 'failed') {
+      return;
+    }
+
+    const history = await this.submissionUploadProcessingStatusRepository.findSubmissionUploadProcessingStatusHistory(
+      scope.submissionId,
+      scope.submissionUploadId
+    );
+    const wasReconciled = history.some((row) => row.status === 'reconciled');
+
+    if (!wasReconciled) {
+      throw new HTTP409('Submission upload failed before reconciliation and cannot be re-indexed');
+    }
+  }
+
+  /**
+   * Validate an approval, record it as `approving` and queue the job that applies it, or return the existing
+   * approval idempotently.
+   *
+   * The job is queued in the request transaction, so an upload is never left `approving` without a durable job
+   * to apply the approval.
+   *
+   * @param {SubmissionUpload} upload Locked submission upload.
+   * @returns {Promise<SubmissionUploadDecisionResult>} `approving`, or `approved` when the approval was already applied.
+   * @memberof SubmissionUploadService
+   */
+  private async requestSubmissionUploadApproval(upload: SubmissionUpload): Promise<SubmissionUploadDecisionResult> {
+    if (upload.decision === 'approved' || upload.decision === 'approving') {
+      return { submission_upload_id: upload.submission_upload_id, decision: upload.decision };
+    }
+
+    await this.assertSubmissionUploadCanBeApproved(upload);
+
+    const approving = await this.submissionUploadRepository.updateSubmissionUploadDecision(
+      upload.submission_upload_id,
+      'approving'
+    );
+
+    await SubmissionUploadService.dependencies.publishApproveSubmissionUploadJob(this.connection, {
+      submissionUploadId: upload.submission_upload_id
+    });
+
+    return { submission_upload_id: approving.submission_upload_id, decision: approving.decision };
   }
 
   /**
@@ -612,7 +898,7 @@ export class SubmissionUploadService extends DBService {
    * Publish history of a submission: every upload with its review state, newest first.
    *
    * The wire values predate the `decision` column and are kept stable for external consumers: a
-   * soft-deleted upload is `deleted`, a pending decision is `submitted`.
+   * soft-deleted upload is `deleted`, a pending or still-approving decision is `submitted`.
    * Requires submission-team authorization or system-administrator access, enforced by middleware.
    *
    * @param {string} submissionUuid Submission UUID whose uploads are requested.
@@ -801,5 +1087,10 @@ const toSubmissionUploadHistoryStatus = (
     return 'deleted';
   }
 
-  return decision === 'pending' ? 'submitted' : decision;
+  // An approval whose features are not yet published is still awaiting its outcome for external consumers.
+  if (decision === 'pending' || decision === 'approving') {
+    return 'submitted';
+  }
+
+  return decision;
 };

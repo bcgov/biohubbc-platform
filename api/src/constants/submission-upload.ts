@@ -64,3 +64,9 @@ export const INDEX_START_STATUSES: SubmissionUpload['status'][] = ['reconciled',
  * Reconciliation runs inside one transaction, so there is no intermediate status to resume from.
  */
 export const RECONCILE_START_STATUSES: SubmissionUpload['status'][] = ['ingested'];
+
+/**
+ * Statuses from which an administrator can re-index an upload. `failed` is accepted only after the upload reached
+ * `reconciled`, because indexing needs reconciled features.
+ */
+export const REINDEX_START_STATUSES: SubmissionUpload['status'][] = ['indexed', 'invalid', 'failed'];

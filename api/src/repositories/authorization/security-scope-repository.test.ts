@@ -142,7 +142,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0, null);
 
       expect(result).to.eql({ pageLastId: 200 });
       expect(queryStub.getCall(0).args[0]).to.include('NOT EXISTS');
@@ -163,7 +163,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0, null);
 
       expect(result).to.eql({ pageLastId: 5000 });
       expect(queryStub.getCall(1).args[0]).to.include('SELECT MAX');
@@ -181,7 +181,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+      const result = await repository.deleteStaleAnchorBatch('scope-uuid-1', 0, null);
 
       expect(result).to.be.null;
     });
@@ -195,10 +195,42 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deleteStaleAnchorBatch('scope-uuid-1', 5000);
+      await repository.deleteStaleAnchorBatch('scope-uuid-1', 5000, null);
 
       // afterId=5000, securityScopeId, BATCH_SIZE=5000
       expect(queryStub.getCall(0).args[1]).to.eql(['scope-uuid-1', 5000, 5000]);
+    });
+
+    it('limits the batch and boundary scans to one submission when a submission is given', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.deleteStaleAnchorBatch('scope-uuid-1', 0, 42);
+
+      for (const call of [queryStub.getCall(0), queryStub.getCall(1)]) {
+        expect(call.args[0]).to.include('scoped_anchor.submission_id = $4::integer');
+        expect(call.args[1]).to.eql(['scope-uuid-1', 0, 5000, 42]);
+      }
+    });
+
+    it('scans every anchor of the scope when no submission is given', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.deleteStaleAnchorBatch('scope-uuid-1', 0, null);
+
+      expect(queryStub.getCall(0).args[0]).not.to.include('scoped_anchor');
+      expect(queryStub.getCall(1).args[0]).not.to.include('scoped_anchor');
     });
   });
 
@@ -248,7 +280,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0);
+      const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
 
       expect(result).to.eql({ pageLastId: 102 });
       const batchSql = queryStub.getCall(0).args[0];
@@ -275,7 +307,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0);
+      const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
 
       expect(result).to.eql({ pageLastId: 5000 });
       expect(queryStub.getCall(1).args[0]).to.include('SELECT MAX');
@@ -293,7 +325,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0);
+      const result = await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
 
       expect(result).to.be.null;
     });
@@ -307,10 +339,42 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.computeAnchorBatch('scope-uuid-1', urn, 5000);
+      await repository.computeAnchorBatch('scope-uuid-1', urn, 5000, null);
 
       // afterId=5000, urn components, BATCH_SIZE=5000
       expect(queryStub.getCall(0).args[1]).to.eql([5000, '*', 'telemetry', '*', 5000]);
+    });
+
+    it('adds an indexable submission predicate to the batch and boundary scans when a submission is given', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.computeAnchorBatch('scope-uuid-1', urn, 0, 42);
+
+      for (const call of [queryStub.getCall(0), queryStub.getCall(1)]) {
+        expect(call.args[0]).to.include('AND candidate.submission_id = $6::integer');
+        expect(call.args[1]).to.eql([0, '*', 'telemetry', '*', 5000, 42]);
+      }
+    });
+
+    it('omits the submission predicate when no submission is given', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
+
+      expect(queryStub.getCall(0).args[0]).not.to.include('candidate.submission_id = $6');
+      expect(queryStub.getCall(1).args[0]).not.to.include('candidate.submission_id = $6');
     });
 
     it('propagates errors from the keyset batch query', async () => {
@@ -320,7 +384,7 @@ describe('SecurityScopeRepository', () => {
       const repository = new SecurityScopeRepository(mockDBConnection);
 
       try {
-        await repository.computeAnchorBatch('scope-uuid-1', urn, 0);
+        await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
         expect.fail('Should have thrown');
       } catch (error) {
         expect((error as Error).message).to.equal('query failed');
@@ -455,7 +519,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repository = new SecurityScopeRepository(mockDBConnection);
 
-      await repository.deleteStaleAnchorBatch('scope-uuid-1', 0);
+      await repository.deleteStaleAnchorBatch('scope-uuid-1', 0, null);
 
       const sqlText = queryStub.firstCall.args[0].toLowerCase();
       expect(sqlText).to.include("ps.effect = 'allow'");

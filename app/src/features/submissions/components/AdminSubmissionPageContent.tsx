@@ -1,8 +1,7 @@
-import { Box, Breadcrumbs, Container, Link, Skeleton, Stack, Typography } from '@mui/material';
+import { Box, Breadcrumbs, Link, Skeleton, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { useApi } from 'hooks/useApi';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { AdminSubmissionMetadata } from './content/AdminSubmissionMetadata';
@@ -29,67 +28,61 @@ export const AdminSubmissionPageContent = ({ submissionId }: AdminSubmissionPage
   const submission = submissionQuery.data;
 
   return (
-    <>
-      <PageHeader
-        breadcrumbs={
-          <Breadcrumbs aria-label="submission breadcrumb">
-            <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
-              Submissions
-            </Link>
-            <Typography variant="inherit" color="text.primary" aria-current="page">
-              {submission?.name ?? 'Submission'}
-            </Typography>
-          </Breadcrumbs>
+    <AdminPageLayout
+      breadcrumbs={
+        <Breadcrumbs aria-label="submission breadcrumb">
+          <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+            Administration
+          </Link>
+          <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+            Submissions
+          </Link>
+          <Typography variant="inherit" color="text.primary" aria-current="page">
+            {submission?.name ?? 'Submission'}
+          </Typography>
+        </Breadcrumbs>
+      }
+      title={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
+      description={submission?.description}
+      tabs={[
+        {
+          value: 'uploads',
+          label: 'Uploads',
+          id: 'submission-uploads-tab',
+          ariaControls: 'submission-uploads-panel'
+        },
+        {
+          value: 'metadata',
+          label: 'About',
+          id: 'submission-metadata-tab',
+          ariaControls: 'submission-metadata-panel'
         }
-        label={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
-        description={submission?.description}
-        tabs={
-          <TabGroup
-            value={activeTab}
-            onChange={(value) => {
-              const next = new URLSearchParams(searchParams);
-              next.set('tab', value);
-              setSearchParams(next);
-            }}
-            ariaLabel="Submission detail sections"
-            tabs={[
-              {
-                value: 'uploads',
-                label: 'Uploads',
-                id: 'submission-uploads-tab',
-                ariaControls: 'submission-uploads-panel'
-              },
-              {
-                value: 'metadata',
-                label: 'Metadata',
-                id: 'submission-metadata-tab',
-                ariaControls: 'submission-metadata-panel'
-              }
-            ]}
-          />
-        }
-      />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Stack gap={3}>
-          {submissionQuery.isPending && <Skeleton variant="rectangular" height={300} />}
-          {submission && (
-            <>
-              <Box
-                role="tabpanel"
-                id="submission-uploads-panel"
-                aria-labelledby="submission-uploads-tab"
-                hidden={activeTab !== 'uploads'}>
-                <AdminSubmissionUploads submissionId={submissionId} />
+      ]}
+      activeTab={activeTab}
+      onTabChange={(value) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab', value);
+        setSearchParams(next);
+      }}>
+      <Stack gap={3}>
+        {submissionQuery.isPending && <Skeleton variant="rectangular" height={300} />}
+        {submission && (
+          <>
+            <Box
+              role="tabpanel"
+              id="submission-uploads-panel"
+              aria-labelledby="submission-uploads-tab"
+              hidden={activeTab !== 'uploads'}>
+              <AdminSubmissionUploads submissionId={submissionId} />
+            </Box>
+            {activeTab === 'metadata' && (
+              <Box role="tabpanel" id="submission-metadata-panel" aria-labelledby="submission-metadata-tab">
+                <AdminSubmissionMetadata submission={submission} />
               </Box>
-              {activeTab === 'metadata' && (
-                <Box role="tabpanel" id="submission-metadata-panel" aria-labelledby="submission-metadata-tab">
-                  <AdminSubmissionMetadata submission={submission} />
-                </Box>
-              )}
-            </>
-          )}
-        </Stack>
-      </Container>
-    </>
+            )}
+          </>
+        )}
+      </Stack>
+    </AdminPageLayout>
   );
 };

@@ -1,5 +1,6 @@
 import AlertTitle from '@mui/material/AlertTitle';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { SubmissionFeatureAbout } from 'components/feature/SubmissionFeatureAbout';
@@ -7,11 +8,16 @@ import { AlertBanner } from 'components/notifications/AlertBanner';
 import { PageSection } from 'components/section/PageSection';
 import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { PropsWithChildren } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 
 interface SubmissionFeatureDetailContentProps {
   /** Submission feature displayed by the page. */
   feature: ISubmissionFeature;
+  /** Base route used to link to the feature's submission and its features. */
+  submissionDetailBasePath: string;
+  /** Query string preserved when navigating to the current feature. */
+  queryString?: string;
 }
 
 /**
@@ -26,14 +32,31 @@ interface SubmissionFeatureDetailContentProps {
  */
 export const SubmissionFeatureDetailContent = ({
   feature,
+  submissionDetailBasePath,
+  queryString = '',
   children
 }: PropsWithChildren<SubmissionFeatureDetailContentProps>) => {
+  const terminalFeatureId = feature.terminal_submission_feature_id;
+  const hasTerminalFeature = terminalFeatureId !== null && terminalFeatureId !== feature.submission_feature_id;
+
   return (
     <Container maxWidth="xl">
       {feature.successor_submission_feature_id && (
         <AlertBanner severity="warning" variant="standard" sx={{ mt: 4 }}>
           <AlertTitle sx={{ mb: 0 }}>This feature has been superseded</AlertTitle>
-          <Typography fontSize="0.8rem">This information has been updated with a newer version.</Typography>
+          <Typography fontSize="0.8rem">
+            This information has been updated with a newer version.
+            {hasTerminalFeature && (
+              <>
+                {' '}
+                <Link
+                  component={RouterLink}
+                  to={`${submissionDetailBasePath}/${feature.submission_id}/feature/${terminalFeatureId}${queryString}`}>
+                  View the current version
+                </Link>
+              </>
+            )}
+          </Typography>
         </AlertBanner>
       )}
       <Stack spacing={3} py={4}>

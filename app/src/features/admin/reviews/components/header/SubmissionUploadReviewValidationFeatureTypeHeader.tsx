@@ -2,9 +2,9 @@ import { RECONCILIATION_OUTCOMES } from 'constants/reconciliation';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { ISubmissionUploadReviewDetail } from 'interfaces/useAdminApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
+import { PropsWithChildren } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 
@@ -16,26 +16,34 @@ interface SubmissionUploadReviewValidationFeatureTypeHeaderProps {
 }
 
 /**
- * Render feature-type review ancestry and the single Properties tab.
- * @param {SubmissionUploadReviewValidationFeatureTypeHeaderProps} props Feature type and originating outcome.
- * @returns {JSX.Element} Header with a breadcrumb back to the selected outcome page.
+ * Render a feature-type review page in the administrative page layout: review ancestry and the single Properties
+ * tab, above the content passed as children.
+ * @param {PropsWithChildren<SubmissionUploadReviewValidationFeatureTypeHeaderProps>} props Feature type and
+ * originating outcome.
+ * @returns {JSX.Element} Header with a breadcrumb back to the selected outcome page, and the page content.
  */
 export const SubmissionUploadReviewValidationFeatureTypeHeader = ({
   submissionId,
   review,
   featureType,
-  outcomeRoute
-}: SubmissionUploadReviewValidationFeatureTypeHeaderProps) => {
+  outcomeRoute,
+  children
+}: PropsWithChildren<SubmissionUploadReviewValidationFeatureTypeHeaderProps>) => {
   const location = useLocation();
   const outcome = RECONCILIATION_OUTCOMES.find(({ route }) => route === outcomeRoute);
   const title = getFeatureTypeDisplayLabel(featureType);
   const reviewPath = `/admin/submission/${submissionId}/upload/${review.submission_upload_id}/review/${review.submission_upload_review_id}`;
   return (
-    <PageHeader
-      maxWidth="xl"
-      label={<Typography variant="h1">{title}</Typography>}
+    <AdminPageLayout
+      title={title}
       breadcrumbs={
         <Breadcrumbs aria-label="feature type properties breadcrumb">
+          <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+            Administration
+          </Link>
+          <Link component={RouterLink} to="/admin/submissions" underline="hover" color="inherit">
+            Submissions
+          </Link>
           <Link component={RouterLink} to={`/admin/submissions/${submissionId}`} underline="hover" color="inherit">
             Submission
           </Link>
@@ -59,14 +67,10 @@ export const SubmissionUploadReviewValidationFeatureTypeHeader = ({
           </Typography>
         </Breadcrumbs>
       }
-      tabs={
-        <TabGroup
-          value="properties"
-          onChange={() => {}}
-          ariaLabel="Feature type review sections"
-          tabs={[{ value: 'properties', label: 'Properties' }]}
-        />
-      }
-    />
+      tabs={[{ value: 'properties', label: 'Properties' }]}
+      activeTab="properties"
+      onTabChange={() => {}}>
+      {children}
+    </AdminPageLayout>
   );
 };

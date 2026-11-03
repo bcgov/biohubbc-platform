@@ -3,6 +3,7 @@ import {
   mdiCommentTextOutline,
   mdiDatabaseLockOutline,
   mdiEmailOpenOutline,
+  mdiTagOutline,
   mdiUploadOutline
 } from '@mdi/js';
 
@@ -11,5 +12,6 @@ export const TICKET_TIMELINE_ICONS = {
   closed: mdiCheck,
   comment: mdiCommentTextOutline,
   data_request: mdiDatabaseLockOutline,
-  upload: mdiUploadOutline
+  upload: mdiUploadOutline,
+  tag: mdiTagOutline
 } as const;

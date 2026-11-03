@@ -15,8 +15,7 @@ const baseDataRequest = {
 };
 
 const renderComponent = (status: PolicyStatus, isUpdating = false) => {
-  const onViewPolicy = vi.fn();
-  const onViewFinalizedPolicy = vi.fn();
+  const onViewRequest = vi.fn();
   const onApprove = vi.fn();
   const onDeny = vi.fn();
   const onResetToReviewed = vi.fn();
@@ -26,45 +25,44 @@ const renderComponent = (status: PolicyStatus, isUpdating = false) => {
       dataRequest={{ ...baseDataRequest, status }}
       dateLabel="a few seconds ago"
       isUpdating={isUpdating}
-      onViewPolicy={onViewPolicy}
-      onViewFinalizedPolicy={onViewFinalizedPolicy}
+      onViewRequest={onViewRequest}
       onApprove={onApprove}
       onDeny={onDeny}
       onResetToReviewed={onResetToReviewed}
     />
   );
 
-  return { onViewPolicy, onViewFinalizedPolicy, onApprove, onDeny, onResetToReviewed };
+  return { onViewRequest, onApprove, onDeny, onResetToReviewed };
 };
 
 describe('TicketTimelineDataRequestItem', () => {
-  it('shows only Review Policy when status is requested', () => {
+  it('shows only Review Request when status is requested', () => {
     renderComponent(PolicyStatus.REQUESTED);
 
-    expect(screen.getByRole('button', { name: 'Review Policy' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Review Request' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'View Policy' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Requested' })).not.toBeInTheDocument();
   });
 
-  it('calls onViewFinalizedPolicy when Review Policy is clicked from requested state', async () => {
+  it('calls onViewRequest with the data request when Review Request is clicked from requested state', async () => {
     const user = userEvent.setup();
-    const { onViewFinalizedPolicy, onViewPolicy } = renderComponent(PolicyStatus.REQUESTED);
+    const { onViewRequest } = renderComponent(PolicyStatus.REQUESTED);
 
-    await user.click(screen.getByRole('button', { name: 'Review Policy' }));
+    await user.click(screen.getByRole('button', { name: 'Review Request' }));
 
-    expect(onViewFinalizedPolicy).toHaveBeenCalledWith(baseDataRequest.data_request_id, baseDataRequest.policy_id);
-    expect(onViewPolicy).not.toHaveBeenCalled();
+    expect(onViewRequest).toHaveBeenCalledWith(baseDataRequest.data_request_id);
   });
 
   it('shows View + Approve + Deny when status is not requested/finalized', () => {
     renderComponent(PolicyStatus.REVIEWED);
 
-    expect(screen.getByRole('button', { name: 'View Policy' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'View Request' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'View Policy' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Deny' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Review Policy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review Request' })).not.toBeInTheDocument();
   });
 
   it('shows finalized button only for approved/denied', () => {
@@ -77,8 +75,7 @@ describe('TicketTimelineDataRequestItem', () => {
           dataRequest={{ ...baseDataRequest, status }}
           dateLabel="a few seconds ago"
           isUpdating={false}
-          onViewPolicy={vi.fn()}
-          onViewFinalizedPolicy={vi.fn()}
+          onViewRequest={vi.fn()}
           onApprove={vi.fn()}
           onDeny={vi.fn()}
           onResetToReviewed={vi.fn()}
@@ -86,10 +83,11 @@ describe('TicketTimelineDataRequestItem', () => {
       );
 
       expect(screen.getByRole('button', { name: label })).toBeVisible();
-      expect(screen.getByRole('button', { name: 'View Policy' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'View Request' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'View Policy' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Review Policy' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Review Request' })).not.toBeInTheDocument();
 
       unmount();
     }
@@ -104,12 +102,12 @@ describe('TicketTimelineDataRequestItem', () => {
     expect(onResetToReviewed).toHaveBeenCalledWith(baseDataRequest.data_request_id);
   });
 
-  it('calls onViewFinalizedPolicy when View Policy is clicked for finalized statuses', async () => {
+  it('calls onViewRequest with the data request when View Request is clicked for finalized statuses', async () => {
     const user = userEvent.setup();
-    const { onViewFinalizedPolicy } = renderComponent(PolicyStatus.DENIED);
+    const { onViewRequest } = renderComponent(PolicyStatus.DENIED);
 
-    await user.click(screen.getByRole('button', { name: 'View Policy' }));
+    await user.click(screen.getByRole('button', { name: 'View Request' }));
 
-    expect(onViewFinalizedPolicy).toHaveBeenCalledWith(baseDataRequest.data_request_id, baseDataRequest.policy_id);
+    expect(onViewRequest).toHaveBeenCalledWith(baseDataRequest.data_request_id);
   });
 });

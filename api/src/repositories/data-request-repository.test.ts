@@ -25,6 +25,111 @@ describe('DataRequestRepository', () => {
     status: 'requested',
     create_date: '2026-04-17T00:00:00.000Z'
   };
+  describe('getDataRequestList', () => {
+    it('returns one page of active data requests filtered by keyword', async () => {
+      const mockRow = {
+        data_request_id: mockDataRequest.data_request_id,
+        reason: mockDataRequest.reason,
+        status: mockDataRequest.status,
+        create_date: mockDataRequest.create_date,
+        requested_by: 1,
+        requested_by_name: 'Test User',
+        ticket_id: mockDataRequest.ticket_id,
+        policy_id: mockDataRequest.policy_id
+      };
+      const knex = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] });
+      const repo = new DataRequestRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getDataRequestList(
+        { keyword: 'research' },
+        { page: 2, limit: 5, sort: 'create_date', order: 'desc' }
+      );
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"dr"."record_end_date" is null');
+      expect(sql).to.include('"p"."record_end_date" is null');
+      expect(sql).to.include('order by "create_date" desc');
+      expect(bindings).to.eql(['%research%', 5, 5]);
+      expect(result).to.eql([mockRow]);
+    });
+
+    it('lists every active data request when no keyword is given', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new DataRequestRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getDataRequestList({}, { page: 1, limit: 10 });
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).not.to.include('ilike');
+      expect(bindings).to.eql([10]);
+      expect(result).to.eql([]);
+    });
+  });
+
+  describe('getDataRequestListItem', () => {
+    it('returns the active data request for the ID', async () => {
+      const mockRow = {
+        data_request_id: mockDataRequest.data_request_id,
+        reason: mockDataRequest.reason,
+        status: mockDataRequest.status,
+        create_date: mockDataRequest.create_date,
+        requested_by: 1,
+        requested_by_name: 'Test User',
+        ticket_id: mockDataRequest.ticket_id,
+        policy_id: mockDataRequest.policy_id
+      };
+      const knex = sinon.stub().resolves({ rowCount: 1, rows: [mockRow] });
+      const repo = new DataRequestRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getDataRequestListItem(mockDataRequest.data_request_id);
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"dr"."record_end_date" is null');
+      expect(sql).to.include('"p"."record_end_date" is null');
+      expect(bindings).to.eql([mockDataRequest.data_request_id]);
+      expect(result).to.eql(mockRow);
+    });
+
+    it('throws ApiNotFoundError when no active data request exists for the ID', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new DataRequestRepository(getMockDBConnection({ knex }));
+
+      try {
+        await repo.getDataRequestListItem(mockDataRequest.data_request_id);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+    });
+  });
+
+  describe('getDataRequestCount', () => {
+    it('counts active data requests matching the keyword', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 7 }] });
+      const repo = new DataRequestRepository(getMockDBConnection({ knex }));
+
+      const result = await repo.getDataRequestCount({ keyword: 'research' });
+
+      const { sql, bindings } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"dr"."record_end_date" is null');
+      expect(sql).to.include('"p"."record_end_date" is null');
+      expect(bindings).to.eql(['%research%']);
+      expect(result).to.equal(7);
+    });
+
+    it('throws when the count query returns no row', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repo = new DataRequestRepository(getMockDBConnection({ knex }));
+
+      try {
+        await repo.getDataRequestCount({});
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Failed to get data requests count');
+      }
+    });
+  });
+
   describe('findDataRequests', () => {
     it('should return data requests when found', async () => {
       const mockQueryResponse = {

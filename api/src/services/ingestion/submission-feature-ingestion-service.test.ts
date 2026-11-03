@@ -41,16 +41,7 @@ describe('SubmissionFeatureIngestionService', () => {
       await service.ingestFeatureBatch(42, 'submission-upload-1', features, knownFeatureTypeMap);
 
       expect(insertStub.calledOnce).to.be.true;
-      const insertedRows = insertStub.firstCall.args[0] as Array<{
-        submissionId: number;
-        submissionUploadId: string;
-        sourceId: string;
-        featureTypeId: number;
-        data: IFlattenedBlock;
-        dataByteSize: number;
-        contentHash: string;
-        universalId?: string;
-      }>;
+      const insertedRows = insertStub.firstCall.args[0];
       expect(insertedRows).to.have.length(2);
 
       expect(insertedRows[0]).to.include({
@@ -58,9 +49,10 @@ describe('SubmissionFeatureIngestionService', () => {
         submissionUploadId: 'submission-upload-1',
         sourceId: 'feature-1',
         featureTypeId: 1,
+        featureTypeName: 'survey',
         universalId: 'external-survey-1'
       });
-      expect(insertedRows[0].data).to.deep.equal({
+      expect(JSON.parse(insertedRows[0].dataJson)).to.deep.equal({
         id: 'feature-1',
         type: 'survey',
         properties: { name: 'Test Survey' },
@@ -68,7 +60,7 @@ describe('SubmissionFeatureIngestionService', () => {
         parent: null,
         universal_id: 'external-survey-1'
       });
-      expect(insertedRows[0].dataByteSize).to.be.a('number').and.greaterThan(0);
+      expect(insertedRows[0].dataByteSize).to.equal(Buffer.byteLength(insertedRows[0].dataJson));
       expect(insertedRows[0].contentHash).to.match(/^[0-9a-f]{64}$/);
       expect(insertedRows[1].contentHash).to.match(/^[0-9a-f]{64}$/);
       expect(insertedRows[0].contentHash).to.not.equal(insertedRows[1].contentHash);
@@ -101,13 +93,7 @@ describe('SubmissionFeatureIngestionService', () => {
       await service.ingestFeatureBatch(42, 'submission-upload-1', [feature], knownFeatureTypeMap);
 
       expect(insertStub.calledOnce).to.be.true;
-      const insertedRows = insertStub.firstCall.args[0] as Array<{
-        submissionId: number;
-        submissionUploadId: string;
-        sourceId: string;
-        featureTypeId: number;
-        data: IFlattenedBlock;
-      }>;
+      const insertedRows = insertStub.firstCall.args[0];
       expect(insertedRows).to.have.length(1);
       expect(insertedRows[0]).to.include({
         submissionId: 42,
@@ -115,7 +101,7 @@ describe('SubmissionFeatureIngestionService', () => {
         sourceId: 'legacy-feature',
         featureTypeId: 1
       });
-      expect(insertedRows[0].data).to.deep.equal(feature);
+      expect(JSON.parse(insertedRows[0].dataJson)).to.deep.equal(feature);
     });
 
     it('skips unknown feature types and only inserts known feature rows', async () => {

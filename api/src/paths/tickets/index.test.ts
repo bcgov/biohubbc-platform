@@ -59,6 +59,30 @@ describe('paths/tickets', () => {
       expect(mockRes.jsonValue.pagination.total).to.equal(1);
     });
 
+    it('never applies admin-only tag filters or returns tag data', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => 7,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves([mockTicket.team_id]);
+      const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
+      const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
+      const taggedListStub = sinon.stub(TicketService.prototype, 'getTicketsWithTags');
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.query = { tag_ids: ['33333333-3333-3333-3333-333333333333'], page: '1', limit: '10' };
+
+      await getTicketsForUser()(mockReq, mockRes, mockNext);
+
+      expect(taggedListStub).to.not.have.been.called;
+      expect(listStub.firstCall.args[0]).to.not.have.property('tag_ids');
+      expect(countStub.firstCall.args[0]).to.not.have.property('tag_ids');
+      expect(mockRes.jsonValue.tickets[0]).to.not.have.property('tags');
+    });
+
     it('returns an empty list when the user has no team memberships', async () => {
       const systemUserId = 99;
 

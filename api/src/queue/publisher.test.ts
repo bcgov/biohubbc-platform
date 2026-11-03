@@ -14,6 +14,7 @@ import {
   publishComputeScopeAnchorsJob,
   publishComputeSubmissionFeatureClosureJob,
   publisherDependencies,
+  publishEvaluateTicketTagRulesJob,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
   publishProcessDownloadJob,
@@ -91,7 +92,7 @@ describe('publisher', () => {
       expect(options.retryLimit).to.equal(2);
       expect(options.retryDelay).to.equal(60);
       expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
+      expect(options.expireInSeconds).to.equal(60 * 60 * 2); // 2 hours
     });
 
     it('merges provided options with process submission features defaults', async () => {
@@ -110,7 +111,7 @@ describe('publisher', () => {
 
       const options = sendStub.firstCall.args[2];
       expect(options.retryLimit).to.equal(5);
-      expect(options.expireInSeconds).to.equal(60 * 10); // Still 10 minutes
+      expect(options.expireInSeconds).to.equal(60 * 60 * 2); // Still 2 hours
     });
 
     it('returns duplicate status and does not create validation when send returns null', async () => {
@@ -476,7 +477,7 @@ describe('publisher', () => {
           retryLimit: 3,
           retryDelay: 60,
           retryBackoff: true,
-          expireInSeconds: 60 * 10,
+          expireInSeconds: 60 * 60 * 2,
           singletonKey: testCase.singletonKey
         });
         expect(sendStub.firstCall.args[2].db.executeSql).to.be.a('function');
@@ -543,7 +544,7 @@ describe('publisher', () => {
       expect(options.retryLimit).to.equal(3);
       expect(options.retryDelay).to.equal(60);
       expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
+      expect(options.expireInSeconds).to.equal(60 * 60 * 2); // 2 hours
     });
 
     it('passes db option using caller connection for transactional job insert', async () => {
@@ -765,7 +766,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const data = { securityScopeId: 'scope-uuid-1' };
+      const data = { securityScopeId: 'scope-uuid-1', submissionId: null };
       const result = await publishComputeScopeAnchorsJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -777,27 +778,22 @@ describe('publisher', () => {
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('anchors-job-id');
     });
 
-    it('uses 30 minute timeout with retry backoff and a 20 second cooldown', async () => {
-      const clock = sinon.useFakeTimers(new Date('2026-06-24T12:00:00.000Z'));
-      try {
-        const mockConnection = getMockDBConnection();
-        const sendStub = sinon.stub().resolves('anchors-job-id');
-        const createQueueStub = sinon.stub().resolves();
-        const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+    it('uses 30 minute timeout with retry backoff and a 10 second delay', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
 
-        sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-        await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1', submissionId: null });
 
-        const options = sendStub.firstCall.args[2];
-        expect(options.retryLimit).to.equal(3);
-        expect(options.retryDelay).to.equal(60);
-        expect(options.retryBackoff).to.equal(true);
-        expect(options.expireInSeconds).to.equal(60 * 30);
-        expect(options.startAfter).to.deep.equal(new Date('2026-06-24T12:00:20.000Z'));
-      } finally {
-        clock.restore();
-      }
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 30);
+      expect(options.startAfter).to.equal(10);
     });
 
     it('passes db option using caller connection for transactional job insert', async () => {
@@ -808,7 +804,7 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1', submissionId: null });
 
       const options = sendStub.firstCall.args[2];
       expect(options.db).to.exist;
@@ -823,25 +819,24 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' });
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456', submissionId: null });
 
       const options = sendStub.firstCall.args[2];
       expect(options.singletonKey).to.equal('scope-anchors-scope-uuid-456');
     });
 
-    it('honours an explicit startAfter override', async () => {
+    it('uses a per-scope-and-submission singletonKey for submission-limited anchor computation jobs', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('anchors-job-id');
       const createQueueStub = sinon.stub().resolves();
       const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
-      const startAfter = new Date('2026-06-24T12:05:00.000Z');
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' }, { startAfter });
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456', submissionId: 42 });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.startAfter).to.equal(startAfter);
+      expect(options.singletonKey).to.equal('scope-anchors-scope-uuid-456-submission-42');
     });
 
     it('returns duplicate status when send returns null', async () => {
@@ -852,7 +847,10 @@ describe('publisher', () => {
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      const result = await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+      const result = await publishComputeScopeAnchorsJob(mockConnection, {
+        securityScopeId: 'scope-uuid-1',
+        submissionId: null
+      });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
@@ -865,7 +863,7 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       try {
-        await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+        await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1', submissionId: null });
         expect.fail('expected publisher to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss not initialized');
@@ -1005,20 +1003,20 @@ describe('publisher', () => {
       expect(options.singletonKey).to.equal('closure-recompute-sub-upload-uuid-closure-1');
     });
 
-    it('uses a caller-provided singleton key for distinct feature-state revisions', async () => {
+    it('delays the per-upload closure job so changes before it starts coalesce into it', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('closure-job-id');
       const mockBoss: MockPgBoss = { send: sendStub, createQueue: sinon.stub().resolves() };
 
       sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
 
-      await publishComputeSubmissionFeatureClosureJob(
-        mockConnection,
-        { submissionId: 777, submissionUploadId: 'sub-upload-uuid-closure-1' },
-        { singletonKey: 'closure-recompute-sub-upload-uuid-closure-1-review-7' }
-      );
+      await publishComputeSubmissionFeatureClosureJob(mockConnection, {
+        submissionUploadId: 'sub-upload-uuid-closure-1'
+      });
 
-      expect(sendStub.firstCall.args[2].singletonKey).to.equal('closure-recompute-sub-upload-uuid-closure-1-review-7');
+      const options = sendStub.firstCall.args[2];
+      expect(options.startAfter).to.equal(10);
+      expect(options.singletonKey).to.equal('closure-recompute-sub-upload-uuid-closure-1');
     });
 
     it('uses recompute closure options with 2 hour timeout and retry backoff', async () => {
@@ -1058,7 +1056,7 @@ describe('publisher', () => {
       expect(options.db.executeSql).to.be.a('function');
 
       await options.db.executeSql('SELECT 1', [42]);
-      expect(queryStub.calledOnceWith('SELECT 1', [42])).to.be.true;
+      expect(queryStub.lastCall.calledWith('SELECT 1', [42])).to.be.true;
     });
 
     it('returns published status with jobId when boss.send returns a job ID', async () => {
@@ -1106,6 +1104,58 @@ describe('publisher', () => {
         expect.fail('expected publisher to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
+    });
+  });
+
+  describe('publishEvaluateTicketTagRulesJob', () => {
+    it('publishes a delayed per-ticket singleton job inside the caller transaction', async () => {
+      const clock = sinon.useFakeTimers(new Date('2026-10-20T12:00:00.000Z'));
+      try {
+        const mockConnection = getMockDBConnection();
+        const sendStub = sinon.stub().resolves('tag-rules-job-id');
+        const createQueueStub = sinon.stub().resolves();
+        const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+        sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+        const result = await publishEvaluateTicketTagRulesJob(mockConnection, { ticketId: 'ticket-1' });
+
+        expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.EVALUATE_TICKET_TAG_RULES);
+        expect(sendStub.firstCall.args[0]).to.equal(JobQueues.EVALUATE_TICKET_TAG_RULES);
+        expect(sendStub.firstCall.args[1]).to.deep.equal({ ticketId: 'ticket-1' });
+
+        const options = sendStub.firstCall.args[2];
+        expect(options.singletonKey).to.equal('ticket-tag-rules-ticket-1');
+        expect(options.startAfter).to.deep.equal(new Date('2026-10-20T12:00:10.000Z'));
+        expect(options.db).to.have.property('executeSql');
+        expect(result).to.eql({ status: 'published', jobId: 'tag-rules-job-id' });
+      } finally {
+        clock.restore();
+      }
+    });
+
+    it('returns duplicate when a job is already queued for the ticket', async () => {
+      const mockBoss: MockPgBoss = { send: sinon.stub().resolves(null), createQueue: sinon.stub().resolves() };
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const result = await publishEvaluateTicketTagRulesJob(getMockDBConnection(), { ticketId: 'ticket-1' });
+
+      expect(result.status).to.equal('duplicate');
+    });
+
+    it('rethrows pg-boss errors so the caller transaction rolls back', async () => {
+      const mockBoss: MockPgBoss = {
+        send: sinon.stub().rejects(new Error('boom')),
+        createQueue: sinon.stub().resolves()
+      };
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      try {
+        await publishEvaluateTicketTagRulesJob(getMockDBConnection(), { ticketId: 'ticket-1' });
+        expect.fail('Expected error');
+      } catch (error) {
+        expect((error as Error).message).to.equal('boom');
       }
     });
   });

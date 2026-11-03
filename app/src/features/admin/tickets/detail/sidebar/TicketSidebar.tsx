@@ -1,6 +1,7 @@
 import Stack from '@mui/material/Stack';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { TicketSystemUserDialog } from 'features/admin/tickets/components/dialog/system-user/TicketSystemUserDialog';
+import { TicketTagDialog } from 'features/admin/tickets/components/dialog/tag/TicketTagDialog';
 import { TicketTeamDialog } from 'features/admin/tickets/components/dialog/team/TicketTeamDialog';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
@@ -14,6 +15,7 @@ import { useUpdateTicketSystemUserStatusMutation } from '../../hooks/useUpdateTi
 import { TicketSidebarSystemUsers } from './TicketSidebarSystemUsers';
 import { TicketSidebarDataRequests } from './TicketSidebarDataRequests';
 import { TicketSidebarReferences } from './TicketSidebarReferences';
+import { TicketSidebarTags } from './TicketSidebarTags';
 import { TicketSidebarTeam } from './TicketSidebarTeam';
 import { TicketSidebarUploads } from './TicketSidebarUploads';
 
@@ -28,6 +30,7 @@ export const TicketSidebar = () => {
   const ticket = useTicketQuery().data;
   const [isParticipantsDialogOpen, setIsParticipantsDialogOpen] = useState(false);
   const [isTicketSystemUserDialogOpen, setIsTicketSystemUserDialogOpen] = useState(false);
+  const [isTicketTagDialogOpen, setIsTicketTagDialogOpen] = useState(false);
   const removeTeamMemberMutation = useRemoveTeamMemberMutation();
   const updateSystemUserStatusMutation = useUpdateTicketSystemUserStatusMutation();
   const removeSystemUserMutation = useRemoveTicketSystemUserMutation();
@@ -77,6 +80,7 @@ export const TicketSidebar = () => {
 
   return (
     <Stack spacing={5}>
+      <TicketSidebarTags onOpenDialog={() => setIsTicketTagDialogOpen(true)} />
       <TicketSidebarSystemUsers
         ticketSystemUsers={ticket.ticket_system_users}
         onOpenDialog={() => setIsTicketSystemUserDialogOpen(true)}
@@ -107,6 +111,7 @@ export const TicketSidebar = () => {
         open={isTicketSystemUserDialogOpen}
         onClose={() => setIsTicketSystemUserDialogOpen(false)}
       />
+      <TicketTagDialog open={isTicketTagDialogOpen} onClose={() => setIsTicketTagDialogOpen(false)} />
     </Stack>
   );
 };

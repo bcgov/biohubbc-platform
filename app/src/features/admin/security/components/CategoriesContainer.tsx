@@ -1,7 +1,7 @@
 import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import Container from '@mui/material/Container';
 import InputAdornment from '@mui/material/InputAdornment';
+import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -17,6 +17,7 @@ import { useDialogContext } from 'hooks/useContext';
 import { ISecurityCategoryWithRuleCount } from 'interfaces/useSecurityApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AddCategoryForm,
   AddCategoryFormInitialValues,
@@ -35,7 +36,7 @@ export interface ICategoriesContainerProps extends IServerPaginationProps {
  * Container component for managing security categories.
  *
  * Provides functionality to:
- * - View categories in a searchable, paginated table
+ * - View categories in a searchable, paginated table, and open a category's page, which lists its rules
  * - Create new categories via EditDialog
  * - Edit existing categories via EditDialog
  * - Delete categories with confirmation
@@ -57,6 +58,7 @@ export const CategoriesContainer = (props: ICategoriesContainerProps) => {
   } = props;
 
   const biohubApi = useApi();
+  const navigate = useNavigate();
   const dialogContext = useDialogContext();
 
   const [openAddCategoryDialog, setOpenAddCategoryDialog] = useState(false);
@@ -234,7 +236,7 @@ export const CategoriesContainer = (props: ICategoriesContainerProps) => {
     },
     {
       field: 'rule_count',
-      headerName: 'Reasons',
+      headerName: 'Rules',
       width: 120,
       align: 'center',
       headerAlign: 'center'
@@ -247,28 +249,30 @@ export const CategoriesContainer = (props: ICategoriesContainerProps) => {
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => (
-        <CustomMenuIconButton
-          buttonTitle="Actions"
-          buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-          menuItems={[
-            {
-              menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
-              menuLabel: 'Edit category',
-              menuOnClick: () => handleEditCategoryClick(params.row)
-            },
-            {
-              menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-              menuLabel: 'Delete category',
-              menuOnClick: () => handleDeleteCategoryClick(params.row)
-            }
-          ]}
-        />
+        <Box onClick={(event) => event.stopPropagation()}>
+          <CustomMenuIconButton
+            buttonTitle="Actions"
+            buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+            menuItems={[
+              {
+                menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
+                menuLabel: 'Edit category',
+                menuOnClick: () => handleEditCategoryClick(params.row)
+              },
+              {
+                menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+                menuLabel: 'Delete category',
+                menuOnClick: () => handleDeleteCategoryClick(params.row)
+              }
+            ]}
+          />
+        </Box>
       )
     }
   ];
 
   return (
-    <Container maxWidth="xl">
+    <>
       <PageSection
         id="categories"
         label={
@@ -311,6 +315,7 @@ export const CategoriesContainer = (props: ICategoriesContainerProps) => {
           setPaginationModel={setPaginationModel}
           sortModel={sortModel}
           setSortModel={setSortModel}
+          onRowClick={(row) => navigate(`/admin/security/categories/${row.security_category_id}`)}
         />
       </PageSection>
 
@@ -344,6 +349,6 @@ export const CategoriesContainer = (props: ICategoriesContainerProps) => {
         }}
         onSave={handleEditCategorySave}
       />
-    </Container>
+    </>
   );
 };

@@ -29,6 +29,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import {
   createBlueprintFeatureTypeProperty,
+  createTaxon,
   createTestUpload,
   featureTypeIdByName,
   getPropertyFeatureRows as fetchPropertyFeatureRows,
@@ -165,6 +166,86 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
   ): Promise<{ referenced_submission_feature_id: number; blueprint_feature_type_property_id: number }[]> {
     return fetchPropertyFeatureRows(connection, sourceFeatureId);
   }
+
+  // --- recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId ----------
+
+  describe('recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId', () => {
+    /** Insert one taxon candidate row into the UNLOGGED staging table. */
+    async function insertTaxonCandidate(params: {
+      uploadId: string;
+      sourceFeatureId: number;
+      blueprintFeatureTypePropertyId: number;
+      tsn: number | null;
+      taxonId: number | null;
+    }): Promise<void> {
+      await connection.sql(SQL`
+        INSERT INTO submission_upload_staging_taxon_candidate (
+          submission_upload_id,
+          submission_feature_id,
+          property_name,
+          blueprint_feature_type_property_id,
+          raw_value,
+          tsn,
+          taxon_id
+        )
+        VALUES (
+          ${params.uploadId}::uuid,
+          ${params.sourceFeatureId},
+          'taxon',
+          ${params.blueprintFeatureTypePropertyId},
+          ${JSON.stringify(params.tsn)}::jsonb,
+          ${params.tsn},
+          ${params.taxonId}
+        );
+      `);
+    }
+
+    /** Link a taxon to its parent, as a completed hierarchy repair would. */
+    async function setTaxonParent(taxonId: number, parentTaxonId: number): Promise<void> {
+      await connection.sql(SQL`UPDATE taxon SET parent_taxon_id = ${parentTaxonId} WHERE taxon_id = ${taxonId};`);
+    }
+
+    it('records every candidate the taxonomy lookup would have repaired, and no complete taxa', async () => {
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
+      const kingdomId = await createTaxon(connection, 'Animalia', null, null, null, 'Kingdom');
+      const completeId = await createTaxon(connection, 'Complete species', null, null, null, 'Species');
+      const missingRankId = await createTaxon(connection, 'Rankless species', null, null, null, null);
+      const missingParentId = await createTaxon(connection, 'Orphan species', null, null, null, 'Species');
+      await setTaxonParent(completeId, kingdomId);
+      await setTaxonParent(missingRankId, kingdomId);
+      const candidate = { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId };
+
+      // Not cached locally, missing rank, and missing parent link: all need ITIS.
+      await insertTaxonCandidate({ ...candidate, tsn: 999_999_991, taxonId: null });
+      await insertTaxonCandidate({ ...candidate, tsn: 999_999_992, taxonId: missingRankId });
+      await insertTaxonCandidate({ ...candidate, tsn: 999_999_993, taxonId: missingParentId });
+      // Complete taxa, including a kingdom with no parent, and a value that did not parse to a TSN.
+      await insertTaxonCandidate({ ...candidate, tsn: 999_999_994, taxonId: completeId });
+      await insertTaxonCandidate({ ...candidate, tsn: 999_999_995, taxonId: kingdomId });
+      await insertTaxonCandidate({ ...candidate, tsn: null, taxonId: null });
+
+      await repo.recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId(uploadId);
+
+      expect(await getErrors(uploadId)).to.eql([{ error_code: 'TAXONOMY_SERVICE_UNAVAILABLE', count: 3 }]);
+    });
+
+    it('records nothing for another upload', async () => {
+      const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
+      const { uploadId: otherUploadId } = await seedUpload();
+      await insertTaxonCandidate({
+        uploadId,
+        sourceFeatureId,
+        blueprintFeatureTypePropertyId,
+        tsn: 999_999_991,
+        taxonId: null
+      });
+
+      await repo.recordTaxonomyServiceUnavailableErrorsBySubmissionUploadId(otherUploadId);
+
+      expect(await getErrors(uploadId)).to.eql([]);
+      expect(await getErrors(otherUploadId)).to.eql([]);
+    });
+  });
 
   // --- recordFeaturePropertyResolutionErrorsBySubmissionUploadId -----------
 

@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { SearchFeatureResultWithRelevancy } from '../services/search-feature-service.interface';
-import { ApiCursorPaginationResults } from '../zod-schema/pagination';
-import { SearchFeatureProperty } from './feature-property';
+import { ApiPaginationResults } from '../zod-schema/pagination';
 
 /**
  * Classifications stored by the submission feature reconciliation enum.
@@ -36,23 +34,19 @@ export interface ReconciliationFeatureScope {
   reconciliation: ReconciliationType;
 }
 
-/** A feature type represented in a stored reconciliation outcome. */
-export const ReconciliationFeatureTypeCount = z.object({
-  feature_type_name: z.string(),
-  count: z.number().int().nonnegative()
+/** Columns the raw reconciliation feature data list can be sorted on. */
+export const RECONCILIATION_FEATURE_DATA_SORT_COLUMNS = ['submission_feature_id'];
+
+/** A stored reconciliation feature and its raw submitted jsonb payload. */
+export const ReconciliationFeatureData = z.object({
+  submission_feature_id: z.number(),
+  data: z.record(z.string(), z.any())
 });
 
-export type ReconciliationFeatureTypeCount = z.infer<typeof ReconciliationFeatureTypeCount>;
+export type ReconciliationFeatureData = z.infer<typeof ReconciliationFeatureData>;
 
-/** Outcome totals across the complete upload lifecycle. */
-export interface ReconciliationFeatureCounts {
-  total: number;
-  feature_types: ReconciliationFeatureTypeCount[];
-}
-
-/** Hydrated reconciliation results and cursor metadata. */
-export interface ReconciliationFeaturePage {
-  features: SearchFeatureResultWithRelevancy[];
-  properties: SearchFeatureProperty[];
-  pagination: ApiCursorPaginationResults;
+/** One page of raw reconciliation feature data and its pagination totals. */
+export interface ReconciliationFeatureDataPage {
+  features: ReconciliationFeatureData[];
+  pagination: ApiPaginationResults;
 }

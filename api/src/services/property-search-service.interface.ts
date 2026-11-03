@@ -17,7 +17,7 @@ export const SearchPropertyResult = z.object({
   feature_property_id: z.number(),
   property_name: z.string(),
   property_display_name: z.string(),
-  feature_property_type: z.enum(['string', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']),
+  feature_property_type: z.enum(['string', 'paragraph', 'number', 'boolean', 'datetime', 'taxon', 'spatial', 'code']),
   operators: z.array(z.string()),
   relevancy_score: z.number()
 });
@@ -29,6 +29,7 @@ export type SearchPropertyResult = z.infer<typeof SearchPropertyResult>;
  */
 export const GroupedPropertyResults = z.object({
   string: z.array(SearchPropertyResult),
+  paragraph: z.array(SearchPropertyResult),
   number: z.array(SearchPropertyResult),
   boolean: z.array(SearchPropertyResult),
   datetime: z.array(SearchPropertyResult),

@@ -170,12 +170,11 @@ describe('Martin tile cache keying (integration)', function () {
     );
 
     await connection.sql(SQL`
-      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
+      INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
       VALUES (
         ${featureId},
         ${spatial.rows[0].blueprint_feature_type_property_id},
-        public.ST_SetSRID(public.ST_MakePoint(${TEST_LNG}, ${TEST_LAT}), 4326),
-        ${connection.systemUserId()}
+        public.ST_SetSRID(public.ST_MakePoint(${TEST_LNG}, ${TEST_LAT}), 4326)
       );
     `);
     await connection.sql(SQL`

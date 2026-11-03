@@ -2,9 +2,9 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
-import { SubmissionUploadDecision, SubmissionUploadJobStatus } from '../../../../../models/submission-upload';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../../openapi/schemas/pagination';
+import { AdminSubmissionUploadSchema } from '../../../../../openapi/schemas/submission-upload';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { SubmissionUploadService } from '../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../utils/logger';
@@ -54,32 +54,7 @@ GET.apiDoc = {
             properties: {
               uploads: {
                 type: 'array',
-                items: {
-                  type: 'object',
-                  additionalProperties: false,
-                  required: [
-                    'submission_upload_id',
-                    'upload_id',
-                    'status',
-                    'decision',
-                    'ticket_id',
-                    'comment',
-                    'create_date',
-                    'create_user',
-                    'submitted_by_identifier'
-                  ],
-                  properties: {
-                    submission_upload_id: { type: 'string', format: 'uuid' },
-                    upload_id: { type: 'string', format: 'uuid' },
-                    status: { type: 'string', enum: SubmissionUploadJobStatus.options },
-                    decision: { type: 'string', enum: SubmissionUploadDecision.options },
-                    ticket_id: { type: 'string', format: 'uuid' },
-                    comment: { type: 'string', nullable: true },
-                    create_date: { type: 'string' },
-                    create_user: { type: 'integer' },
-                    submitted_by_identifier: { type: 'string', nullable: true }
-                  }
-                }
+                items: AdminSubmissionUploadSchema
               },
               pagination: paginationResponseSchema
             }

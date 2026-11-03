@@ -4,7 +4,11 @@ import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { UpdateSecurityCategory } from '../../../../../models/security-category';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { SecurityCategorySchema, UpdateSecurityCategoryRequestSchema } from '../../../../../openapi/schemas/security';
+import {
+  SecurityCategoryDetailsSchema,
+  SecurityCategorySchema,
+  UpdateSecurityCategoryRequestSchema
+} from '../../../../../openapi/schemas/security';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { SecurityCategoryService } from '../../../../../services/security-category-service';
 import { getLogger } from '../../../../../utils/logger';
@@ -31,7 +35,7 @@ const securityCategoryIdParam = {
 export const GET: Operation = [authorizeRequestHandler(securityAdminAuth), getSecurityCategory()];
 
 GET.apiDoc = {
-  description: 'Get a security category by ID.',
+  description: 'Get a security category by ID, with when it was created and who created it.',
   tags: ['security'],
   security: [{ Bearer: [] }],
   parameters: [securityCategoryIdParam],
@@ -40,7 +44,7 @@ GET.apiDoc = {
       description: 'Security category',
       content: {
         'application/json': {
-          schema: SecurityCategorySchema
+          schema: SecurityCategoryDetailsSchema
         }
       }
     },
@@ -49,7 +53,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get a security category by ID.
+ * Get a security category by ID, with when it was created and who created it.
  *
  * @returns {RequestHandler}
  */
@@ -62,7 +66,7 @@ export function getSecurityCategory(): RequestHandler {
       await connection.open();
 
       const securityCategoryService = new SecurityCategoryService(connection);
-      const result = await securityCategoryService.getSecurityCategory(securityCategoryId);
+      const result = await securityCategoryService.getSecurityCategoryDetails(securityCategoryId);
 
       await connection.commit();
 

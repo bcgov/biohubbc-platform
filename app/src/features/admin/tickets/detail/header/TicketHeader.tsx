@@ -4,10 +4,10 @@ import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
+import { PropsWithChildren } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { EditTicketDialog } from '../../components/dialog/edit/EditTicketDialog';
 import { useOptimisticTicketHandlers } from '../../hooks/useOptimisticTicketHandlers';
@@ -22,13 +22,14 @@ interface ITicketHeaderProps {
 export type TicketDetailTab = 'timeline' | 'artifacts';
 
 /**
- * Renders the ticket header with breadcrumb, identifier, status, and description.
+ * Renders the ticket page in the administrative page layout: the header with breadcrumb, identifier, status,
+ * description and tabs, above the selected tab's content passed as children.
  *
- * @param {ITicketHeaderProps} props
+ * @param {PropsWithChildren<ITicketHeaderProps>} props
  * @return {*}
  */
-export const TicketHeader = (props: ITicketHeaderProps) => {
-  const { ticket, activeTab, onTabChange } = props;
+export const TicketHeader = (props: PropsWithChildren<ITicketHeaderProps>) => {
+  const { ticket, activeTab, onTabChange, children } = props;
   const { biohubUserWrapper } = useAuthStateContext();
   const { isSavingTicket, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } = useTicketEditDialog({
     ticket
@@ -47,10 +48,12 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
 
   return (
     <>
-      <PageHeader
-        maxWidth="xl"
+      <AdminPageLayout
         breadcrumbs={
           <Breadcrumbs aria-label="ticket breadcrumb">
+            <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+              Administration
+            </Link>
             <Link component={RouterLink} to="/admin/tickets" underline="hover" color="inherit">
               Tickets
             </Link>
@@ -59,7 +62,7 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
             </Typography>
           </Breadcrumbs>
         }
-        label={<Typography variant="h1">{ticket.subject}</Typography>}
+        title={ticket.subject}
         buttons={
           <Stack direction="row" spacing={1}>
             <Button
@@ -76,7 +79,7 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
             </Button>
           </Stack>
         }
-        subheader={
+        subtitle={
           <Stack direction="row" spacing={1}>
             <Chip label={`${ticket.priority} priority`} sx={{ textTransform: 'capitalize' }} />
             <Chip
@@ -88,18 +91,14 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
         }
         description={ticket.description}
         descriptionDialogTitle="Ticket Description"
-        tabs={
-          <TabGroup<TicketDetailTab>
-            value={activeTab}
-            onChange={onTabChange}
-            ariaLabel="Ticket detail sections"
-            tabs={[
-              { value: 'timeline', label: 'Timeline' },
-              { value: 'artifacts', label: 'Files' }
-            ]}
-          />
-        }
-      />
+        tabs={[
+          { value: 'timeline', label: 'Timeline' },
+          { value: 'artifacts', label: 'Files' }
+        ]}
+        activeTab={activeTab}
+        onTabChange={onTabChange}>
+        {children}
+      </AdminPageLayout>
 
       {isEditDialogOpen ? (
         <EditTicketDialog

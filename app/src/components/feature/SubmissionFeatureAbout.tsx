@@ -53,7 +53,12 @@ export const SubmissionFeatureAbout = ({ feature }: SubmissionFeatureAboutProps)
         value: getFormattedDate(DATE_FORMAT.MediumDateFormat, feature.create_date)
       },
       { id: 'contributor', property: 'Contributor', value: feature.contributor_name },
-      { id: 'uuid', property: 'UUID', value: feature.uuid }
+      { id: 'uuid', property: 'UUID', value: feature.uuid },
+      {
+        id: 'successor',
+        property: 'Successor',
+        value: feature.successor_submission_feature_id?.toString() ?? ''
+      }
     ],
     [feature]
   );

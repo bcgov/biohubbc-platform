@@ -144,7 +144,8 @@ export class SecurityScopeService extends DBService {
 
     for (const statement of statements) {
       await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
-        securityScopeId: statement.security_scope_id
+        securityScopeId: statement.security_scope_id,
+        submissionId: null
       });
     }
 
@@ -241,7 +242,8 @@ export class SecurityScopeService extends DBService {
    *
    * Called when security rules are applied to features in a submission.
    * New secured features may become anchors for existing scopes that cover
-   * the affected submission's URN pattern.
+   * the affected submission's URN pattern. Each job is limited to the submission,
+   * so a wildcard scope does not rescan every other submission's features.
    *
    * @param submissionId The submission whose features gained security rules
    */
@@ -254,9 +256,35 @@ export class SecurityScopeService extends DBService {
 
     for (const scope of scopes) {
       await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
-        securityScopeId: scope.security_scope_id
+        securityScopeId: scope.security_scope_id,
+        submissionId
       });
     }
+  }
+
+  /**
+   * Resolve the single submission an anchor recompute can be limited to.
+   *
+   * Closure, and therefore every anchor's ancestry, is per submission. A scope URN naming one submission can
+   * only anchor that submission's features; a run triggered by one submission's graph change can only
+   * change that submission's anchors. A wildcard scope recomputed for a policy change spans every submission.
+   *
+   * @param {SecurityScopeUrn} urn URN components resolved through `resolveUrnForScope`.
+   * @param {number | null} triggeringSubmissionId Submission whose graph changed, or null for a policy change.
+   * @returns {number | null} The submission to limit both anchor scans to, or null to scan every submission.
+   */
+  static getAnchorSubmissionId(urn: SecurityScopeUrn, triggeringSubmissionId: number | null): number | null {
+    if (urn.urn_submission_id === '*') {
+      return triggeringSubmissionId;
+    }
+
+    // Non-numeric URN submission ids match no feature; the repository's URN predicate still excludes them.
+    const urnSubmissionId = Number(urn.urn_submission_id);
+    if (Number.isInteger(urnSubmissionId)) {
+      return urnSubmissionId;
+    }
+
+    return triggeringSubmissionId;
   }
 
   /**
@@ -268,10 +296,15 @@ export class SecurityScopeService extends DBService {
    *
    * @param securityScopeId UUID of the security scope
    * @param afterId Keyset cursor — pass 0 to start from the beginning
+   * @param submissionId Submission whose anchors are checked, or null to check every anchor of the scope
    * @returns Next cursor position, or null when no more anchors exist
    */
-  async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
-    return this.securityScopeRepository.deleteStaleAnchorBatch(securityScopeId, afterId);
+  async deleteStaleAnchorBatch(
+    securityScopeId: string,
+    afterId: number,
+    submissionId: number | null
+  ): Promise<AnchorBatchResult | null> {
+    return this.securityScopeRepository.deleteStaleAnchorBatch(securityScopeId, afterId, submissionId);
   }
 
   /**
@@ -293,13 +326,15 @@ export class SecurityScopeService extends DBService {
    * @param securityScopeId UUID of the security scope
    * @param urn URN components resolved via `resolveUrnForScope`
    * @param afterId Keyset cursor — pass 0 to start from the beginning
+   * @param submissionId Submission whose features are candidates, or null to consider every submission
    * @returns Next cursor position, or null when no more candidates exist
    */
   async computeAnchorBatch(
     securityScopeId: string,
     urn: SecurityScopeUrn,
-    afterId: number
+    afterId: number,
+    submissionId: number | null
   ): Promise<AnchorBatchResult | null> {
-    return this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, afterId);
+    return this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, afterId, submissionId);
   }
 }

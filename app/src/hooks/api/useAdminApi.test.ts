@@ -14,6 +14,43 @@ describe('useAdminApi', () => {
     mock.restore();
   });
 
+  it('reads one upload from the submission-scoped admin endpoint', async () => {
+    const upload = { submission_upload_id: 'upload-id', status: 'indexed', decision: 'pending' };
+    mock.onGet('/api/administrative/submission/16/upload/upload-id').reply(200, upload);
+    const signal = new AbortController().signal;
+
+    const result = await useAdminApi(axios).getAdminSubmissionUpload(
+      { submissionId: 16, submissionUploadId: 'upload-id' },
+      { signal }
+    );
+
+    expect(result).toEqual(upload);
+    expect(mock.history.get[0].signal).toBe(signal);
+  });
+
+  it('posts the chosen blueprint to the upload indexing endpoint', async () => {
+    mock.onPost('/api/administrative/submission/16/upload/upload-id/indexing').reply(202);
+
+    await useAdminApi(axios).reindexSubmissionUpload({ submissionId: 16, submissionUploadId: 'upload-id' }, 4);
+
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ blueprintId: 4 });
+  });
+
+  it('sends pagination to the upload-scoped error endpoint', async () => {
+    const response = { errors: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+    mock.onGet('/api/administrative/submission/16/upload/upload-id/error').reply(200, response);
+    const pagination = { page: 2, limit: 10, sort: 'count', order: 'desc' as const };
+    const signal = new AbortController().signal;
+    const result = await useAdminApi(axios).listSubmissionFeatureErrors(
+      { submissionId: 16, submissionUploadId: 'upload-id' },
+      pagination,
+      { signal }
+    );
+    expect(result).toEqual(response);
+    expect(mock.history.get[0].params).toEqual(pagination);
+    expect(mock.history.get[0].signal).toBe(signal);
+  });
+
   it('loads feature-type property definitions for the upload without feature IDs or outcome filters', async () => {
     const signal = new AbortController().signal;
     const response = { properties: [] };
@@ -27,29 +64,45 @@ describe('useAdminApi', () => {
     expect(mock.history.get[0].params).toBeUndefined();
   });
 
-  it('loads reconciliation counts and a cursor page with cancellation', async () => {
-    const scope = { submissionId: 7, submissionUploadId: 'upload-1', reconciliation: 'unmodified' as const };
+  it('sends the outcome filter and pagination to the upload-scoped feature type endpoint', async () => {
+    const scope = { submissionId: 7, submissionUploadId: 'upload-1' };
     const signal = new AbortController().signal;
-    const path = '/api/administrative/submission/7/upload/upload-1/reconciliation/unmodified/features';
-    const counts = { total: 0, feature_types: [] };
-    const page = { features: [], properties: [], pagination: { next_cursor: null, previous_cursor: null } };
-    mock.onGet(`${path}/count`).reply(200, counts);
-    mock.onPost(path).reply(200, page);
-    expect(await useAdminApi(axios).countReconciliationFeatures(scope, { signal })).toEqual(counts);
+    const response = { feature_types: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+    const pagination = { page: 2, limit: 10, sort: 'count', order: 'desc' as const };
+    mock
+      .onGet('/api/administrative/submission/7/upload/upload-1/reconciliation/unmodified/features/types')
+      .reply(200, response);
     expect(
-      await useAdminApi(axios).getReconciliationFeatures(
-        scope,
-        'animal',
-        { limit: 25, cursor: 'NextCursor' },
-        { signal }
+      await useAdminApi(axios).listSubmissionUploadFeatureTypes(
+        { ...scope, reconciliation: 'unmodified' },
+        pagination,
+        {
+          signal
+        }
       )
-    ).toEqual(page);
-    expect(JSON.parse(mock.history.post[0].data)).toEqual({
-      featureType: 'animal',
-      pagination: { limit: 25, cursor: 'NextCursor' }
-    });
+    ).toEqual(response);
+    expect(mock.history.get[0].params).toEqual(pagination);
     expect(mock.history.get[0].signal).toBe(signal);
-    expect(mock.history.post[0].signal).toBe(signal);
+  });
+
+  it('requests one page of raw reconciliation feature data', async () => {
+    const signal = new AbortController().signal;
+    const response = { features: [], pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 } };
+    const pagination = { page: 1, limit: 10, sort: 'submission_feature_id', order: 'asc' as const };
+    mock
+      .onGet('/api/administrative/submission/7/upload/upload-1/reconciliation/modified/features')
+      .reply(200, response);
+    expect(
+      await useAdminApi(axios).getReconciliationFeatureData(
+        { submissionId: 7, submissionUploadId: 'upload-1', reconciliation: 'modified' },
+        pagination,
+        {
+          signal
+        }
+      )
+    ).toEqual(response);
+    expect(mock.history.get[0].params).toEqual(pagination);
+    expect(mock.history.get[0].signal).toBe(signal);
   });
 
   it('requests the upload-feature extent without creating a tile session', async () => {
@@ -86,20 +139,6 @@ describe('useAdminApi', () => {
     ]);
     expect(mock.history.get[2].params).toEqual(pagination);
     expect(mock.history.get[3].params).toEqual(pagination);
-  });
-
-  it('gets paginated submission features from the administrative endpoint', async () => {
-    const mockResponse = {
-      features: [],
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
-    };
-
-    mock.onGet('/api/administrative/submission/1/features').reply(200, mockResponse);
-
-    const result = await useAdminApi(axios).getSubmissionFeatures(1, { page: 1, limit: 10 });
-
-    expect(result).toEqual(mockResponse);
-    expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
   });
 
   it('gets a submission upload review', async () => {
@@ -159,24 +198,6 @@ describe('useAdminApi', () => {
     await expect(
       useAdminApi(axios).updateSubmissionUploadReview(16, submissionUploadId, submissionUploadReviewId, 'completed')
     ).resolves.toEqual(mockResponse);
-  });
-
-  it('gets paginated features for a submission upload', async () => {
-    const submissionUploadId = '11111111-1111-4111-8111-111111111111';
-    const mockResponse = {
-      features: [],
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 25 }
-    };
-
-    mock.onGet(`/api/administrative/submission/16/upload/${submissionUploadId}/features`).reply(200, mockResponse);
-
-    const result = await useAdminApi(axios).getSubmissionUploadFeatures(16, submissionUploadId, {
-      page: 1,
-      limit: 25
-    });
-
-    expect(result).toEqual(mockResponse);
-    expect(mock.history.get[0].params).toEqual({ page: 1, limit: 25 });
   });
 
   it('gets an unpublished feature belonging to a submission upload', async () => {

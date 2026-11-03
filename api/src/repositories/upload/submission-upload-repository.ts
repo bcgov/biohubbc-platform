@@ -1,15 +1,22 @@
 import { SQL } from 'sql-template-strings';
 import { z } from 'zod';
+import {
+  SUBMISSION_UPLOAD_INGESTION_LOCK_PREFIX,
+  SUBMISSION_UPLOAD_INGESTION_LOCK_SEED
+} from '../../constants/database-lock-keys';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
 import {
   AdminSubmissionUpload,
+  AdminSubmissionUploadListFilters,
+  AdminSubmissionUploadListItem,
   CreateSubmissionUploadWithTeam,
   SubmissionUpload,
   SubmissionUploadDecision,
   SubmissionUploadFilters,
   SubmissionUploadJobStatus,
+  SubmissionUploadScope,
   TicketSubmissionUpload,
   UpdateSubmissionUpload
 } from '../../models/submission-upload';
@@ -17,6 +24,7 @@ import {
   SubmissionUploadDecisionHistoryRow,
   SubmissionUploadDecisionRow
 } from '../../models/submission-upload-decision';
+import { TicketSubmissionUploadScope } from '../../models/tag-rule';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -55,6 +63,119 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, AdminSubmissionUpload);
     return response.rows;
+  }
+
+  /**
+   * Get one page of the active uploads of every active submission, with the submission each belongs to.
+   *
+   * @param {AdminSubmissionUploadListFilters} filters Optional keyword matched against the submission name.
+   * @param {ApiPaginationOptions} pagination Page, page size and a sort column restricted by the endpoint.
+   * @returns {Promise<AdminSubmissionUploadListItem[]>} One page of upload records, with stable ordering.
+   * @memberof SubmissionUploadRepository
+   */
+  async getAdminSubmissionUploadList(
+    filters: AdminSubmissionUploadListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<AdminSubmissionUploadListItem[]> {
+    const knex = getKnex();
+
+    // Every sortable field is a selected output column, which Postgres prefers over same-named input columns.
+    const query = knex('submission_upload as su')
+      .select(
+        'su.submission_upload_id',
+        'su.submission_id',
+        's.name as submission_name',
+        'su.upload_id',
+        'su.status',
+        'su.decision',
+        'su.ticket_id',
+        'su.comment',
+        'su.create_date',
+        'su.create_user',
+        'u.user_identifier as submitted_by_identifier'
+      )
+      .join('submission as s', 's.submission_id', 'su.submission_id')
+      .leftJoin('system_user as u', 'u.system_user_id', 'su.create_user')
+      .whereNull('su.record_end_date')
+      .whereNull('s.record_end_date');
+
+    if (filters.keyword) {
+      query.whereILike('s.name', `%${filters.keyword}%`);
+    }
+
+    query
+      .orderBy(pagination.sort ?? 'create_date', pagination.order ?? 'desc')
+      .orderBy('su.submission_upload_id', 'desc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, AdminSubmissionUploadListItem);
+
+    return response.rows;
+  }
+
+  /**
+   * Count the active uploads of every active submission matching the filters.
+   *
+   * @param {AdminSubmissionUploadListFilters} filters Optional keyword matched against the submission name.
+   * @returns {Promise<number>} Number of matching uploads.
+   * @memberof SubmissionUploadRepository
+   */
+  async getAdminSubmissionUploadCount(filters: AdminSubmissionUploadListFilters): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex('submission_upload as su')
+      .select(knex.raw('count(*)::integer as count'))
+      .join('submission as s', 's.submission_id', 'su.submission_id')
+      .whereNull('su.record_end_date')
+      .whereNull('s.record_end_date');
+
+    if (filters.keyword) {
+      query.whereILike('s.name', `%${filters.keyword}%`);
+    }
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
+  }
+
+  /**
+   * Get one active upload of a submission, in the shape administrators list uploads with.
+   *
+   * @param {SubmissionUploadScope} scope Submission and upload ownership boundary.
+   * @returns {Promise<AdminSubmissionUpload>} The upload record.
+   * @throws {ApiNotFoundError} When the upload is not an active upload of the submission.
+   * @memberof SubmissionUploadRepository
+   */
+  async getAdminSubmissionUpload(scope: SubmissionUploadScope): Promise<AdminSubmissionUpload> {
+    const knex = getKnex();
+    const query = knex('submission_upload as su')
+      .select(
+        'su.submission_upload_id',
+        'su.upload_id',
+        'su.status',
+        'su.decision',
+        'su.ticket_id',
+        'su.comment',
+        'su.create_date',
+        'su.create_user',
+        'u.user_identifier as submitted_by_identifier'
+      )
+      .leftJoin('system_user as u', 'u.system_user_id', 'su.create_user')
+      .where('su.submission_id', scope.submissionId)
+      .where('su.submission_upload_id', scope.submissionUploadId)
+      .whereNull('su.record_end_date');
+
+    const response = await this.connection.knex(query, AdminSubmissionUpload);
+
+    if (!response.rowCount) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getAdminSubmissionUpload',
+        scope
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**
@@ -122,8 +243,11 @@ export class SubmissionUploadRepository extends BaseRepository {
   /**
    * Get and lock a single active submission_upload record by ID.
    *
-   * Uses `FOR UPDATE` to serialize concurrent workers attempting to start
-   * process-stage work for the same submission_upload_id.
+   * Uses `FOR NO KEY UPDATE` to serialize concurrent workers attempting to start
+   * process-stage work for the same submission_upload_id. Feature pipeline jobs hold this lock for
+   * their whole stage transaction, so it must not be `FOR UPDATE`: that mode conflicts with the
+   * `FOR KEY SHARE` lock taken by foreign key checks, and would block inserts of rows that reference
+   * the upload (such as reviews) until the stage commits.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record.
    * @returns {Promise<SubmissionUpload>} - The locked submission_upload record.
@@ -149,7 +273,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       WHERE
         submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL
-      FOR UPDATE;
+      FOR NO KEY UPDATE;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
@@ -167,6 +291,28 @@ export class SubmissionUploadRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Try to take the per-upload ingestion advisory lock for the current transaction.
+   *
+   * The lock is released when the transaction commits or rolls back. It does not block:
+   * callers decide how to handle an upload whose ingestion is already running elsewhere.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @returns {Promise<boolean>} True when the lock was acquired.
+   * @memberof SubmissionUploadRepository
+   */
+  async tryLockSubmissionUploadIngestion(submissionUploadId: string): Promise<boolean> {
+    const sqlStatement = SQL`
+      SELECT pg_try_advisory_xact_lock(
+        hashtextextended(${SUBMISSION_UPLOAD_INGESTION_LOCK_PREFIX} || ':' || ${submissionUploadId}::text, ${SUBMISSION_UPLOAD_INGESTION_LOCK_SEED})
+      ) AS locked;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, z.object({ locked: z.boolean() }));
+
+    return response.rows[0].locked;
   }
 
   /**
@@ -320,6 +466,25 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Get the submission and upload ids of a ticket's active submission uploads.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<TicketSubmissionUploadScope[]>} Active upload scopes of the ticket.
+   * @memberof SubmissionUploadRepository
+   */
+  async getActiveSubmissionUploadScopesByTicketId(ticketId: string): Promise<TicketSubmissionUploadScope[]> {
+    const knex = getKnex();
+    const query = knex('submission_upload')
+      .select('submission_id', 'submission_upload_id')
+      .where('ticket_id', ticketId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, TicketSubmissionUploadScope);
+
+    return response.rows;
+  }
+
+  /**
    * Find ticket-scoped submission upload timeline records.
    *
    * @param {string} ticketId - Ticket UUID.
@@ -440,7 +605,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         WHERE submission_id = ${submissionUpload.submission_id}
         ORDER BY create_date DESC, submission_upload_id DESC
         LIMIT 1
-        FOR UPDATE
+        FOR NO KEY UPDATE
       ),
       inserted AS (
         INSERT INTO submission_upload (
@@ -489,37 +654,6 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Find the `blueprint_id` of the most recent prior submission_upload for a submission.
-   *
-   * Used to pin a new upload to the same Blueprint as the submission's previous upload, so
-   * re-submissions remain stable when the default Blueprint changes. The most recent upload is
-   * selected by `create_date` regardless of `record_end_date` — a soft-deleted prior upload's
-   * Blueprint is still a valid pin.
-   *
-   * @param {number} submissionId - The submission whose prior uploads should be inspected.
-   * @returns {Promise<number | null>} - The prior upload's `blueprint_id`, or null if none exists.
-   * @memberof SubmissionUploadRepository
-   */
-  async findMostRecentBlueprintIdBySubmissionId(submissionId: number): Promise<number | null> {
-    const sqlStatement = SQL`
-      SELECT
-        blueprint_id
-      FROM
-        submission_upload
-      WHERE
-        submission_id = ${submissionId}
-      ORDER BY
-        create_date DESC,
-        submission_upload_id DESC
-      LIMIT 1;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, z.object({ blueprint_id: z.number() }));
-
-    return response.rows[0]?.blueprint_id ?? null;
-  }
-
-  /**
    * Update an existing submission_upload record.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record to update.
@@ -553,6 +687,38 @@ export class SubmissionUploadRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Set the blueprint an active submission_upload record is indexed with.
+   *
+   * Only `SubmissionUploadService.reindexSubmissionUpload` should call this: it holds the row lock, validates the
+   * blueprint and queues the re-index that rebuilds the upload's property rows against it.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to update.
+   * @param {number} blueprintId - The blueprint to index the upload with.
+   * @returns {Promise<void>} Resolves after the active record is updated.
+   * @throws {ApiExecuteSQLError} - If no active record was updated.
+   * @memberof SubmissionUploadRepository
+   */
+  async updateSubmissionUploadBlueprint(submissionUploadId: string, blueprintId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET
+        blueprint_id = ${blueprintId}
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission_upload blueprint', [
+        'SubmissionUploadRepository->updateSubmissionUploadBlueprint',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
   }
 
   /**
@@ -777,7 +943,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       WHERE submission_id = ${submissionId}
         AND record_end_date IS NULL
       ORDER BY submission_upload_id
-      FOR UPDATE;
+      FOR NO KEY UPDATE;
     `;
 
     await this.connection.sql(sqlStatement);

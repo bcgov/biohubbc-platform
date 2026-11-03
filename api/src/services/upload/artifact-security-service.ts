@@ -1,20 +1,25 @@
-import { HeadObjectCommandOutput } from '@aws-sdk/client-s3';
 import { TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
-import { ClamAvScanValidationError } from '../../errors/clamav-errors';
 import { ArtifactStatusEnum } from '../../models/artifact';
-import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
+import {
+  ArtifactSecurity,
+  ArtifactSecurityScanStart,
+  CreateArtifactSecurity,
+  ScanExecutionResult,
+  StartedArtifactSecurityScan,
+  UpdateArtifactSecurity
+} from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
 import { UploadArchive } from '../../models/upload-archive';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
-import { _getClamAvScanner, getObjectStoreBucketName, getSecurityObjectStoreBucketName } from '../../utils/file-utils';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { sanitizeJsonbValue } from '../../utils/jsonb';
 import { DBService } from '../db-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
-import { ScanExecutionResult, ScanOutcome } from './artifact-security-service.interface';
+import { ScanOutcome } from './artifact-security-service.interface';
 import { ArtifactService } from './artifact-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
@@ -31,8 +36,7 @@ export class ArtifactSecurityService extends DBService {
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
    */
   static readonly dependencies = {
-    publishProcessSubmissionFeaturesJob,
-    getClamAvScanner: _getClamAvScanner
+    publishProcessSubmissionFeaturesJob
   };
 
   /**
@@ -115,12 +119,11 @@ export class ArtifactSecurityService extends DBService {
    *
    * **Ordering contract.** This method must only be called AFTER `publishNextPipelineStep` has successfully
    * enqueued the downstream submission-processing job. Running it earlier creates an orphan: a CLEAN/promoted
-   * artifact with no downstream pipeline step to consume it. See `executeScan` for the full ordering.
+   * artifact with no downstream pipeline step to consume it. See `completeArtifactSecurityScan` for the full ordering.
    *
-   * Known residual: if this method itself throws between the CLEAN-security commit and its two writes
-   * (e.g. S3 outage between `promoteFromSecurity` and `updateUploadArchive`), a narrower orphan direction
-   * is possible (security=CLEAN but archive=BLOCKED). Fixing that tail requires a transactional outbox or
-   * similar structural change.
+   * These writes share the completion transaction with the CLEAN security write and the published job, so a
+   * failure after `promoteFromSecurity` rolls all of them back. The promote is a copy, so the retried scan
+   * re-copies the same object and converges.
    *
    * @param {UploadArchive | null} uploadArchive - The already-looked-up archive record for the artifact, if one exists.
    * @param {string} artifactId - Artifact record to mark as promoted after the copy succeeds.
@@ -192,25 +195,30 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Execute end-to-end malware scanning for one artifact security record.
+   * Start a malware scan for one artifact security record.
    *
-   * This method validates artifact readiness, inserts a scan record, runs ClamAV, persists results,
-   * updates security status, and triggers the next pipeline step when clean.
+   * Validates artifact readiness and inserts a PENDING scan record. Callers commit this before
+   * streaming the artifact to ClamAV so no transaction stays open for the length of the scan.
+   * Security records that already have a final status are returned unchanged (idempotent), and
+   * artifacts that are not uploaded are marked ERROR without a scan.
    *
    * @param {string} artifactSecurityId - Artifact security record identifier.
-   * @returns {Promise<ScanExecutionResult>} Final scan execution result summary.
+   * @returns {Promise<ArtifactSecurityScanStart>} The final result, or the started scan to run.
+   * @memberof ArtifactSecurityService
    */
-  async executeScan(artifactSecurityId: string): Promise<ScanExecutionResult> {
-    // 1. Get artifact info and validate
+  async startArtifactSecurityScan(artifactSecurityId: string): Promise<ArtifactSecurityScanStart> {
     const securityRecord = await this.getArtifactSecurity(artifactSecurityId);
     const artifact = await this.artifactService.getArtifact(securityRecord.artifact_id);
 
     // Already processed - return existing result (idempotent)
     if (securityRecord.security !== SecurityStatusEnum.PENDING) {
       return {
-        artifactId: artifact.artifact_id,
-        objectKey: artifact.object_key,
-        securityStatus: securityRecord.security as SecurityStatusEnum
+        status: 'finished',
+        result: {
+          artifactId: artifact.artifact_id,
+          objectKey: artifact.object_key,
+          securityStatus: securityRecord.security as SecurityStatusEnum
+        }
       };
     }
 
@@ -221,13 +229,15 @@ export class ArtifactSecurityService extends DBService {
       });
 
       return {
-        artifactId: artifact.artifact_id,
-        objectKey: artifact.object_key,
-        securityStatus: SecurityStatusEnum.ERROR
+        status: 'finished',
+        result: {
+          artifactId: artifact.artifact_id,
+          objectKey: artifact.object_key,
+          securityStatus: SecurityStatusEnum.ERROR
+        }
       };
     }
 
-    // 2. Create scan record (PENDING)
     const { artifact_security_scan_id } = await this.artifactSecurityScanService.insertArtifactSecurityScan({
       artifact_security_id: artifactSecurityId,
       scan_status: ProcessStatusStatusEnum.PENDING,
@@ -236,178 +246,107 @@ export class ArtifactSecurityService extends DBService {
       results: null
     });
 
-    try {
-      // 3. Run the scan
-      const scanOutcome = await this.scanArtifactObject(artifact.bucket, artifact.object_key);
+    return {
+      status: 'started',
+      scan: {
+        artifactSecurityId,
+        artifactSecurityScanId: artifact_security_scan_id,
+        artifactId: artifact.artifact_id,
+        bucket: artifact.bucket,
+        objectKey: artifact.object_key
+      }
+    };
+  }
 
-      // 4. Update scan record with results
-      await this.artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
-        scan_status: scanOutcome.scanStatus,
-        scanner_version: scanOutcome.scannerVersion,
-        scanned_at: scanOutcome.scannedAt,
-        results: sanitizeJsonbValue(scanOutcome.results)
-      });
+  /**
+   * Persist a completed malware scan and apply its post-scan actions.
+   *
+   * Updates the scan record and security status. A clean archive publishes its downstream
+   * processing job before the irreversible CLEAN, archive unblock, and S3 promote writes.
+   *
+   * @param {StartedArtifactSecurityScan} scan - The scan started by {@link startArtifactSecurityScan}.
+   * @param {ScanOutcome} scanOutcome - ClamAV scan outcome for the artifact.
+   * @returns {Promise<ScanExecutionResult>} Final scan execution result summary.
+   * @memberof ArtifactSecurityService
+   */
+  async completeArtifactSecurityScan(
+    scan: StartedArtifactSecurityScan,
+    scanOutcome: ScanOutcome
+  ): Promise<ScanExecutionResult> {
+    // The scan ran outside any transaction, so an expired attempt and its retry can both reach completion.
+    // Lock the security record and apply only the first result; a later one is kept on its scan row as audit.
+    const securityRecord = await this.uploadArtifactSecurityRepository.getArtifactSecurityWithLock(
+      scan.artifactSecurityId
+    );
 
-      // 5. Handle post-scan actions by scan outcome.
-      if (scanOutcome.securityStatus === SecurityStatusEnum.CLEAN) {
-        // Publish BEFORE committing any point-of-no-return write
-        // (security = CLEAN, archive unblock, S3 promote).
-        //
-        // If `publishProcessSubmissionFeaturesJob` throws here — e.g. pg-boss's DB is
-        // unavailable — the caller's transaction rolls back with nothing CLEAN persisted,
-        // the archive stays BLOCKED, and the S3 object stays in the security bucket.
-        // pg-boss retries the whole scan on a fresh connection; `getArtifactSecurity`
-        // still reads `security = PENDING`, so `executeScan` re-runs the full flow and
-        // converges. Without this ordering, a queue outage at this step leaves a clean
-        // artifact with no downstream submission-processing job.
-        const uploadArchive = await this.uploadArchiveService.findUploadArchiveByArtifactId(artifact.artifact_id);
+    await this.artifactSecurityScanService.updateArtifactSecurityScan(scan.artifactSecurityScanId, {
+      scan_status: scanOutcome.scanStatus,
+      scanner_version: scanOutcome.scannerVersion,
+      scanned_at: scanOutcome.scannedAt,
+      results: sanitizeJsonbValue(scanOutcome.results)
+    });
 
-        if (uploadArchive) {
-          await this.publishNextPipelineStep(uploadArchive);
-        }
+    if (securityRecord.security !== SecurityStatusEnum.PENDING) {
+      return {
+        artifactId: scan.artifactId,
+        objectKey: scan.objectKey,
+        securityStatus: securityRecord.security as SecurityStatusEnum
+      };
+    }
 
-        // Point-of-no-return: publish succeeded; now commit the CLEAN state and
-        // the irreversible S3 + archive writes.
-        await this.updateArtifactSecurity(artifactSecurityId, {
-          security: SecurityStatusEnum.CLEAN
-        });
-        await this.handleCleanScanResult(uploadArchive, artifact.artifact_id, artifact.object_key);
-      } else {
-        // INFECTED / ERROR / SKIPPED: no publish, no S3 promote, no archive unblock.
-        // Write the security status directly — no orphan risk on this branch.
-        await this.updateArtifactSecurity(artifactSecurityId, {
-          security: scanOutcome.securityStatus
-        });
+    if (scanOutcome.securityStatus === SecurityStatusEnum.CLEAN) {
+      // Publish BEFORE any point-of-no-return write (security = CLEAN, archive unblock, S3 promote).
+      //
+      // If `publishProcessSubmissionFeaturesJob` throws here — e.g. pg-boss's DB is
+      // unavailable — the caller's transaction rolls back with nothing CLEAN persisted,
+      // the archive stays BLOCKED, and the S3 object stays in the security bucket.
+      // pg-boss retries the whole scan; `getArtifactSecurity` still reads `security = PENDING`,
+      // so the scan re-runs and converges. Without this ordering, a queue outage at this step
+      // leaves a clean artifact with no downstream submission-processing job.
+      const uploadArchive = await this.uploadArchiveService.findUploadArchiveByArtifactId(scan.artifactId);
+
+      if (uploadArchive) {
+        await this.publishNextPipelineStep(uploadArchive);
       }
 
-      return {
-        artifactId: artifact.artifact_id,
-        objectKey: artifact.object_key,
-        securityStatus: scanOutcome.securityStatus
-      };
-    } catch (error) {
-      const results = error instanceof Error ? sanitizeJsonbValue({ error: error.message }) : 'Unknown error';
-
-      // Update scan record to FAILED
-      await this.artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
-        scan_status: ProcessStatusStatusEnum.FAILED,
-        scanned_at: new Date().toISOString(),
-        results
+      // Point-of-no-return: publish succeeded; now write the CLEAN state and
+      // the irreversible S3 + archive writes.
+      await this.updateArtifactSecurity(scan.artifactSecurityId, {
+        security: SecurityStatusEnum.CLEAN
       });
-
-      // Commit the FAILED scan record to preserve the audit trail
-      await this.connection.commit();
-
-      throw error;
+      await this.handleCleanScanResult(uploadArchive, scan.artifactId, scan.objectKey);
+    } else {
+      // INFECTED / ERROR / SKIPPED: no publish, no S3 promote, no archive unblock.
+      // Write the security status directly — no orphan risk on this branch.
+      await this.updateArtifactSecurity(scan.artifactSecurityId, {
+        security: scanOutcome.securityStatus
+      });
     }
-  }
-
-  /**
-   * Map a persisted bucket name to an internal bucket type enum.
-   *
-   * @param {string} bucketName - Bucket name stored with the artifact record.
-   * @returns {BucketType} Bucket type used by object storage service operations.
-   */
-  private getBucketTypeForArtifact(bucketName: string): BucketType {
-    if (bucketName === getSecurityObjectStoreBucketName()) {
-      return BucketType.QUARANTINE;
-    }
-
-    if (bucketName === getObjectStoreBucketName()) {
-      return BucketType.MAIN;
-    }
-
-    throw new Error(`Unsupported artifact bucket: ${bucketName}`);
-  }
-
-  /**
-   * Resolve the configured maximum scan size in bytes.
-   *
-   * Falls back to 20MB when `CLAMAV_MAX_SCAN_SIZE` is not set.
-   *
-   * ClamAV has two related limits:
-   * - `MaxFileSize`: maximum size of any single file ClamAV will inspect (including files extracted from archives).
-   * - `MaxScanSize`: maximum total bytes ClamAV will process while scanning one input (including recursive archive extraction).
-   *
-   * Files over these limits may be skipped/truncated by ClamAV instead of being fully scanned. We pre-check
-   * the object size against this application limit so oversized files fail validation before scan submission.
-   *
-   * @see https://github.com/Cisco-Talos/clamav/issues/1274
-   *
-   * @returns {number} Maximum allowed scan size in bytes.
-   */
-  private getClamAvMaxScanSize(): number {
-    const maxScanSize = Number(process.env.CLAMAV_MAX_SCAN_SIZE ?? 20 * 1024 * 1024);
-
-    if (!Number.isFinite(maxScanSize) || maxScanSize <= 0) {
-      throw new ClamAvScanValidationError('CLAMAV_MAX_SCAN_SIZE must be a positive number of bytes');
-    }
-
-    return maxScanSize;
-  }
-
-  /**
-   * Validate object metadata before attempting ClamAV scan.
-   *
-   * This is a fail-fast guardrail so we do not send objects to ClamAV that are known to be unscannable under our configured
-   * limits. It validates:
-   * - file size is present and numeric (`ContentLength` from S3 HEAD metadata)
-   * - file size does not exceed `CLAMAV_MAX_SCAN_SIZE`
-   *
-   * Rejecting here provides a deterministic validation error instead of relying on ClamAV's limit handling (which may skip or
-   * partially process oversized content depending on daemon configuration).
-   *
-   * @param {string} objectKey - S3 key used for error context.
-   * @param {HeadObjectCommandOutput} metadata - Object metadata returned by S3 HEAD request.
-   * @throws {ClamAvScanValidationError} When file size is missing/non-numeric or exceeds `CLAMAV_MAX_SCAN_SIZE`.
-   * @returns {void}
-   */
-  private validateObjectBeforeScan(objectKey: string, metadata: HeadObjectCommandOutput): void {
-    const maxScanSize = this.getClamAvMaxScanSize();
-    const fileSize = metadata.ContentLength;
-
-    if (!Number.isFinite(fileSize)) {
-      throw new ClamAvScanValidationError(`Cannot determine file size for ClamAV scan: ${objectKey}`);
-    }
-
-    if (Number(fileSize) > maxScanSize) {
-      throw new ClamAvScanValidationError(`File size ${Number(fileSize)} exceeds CLAMAV_MAX_SCAN_SIZE ${maxScanSize}`);
-    }
-  }
-
-  /**
-   * Scan a stored artifact object with ClamAV and map result to scan outcome.
-   *
-   * @param {string} bucketName - Bucket name containing the artifact.
-   * @param {string} objectKey - Object key for the artifact.
-   * @returns {Promise<ScanOutcome>} Scan status and security outcome payload.
-   */
-  private async scanArtifactObject(bucketName: string, objectKey: string): Promise<ScanOutcome> {
-    const scannedAt = new Date().toISOString();
-
-    const bucketType = this.getBucketTypeForArtifact(bucketName);
-    const metadata = await this.objectStorageService.getMetadata(bucketType, objectKey);
-    this.validateObjectBeforeScan(objectKey, metadata);
-
-    const fileStream = await this.objectStorageService.getFileStream(bucketType, objectKey);
-
-    const clamAvScanner = await ArtifactSecurityService.dependencies.getClamAvScanner();
-    const clamavScanResult = await clamAvScanner.scanStream(fileStream);
-    const isInfected = Boolean((clamavScanResult as { isInfected?: boolean }).isInfected);
-
-    // Extract only the fields we need (avoids null bytes in resultString that PostgreSQL JSONB rejects)
-    const scanResults = {
-      isInfected,
-      viruses: (clamavScanResult as { viruses?: string[] }).viruses ?? [],
-      timeout: (clamavScanResult as { timeout?: boolean }).timeout ?? false
-    };
 
     return {
-      scanStatus: ProcessStatusStatusEnum.COMPLETED,
-      securityStatus: isInfected ? SecurityStatusEnum.INFECTED : SecurityStatusEnum.CLEAN,
-      scannedAt,
-      scannerVersion: null,
-      results: scanResults
+      artifactId: scan.artifactId,
+      objectKey: scan.objectKey,
+      securityStatus: scanOutcome.securityStatus
     };
+  }
+
+  /**
+   * Record a failed malware scan attempt on its scan record for the audit trail.
+   *
+   * The security record stays PENDING so a retried job starts a new scan.
+   *
+   * @param {string} artifactSecurityScanId - Scan record created by {@link startArtifactSecurityScan}.
+   * @param {unknown} error - The error that failed the scan or its completion.
+   * @returns {Promise<void>}
+   * @memberof ArtifactSecurityService
+   */
+  async failArtifactSecurityScan(artifactSecurityScanId: string, error: unknown): Promise<void> {
+    const results = error instanceof Error ? sanitizeJsonbValue({ error: error.message }) : 'Unknown error';
+
+    await this.artifactSecurityScanService.updateArtifactSecurityScan(artifactSecurityScanId, {
+      scan_status: ProcessStatusStatusEnum.FAILED,
+      scanned_at: new Date().toISOString(),
+      results
+    });
   }
 }

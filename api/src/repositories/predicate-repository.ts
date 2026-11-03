@@ -120,6 +120,7 @@ export class PredicateRepository extends BaseRepository {
   private readonly readPayloadCountExpression = `
     (
       (CASE WHEN ps.predicate_id IS NULL THEN 0 ELSE 1 END) +
+      (CASE WHEN pp.predicate_id IS NULL THEN 0 ELSE 1 END) +
       (CASE WHEN pn.predicate_id IS NULL THEN 0 ELSE 1 END) +
       (CASE WHEN pb.predicate_id IS NULL THEN 0 ELSE 1 END) +
       (CASE WHEN pt.predicate_id IS NULL THEN 0 ELSE 1 END) +
@@ -136,6 +137,13 @@ export class PredicateRepository extends BaseRepository {
           'operator', ps.operator::text
         ) || CASE
           WHEN ps.operator::text <> 'Exists' THEN jsonb_build_object('value', ps.value)
+          ELSE '{}'::jsonb
+        END
+      WHEN pp.predicate_id IS NOT NULL THEN
+        jsonb_build_object(
+          'operator', pp.operator::text
+        ) || CASE
+          WHEN pp.operator::text <> 'Exists' THEN jsonb_build_object('value', pp.value)
           ELSE '{}'::jsonb
         END
       WHEN pn.predicate_id IS NOT NULL THEN
@@ -224,6 +232,9 @@ export class PredicateRepository extends BaseRepository {
       .leftJoin('predicate_string as ps', function () {
         this.on('ps.predicate_id', '=', 'p.predicate_id').onNull('ps.record_end_date');
       })
+      .leftJoin('predicate_paragraph as pp', function () {
+        this.on('pp.predicate_id', '=', 'p.predicate_id').onNull('pp.record_end_date');
+      })
       .leftJoin('predicate_number as pn', function () {
         this.on('pn.predicate_id', '=', 'p.predicate_id').onNull('pn.record_end_date');
       })
@@ -288,6 +299,31 @@ export class PredicateRepository extends BaseRepository {
       predicate_id: predicateId,
       operator: predicate.operator,
       value: stringValue
+    });
+  }
+
+  /**
+   * Build an insert query for paragraph predicate payload rows.
+   *
+   * `Exists` operators intentionally persist `value = null` to keep payload-row
+   * shape consistent with other typed payload tables.
+   *
+   * @param {Knex} knex - Knex instance used to build queries.
+   * @param {string} predicateId - Base predicate identifier.
+   * @param {Extract<InternalTypedPredicate, { type: 'paragraph' }>} predicate - Typed paragraph payload.
+   * @return {Knex.QueryBuilder} Insert query.
+   */
+  private buildParagraphPredicateInsert(
+    knex: Knex,
+    predicateId: string,
+    predicate: Extract<InternalTypedPredicate, { type: 'paragraph' }>
+  ): Knex.QueryBuilder {
+    const paragraphValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+
+    return knex('predicate_paragraph').insert({
+      predicate_id: predicateId,
+      operator: predicate.operator,
+      value: paragraphValue
     });
   }
 
@@ -470,6 +506,8 @@ export class PredicateRepository extends BaseRepository {
       switch (predicate.type) {
         case 'string':
           return this.buildStringPredicateInsert(knex, predicateId, predicate);
+        case 'paragraph':
+          return this.buildParagraphPredicateInsert(knex, predicateId, predicate);
         case 'number':
           return this.buildNumberPredicateInsert(knex, predicateId, predicate);
         case 'boolean':

@@ -209,8 +209,6 @@ describe('Download Parquet pipeline (integration)', function () {
     featureTypeName: string;
     parentFeatureId?: number;
   }): Promise<number> {
-    const systemUserId = connection.systemUserId();
-
     const result = await connection.sql(SQL`
       INSERT INTO submission_feature (
         submission_id,
@@ -219,8 +217,7 @@ describe('Download Parquet pipeline (integration)', function () {
         parent_submission_feature_id,
         data,
         data_byte_size,
-        record_effective_date,
-        create_user
+        record_effective_date
       )
       VALUES (
         ${params.submissionId},
@@ -229,8 +226,7 @@ describe('Download Parquet pipeline (integration)', function () {
         ${params.parentFeatureId ?? null},
         '{}'::jsonb,
         500,
-        now(),
-        ${systemUserId}
+        now()
       )
       RETURNING submission_feature_id;
     `);
@@ -242,7 +238,7 @@ describe('Download Parquet pipeline (integration)', function () {
    * Helper: insert a typed property row into the appropriate submission_feature_property_* table.
    *
    * The assignment is given by id, or by property name to resolve the feature's own assignment of it.
-   * For string/number/boolean/timestamp/geometry: inserts (submission_feature_id, blueprint_feature_type_property_id, value, create_user).
+   * For string/number/boolean/timestamp/geometry: inserts (submission_feature_id, blueprint_feature_type_property_id, value).
    * For code: value is the contributor_codeset_code_id.
    * For taxon: value is the taxon_id.
    * For geometry: value is a GeoJSON string passed through ST_GeomFromGeoJSON.
@@ -253,7 +249,6 @@ describe('Download Parquet pipeline (integration)', function () {
     assignment: number | string,
     value: unknown
   ): Promise<void> {
-    const systemUserId = connection.systemUserId();
     // A property name resolves to the feature's assignment of it in its upload's Blueprint.
     const blueprintFeatureTypePropertyId =
       typeof assignment === 'string'
@@ -262,34 +257,34 @@ describe('Download Parquet pipeline (integration)', function () {
 
     if (tableName === 'submission_feature_property_code') {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id, create_user)
-        VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value as number}, ${systemUserId});
+        INSERT INTO submission_feature_property_code (submission_feature_id, blueprint_feature_type_property_id, contributor_codeset_code_id)
+        VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value as number});
       `);
     } else if (tableName === 'submission_feature_property_taxon') {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id, create_user)
-        VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value as number}, ${systemUserId});
+        INSERT INTO submission_feature_property_taxon (submission_feature_id, blueprint_feature_type_property_id, taxon_id)
+        VALUES (${submissionFeatureId}, ${blueprintFeatureTypePropertyId}, ${value as number});
       `);
     } else if (tableName === 'submission_feature_property_geometry') {
       await connection.query(
-        `INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-         VALUES ($1, $2, ST_GeomFromGeoJSON($3), $4)`,
-        [submissionFeatureId, blueprintFeatureTypePropertyId, value as string, systemUserId]
+        `INSERT INTO submission_feature_property_geometry (submission_feature_id, blueprint_feature_type_property_id, value)
+         VALUES ($1, $2, ST_GeomFromGeoJSON($3))`,
+        [submissionFeatureId, blueprintFeatureTypePropertyId, value as string]
       );
     } else if (tableName === 'submission_feature_property_timestamp') {
       const ts = value as { date_value: string | null; time_value: string | null };
       await connection.query(
         `INSERT INTO submission_feature_property_timestamp
-           (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value, create_user)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [submissionFeatureId, blueprintFeatureTypePropertyId, ts.date_value, ts.time_value, systemUserId]
+           (submission_feature_id, blueprint_feature_type_property_id, date_value, time_value)
+         VALUES ($1, $2, $3, $4)`,
+        [submissionFeatureId, blueprintFeatureTypePropertyId, ts.date_value, ts.time_value]
       );
     } else {
       // string, number, boolean — all use a `value` column
       await connection.query(
-        `INSERT INTO ${tableName} (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-         VALUES ($1, $2, $3, $4)`,
-        [submissionFeatureId, blueprintFeatureTypePropertyId, value, systemUserId]
+        `INSERT INTO ${tableName} (submission_feature_id, blueprint_feature_type_property_id, value)
+         VALUES ($1, $2, $3)`,
+        [submissionFeatureId, blueprintFeatureTypePropertyId, value]
       );
     }
   }

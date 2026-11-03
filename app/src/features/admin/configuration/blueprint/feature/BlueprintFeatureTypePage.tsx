@@ -1,15 +1,13 @@
 import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Container from '@mui/material/Container';
+import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import { isAxiosError } from 'axios';
-import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import dayjs from 'dayjs';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
@@ -65,11 +63,14 @@ export const BlueprintFeatureTypePage = () => {
     <LoadingGuard
       isLoading={validIds && !error && (blueprintQuery.isPending || assignmentQuery.isPending)}
       isLoadingFallback={<BlueprintSkeleton tabCount={1} />}>
-      <PageHeader
-        label={assignment?.display_name ?? 'Feature Type'}
+      <AdminPageLayout
+        title={assignment?.display_name ?? 'Feature Type'}
         description={assignment?.description ?? undefined}
         breadcrumbs={
           <Breadcrumbs aria-label="Blueprint feature type breadcrumb">
+            <Link component={RouterLink} to="/admin" color="inherit" underline="hover">
+              Administration
+            </Link>
             <Link component={RouterLink} to="/admin/configuration" color="inherit" underline="hover">
               Configuration
             </Link>
@@ -86,32 +87,27 @@ export const BlueprintFeatureTypePage = () => {
             <Typography color="text.primary">{assignment?.display_name ?? 'Feature Type'}</Typography>
           </Breadcrumbs>
         }
-        tabs={
-          <Tabs value="properties" aria-label="Feature type configuration">
-            <Tab
-              value="properties"
-              label="Properties"
-              id="feature-properties-tab"
-              aria-controls="feature-properties-panel"
+        tabs={[
+          {
+            value: 'properties',
+            label: 'Properties',
+            id: 'feature-properties-tab',
+            ariaControls: 'feature-properties-panel'
+          }
+        ]}
+        activeTab="properties"
+        onTabChange={() => {}}>
+        <Box role="tabpanel" id="feature-properties-panel" aria-labelledby="feature-properties-tab">
+          {blueprint && assignment && (
+            <BlueprintPropertiesSection
+              key={`${blueprintId}-${blueprintFeatureTypeId}`}
+              blueprintId={blueprintId}
+              blueprintFeatureTypeId={blueprintFeatureTypeId}
+              readOnly={readOnly}
             />
-          </Tabs>
-        }
-      />
-      <Container
-        maxWidth="xl"
-        sx={{ py: 4 }}
-        role="tabpanel"
-        id="feature-properties-panel"
-        aria-labelledby="feature-properties-tab">
-        {blueprint && assignment && (
-          <BlueprintPropertiesSection
-            key={`${blueprintId}-${blueprintFeatureTypeId}`}
-            blueprintId={blueprintId}
-            blueprintFeatureTypeId={blueprintFeatureTypeId}
-            readOnly={readOnly}
-          />
-        )}
-      </Container>
+          )}
+        </Box>
+      </AdminPageLayout>
     </LoadingGuard>
   );
 };

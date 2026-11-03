@@ -112,6 +112,8 @@ spec:
               value: {{ .Values.app.itisTsnLookupBatchSize | quote }}
             - name: ITIS_TSN_LOOKUP_DELAY_MS
               value: {{ .Values.app.itisTsnLookupDelayMs | quote }}
+            - name: ITIS_REQUEST_TIMEOUT_MS
+              value: {{ .Values.app.itisRequestTimeoutMs | quote }}
             # Clamav
             - name: ENABLE_FILE_VIRUS_SCAN
               value: {{ .Values.app.clamav.enabled | quote }}

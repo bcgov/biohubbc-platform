@@ -115,8 +115,6 @@ describe('Security scope search (integration)', function () {
     featureTypeName: string;
     parentFeatureId?: number;
   }): Promise<number> {
-    const systemUserId = connection.systemUserId();
-
     const result = await connection.sql(SQL`
       INSERT INTO submission_feature (
         submission_id,
@@ -125,8 +123,7 @@ describe('Security scope search (integration)', function () {
         parent_submission_feature_id,
         data,
         data_byte_size,
-        record_effective_date,
-        create_user
+        record_effective_date
       )
       VALUES (
         ${params.submissionId},
@@ -135,8 +132,7 @@ describe('Security scope search (integration)', function () {
         ${params.parentFeatureId ?? null},
         '{}'::jsonb,
         500,
-        now(),
-        ${systemUserId}
+        now()
       )
       RETURNING submission_feature_id;
     `);
@@ -461,7 +457,7 @@ describe('Security scope search (integration)', function () {
   async function deleteStaleAnchors(scopeId: string): Promise<void> {
     let lastId = 0;
     while (true) {
-      const batch = await scopeRepo.deleteStaleAnchorBatch(scopeId, lastId);
+      const batch = await scopeRepo.deleteStaleAnchorBatch(scopeId, lastId, null);
       if (!batch) {
         break;
       }
@@ -477,7 +473,7 @@ describe('Security scope search (integration)', function () {
   async function deleteStaleAnchorsViaService(scopeId: string): Promise<void> {
     let lastId = 0;
     while (true) {
-      const batch = await scopeService.deleteStaleAnchorBatch(scopeId, lastId);
+      const batch = await scopeService.deleteStaleAnchorBatch(scopeId, lastId, null);
       if (!batch) {
         break;
       }
@@ -495,7 +491,7 @@ describe('Security scope search (integration)', function () {
     if (urn) {
       let lastId = 0;
       while (true) {
-        const batch = await scopeService.computeAnchorBatch(scopeId, urn, lastId);
+        const batch = await scopeService.computeAnchorBatch(scopeId, urn, lastId, null);
         if (!batch) {
           break;
         }
@@ -2308,7 +2304,7 @@ describe('Security scope search (integration)', function () {
       let batchCount = 0;
 
       while (true) {
-        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId, null);
 
         if (!staleBatch) {
           break;

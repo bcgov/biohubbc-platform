@@ -246,6 +246,8 @@ export class ExpressionTreeNormalizationService {
       switch (propertyType) {
         case FEATURE_PROPERTY_TYPE.STRING:
           return { type: 'string', operator: predicate.operator };
+        case FEATURE_PROPERTY_TYPE.PARAGRAPH:
+          return { type: 'paragraph', operator: predicate.operator };
         case FEATURE_PROPERTY_TYPE.NUMBER:
           return { type: 'number', operator: predicate.operator };
         case FEATURE_PROPERTY_TYPE.BOOLEAN:
@@ -265,6 +267,8 @@ export class ExpressionTreeNormalizationService {
     switch (propertyType) {
       case FEATURE_PROPERTY_TYPE.STRING:
         return { type: 'string', operator: predicate.operator, value: this.requireStringValue(predicate) };
+      case FEATURE_PROPERTY_TYPE.PARAGRAPH:
+        return { type: 'paragraph', operator: predicate.operator, value: this.requireStringValue(predicate) };
       case FEATURE_PROPERTY_TYPE.NUMBER:
         return { type: 'number', operator: predicate.operator, value: this.requireNumberValue(predicate) };
       case FEATURE_PROPERTY_TYPE.BOOLEAN:

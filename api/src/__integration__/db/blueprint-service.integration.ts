@@ -204,8 +204,8 @@ describe('BlueprintService — blueprint-owned property assignments (integration
   async function tryInsertNumber(submissionFeatureId: number, assignmentId: number | null): Promise<unknown> {
     try {
       await connection.sql(SQL`
-        INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value, create_user)
-        VALUES (${submissionFeatureId}, ${assignmentId}, 1, ${connection.systemUserId()});
+        INSERT INTO submission_feature_property_number (submission_feature_id, blueprint_feature_type_property_id, value)
+        VALUES (${submissionFeatureId}, ${assignmentId}, 1);
       `);
       return null;
     } catch (error) {
@@ -552,23 +552,19 @@ describe('BlueprintService — blueprint-owned property assignments (integration
       allowMultiple: true
     });
 
-    // Stage one raw property for a feature of the fixture type in an upload pinned to the draft.
+    // One raw property on a feature of the fixture type in an upload pinned to the draft.
     const submissionId = await createTestSubmission(connection);
     const submissionUploadId = await createTestUpload(connection, submissionId);
-    const feature = await connection.sql(SQL`
+    const featureData = JSON.stringify({ properties: { [propertyName]: 7 } });
+    await connection.sql(SQL`
       INSERT INTO submission_feature (
-        submission_id, submission_upload_id, feature_type_id, source_id, data, data_byte_size, record_effective_date, create_user
+        submission_id, submission_upload_id, feature_type_id, source_id, data, data_byte_size, record_effective_date
       )
       VALUES (
         ${submissionId}, ${submissionUploadId}, ${
       blueprintFeatureType.feature_type_id
-    }, ${randomUUID()}, '{}'::jsonb, 502, now(), ${connection.systemUserId()}
-      )
-      RETURNING submission_feature_id;
-    `);
-    await connection.sql(SQL`
-      INSERT INTO submission_upload_staging_raw_property (submission_feature_id, submission_upload_id, feature_type_id, property_name, value)
-      VALUES (${feature.rows[0].submission_feature_id}, ${submissionUploadId}::uuid, ${blueprintFeatureType.feature_type_id}, ${propertyName}, '7'::jsonb);
+    }, ${randomUUID()}, ${featureData}::jsonb, 502, now()
+      );
     `);
 
     const ingestion = new SubmissionFeaturePropertyIngestionRepository(connection);

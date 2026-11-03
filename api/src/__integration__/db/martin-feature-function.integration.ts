@@ -18,6 +18,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import {
   addTestGeometry,
+  buildMixedGeometryCollectionWkt,
   buildWktGeometries,
   decodeGeometriesLayer,
   findSpatialAssignmentId,
@@ -156,16 +157,20 @@ describe('Martin feature function (integration)', function () {
       expect(await renderTileBuffer(contextFor(submissionId, featureId))).to.be.null;
     });
 
-    it('returns an empty tile for an end-dated feature', async () => {
+    it('encodes a superseded feature', async () => {
       const { submissionId, featureId } = await createFeatureWithPoint();
+      const successor = await createFeatureWithPoint(submissionId);
 
       await fixture.connection.sql(SQL`
-        UPDATE submission_feature SET record_end_date = now() - interval '1 day'
+        UPDATE submission_feature
+        SET record_end_date = now() - interval '1 day', successor_submission_feature_id = ${successor.featureId}
         WHERE submission_feature_id = ${featureId};
       `);
 
-      // A token minted before the feature was retired stops producing tiles immediately.
-      expect(await renderTileBuffer(contextFor(submissionId, featureId))).to.be.null;
+      // Superseded features stay reachable by direct ID, so their detail map keeps rendering.
+      const geometries = await decodeGeometries(contextFor(submissionId, featureId));
+
+      expect(geometries).to.have.length(1);
     });
   });
 
@@ -251,6 +256,18 @@ describe('Martin feature function (integration)', function () {
 
       // Every geometry type survives clipping and MVT encoding.
       expect(geometries).to.have.length(wktGeometries.length);
+    });
+
+    it('encodes every part of a geometry collection that mixes points, lines and polygons', async () => {
+      const { submissionId, featureId } = await createFeatureWithPoint();
+      const geometryId = await addGeometry(featureId, buildMixedGeometryCollectionWkt());
+
+      const parts = (await decodeGeometries(contextFor(submissionId, featureId))).filter(
+        (geometry) => geometry.id === geometryId
+      );
+
+      // One tile feature per geometry type, all keyed by the stored geometry's id.
+      expect(parts.map((part) => part.type).sort((a, b) => a - b)).to.eql([1, 2, 3]);
     });
 
     it('returns an empty tile where the feature does not reach', async () => {

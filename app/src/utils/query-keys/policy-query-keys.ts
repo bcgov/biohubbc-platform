@@ -19,6 +19,44 @@ const list = (search: ApiSearchParams, pagination: ApiPaginationRequestOptions) 
   [...lists(), { search, pagination }] as const;
 
 /**
+ * Key of one page of the administrative data requests list. A data request's decision is its policy's status, so the
+ * key sits under the policies lists and is refreshed with them.
+ *
+ * @param {ApiSearchParams} search The search sent.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The data requests list key.
+ */
+const dataRequests = (search: ApiSearchParams, pagination: ApiPaginationRequestOptions) =>
+  [...lists(), 'data-requests', { search, pagination }] as const;
+
+/**
+ * Key of one data request as the administrative pages show it. It sits under the policies lists for the same reason
+ * as the data requests list.
+ *
+ * @param {string} dataRequestId The data request.
+ * @returns The data request key.
+ */
+const dataRequest = (dataRequestId: string) => [...lists(), 'data-requests', dataRequestId] as const;
+
+/**
+ * Key of the feature types a data request asks for. They come from the statements and expressions of its policy, so
+ * the key sits under the data request's own key and is refreshed with the policies lists.
+ *
+ * @param {string} dataRequestId The data request.
+ * @returns The data request feature types key.
+ */
+const dataRequestFeatureTypes = (dataRequestId: string) => [...dataRequest(dataRequestId), 'feature-types'] as const;
+
+/**
+ * Key of the recipients of a data request: the members of the team its policy is assigned to. It sits under the data
+ * request's own key and is refreshed with the policies lists.
+ *
+ * @param {string} dataRequestId The data request.
+ * @returns The data request recipients key.
+ */
+const dataRequestRecipients = (dataRequestId: string) => [...dataRequest(dataRequestId), 'recipients'] as const;
+
+/**
  * Key prefix of everything cached for one policy.
  *
  * @param {string} policyId The policy.
@@ -66,4 +104,16 @@ const teams = (policyId: string, pagination: ApiPaginationRequestOptions) =>
  * Query keys for policies, ordered from broad to narrow so that each prefix names the set of queries a
  * change invalidates.
  */
-export const policyQueryKeys = { lists, list, policy, detail, expressionsAll, expressions, teams };
+export const policyQueryKeys = {
+  lists,
+  list,
+  dataRequests,
+  dataRequest,
+  dataRequestFeatureTypes,
+  dataRequestRecipients,
+  policy,
+  detail,
+  expressionsAll,
+  expressions,
+  teams
+};

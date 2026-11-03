@@ -1,7 +1,15 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../../database/db';
 import { CountResult } from '../../models/count';
-import { ReconciliationCountRow, ReconciliationCounts } from '../../models/reconciliation';
+import {
+  ReconciliationCountRow,
+  ReconciliationCounts,
+  ReconciliationFeatureData,
+  ReconciliationFeatureScope
+} from '../../models/reconciliation';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
+import { resolveSubmissionFeatureParentId } from '../sql-fragments';
 
 /** Reconciles upload-owned submission_feature rows with current published state. */
 export class SubmissionFeatureReconciliationRepository extends BaseRepository {
@@ -117,10 +125,27 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
   }
 
   /**
+   * Refresh planner statistics for submission_feature.
+   *
+   * Reconciliation runs right after ingestion bulk-inserts the upload's rows, before autoanalyze has
+   * seen them. Without fresh statistics the upload-scoped predicates are estimated at a handful of
+   * rows and the classification joins are planned as nested loops.
+   *
+   * @returns {Promise<void>} Resolves after statistics are refreshed.
+   * @memberof SubmissionFeatureReconciliationRepository
+   */
+  async analyzeSubmissionFeatures(): Promise<void> {
+    const sql = SQL`ANALYZE submission_feature;`;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Classify every pending feature against the preceding reviewable upload or published state.
    *
    * Baselines are matched by submission and source identifier. Pending and historical features are
-   * excluded from baseline selection.
+   * excluded from baseline selection. The matched baseline is stored so later steps of the same
+   * reconciliation can join on it, and each feature's parent is resolved in the same row update so the
+   * upload's rows are rewritten once.
    *
    * @param {string} submissionUploadId Submission upload identifier.
    * @param {number} submissionId Submission identifier used to scope published baselines.
@@ -141,7 +166,11 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
             WHEN baseline.submission_feature_id IS NULL THEN 'new'
             WHEN baseline.content_hash = incoming.content_hash THEN 'unmodified'
             ELSE 'modified'
-          END::submission_feature_reconciliation_type AS reconciliation
+          END::submission_feature_reconciliation_type AS reconciliation,
+          baseline.submission_feature_id AS baseline_submission_feature_id,
+          `;
+    sql.append(resolveSubmissionFeatureParentId('incoming'));
+    sql.append(SQL` AS parent_submission_feature_id
         FROM submission_feature incoming
         LEFT JOIN LATERAL (
           SELECT candidate.submission_feature_id, candidate.content_hash
@@ -166,10 +195,13 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
           AND incoming.record_end_date IS NULL
       )
       UPDATE submission_feature incoming
-      SET reconciliation = classified.reconciliation
+      SET
+        reconciliation = classified.reconciliation,
+        baseline_submission_feature_id = classified.baseline_submission_feature_id,
+        parent_submission_feature_id = classified.parent_submission_feature_id
       FROM classified
       WHERE incoming.submission_feature_id = classified.submission_feature_id;
-    `;
+    `);
 
     await this.connection.sql(sql);
   }
@@ -223,6 +255,33 @@ export class SubmissionFeatureReconciliationRepository extends BaseRepository {
       counts[row.reconciliation] = row.count;
     }
     return counts;
+  }
+
+  /**
+   * List one page of an upload's features with one reconciliation outcome and their raw submitted data, across the
+   * complete feature lifecycle.
+   *
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {ApiPaginationOptions} pagination Page size, offset and sort order.
+   * @returns {Promise<ReconciliationFeatureData[]>} One page of feature identifiers and raw jsonb data.
+   * @memberof SubmissionFeatureReconciliationRepository
+   */
+  async getReconciliationFeatureData(
+    scope: ReconciliationFeatureScope,
+    pagination: ApiPaginationOptions
+  ): Promise<ReconciliationFeatureData[]> {
+    const knex = getKnex();
+    const query = knex('submission_feature')
+      .select('submission_feature_id', 'data')
+      .where('submission_id', scope.submissionId)
+      .where('submission_upload_id', scope.submissionUploadId)
+      .where('reconciliation', scope.reconciliation)
+      .orderBy('submission_feature_id', pagination.order ?? 'asc')
+      .limit(pagination.limit)
+      .offset((pagination.page - 1) * pagination.limit);
+
+    const response = await this.connection.knex(query, ReconciliationFeatureData);
+    return response.rows;
   }
 
   /**

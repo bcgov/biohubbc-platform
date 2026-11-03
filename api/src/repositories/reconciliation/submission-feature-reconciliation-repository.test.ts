@@ -54,6 +54,19 @@ describe('SubmissionFeatureReconciliationRepository', () => {
     expect(text).to.include('candidate.successor_submission_feature_id IS NULL');
     expect(text).to.include("THEN 'unmodified'");
     expect(text).to.include('UPDATE submission_feature incoming');
+    expect(text).to.include('baseline_submission_feature_id = classified.baseline_submission_feature_id');
+    expect(text).to.include('parent_submission_feature_id = classified.parent_submission_feature_id');
+    expect(sql).to.have.been.calledOnce;
+  });
+
+  it('refreshes submission_feature statistics in one statement', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([], 0));
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ sql }));
+
+    await repository.analyzeSubmissionFeatures();
+
+    expect(sql).to.have.been.calledOnce;
+    expect(sql.firstCall.args[0].text).to.include('ANALYZE submission_feature');
   });
 
   it('links direct predecessors', async () => {
@@ -95,5 +108,24 @@ describe('SubmissionFeatureReconciliationRepository', () => {
     const text = sql.firstCall.args[0].text as string;
     expect(text).to.not.include('record_effective_date');
     expect(text).to.not.include('record_end_date');
+  });
+
+  it('pages one outcome of an upload by feature id with its raw data, across the complete feature lifecycle', async () => {
+    const rows = [{ submission_feature_id: 5, data: { id: 'A', type: 'survey', properties: {} } }];
+    const knex = sinon.stub().resolves(mockQueryResult(rows, 1));
+    const repository = new SubmissionFeatureReconciliationRepository(getMockDBConnection({ knex }));
+
+    expect(
+      await repository.getReconciliationFeatureData(
+        { submissionId: 9, submissionUploadId: 'upload-id', reconciliation: 'modified' },
+        { page: 3, limit: 10, order: 'desc' }
+      )
+    ).to.eql(rows);
+    const { sql, bindings } = knex.firstCall.args[0].toSQL();
+    expect(sql).to.include('"submission_feature_id", "data"');
+    expect(sql).to.include('order by "submission_feature_id" desc');
+    expect(sql).to.not.include('record_effective_date');
+    expect(sql).to.not.include('record_end_date');
+    expect(bindings).to.eql([9, 'upload-id', 'modified', 10, 20]);
   });
 });

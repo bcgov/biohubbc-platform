@@ -8,6 +8,8 @@ import { ticketQueryKeys } from './ticket-query-keys';
 import { userQueryKeys } from './user-query-keys';
 import { downloadQueryKeys } from './download-query-keys';
 import { policyQueryKeys } from './policy-query-keys';
+import { boardQueryKeys } from './board-query-keys';
+import { tagQueryKeys } from './tag-query-keys';
 
 /**
  * A ticket's detail through either scope's endpoints: what a change to its timeline, assignees, references or data
@@ -110,11 +112,11 @@ const team = () => [[QUERY_KEY_ROOT.TEAM], teamPolicyQueryKeys.lists(), [QUERY_K
 const teamPolicy = () => [teamPolicyQueryKeys.lists(), [QUERY_KEY_ROOT.POLICY], ...access()];
 
 /**
- * Security categories, reasons, review rules and reads whose visibility depends on active security rules.
+ * Security categories, rules, review rules and reads whose visibility depends on active security rules.
  *
  * @returns The keys to refresh.
  */
-const securityReason = () => [
+const securityRule = () => [
   [QUERY_KEY_ROOT.SECURITY],
   [QUERY_KEY_ROOT.SUBMISSION_UPLOAD],
   [QUERY_KEY_ROOT.SUBMISSION_UPLOAD_REVIEW],
@@ -122,7 +124,7 @@ const securityReason = () => [
 ];
 
 /**
- * A review's status, which ticket timelines and the dashboard's reviewed and unreviewed lists show.
+ * A review's status, which ticket timelines and the administrative submission and upload lists show.
  *
  * @returns The keys to refresh.
  */
@@ -196,6 +198,76 @@ const downloadExport = (downloadId: string, downloadVersionId: string) => [
 ];
 
 /**
+ * A ticket's tags, which the administrative ticket lists, boards included, show as chips.
+ *
+ * @returns The keys to refresh.
+ */
+const ticketTags = () => [ticketQueryKeys.lists('admin')];
+
+/**
+ * A ticket put on, moved on, or taken off a board: the administrative ticket lists, which include each board's
+ * tickets.
+ *
+ * @returns The keys to refresh.
+ */
+const boardTicket = () => [ticketQueryKeys.lists('admin')];
+
+/**
+ * A tag's name, color or removal: the tag lists and pickers, every ticket's tags and tag history, and the
+ * administrative ticket lists' chips.
+ *
+ * @returns The keys to refresh.
+ */
+const tag = () => [tagQueryKeys.all(), ticketQueryKeys.tagsAll(), ticketQueryKeys.lists('admin')];
+
+/**
+ * A tag rule's creation or enabled state: its tag's rule list and details. Rules do not apply to existing tickets, so
+ * no ticket changes.
+ *
+ * @param {string} tagId The tag the rule applies.
+ * @returns The keys to refresh.
+ */
+const tagRule = (tagId: string) => [tagQueryKeys.rules(tagId)];
+
+/**
+ * A tag rule's edit or removal, which changes the tags it applied: its tag's rule list and details, every ticket's
+ * tags and tag history, which name the rule that applied a tag, and, because deleting a rule may remove the tags it
+ * applied, the administrative ticket lists that show them.
+ *
+ * @param {string} tagId The tag the rule applies.
+ * @returns The keys to refresh.
+ */
+const tagRuleApplied = (tagId: string) => [...tagRule(tagId), ticketQueryKeys.tagsAll(), ...ticketTags()];
+
+/**
+ * A board's details or removal: the board list and detail, and the board's ticket list.
+ *
+ * @returns The keys to refresh.
+ */
+const board = () => [boardQueryKeys.all(), ticketQueryKeys.lists('admin')];
+
+/**
+ * A tag linked to or unlinked from a board: the tag lists, which list a board's tags, and, because linking a tag puts
+ * the tickets that have it on the board and unlinking it takes them off, the board's ticket list.
+ *
+ * @returns The keys to refresh.
+ */
+const boardTag = () => [tagQueryKeys.all(), ticketQueryKeys.lists('admin')];
+
+/**
+ * A board swimlane's creation, edit or removal: the board's detail and swimlane list, which list its lanes, and the
+ * board's ticket list, which groups its tickets by lane.
+ *
+ * @param {string} boardId The lane's board.
+ * @returns The keys to refresh.
+ */
+const boardSwimlane = (boardId: string) => [
+  boardQueryKeys.detail(boardId),
+  boardQueryKeys.swimlanesAll(boardId),
+  ticketQueryKeys.lists('admin')
+];
+
+/**
  * The cached queries each kind of change makes out of date, beyond the query the change is written to. Pass them to
  * `refreshChangedQueries`; this module is the one place that records which pages show which data.
  */
@@ -210,7 +282,7 @@ export const changedQueryKeys = {
   dataRequest,
   team,
   teamPolicy,
-  securityReason,
+  securityRule,
   reviewStatus,
   uploadDecision,
   submissionSecurity,
@@ -218,5 +290,13 @@ export const changedQueryKeys = {
   systemUser,
   teamMembership,
   download,
-  downloadExport
+  downloadExport,
+  ticketTags,
+  boardTicket,
+  tag,
+  tagRule,
+  tagRuleApplied,
+  board,
+  boardTag,
+  boardSwimlane
 };

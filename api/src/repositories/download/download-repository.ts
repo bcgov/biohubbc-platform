@@ -486,6 +486,11 @@ export class DownloadRepository extends BaseRepository {
                INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
                INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
                WHERE p.submission_feature_id = ANY($1)`,
+      paragraph: `SELECT p.submission_feature_id, fp.name, p.value
+                  FROM submission_feature_property_paragraph p
+                  INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id
+                  INNER JOIN feature_property fp ON bftp.feature_property_id = fp.feature_property_id
+                  WHERE p.submission_feature_id = ANY($1)`,
       number: `SELECT p.submission_feature_id, fp.name, p.value
                FROM submission_feature_property_number p
                INNER JOIN blueprint_feature_type_property bftp ON p.blueprint_feature_type_property_id = bftp.blueprint_feature_type_property_id

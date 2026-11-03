@@ -25,6 +25,30 @@ describe('SubmissionFeatureClosureRepository', () => {
     });
   });
 
+  describe('hasMissingClosureForSubmission', () => {
+    it('probes current features of the submission for a missing self-loop row', async () => {
+      const sqlSpy = sinon.stub().resolves(mockQueryResult([{ has_missing_closure: true }], 1));
+      const repository = new SubmissionFeatureClosureRepository(getMockDBConnection({ sql: sqlSpy }));
+
+      const result = await repository.hasMissingClosureForSubmission(42);
+
+      expect(result).to.be.true;
+      expect(sqlSpy).to.have.been.calledOnce;
+      const sqlText = sqlSpy.firstCall.args[0].text;
+      expect(sqlText).to.include('sf.submission_id =');
+      expect(sqlText).to.include('sf.record_effective_date <= now()');
+      expect(sqlText).to.include('c.target_submission_feature_id = sf.submission_feature_id');
+    });
+
+    it('returns false when every current feature has its self-loop row', async () => {
+      const repository = new SubmissionFeatureClosureRepository(
+        getMockDBConnection({ sql: () => Promise.resolve(mockQueryResult([{ has_missing_closure: false }], 1)) })
+      );
+
+      expect(await repository.hasMissingClosureForSubmission(42)).to.be.false;
+    });
+  });
+
   describe('computeClosureForSubmission', () => {
     it('issues a single INSERT and returns the row count (closure rows written)', async () => {
       const sqlSpy = sinon.stub().resolves(mockQueryResult([], 5));

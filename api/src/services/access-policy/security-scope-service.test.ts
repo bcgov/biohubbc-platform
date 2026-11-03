@@ -76,8 +76,14 @@ describe('SecurityScopeService', () => {
 
       expect(getStatementsStub).to.have.been.calledOnceWith(policyId);
       expect(publishStub).to.have.been.calledTwice;
-      expect(publishStub.firstCall).to.have.been.calledWith(mockDBConnection, { securityScopeId: scopeIdOne });
-      expect(publishStub.secondCall).to.have.been.calledWith(mockDBConnection, { securityScopeId: scopeIdTwo });
+      expect(publishStub.firstCall).to.have.been.calledWith(mockDBConnection, {
+        securityScopeId: scopeIdOne,
+        submissionId: null
+      });
+      expect(publishStub.secondCall).to.have.been.calledWith(mockDBConnection, {
+        securityScopeId: scopeIdTwo,
+        submissionId: null
+      });
       expect(insertTeamGrantStub).to.have.been.calledOnceWith(teamId, policyId);
       expect(publishStub).to.have.been.calledBefore(insertTeamGrantStub);
     });
@@ -126,7 +132,10 @@ describe('SecurityScopeService', () => {
 
       await service.materializeStatementScopesAndTeamAccess(teamId, policyId);
 
-      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId: scopeIdOne });
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, {
+        securityScopeId: scopeIdOne,
+        submissionId: null
+      });
       expect(insertTeamGrantStub).to.have.been.calledOnceWith(teamId, policyId);
     });
 
@@ -218,8 +227,14 @@ describe('SecurityScopeService', () => {
 
       expect(findStub).to.have.been.calledOnceWith(42);
       expect(publishStub).to.have.been.calledTwice;
-      expect(publishStub.firstCall).to.have.been.calledWith(mockDBConnection, { securityScopeId: 'scope-1' });
-      expect(publishStub.secondCall).to.have.been.calledWith(mockDBConnection, { securityScopeId: 'scope-2' });
+      expect(publishStub.firstCall).to.have.been.calledWith(mockDBConnection, {
+        securityScopeId: 'scope-1',
+        submissionId: 42
+      });
+      expect(publishStub.secondCall).to.have.been.calledWith(mockDBConnection, {
+        securityScopeId: 'scope-2',
+        submissionId: 42
+      });
     });
 
     it('does not publish when no scopes match the submission', async () => {
@@ -257,16 +272,16 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorBatch')
         .resolves({ pageLastId: 5000 });
 
-      const result = await service.deleteStaleAnchorBatch('scope-1', 0);
+      const result = await service.deleteStaleAnchorBatch('scope-1', 0, 42);
 
-      expect(stub).to.have.been.calledOnceWith('scope-1', 0);
+      expect(stub).to.have.been.calledOnceWith('scope-1', 0, 42);
       expect(result).to.deep.equal({ pageLastId: 5000 });
     });
 
     it('returns null when no more anchors', async () => {
       sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorBatch').resolves(null);
 
-      const result = await service.deleteStaleAnchorBatch('scope-1', 5000);
+      const result = await service.deleteStaleAnchorBatch('scope-1', 5000, null);
 
       expect(result).to.be.null;
     });
@@ -297,18 +312,43 @@ describe('SecurityScopeService', () => {
     it('delegates to repository and returns batch result', async () => {
       const stub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch').resolves({ pageLastId: 5000 });
 
-      const result = await service.computeAnchorBatch('scope-1', urn, 0);
+      const result = await service.computeAnchorBatch('scope-1', urn, 0, 42);
 
-      expect(stub).to.have.been.calledOnceWith('scope-1', urn, 0);
+      expect(stub).to.have.been.calledOnceWith('scope-1', urn, 0, 42);
       expect(result).to.deep.equal({ pageLastId: 5000 });
     });
 
     it('returns null when no more candidates', async () => {
       sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch').resolves(null);
 
-      const result = await service.computeAnchorBatch('scope-1', urn, 5000);
+      const result = await service.computeAnchorBatch('scope-1', urn, 5000, null);
 
       expect(result).to.be.null;
+    });
+  });
+
+  describe('getAnchorSubmissionId', () => {
+    const wildcard = { urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' };
+
+    it('limits a wildcard scope to the triggering submission', () => {
+      expect(SecurityScopeService.getAnchorSubmissionId(wildcard, 42)).to.equal(42);
+    });
+
+    it('scans every submission for a wildcard scope recomputed by a policy change', () => {
+      expect(SecurityScopeService.getAnchorSubmissionId(wildcard, null)).to.be.null;
+    });
+
+    it('limits a concrete scope URN to its own submission', () => {
+      const urn = { ...wildcard, urn_submission_id: '7' };
+
+      expect(SecurityScopeService.getAnchorSubmissionId(urn, null)).to.equal(7);
+      expect(SecurityScopeService.getAnchorSubmissionId(urn, 7)).to.equal(7);
+    });
+
+    it('falls back to the triggering submission when the URN submission id is not an integer', () => {
+      const urn = { ...wildcard, urn_submission_id: 'not-a-number' };
+
+      expect(SecurityScopeService.getAnchorSubmissionId(urn, null)).to.be.null;
     });
   });
 });

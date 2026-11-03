@@ -2,7 +2,7 @@ import { GridColDef } from '@mui/x-data-grid';
 import { fireEvent } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { ISecurityCategoryWithRuleCount } from 'interfaces/useSecurityApi.interface';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter } from 'react-router-dom';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { CategoriesContainer, ICategoriesContainerProps } from './CategoriesContainer';

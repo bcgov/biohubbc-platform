@@ -2,6 +2,11 @@ import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
+  approveSubmissionUploadFailedHandler,
+  approveSubmissionUploadJobHandler,
+  IApproveSubmissionUploadJobData
+} from './jobs/approve-submission-upload-job';
+import {
   computeScopeAnchorsFailedHandler,
   computeScopeAnchorsJobHandler,
   IComputeScopeAnchorsJobData
@@ -16,6 +21,11 @@ import {
   deleteExpiredMartinContextsJobHandler,
   IDeleteExpiredMartinContextsJobData
 } from './jobs/delete-expired-martin-contexts-job';
+import {
+  evaluateTicketTagRulesFailedHandler,
+  evaluateTicketTagRulesJobHandler,
+  IEvaluateTicketTagRulesJobData
+} from './jobs/evaluate-ticket-tag-rules-job';
 import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,
@@ -85,6 +95,10 @@ export interface WorkerDependencies {
   deleteExpiredMartinContextsFailedHandler: typeof deleteExpiredMartinContextsFailedHandler;
   submissionUploadSecurityJobHandler: typeof submissionUploadSecurityJobHandler;
   submissionUploadSecurityFailedHandler: typeof submissionUploadSecurityFailedHandler;
+  evaluateTicketTagRulesJobHandler: typeof evaluateTicketTagRulesJobHandler;
+  evaluateTicketTagRulesFailedHandler: typeof evaluateTicketTagRulesFailedHandler;
+  approveSubmissionUploadJobHandler: typeof approveSubmissionUploadJobHandler;
+  approveSubmissionUploadFailedHandler: typeof approveSubmissionUploadFailedHandler;
 }
 
 export const workerDependencies: WorkerDependencies = {
@@ -110,7 +124,11 @@ export const workerDependencies: WorkerDependencies = {
   deleteExpiredMartinContextsJobHandler,
   deleteExpiredMartinContextsFailedHandler,
   submissionUploadSecurityJobHandler,
-  submissionUploadSecurityFailedHandler
+  submissionUploadSecurityFailedHandler,
+  evaluateTicketTagRulesJobHandler,
+  evaluateTicketTagRulesFailedHandler,
+  approveSubmissionUploadJobHandler,
+  approveSubmissionUploadFailedHandler
 };
 
 /**
@@ -397,6 +415,50 @@ export const registerWorkers = async (): Promise<void> => {
 
   // Schedule the recurring sweep. The queue must already exist (created + worked above).
   await boss.schedule(JobQueues.DELETE_EXPIRED_MARTIN_CONTEXTS, DELETE_EXPIRED_MARTIN_CONTEXTS_CRON, {}, { tz: 'UTC' });
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.EVALUATE_TICKET_TAG_RULES_FAILED);
+
+  // policy: 'short' enforces the per-ticket singletonKey, so evaluations queued close together run once.
+  await boss.createQueue(JobQueues.EVALUATE_TICKET_TAG_RULES, {
+    deadLetter: JobQueues.EVALUATE_TICKET_TAG_RULES_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  await boss.work<IEvaluateTicketTagRulesJobData>(
+    JobQueues.EVALUATE_TICKET_TAG_RULES,
+    workerDependencies.evaluateTicketTagRulesJobHandler
+  );
+
+  await boss.work<IEvaluateTicketTagRulesJobData>(
+    JobQueues.EVALUATE_TICKET_TAG_RULES_FAILED,
+    workerDependencies.evaluateTicketTagRulesFailedHandler
+  );
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.APPROVE_SUBMISSION_UPLOAD_FAILED);
+
+  // policy: 'short' enforces the per-upload singletonKey, so one approval job per upload is queued at a time.
+  await boss.createQueue(JobQueues.APPROVE_SUBMISSION_UPLOAD, {
+    deadLetter: JobQueues.APPROVE_SUBMISSION_UPLOAD_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  await boss.work<IApproveSubmissionUploadJobData>(
+    JobQueues.APPROVE_SUBMISSION_UPLOAD,
+    workerDependencies.approveSubmissionUploadJobHandler
+  );
+
+  await boss.work<IApproveSubmissionUploadJobData>(
+    JobQueues.APPROVE_SUBMISSION_UPLOAD_FAILED,
+    workerDependencies.approveSubmissionUploadFailedHandler
+  );
 
   defaultLog.info({
     label: 'registerWorkers',

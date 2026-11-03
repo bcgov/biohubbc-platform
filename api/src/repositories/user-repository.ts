@@ -402,6 +402,7 @@ export class UserRepository extends BaseRepository {
     const sortColumns: Record<string, string> = {
       system_user_id: 'su.system_user_id',
       user_identifier: 'su.user_identifier',
+      display_name: 'su.display_name',
       identity_source: 'uis.name',
       record_end_date: 'su.record_end_date',
       create_date: 'su.create_date'

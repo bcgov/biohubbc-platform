@@ -108,3 +108,46 @@ export const SubmissionListResponseSchema: OpenAPIV3.SchemaObject = {
     pagination: paginationResponseSchema
   }
 };
+
+/** Request body for updating a submission's administrative settings. */
+export const updateSubmissionRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['default_blueprint_id'],
+  additionalProperties: false,
+  properties: {
+    default_blueprint_id: {
+      type: 'integer',
+      minimum: 1,
+      description: "Available blueprint to use for the submission's future uploads."
+    }
+  }
+};
+
+/** One active submission as the administrative submissions list shows it. */
+export const AdminSubmissionListItemSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['submission_id', 'uuid', 'name', 'contributor_name', 'submitted_timestamp', 'publish_timestamp'],
+  properties: {
+    submission_id: { type: 'integer', minimum: 1 },
+    uuid: { type: 'string', format: 'uuid' },
+    name: { type: 'string' },
+    contributor_name: { type: 'string' },
+    submitted_timestamp: { type: 'string' },
+    publish_timestamp: { type: 'string', nullable: true }
+  }
+};
+
+/** One page of the administrative submissions list. */
+export const AdminSubmissionPaginatedListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['submissions', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    submissions: {
+      type: 'array',
+      items: AdminSubmissionListItemSchema
+    },
+    pagination: paginationResponseSchema
+  }
+};

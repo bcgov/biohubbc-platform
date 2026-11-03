@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
@@ -67,7 +68,14 @@ export const BlueprintTypesTable = ({
     <PageSection
       addButtonSize="small"
       id="blueprint-types"
-      label="Feature Types"
+      label={
+        <>
+          Feature Types{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({rowCount})
+          </Typography>
+        </>
+      }
       addLabel="Assign"
       onAdd={onCreate}
       headerContent={

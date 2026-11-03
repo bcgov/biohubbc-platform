@@ -20,6 +20,41 @@ export interface AdminSubmissionUploadsResponse {
   pagination: ApiPaginationResponseParams;
 }
 
+/** One active upload in the administrative list of every upload, with the submission it belongs to. */
+export interface AdminSubmissionUploadListItem {
+  submission_upload_id: string;
+  submission_id: number;
+  submission_name: string;
+  upload_id: string;
+  status: SubmissionUploadJobStatus;
+  decision: SubmissionUploadDecision;
+  ticket_id: string;
+  comment: string | null;
+  create_date: string;
+  create_user: number;
+  submitted_by_identifier: string | null;
+}
+
+export interface AdminSubmissionUploadListResponse {
+  uploads: AdminSubmissionUploadListItem[];
+  pagination: ApiPaginationResponseParams;
+}
+
+/** One active submission as the administrative submissions list shows it. */
+export interface AdminSubmissionListItem {
+  submission_id: number;
+  uuid: string;
+  name: string;
+  contributor_name: string;
+  submitted_timestamp: string;
+  publish_timestamp: string | null;
+}
+
+export interface AdminSubmissionListResponse {
+  submissions: AdminSubmissionListItem[];
+  pagination: ApiPaginationResponseParams;
+}
+
 export type SubmissionRecord = {
   submission_id: number;
   uuid: string;
@@ -55,13 +90,6 @@ export type SubmissionRecordWithSecurity = {
   contributor_name: string;
   last_approved_upload_date: string | null;
   feature_types: string[];
-};
-
-export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
-  security: SECURITY_APPLIED_STATUS;
-  root_feature_type_id: number;
-  root_feature_type_name: string;
-  regions: string[];
 };
 
 export type SubmissionSummary = Pick<

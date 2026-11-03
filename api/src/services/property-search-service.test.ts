@@ -45,6 +45,13 @@ describe('PropertySearchService', () => {
           property_display_name: 'Survey date',
           feature_property_type: 'datetime',
           operators: ['Before', 'After', 'Exists']
+        }),
+        propertyResult({
+          feature_property_id: 4,
+          property_name: 'abstract',
+          property_display_name: 'Abstract',
+          feature_property_type: 'paragraph',
+          operators: ['Contains', 'Exists']
         })
       ];
 
@@ -56,6 +63,7 @@ describe('PropertySearchService', () => {
 
       expect(result).to.eql({
         string: [mockResults[0]],
+        paragraph: [mockResults[3]],
         number: [mockResults[1]],
         boolean: [],
         datetime: [mockResults[2]],
@@ -75,6 +83,7 @@ describe('PropertySearchService', () => {
 
       expect(result).to.eql({
         string: [],
+        paragraph: [],
         number: [],
         boolean: [],
         datetime: [],

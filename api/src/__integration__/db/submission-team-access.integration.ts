@@ -56,7 +56,8 @@ describe('submission team access (integration)', function () {
         contributor_id: contributor.rows[0].contributor_id,
         name: 'Pending team access integration test',
         description: 'Submission before feature ingestion completes.',
-        comment: 'Integration test'
+        comment: 'Integration test',
+        default_blueprint_id: null
       },
       [initialSubmitterSystemUserId, requestorSystemUserId]
     );

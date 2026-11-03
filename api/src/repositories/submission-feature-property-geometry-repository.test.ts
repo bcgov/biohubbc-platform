@@ -170,16 +170,16 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       });
       const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
 
-      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId);
+      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, null);
 
       expect(result).to.eql({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 3 });
     });
 
-    it('includes pending features and excludes ended features and retired property definitions', async () => {
+    it('includes every upload feature whatever its lifecycle and excludes retired property definitions', async () => {
       const sqlStub = sinon.stub().callsFake((statement: any) => {
         expect(statement.text).to.contain('sf.submission_upload_id');
-        // The partial index form, verbatim.
-        expect(statement.text).to.contain('sf.record_end_date IS NULL');
+        // No lifecycle predicate: ended and superseded upload features are part of the extent.
+        expect(statement.text).to.not.contain('sf.record_end_date');
         // Upload features under review have never been published, so the extent must not be
         // published-gated or every review map would open on an empty state.
         expect(statement.text).to.not.contain('record_effective_date');
@@ -193,10 +193,25 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
       });
       const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
 
-      await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId);
+      await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, null);
     });
 
-    it('returns null bounds when the upload has no active spatial properties', async () => {
+    it('limits the extent to one reconciliation outcome when requested', async () => {
+      const sqlStub = sinon.stub().callsFake((statement: any) => {
+        expect(statement.text).to.contain('sf.reconciliation =');
+        expect(statement.values).to.eql([submissionUploadId, 12, 'modified']);
+        return Promise.resolve(
+          mockQueryResult([{ min_x: -125.1, min_y: 49.1, max_x: -125.0, max_y: 49.2, geometry_count: 1 }])
+        );
+      });
+      const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, 'modified');
+
+      expect(result).to.eql({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
+    });
+
+    it('returns null bounds when the upload has no spatial properties', async () => {
       const repository = new SubmissionFeaturePropertyGeometryRepository(
         getMockDBConnection({
           sql: () =>
@@ -206,7 +221,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
         })
       );
 
-      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId);
+      const result = await repository.getSubmissionUploadGeometryExtent(12, submissionUploadId, null);
 
       expect(result).to.eql({ bbox: null, geometry_count: 0 });
     });

@@ -17,6 +17,8 @@ export interface IPolicySummary {
   name: string;
   description: string | null;
   status: PolicyStatus;
+  /** When the policy ends, or null when it has no end date. Sent by the policies list and the single policy read, which include ended policies. */
+  record_end_date?: string | null;
 }
 
 export interface IPolicy extends IPolicySummary {

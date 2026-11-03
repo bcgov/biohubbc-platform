@@ -112,6 +112,45 @@ describe('single-table reconciliation (integration)', function () {
     expect((await featureForUpload(pendingUpload)).reconciliation).to.equal('unmodified');
   });
 
+  it('stores each baseline and resolves parents to the same upload before published rows', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const createParentChildUpload = async () => {
+      const uploadId = await createTestUploadWithFeatures(
+        connection,
+        submissionId,
+        'survey',
+        [
+          { source_id: 'P', content_hash: HASH_X, data: { id: 'P', type: 'survey', properties: {} } },
+          { source_id: 'C', content_hash: HASH_X, data: { id: 'C', type: 'survey', properties: {}, parent: 'P' } }
+        ],
+        'indexed'
+      );
+      return uploadId;
+    };
+    const featuresBySource = async (submissionUploadId: string) => {
+      const result = await connection.sql(SQL`
+        SELECT source_id, submission_feature_id, baseline_submission_feature_id, parent_submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}::uuid;
+      `);
+      return Object.fromEntries(result.rows.map((row) => [row.source_id, row]));
+    };
+
+    const firstUpload = await createParentChildUpload();
+    await service.reconcileSubmissionFeatures(firstUpload);
+    const first = await featuresBySource(firstUpload);
+    expect(first.P.baseline_submission_feature_id).to.be.null;
+    expect(first.C.parent_submission_feature_id).to.equal(first.P.submission_feature_id);
+    await service.activateSubmissionUploadReconciliation(firstUpload);
+
+    const secondUpload = await createParentChildUpload();
+    await service.reconcileSubmissionFeatures(secondUpload);
+    const second = await featuresBySource(secondUpload);
+    expect(second.P.baseline_submission_feature_id).to.equal(first.P.submission_feature_id);
+    expect(second.C.baseline_submission_feature_id).to.equal(first.C.submission_feature_id);
+    expect(second.C.parent_submission_feature_id).to.equal(second.P.submission_feature_id);
+  });
+
   it('rejects duplicate source identity before reconciliation', async () => {
     const submissionId = await createTestSubmission(connection);
     const uploadId = await createTestUploadWithFeatures(

@@ -1,5 +1,7 @@
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import {
+  AdminSubmissionListResponse,
+  AdminSubmissionUploadListResponse,
   ICreateSubmission,
   AdminSubmissionUploadsResponse,
   IGetSubmissionsForUserResponse,
@@ -8,8 +10,7 @@ import {
   PresignedUploadUrlResponse,
   SubmissionFilters,
   SubmissionRecordPublishedForPublic,
-  SubmissionRecordWithSecurity,
-  SubmissionRecordWithSecurityAndRootFeature
+  SubmissionRecordWithSecurity
 } from 'interfaces/useSubmissionsApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -38,6 +39,46 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
       `api/administrative/submission/${submissionId}/upload`,
       { params: pagination, ...options }
     );
+    return data;
+  };
+
+  /**
+   * Fetch one page of every active submission for the administrative submissions page.
+   *
+   * @param {SubmissionFilters} filters Search matched against the submission name.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @returns {Promise<AdminSubmissionListResponse>} Submissions with server pagination totals.
+   */
+  const getAdminSubmissionList = async (
+    filters: SubmissionFilters,
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<AdminSubmissionListResponse> => {
+    const { data } = await axios.get<AdminSubmissionListResponse>('api/administrative/submission', {
+      params: { ...filters, ...pagination },
+      ...options
+    });
+    return data;
+  };
+
+  /**
+   * Fetch one page of the active uploads of every submission for the administrative submissions page.
+   *
+   * @param {SubmissionFilters} filters Search matched against the name of each upload's submission.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @returns {Promise<AdminSubmissionUploadListResponse>} Uploads with server pagination totals.
+   */
+  const getAdminSubmissionUploadList = async (
+    filters: SubmissionFilters,
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<AdminSubmissionUploadListResponse> => {
+    const { data } = await axios.get<AdminSubmissionUploadListResponse>('api/administrative/submission/upload', {
+      params: { ...filters, ...pagination },
+      ...options
+    });
     return data;
   };
 
@@ -75,48 +116,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<SubmissionRecordWithSecurity> => {
     const { data } = await axios.get(`api/submission/${submissionId}`, options);
-
-    return data;
-  };
-
-  /**
-   * Fetch all submissions that have not completed security review.
-   *
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
-   */
-  const getUnreviewedSubmissionsForAdmins = async (
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/unreviewed`, options);
-
-    return data;
-  };
-
-  /**
-   * Fetch all submissions that have completed security review.
-   *
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
-   */
-  const getReviewedSubmissionsForAdmins = async (
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/reviewed`, options);
-
-    return data;
-  };
-
-  /**
-   * Fetch all submissions that have completed security review and published.
-   *
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request options, such as an abort signal.
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
-   */
-  const getPublishedSubmissionsForAdmins = async (
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/administrative/submission/published`, options);
 
     return data;
   };
@@ -192,11 +191,10 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
 
   return {
     listAdminSubmissionUploads,
+    getAdminSubmissionList,
+    getAdminSubmissionUploadList,
     getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
-    getUnreviewedSubmissionsForAdmins,
-    getReviewedSubmissionsForAdmins,
-    getPublishedSubmissionsForAdmins,
     getPublishedSubmissions,
     getSubmissionsForUser,
     getSubmissionUploadUrls,

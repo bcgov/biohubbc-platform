@@ -45,7 +45,7 @@ export const BlueprintMetadata = ({ blueprint }: { blueprint: IBlueprint }) => {
   ];
 
   return (
-    <PageSection id="blueprint-metadata" label="Metadata">
+    <PageSection id="blueprint-metadata" label="About">
       <CustomDataGrid autoHeight rows={rows} columns={columns} disableColumnSelector hideFooter rowSelection={false} />
     </PageSection>
   );

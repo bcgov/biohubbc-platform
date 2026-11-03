@@ -1,19 +1,16 @@
 import Box from '@mui/material/Box';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
-import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import { isAxiosError } from 'axios';
 import { EditDialog } from 'components/dialog/EditDialog';
-import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import dayjs from 'dayjs';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { refreshChangedQueries } from 'utils/query-client';
 import { useEffect, useRef, useState } from 'react';
@@ -183,8 +180,8 @@ export const BlueprintPage = () => {
     <LoadingGuard
       isLoading={validId && blueprintQuery.isPending}
       isLoadingFallback={<BlueprintSkeleton metadata={tab === 'metadata'} />}>
-      <PageHeader
-        label={blueprint?.name ?? 'Blueprint'}
+      <AdminPageLayout
+        title={blueprint?.name ?? 'Blueprint'}
         buttons={
           blueprint && (
             <Stack direction="row" spacing={1}>
@@ -208,6 +205,9 @@ export const BlueprintPage = () => {
         }
         breadcrumbs={
           <Breadcrumbs aria-label="Blueprint breadcrumb">
+            <Link component={RouterLink} to="/admin" color="inherit" underline="hover">
+              Administration
+            </Link>
             <Link component={RouterLink} to="/admin/configuration" color="inherit" underline="hover">
               Configuration
             </Link>
@@ -218,26 +218,21 @@ export const BlueprintPage = () => {
           </Breadcrumbs>
         }
         description={blueprint?.description ?? undefined}
-        tabs={
-          <Tabs
-            value={tab}
-            aria-label="Blueprint configuration"
-            onChange={(_event, value: string) => {
-              const next = new URLSearchParams(searchParams);
-              next.set('tab', value);
-              setSearchParams(next);
-            }}>
-            <Tab
-              value="feature-types"
-              label="Feature Types"
-              id="blueprint-feature-types-tab"
-              aria-controls="blueprint-panel"
-            />
-            <Tab value="metadata" label="Metadata" id="blueprint-metadata-tab" aria-controls="blueprint-panel" />
-          </Tabs>
-        }
-      />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+        tabs={[
+          {
+            value: 'feature-types',
+            label: 'Feature Types',
+            id: 'blueprint-feature-types-tab',
+            ariaControls: 'blueprint-panel'
+          },
+          { value: 'metadata', label: 'About', id: 'blueprint-metadata-tab', ariaControls: 'blueprint-panel' }
+        ]}
+        activeTab={tab}
+        onTabChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          next.set('tab', value);
+          setSearchParams(next);
+        }}>
         <Stack gap={3}>
           {blueprint && (
             <Box role="tabpanel" id="blueprint-panel" aria-labelledby={`blueprint-${tab}-tab`}>
@@ -246,7 +241,7 @@ export const BlueprintPage = () => {
             </Box>
           )}
         </Stack>
-      </Container>
+      </AdminPageLayout>
       {blueprint && isEditDialogOpen && (
         <EditDialog<IBlueprintMetadataFormValues>
           open={isEditDialogOpen}

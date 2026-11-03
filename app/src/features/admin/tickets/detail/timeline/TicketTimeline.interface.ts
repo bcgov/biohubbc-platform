@@ -1,4 +1,5 @@
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
+import { ITicketTagEvent } from 'interfaces/useTagsApi.interface';
 import {
   ITicketArtifact,
   ITicketExtended,
@@ -8,10 +9,15 @@ import {
 
 export interface ITicketTimelineProps {
   ticket: ITicketExtended;
+  /**
+   * Tags added to and removed from the ticket. Tag history is administrative only: the admin ticket page passes it,
+   * and the portal passes nothing.
+   */
+  tagEvents?: ITicketTagEvent[];
 }
 
 export interface TimelineEventBase {
-  kind: 'status' | 'comment' | 'data_request' | 'upload';
+  kind: 'status' | 'comment' | 'data_request' | 'upload' | 'tag';
   id: string;
   create_date: string;
 }
@@ -39,4 +45,9 @@ export interface UploadEvent extends TimelineEventBase {
   upload: TicketSubmissionUploadResponse;
 }
 
-export type TimelineEvent = StatusEvent | CommentEvent | DataRequestEvent | UploadEvent;
+export interface TagEvent extends TimelineEventBase {
+  kind: 'tag';
+  tag_event: ITicketTagEvent;
+}
+
+export type TimelineEvent = StatusEvent | CommentEvent | DataRequestEvent | UploadEvent | TagEvent;

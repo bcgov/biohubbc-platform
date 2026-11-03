@@ -73,8 +73,11 @@ describe('administrative/security/reasons', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(withFeatureCountStub).to.have.been.calledOnceWith({ search: undefined }, expectedPagination);
-      expect(countStub).to.have.been.calledOnceWith({ search: undefined });
+      expect(withFeatureCountStub).to.have.been.calledOnceWith(
+        { search: undefined, security_category_id: undefined },
+        expectedPagination
+      );
+      expect(countStub).to.have.been.calledOnceWith({ search: undefined, security_category_id: undefined });
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
 
@@ -106,7 +109,41 @@ describe('administrative/security/reasons', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(withFeatureCountStub).to.have.been.calledOnceWith({ search: 'diabetes' }, expectedPagination);
+      expect(withFeatureCountStub).to.have.been.calledOnceWith(
+        { search: 'diabetes', security_category_id: undefined },
+        expectedPagination
+      );
+      expect(mockRes.statusValue).to.equal(200);
+    });
+
+    it('parses security_category_id query param and limits both the list and the count to it', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      const withFeatureCountStub = sinon
+        .stub(SecurityRuleService.prototype, 'getSecurityRulesWithFeatureCount')
+        .resolves(mockReasons as any);
+      const countStub = sinon.stub(SecurityRuleService.prototype, 'getSecurityRulesCount').resolves(1 as any);
+
+      const requestHandler = getSecurityReasons();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = { security_category_id: '2' };
+
+      const expectedPagination = makePaginationOptionsFromRequest(mockReq);
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(withFeatureCountStub).to.have.been.calledOnceWith(
+        { search: undefined, security_category_id: 2 },
+        expectedPagination
+      );
+      expect(countStub).to.have.been.calledOnceWith({ search: undefined, security_category_id: 2 });
       expect(mockRes.statusValue).to.equal(200);
     });
 

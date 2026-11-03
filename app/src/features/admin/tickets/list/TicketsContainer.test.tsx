@@ -1,12 +1,14 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import { ITicket } from 'interfaces/useTicketsApi.interface';
+import { ITicketWithTags } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { TicketsContainer } from './TicketsContainer';
 
 describe('TicketsContainer', () => {
   const onToggleTicketStatus = vi.fn();
 
-  const tickets: ITicket[] = [
+  const urgentTag = { tag_id: 'tag-1', name: 'Urgent', color: '#D8292F' };
+
+  const tickets: ITicketWithTags[] = [
     {
       ticket_id: '11111111-1111-1111-1111-111111111111',
       ticket_slug: '04900001',
@@ -15,7 +17,8 @@ describe('TicketsContainer', () => {
       team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       create_date: '2026-03-01T00:00:00.000Z',
       priority: 'medium',
-      status: 'open'
+      status: 'open',
+      tags: [urgentTag]
     },
     {
       ticket_id: '22222222-2222-2222-2222-222222222222',
@@ -25,7 +28,8 @@ describe('TicketsContainer', () => {
       team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       create_date: '2026-03-01T00:00:00.000Z',
       priority: 'medium',
-      status: 'closed'
+      status: 'closed',
+      tags: []
     }
   ];
 
@@ -47,12 +51,20 @@ describe('TicketsContainer', () => {
           onDeleteTicket: vi.fn()
         }}
         onRowClick={vi.fn()}
+        tagFilter={[]}
+        onTagFilterChange={vi.fn()}
       />
     );
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("shows each ticket's tags", () => {
+    const { getByText } = renderList();
+
+    expect(getByText('Urgent')).toBeVisible();
   });
 
   it('shows close action for open tickets', async () => {

@@ -1,5 +1,7 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { BaseRepository } from './base-repository';
+import { isSubmissionFeatureCurrent } from './sql-fragments';
 
 /**
  * Repository class for the derived submission feature closure table.
@@ -37,6 +39,40 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
   }
 
   /**
+   * Return whether any current feature of a submission lacks its reflexive closure row.
+   *
+   * Every current feature always has a self-loop row once a rebuild commits, so a missing self-loop means
+   * the submission's closure was invalidated (approval) and its rebuild has not completed, for example
+   * because the rebuild job exhausted its retries.
+   *
+   * @param {number} submissionId The submission scope.
+   * @return {Promise<boolean>} True when at least one current feature has no self-loop closure row.
+   * @memberof SubmissionFeatureClosureRepository
+   */
+  async hasMissingClosureForSubmission(submissionId: number): Promise<boolean> {
+    const sqlStatement = SQL`
+      SELECT EXISTS (
+        SELECT 1
+        FROM submission_feature sf
+        WHERE sf.submission_id = ${submissionId}
+          AND `;
+    sqlStatement.append(isSubmissionFeatureCurrent('sf'));
+    sqlStatement.append(`
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_closure c
+            WHERE c.source_submission_feature_id = sf.submission_feature_id
+              AND c.target_submission_feature_id = sf.submission_feature_id
+          )
+      ) AS has_missing_closure;
+    `);
+
+    const response = await this.connection.sql(sqlStatement, z.object({ has_missing_closure: z.boolean() }));
+
+    return response.rows[0].has_missing_closure;
+  }
+
+  /**
    * Compute and insert the directed reachability closure for a single submission.
    *
    * Closure = reachability over the submission's parent and property (feature-reference) edges — the
@@ -46,7 +82,7 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * distinct targets are resolved through direct successor links to their terminal current feature.
    * Content edges (submission_feature_feature) are deliberately EXCLUDED: content is the parent tree
    * reversed, so closing over (parent + content) makes every tree edge bidirectional and the closure
-   * becomes the complete digraph (O(N^2)). UNION (not UNION ALL) in the recursive CTEs terminates cycles
+   * becomes the complete digraph (O(N^2)). UNION (not UNION ALL) in the recursive CTE terminates cycles
    * (property edges may cycle) and dedupes multi-path edges. is_ancestor marks the pure parent-ancestry
    * subset (the authorization reach, since security cascades up the parent tree only); auth reads WHERE
    * is_ancestor, search reads all rows. See submission_feature_closure's table comment for the full
@@ -64,9 +100,8 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
    * @memberof SubmissionFeatureClosureRepository
    */
   async computeClosureForSubmission(submissionId: number): Promise<number> {
-    // Compute TWO closures and store every evidence edge: the ancestry closure (parent-only,
-    // transitive) is the authorization reach; the evidence closure (parent + property, transitive) is
-    // the search reach and a superset. is_ancestor is true iff the edge is also in the ancestry closure.
+    // Store every evidence edge (parent + property, transitive: the search reach). is_ancestor is true
+    // iff the pair is also connected by a pure-parent path (the authorization reach).
     const sqlStatement = SQL`
       WITH RECURSIVE
       -- Current features in the submission (the universe for self-loops and edge filtering).
@@ -122,66 +157,49 @@ export class SubmissionFeatureClosureRepository extends BaseRepository {
         JOIN current_features current_target
           ON current_target.submission_feature_id = walk.resolved_id
       ),
-      -- Reflexive self-loops (every current feature reaches itself) seed the closure.
-      self_loops AS (
-        SELECT submission_feature_id AS source, submission_feature_id AS target FROM current_features
-      ),
       -- Direct parent and property-reference edges. Sources are current; immutable stored targets are
-      -- normalized to current feature rows before entering either graph recursion.
-      parent_edges AS (
-        SELECT child.submission_feature_id AS source, resolved.resolved_id AS target
+      -- normalized to current feature rows before entering the graph recursion. is_ancestor marks parent
+      -- edges, the only edges that contribute to the authorization reach.
+      direct_edges AS (
+        SELECT child.submission_feature_id AS source, resolved.resolved_id AS target, true AS is_ancestor
         FROM submission_feature child
         JOIN current_features current_source
           ON current_source.submission_feature_id = child.submission_feature_id
         JOIN resolved_targets resolved
           ON resolved.original_id = child.parent_submission_feature_id
         WHERE child.parent_submission_feature_id IS NOT NULL
-      ),
-      property_edges AS (
-        SELECT property.submission_feature_id AS source,
-               resolved.resolved_id AS target
+
+        UNION ALL
+
+        SELECT property.submission_feature_id AS source, resolved.resolved_id AS target, false AS is_ancestor
         FROM submission_feature_property_feature property
         JOIN current_features current_source
           ON current_source.submission_feature_id = property.submission_feature_id
         JOIN resolved_targets resolved
           ON resolved.original_id = property.referenced_submission_feature_id
       ),
-      -- Ancestry base: self + parent only (the authorization reach, before transitive closure).
-      ancestry_edges AS (
-        SELECT source, target FROM self_loops
-        UNION ALL SELECT source, target FROM parent_edges
-      ),
-      -- Evidence base: self + parent + property (the search reach). UNION ALL because dedupe happens in
-      -- the recursive CTEs below.
-      direct_edges AS (
-        SELECT source, target FROM self_loops
-        UNION ALL SELECT source, target FROM parent_edges
-        UNION ALL SELECT source, target FROM property_edges
-      ),
-      -- Ancestry closure: transitive reachability over parent only. Acyclic up-tree, so it terminates at
-      -- tree depth. These edges are the authorization reach (flagged is_ancestor = true below).
-      ancestry_closure AS (
-        SELECT source, target FROM ancestry_edges
+      -- One transitive walk over real edges only. A path is ancestry iff every edge on it is a parent edge,
+      -- so the flag is ANDed along the path. Keeping the flag in the row lets a pair reached by both a
+      -- pure-parent path and a mixed path carry both flags; UNION dedupes on (source, target, flag), which
+      -- bounds the walk at two rows per pair and terminates property-reference cycles. Self-loops stay out
+      -- of the recursion: as join partners they would only re-derive rows that UNION then discards.
+      walk AS (
+        SELECT source, target, is_ancestor FROM direct_edges
         UNION
-        SELECT c.source, d.target
-        FROM ancestry_closure c
-        JOIN ancestry_edges d ON d.source = c.target
+        SELECT w.source, d.target, w.is_ancestor AND d.is_ancestor
+        FROM walk w
+        JOIN direct_edges d ON d.source = w.target
       ),
-      -- Evidence closure: transitive reachability over parent + property (the search reach; a superset of
-      -- the ancestry closure). UNION (not UNION ALL) dedupes multi-path edges and terminates on cycles in
-      -- the property-reference graph (submission_feature_property_feature is not cycle-prevented).
-      closure AS (
-        SELECT source, target FROM direct_edges
-        UNION
-        SELECT c.source, d.target
-        FROM closure c
-        JOIN direct_edges d ON d.source = c.target
+      -- Reflexive self-loops (every current feature reaches itself, as its own ancestor) close the reach.
+      reach AS (
+        SELECT source, target, is_ancestor FROM walk
+        UNION ALL
+        SELECT submission_feature_id, submission_feature_id, true FROM current_features
       )
       INSERT INTO submission_feature_closure (source_submission_feature_id, target_submission_feature_id, is_ancestor)
-      SELECT cl.source, cl.target, (anc.source IS NOT NULL) AS is_ancestor
-      FROM closure cl
-      LEFT JOIN ancestry_closure anc
-        ON anc.source = cl.source AND anc.target = cl.target;
+      SELECT source, target, bool_or(is_ancestor)
+      FROM reach
+      GROUP BY source, target;
     `;
 
     const response = await this.connection.sql(sqlStatement);

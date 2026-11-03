@@ -75,7 +75,6 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
     sourceId: string;
     data: Record<string, unknown>;
   }): Promise<number> {
-    const systemUserId = connection.systemUserId();
     const dataJson = JSON.stringify(params.data);
 
     const result = await connection.sql(SQL`
@@ -86,8 +85,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
         source_id,
         data,
         data_byte_size,
-        record_effective_date,
-        create_user
+        record_effective_date
       )
       VALUES (
         ${params.submissionId},
@@ -96,8 +94,7 @@ describe('SubmissionFeaturePropertyIngestionService — feature property indexin
         ${params.sourceId},
         ${dataJson}::jsonb,
         octet_length(${dataJson}::jsonb::text) + 500,
-        now(),
-        ${systemUserId}
+        now()
       )
       RETURNING submission_feature_id;
     `);

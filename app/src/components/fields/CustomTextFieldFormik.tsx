@@ -3,11 +3,12 @@ import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import CustomTextField from './CustomTextField';
 
-export interface ICustomTextFieldFormikProps extends Omit<
-  TextFieldProps,
-  'name' | 'value' | 'onChange' | 'error' | 'helperText'
-> {
+export interface ICustomTextFieldFormikProps extends Omit<TextFieldProps, 'name' | 'value' | 'error' | 'helperText'> {
   name: string;
+  /**
+   * Replaces Formik's default change handler, for a field that normalizes what is typed or pasted before setting it.
+   */
+  onChange?: TextFieldProps['onChange'];
 }
 
 /**

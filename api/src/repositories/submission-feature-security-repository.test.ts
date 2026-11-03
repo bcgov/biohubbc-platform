@@ -90,13 +90,12 @@ describe('SubmissionFeatureSecurityRepository', () => {
       const sql = sinon.stub().resolves({ rows: [], rowCount: 1 });
       const repository = new SubmissionFeatureSecurityRepository(getMockDBConnection({ sql }));
 
-      await repository.copySubmissionFeatureSecurityToSuccessors('upload-id', 'predecessor-upload-id');
+      await repository.copySubmissionFeatureSecurityToSuccessors('upload-id');
 
       const statement = sql.firstCall.args[0];
       const text = statement.text as string;
-      expect(text).to.include('candidate.submission_id = incoming.submission_id');
-      expect(text).to.include('candidate.source_id = incoming.source_id');
-      expect(text).to.include('candidate.successor_submission_feature_id IS NULL');
+      expect(text).to.include('predecessor_security.submission_feature_id = incoming.baseline_submission_feature_id');
+      expect(text).to.include('incoming.reconciliation IS NOT NULL');
       expect(text).to.include('predecessor_security.submission_upload_review_id');
       expect(text).to.include('predecessor_security.record_effective_date <= now()');
       expect(text).not.to.include('predecessor_security.status');
@@ -106,7 +105,7 @@ describe('SubmissionFeatureSecurityRepository', () => {
       expect(text).to.include('ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING');
       expect(text).not.to.include('DO UPDATE');
       expect(text).not.to.include('submission_feature_closure');
-      expect(statement.values).to.eql(['predecessor-upload-id', 'predecessor-upload-id', 'upload-id']);
+      expect(statement.values).to.eql(['upload-id']);
     });
   });
 

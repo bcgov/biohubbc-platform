@@ -69,6 +69,15 @@ describe('useMartinApi', () => {
     expect(mock.history.post[0].signal).toBe(controller.signal);
   });
 
+  it('limits an upload tile session to a reconciliation outcome when one is given', async () => {
+    const submissionUploadId = '11111111-1111-4111-8111-111111111111';
+    mock.onPost(`/api/administrative/submission/16/upload/${submissionUploadId}/tile`).reply(200, session);
+
+    await useMartinApi(axios).createSubmissionUploadTileSession(16, submissionUploadId, { reconciliation: 'modified' });
+
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ reconciliation: 'modified' });
+  });
+
   it('passes through the empty result for an upload with nothing to map', async () => {
     const submissionUploadId = '11111111-1111-4111-8111-111111111111';
     mock

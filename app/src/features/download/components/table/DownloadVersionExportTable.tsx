@@ -95,7 +95,7 @@ export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: Do
         flex: 0.8,
         renderCell: (params) => (
           <Typography variant="body2" noWrap title={params.value || ''}>
-            {getRelativeTimeLabel(typeof params.value === 'string' ? params.value : undefined) ?? '-'}
+            {getRelativeTimeLabel(typeof params.value === 'string' ? params.value : undefined)}
           </Typography>
         )
       },
@@ -106,7 +106,7 @@ export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: Do
         flex: 0.8,
         renderCell: (params) => (
           <Typography variant="body2" noWrap title={params.value || ''}>
-            {getRelativeTimeLabel(typeof params.value === 'string' ? params.value : undefined) ?? '-'}
+            {getRelativeTimeLabel(typeof params.value === 'string' ? params.value : undefined)}
           </Typography>
         )
       },
@@ -118,7 +118,7 @@ export const DownloadVersionExportTable = ({ downloadId, downloadVersionId }: Do
         sortable: false,
         renderCell: (params) => (
           <Typography variant="body2" noWrap title={params.value || ''}>
-            {params.value || '-'}
+            {params.value}
           </Typography>
         )
       },

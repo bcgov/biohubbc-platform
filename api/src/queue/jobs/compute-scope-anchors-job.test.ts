@@ -19,11 +19,15 @@ describe('computeScopeAnchorsJobHandler', () => {
     sinon.restore();
   });
 
-  const createMockJob = (securityScopeId: string, id = 'job-1'): PgBoss.Job<IComputeScopeAnchorsJobData> =>
+  const createMockJob = (
+    securityScopeId: string,
+    id = 'job-1',
+    submissionId: number | null = null
+  ): PgBoss.Job<IComputeScopeAnchorsJobData> =>
     ({
       id,
       name: 'compute-scope-anchors',
-      data: { securityScopeId }
+      data: { securityScopeId, submissionId }
     } as PgBoss.Job<IComputeScopeAnchorsJobData>);
 
   it('should compute anchors using one connection per phase', async () => {
@@ -62,10 +66,50 @@ describe('computeScopeAnchorsJobHandler', () => {
     // Phase 3: insert loop (two calls — one batch + null terminator)
     expect(batchStub).to.have.been.calledTwice;
 
+    // A policy-triggered run of a wildcard scope scans every submission.
+    expect(deleteStaleStub.firstCall.args).to.eql(['scope-uuid-1', 0, null]);
+    expect(batchStub.secondCall.args[3]).to.be.null;
+
     // 5 phases total (resolve URN, stale batch 1, stale batch 2, insert batch 1, insert batch 2)
     expect(openStub.callCount).to.equal(5);
     expect(commitStub.callCount).to.equal(5);
     expect(releaseStub.callCount).to.equal(5);
+  });
+
+  it('should limit both anchor scans to the triggering submission', async () => {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    const urn = { urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' };
+    sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(urn);
+    const deleteStaleStub = sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorBatch').resolves(null);
+    const batchStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorBatch').resolves(null);
+
+    await computeScopeAnchorsJobHandler([createMockJob('scope-uuid-1', 'job-1', 42)]);
+
+    expect(deleteStaleStub).to.have.been.calledOnceWith('scope-uuid-1', 0, 42);
+    expect(batchStub).to.have.been.calledOnceWith('scope-uuid-1', urn, 0, 42);
+  });
+
+  it('should scan every submission for a job queued without a submission', async () => {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    sinon
+      .stub(SecurityScopeService.prototype, 'resolveUrnForScope')
+      .resolves({ urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' });
+    const deleteStaleStub = sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorBatch').resolves(null);
+    sinon.stub(SecurityScopeService.prototype, 'computeAnchorBatch').resolves(null);
+
+    const legacyJob = {
+      id: 'job-legacy',
+      name: 'compute-scope-anchors',
+      data: { securityScopeId: 'scope-uuid-1' }
+    } as unknown as PgBoss.Job<IComputeScopeAnchorsJobData>;
+
+    await computeScopeAnchorsJobHandler([legacyJob]);
+
+    expect(deleteStaleStub).to.have.been.calledOnceWith('scope-uuid-1', 0, null);
   });
 
   it('should stop after URN resolve when no active policy statements', async () => {
@@ -195,7 +239,7 @@ describe('computeScopeAnchorsFailedHandler', () => {
     const job = {
       id: 'job-1',
       name: 'compute-scope-anchors-failed',
-      data: { securityScopeId: 'scope-uuid-1' },
+      data: { securityScopeId: 'scope-uuid-1', submissionId: null },
       output: { message: 'Anchor computation failed after retries' }
     } as unknown as PgBoss.Job<IComputeScopeAnchorsJobData>;
 
@@ -211,7 +255,7 @@ describe('computeScopeAnchorsFailedHandler', () => {
     const job = {
       id: 'job-2',
       name: 'compute-scope-anchors-failed',
-      data: { securityScopeId: 'scope-uuid-2' },
+      data: { securityScopeId: 'scope-uuid-2', submissionId: null },
       output: null
     } as unknown as PgBoss.Job<IComputeScopeAnchorsJobData>;
 

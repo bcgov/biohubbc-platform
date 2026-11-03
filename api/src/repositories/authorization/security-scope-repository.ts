@@ -151,12 +151,31 @@ export class SecurityScopeRepository extends BaseRepository {
    * are deleted but the batch is not exhausted. A boundary query advances the
    * cursor past the fully-valid page.
    *
+   * **Submission scope:** when `submissionId` is set, only anchors on that submission's features are
+   * checked. Anchor validity depends only on the anchor's own submission graph and the scope's policy, so a
+   * run triggered by one submission's graph change cannot make another submission's anchors stale.
+   *
    * @param {string} securityScopeId Security scope identifier whose stale anchors are removed.
    * @param {number} afterId Keyset cursor; pass zero to start with the first anchor.
+   * @param {number | null} submissionId Submission whose anchors are checked, or null to check every anchor.
    * @returns {Promise<AnchorBatchResult | null>} Next cursor position, or null when no anchors remain.
    * @memberof SecurityScopeRepository
    */
-  async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
+  async deleteStaleAnchorBatch(
+    securityScopeId: string,
+    afterId: number,
+    submissionId: number | null
+  ): Promise<AnchorBatchResult | null> {
+    const values: (string | number)[] = [securityScopeId, afterId, SECURITY_SCOPE_ANCHOR_BATCH_SIZE];
+    let anchorSubmissionJoin = '';
+
+    if (submissionId !== null) {
+      values.push(submissionId);
+      anchorSubmissionJoin = `JOIN submission_feature scoped_anchor
+           ON scoped_anchor.submission_feature_id = ssa.anchor_submission_feature_id
+          AND scoped_anchor.submission_id = $4::integer`;
+    }
+
     const result = await this.connection.query<{
       anchor_submission_feature_id: number;
       page_last_id: number;
@@ -176,6 +195,7 @@ export class SecurityScopeRepository extends BaseRepository {
        batch AS (
          SELECT ssa.anchor_submission_feature_id
          FROM security_scope_anchor ssa
+         ${anchorSubmissionJoin}
          WHERE ssa.security_scope_id = $1
            AND ssa.anchor_submission_feature_id > $2
            AND EXISTS (SELECT 1 FROM active_scope)
@@ -212,7 +232,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
            AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
        )`,
-      [securityScopeId, afterId, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
+      values
     );
 
     if (result.rows.length > 0) {
@@ -247,13 +267,14 @@ export class SecurityScopeRepository extends BaseRepository {
        FROM (
          SELECT ssa.anchor_submission_feature_id
          FROM security_scope_anchor ssa
+         ${anchorSubmissionJoin}
          WHERE ssa.security_scope_id = $1
            AND ssa.anchor_submission_feature_id > $2
            AND EXISTS (SELECT 1 FROM active_scope)
          ORDER BY ssa.anchor_submission_feature_id
          LIMIT $3
        ) ssa`,
-      [securityScopeId, afterId, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
+      values
     );
 
     if (!boundaryResult.rows[0]?.last_id) {
@@ -330,17 +351,38 @@ export class SecurityScopeRepository extends BaseRepository {
    * ON CONFLICT DO NOTHING makes each batch idempotent, so partial completion
    * followed by retry is safe.
    *
+   * **Submission scope:** when `submissionId` is set, candidates are limited to that submission's features
+   * with an indexable equality on `submission_feature (submission_id, submission_feature_id)`, which also
+   * serves the keyset order. The text URN predicates stay in place, so the result is the same subset the
+   * unscoped scan would select from that submission.
+   *
    * @param {string} securityScopeId Security scope identifier whose anchors are computed.
    * @param {SecurityScopeUrn} urn URN components resolved through {@link resolveUrnForScope}.
    * @param {number} afterId Keyset cursor; pass zero to start with the first candidate.
+   * @param {number | null} submissionId Submission whose features are candidates, or null for every submission.
    * @returns {Promise<AnchorBatchResult | null>} Next cursor position, or null when no candidates remain.
    * @memberof SecurityScopeRepository
    */
   async computeAnchorBatch(
     securityScopeId: string,
     urn: SecurityScopeUrn,
-    afterId: number
+    afterId: number,
+    submissionId: number | null
   ): Promise<AnchorBatchResult | null> {
+    const values: (string | number)[] = [
+      afterId,
+      urn.urn_submission_id,
+      urn.urn_feature_type,
+      urn.urn_feature_id,
+      SECURITY_SCOPE_ANCHOR_BATCH_SIZE
+    ];
+    let candidateSubmissionPredicate = '';
+
+    if (submissionId !== null) {
+      values.push(submissionId);
+      candidateSubmissionPredicate = 'AND candidate.submission_id = $6::integer';
+    }
+
     const result = await this.connection.query<{
       submission_feature_id: number;
       page_last_id: number;
@@ -359,6 +401,7 @@ export class SecurityScopeRepository extends BaseRepository {
                AND closure_ready.target_submission_feature_id = candidate.submission_feature_id
            )
            AND candidate.submission_feature_id > $1
+           ${candidateSubmissionPredicate}
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
            AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
@@ -396,7 +439,7 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT 1 FROM has_candidate_ancestor hca
          WHERE hca.candidate_id = b.submission_feature_id
        )`,
-      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
+      values
     );
 
     if (result.rows.length > 0) {
@@ -430,6 +473,7 @@ export class SecurityScopeRepository extends BaseRepository {
                AND closure_ready.target_submission_feature_id = candidate.submission_feature_id
            )
            AND candidate.submission_feature_id > $1
+           ${candidateSubmissionPredicate}
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
            AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
@@ -437,7 +481,7 @@ export class SecurityScopeRepository extends BaseRepository {
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ) candidate`,
-      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, SECURITY_SCOPE_ANCHOR_BATCH_SIZE]
+      values
     );
 
     if (!boundaryResult.rows[0]?.last_id) {

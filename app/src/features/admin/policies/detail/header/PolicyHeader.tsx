@@ -5,9 +5,9 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { DropdownButton } from 'components/DropdownButton';
-import { PageHeader } from 'components/header/PageHeader';
-import { TabGroup } from 'components/tabs/TabGroup';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { AdminPageLayout } from 'layouts/AdminPageLayout';
+import { PropsWithChildren } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 export type PolicyDetailTab = 'expressions' | 'statements' | 'teams';
@@ -43,9 +43,10 @@ interface PolicyHeaderProps {
 }
 
 /**
- * Header for the policy detail page.
+ * Renders the policy detail page in the administrative page layout: the header with breadcrumb, name, description,
+ * status actions and tabs, above the selected tab's content passed as children.
  *
- * @param {PolicyHeaderProps} props
+ * @param {PropsWithChildren<PolicyHeaderProps>} props
  * @returns {JSX.Element}
  */
 export const PolicyHeader = ({
@@ -55,21 +56,27 @@ export const PolicyHeader = ({
   isSavingPolicyDetails,
   onTabChange,
   onPolicyStatusChange,
-  onEditPolicy
-}: PolicyHeaderProps) => (
-  <PageHeader
-    maxWidth="xl"
+  onEditPolicy,
+  children
+}: PropsWithChildren<PolicyHeaderProps>) => (
+  <AdminPageLayout
     breadcrumbs={
       <Breadcrumbs aria-label="policy breadcrumb">
-        <Link component={RouterLink} to="/admin/policies" underline="hover" color="inherit">
-          Policy
+        <Link component={RouterLink} to="/admin" underline="hover" color="inherit">
+          Administration
+        </Link>
+        <Link component={RouterLink} to="/admin/data-requests" underline="hover" color="inherit">
+          Data Requests
+        </Link>
+        <Link component={RouterLink} to="/admin/data-requests?tab=policies" underline="hover" color="inherit">
+          Policies
         </Link>
         <Typography variant="inherit" color="text.primary">
           {policy.name}
         </Typography>
       </Breadcrumbs>
     }
-    label={<Typography variant="h1">{policy.name}</Typography>}
+    title={policy.name}
     description={policy.description}
     descriptionDialogTitle="Policy Description"
     buttons={
@@ -93,13 +100,9 @@ export const PolicyHeader = ({
         </Button>
       </Stack>
     }
-    tabs={
-      <TabGroup<PolicyDetailTab>
-        value={activeTab}
-        tabs={policyDetailTabs}
-        onChange={onTabChange}
-        ariaLabel="Policy detail sections"
-      />
-    }
-  />
+    tabs={policyDetailTabs}
+    activeTab={activeTab}
+    onTabChange={onTabChange}>
+    {children}
+  </AdminPageLayout>
 );

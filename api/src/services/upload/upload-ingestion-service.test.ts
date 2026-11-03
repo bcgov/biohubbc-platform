@@ -35,7 +35,8 @@ describe('UploadIngestionService', () => {
     contributor_id: 1,
     name: 'Test Submission',
     description: 'Test Description',
-    comment: 'Test Comment'
+    comment: 'Test Comment',
+    default_blueprint_id: 7
   };
 
   const mockBlueprintId = 7;
@@ -51,6 +52,48 @@ describe('UploadIngestionService', () => {
 
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('createSubmissionArchiveUpload', () => {
+    it("stores the first upload's resolved Blueprint as the new submission's default", async () => {
+      const resolve = sinon.stub(SubmissionUploadService.prototype, 'resolveBlueprintIdForNewSubmission').resolves(9);
+      const start = sinon.stub(service, 'startArchiveUpload').resolves({} as any);
+
+      await service.createSubmissionArchiveUpload({
+        contributorId: 3,
+        bytes: 5_000_000,
+        name: 'Name',
+        description: 'Description',
+        comment: 'Comment',
+        blueprintId: 9
+      });
+
+      expect(resolve).to.have.been.calledOnceWithExactly(9);
+      expect(start).to.have.been.calledOnce;
+      expect(start.firstCall.args[1]).to.include({ contributor_id: 3, default_blueprint_id: 9 });
+      expect(start.firstCall.args[3]).to.equal(9);
+    });
+
+    it('does not create a submission when the requested Blueprint cannot be resolved', async () => {
+      const error = new Error('Requested Blueprint is not available');
+      sinon.stub(SubmissionUploadService.prototype, 'resolveBlueprintIdForNewSubmission').rejects(error);
+      const start = sinon.stub(service, 'startArchiveUpload');
+
+      try {
+        await service.createSubmissionArchiveUpload({
+          contributorId: 3,
+          bytes: 5_000_000,
+          name: 'Name',
+          description: 'Description',
+          comment: 'Comment',
+          blueprintId: 99
+        });
+        expect.fail('Expected failure');
+      } catch (actual) {
+        expect(actual).to.equal(error);
+      }
+      expect(start).not.to.have.been.called;
+    });
   });
 
   describe('startArchiveUpload', () => {

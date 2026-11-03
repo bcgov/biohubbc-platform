@@ -413,29 +413,31 @@ export class ExpressionTreeService extends DBService {
    * case in their identity.
    *
    * @private
-   * @param {Extract<InternalTypedPredicate, { type: 'string' }>['operator']} operator - String operator.
+   * @param {Extract<InternalTypedPredicate, { type: 'string' | 'paragraph' }>['operator']} operator - String or paragraph operator.
    * @return {boolean} True when values should be normalized to case-insensitive form.
    * @memberof ExpressionTreeService
    */
   private isCaseInsensitiveStringOperator(
-    operator: Extract<InternalTypedPredicate, { type: 'string' }>['operator']
+    operator: Extract<InternalTypedPredicate, { type: 'string' | 'paragraph' }>['operator']
   ): boolean {
     return operator === 'ILike';
   }
 
   /**
-   * Normalize a string predicate value for semantic hashing.
+   * Normalize a string or paragraph predicate value for semantic hashing.
    *
-   * The semantic validator guarantees a non-Exists string predicate has a
+   * The semantic validator guarantees a non-Exists string or paragraph predicate has a
    * string value. The `undefined` branch is kept for Exists predicates, which
    * intentionally have no value but still need a stable hash identity.
    *
    * @private
-   * @param {Extract<InternalTypedPredicate, { type: 'string' }>} predicate - String predicate payload.
+   * @param {Extract<InternalTypedPredicate, { type: 'string' | 'paragraph' }>} predicate - String or paragraph predicate payload.
    * @return {string} Normalized value, or empty string when value is absent.
    * @memberof ExpressionTreeService
    */
-  private normalizeStringPredicateValue(predicate: Extract<InternalTypedPredicate, { type: 'string' }>): string {
+  private normalizeStringPredicateValue(
+    predicate: Extract<InternalTypedPredicate, { type: 'string' | 'paragraph' }>
+  ): string {
     if (predicate.value === undefined) {
       return '';
     }
@@ -543,6 +545,7 @@ export class ExpressionTreeService extends DBService {
 
     switch (predicate.type) {
       case 'string':
+      case 'paragraph':
         return this.buildPredicateIdentity(
           feature_property_id,
           blueprint_feature_type_property_id,

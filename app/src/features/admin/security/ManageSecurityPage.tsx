@@ -12,10 +12,10 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
 import { CategoriesContainer } from './components/CategoriesContainer';
-import { ReasonsContainer } from './components/ReasonsContainer';
+import { RulesContainer } from './components/RulesContainer';
 
 /**
- * Admin page for managing security categories and reasons.
+ * Admin page for managing security categories and rules.
  *
  * Each table loads the page on screen through a query; a container's `refresh` reloads every page of its table.
  *
@@ -34,22 +34,21 @@ export const ManageSecurityPage = () => {
     placeholderData: keepPreviousData
   });
 
-  const reasonsGrid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
-  const reasonsSearch = { search: reasonsGrid.debouncedSearchTerm };
-  const reasonsQuery = useQuery({
-    queryKey: securityQueryKeys.reasons(reasonsSearch, reasonsGrid.apiPagination),
-    queryFn: ({ signal }) =>
-      biohubApi.security.getSecurityReasons(reasonsSearch, reasonsGrid.apiPagination, { signal }),
+  const rulesGrid = useServerPaginatedGridState({ defaultSort: { field: 'name', sort: 'asc' } });
+  const rulesSearch = { search: rulesGrid.debouncedSearchTerm };
+  const rulesQuery = useQuery({
+    queryKey: securityQueryKeys.rules(rulesSearch, rulesGrid.apiPagination),
+    queryFn: ({ signal }) => biohubApi.security.getSecurityRules(rulesSearch, rulesGrid.apiPagination, { signal }),
     placeholderData: keepPreviousData
   });
 
   /**
-   * Reloads both tables after a category or reason changes, since reasons show their category, and refreshes the
-   * reviews that show reasons as rules.
+   * Reloads both tables after a category or rule changes, since rules show their category, and refreshes the
+   * reviews that apply rules.
    *
    * @returns {void}
    */
-  const refreshSecurity = () => refreshChangedQueries(queryClient, changedQueryKeys.securityReason());
+  const refreshSecurity = () => refreshChangedQueries(queryClient, changedQueryKeys.securityRule());
 
   return (
     <>
@@ -81,17 +80,17 @@ export const ManageSecurityPage = () => {
         />
 
         <Box mt={4}>
-          <QueryErrorDialog error={reasonsQuery.error} label="security reasons" />
-          <ReasonsContainer
-            reasons={reasonsQuery.data?.reasons ?? []}
-            rowCount={reasonsQuery.data?.pagination.total ?? 0}
-            paginationModel={reasonsGrid.paginationModel}
-            setPaginationModel={reasonsGrid.handlePaginationChange}
-            sortModel={reasonsGrid.sortModel}
-            setSortModel={reasonsGrid.handleSortChange}
+          <QueryErrorDialog error={rulesQuery.error} label="security rules" />
+          <RulesContainer
+            rules={rulesQuery.data?.reasons ?? []}
+            rowCount={rulesQuery.data?.pagination.total ?? 0}
+            paginationModel={rulesGrid.paginationModel}
+            setPaginationModel={rulesGrid.handlePaginationChange}
+            sortModel={rulesGrid.sortModel}
+            setSortModel={rulesGrid.handleSortChange}
             refresh={refreshSecurity}
-            searchTerm={reasonsGrid.searchTerm}
-            onSearch={reasonsGrid.handleSearch}
+            searchTerm={rulesGrid.searchTerm}
+            onSearch={rulesGrid.handleSearch}
           />
         </Box>
       </Box>

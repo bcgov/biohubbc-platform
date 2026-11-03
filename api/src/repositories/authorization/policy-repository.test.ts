@@ -164,6 +164,29 @@ describe('PolicyRepository', () => {
     });
   });
 
+  describe('ended policies', () => {
+    it('lists ended policies with their end date', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repository = new PolicyRepository(getMockDBConnection({ knex }));
+
+      await repository.getPolicies({ search: 'Telemetry' }, { page: 1, limit: 50 });
+
+      const { sql } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).to.include('"record_end_date"');
+      expect(sql).not.to.include('"record_end_date" is null');
+    });
+
+    it('counts ended policies so the total matches the list', async () => {
+      const knex = sinon.stub().resolves({ rowCount: 1, rows: [{ count: 3 }] });
+      const repository = new PolicyRepository(getMockDBConnection({ knex }));
+
+      await repository.getPoliciesCount({ search: 'Telemetry' });
+
+      const { sql } = knex.firstCall.args[0].toSQL().toNative();
+      expect(sql).not.to.include('record_end_date');
+    });
+  });
+
   describe('getPoliciesCount', () => {
     it('returns count for matching policies', async () => {
       const mockResponse = {

@@ -18,12 +18,8 @@ describe('Header', () => {
       </AuthStateContext.Provider>
     );
 
-    expect(getByTestId('submissions-header-item')).toBeVisible();
     expect(getByTestId('portal-header-item')).toBeVisible();
-    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
-    expect(getByTestId('manage-users-header-item')).toBeVisible();
-    expect(getByTestId('security-header-item')).toBeVisible();
-    expect(getByTestId('configuration-header-item')).toBeVisible();
+    expect(getByTestId('admin-header-item')).toHaveAttribute('href', '/admin');
   });
 
   it('renders correctly with system admin role (BCeID Business)', () => {
@@ -40,12 +36,8 @@ describe('Header', () => {
       </AuthStateContext.Provider>
     );
 
-    expect(getByTestId('submissions-header-item')).toBeVisible();
     expect(getByTestId('portal-header-item')).toBeVisible();
-    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
-    expect(getByTestId('manage-users-header-item')).toBeVisible();
-    expect(getByTestId('security-header-item')).toBeVisible();
-    expect(getByTestId('configuration-header-item')).toBeVisible();
+    expect(getByTestId('admin-header-item')).toHaveAttribute('href', '/admin');
   });
 
   it('renders correctly with system admin role (BCeID Basic)', () => {
@@ -62,12 +54,8 @@ describe('Header', () => {
       </AuthStateContext.Provider>
     );
 
-    expect(getByTestId('submissions-header-item')).toBeVisible();
     expect(getByTestId('portal-header-item')).toBeVisible();
-    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
-    expect(getByTestId('manage-users-header-item')).toBeVisible();
-    expect(getByTestId('security-header-item')).toBeVisible();
-    expect(getByTestId('configuration-header-item')).toBeVisible();
+    expect(getByTestId('admin-header-item')).toHaveAttribute('href', '/admin');
   });
 
   it('renders the username and logout button', () => {
@@ -90,7 +78,7 @@ describe('Header', () => {
     expect(getByTestId('menu_portal_link')).toHaveAttribute('href', '/portal');
   });
 
-  it('hides Configuration from non-administrators', () => {
+  it('hides Admin from non-administrators', () => {
     const authState = getMockAuthState({ base: SystemUserAuthState });
     const page = render(
       <AuthStateContext.Provider value={authState}>
@@ -99,8 +87,8 @@ describe('Header', () => {
         </MemoryRouter>
       </AuthStateContext.Provider>
     );
-    expect(page.queryByTestId('configuration-header-item')).toBeNull();
-    expect(page.queryByTestId('collapsed_configuration-header-item')).toBeNull();
+    expect(page.queryByTestId('admin-header-item')).toBeNull();
+    expect(page.queryByTestId('collapsed_admin-header-item')).toBeNull();
   });
 
   describe('Log out', () => {

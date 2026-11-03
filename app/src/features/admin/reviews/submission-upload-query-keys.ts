@@ -219,26 +219,42 @@ const statusHistory = (scope: SubmissionUploadKeyScope, uploadStatus: Submission
   [...upload(scope), 'status-history', { uploadStatus }] as const;
 
 /**
- * Scope reconciliation data to one outcome and optionally its selected feature type.
- * @param {ReconciliationFeatureScope} scope Upload and stored outcome.
- * @param {string} [featureType] Selected type when keying feature results.
- * @returns Outcome-specific query prefix.
+ * Key prefix of every page of an upload's feature types for one reconciliation outcome.
+ *
+ * @param {ReconciliationFeatureScope} scope The upload and outcome.
+ * @returns The feature types key prefix.
  */
-const reconciliationFeatures = (scope: ReconciliationFeatureScope, featureType?: string) =>
-  [...upload(scope), 'reconciliation', scope.reconciliation, featureType ?? null] as const;
+const featureTypesAll = (scope: ReconciliationFeatureScope) =>
+  [...upload(scope), 'feature-types', { reconciliation: scope.reconciliation }] as const;
 
 /**
- * Key one hydrated reconciliation page without sharing rows with another outcome or type.
- * @param {ReconciliationFeatureScope} scope Upload and stored outcome.
- * @param {string} featureType Selected type.
- * @param {ApiCursorPaginationRequestOptions} pagination Requested cursor and sort.
- * @returns Page-specific query key.
+ * Key of one page of an upload's feature types and their feature counts for one reconciliation outcome.
+ *
+ * @param {ReconciliationFeatureScope} scope The upload and outcome.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The feature types key.
  */
-const reconciliationFeaturePage = (
-  scope: ReconciliationFeatureScope,
-  featureType: string,
-  pagination: ApiCursorPaginationRequestOptions
-) => [...reconciliationFeatures(scope, featureType), pagination] as const;
+const featureTypes = (scope: ReconciliationFeatureScope, pagination: ApiPaginationRequestOptions) =>
+  [...featureTypesAll(scope), { pagination }] as const;
+
+/**
+ * Key prefix of every page of an upload's raw feature data for one reconciliation outcome.
+ *
+ * @param {ReconciliationFeatureScope} scope The upload and outcome.
+ * @returns The raw feature data key prefix.
+ */
+const reconciliationFeatureDataAll = (scope: ReconciliationFeatureScope) =>
+  [...upload(scope), 'feature-data', { reconciliation: scope.reconciliation }] as const;
+
+/**
+ * Key of one page of an upload's raw feature data for one reconciliation outcome.
+ *
+ * @param {ReconciliationFeatureScope} scope The upload and outcome.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The raw feature data key.
+ */
+const reconciliationFeatureData = (scope: ReconciliationFeatureScope, pagination: ApiPaginationRequestOptions) =>
+  [...reconciliationFeatureDataAll(scope), { pagination }] as const;
 
 /**
  * Key unique feature-type property definitions across the entire upload.
@@ -273,6 +289,8 @@ export const submissionUploadQueryKeys = {
   featureGeometryExtent,
   statusHistory,
   reconciliationCounts,
-  reconciliationFeatures,
-  reconciliationFeaturePage
+  featureTypesAll,
+  featureTypes,
+  reconciliationFeatureDataAll,
+  reconciliationFeatureData
 };

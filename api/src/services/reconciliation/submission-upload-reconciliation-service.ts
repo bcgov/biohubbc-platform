@@ -1,9 +1,15 @@
 import { IDBConnection } from '../../database/db';
 import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP500 } from '../../errors/http-error';
-import { ReconciliationCounts } from '../../models/reconciliation';
+import {
+  ReconciliationCounts,
+  ReconciliationFeatureDataPage,
+  ReconciliationFeatureScope
+} from '../../models/reconciliation';
 import { SubmissionFeatureReconciliationRepository } from '../../repositories/reconciliation/submission-feature-reconciliation-repository';
 import { getLogger } from '../../utils/logger';
+import { makePaginationResponse } from '../../utils/pagination';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
@@ -38,6 +44,20 @@ export class SubmissionUploadReconciliationService extends DBService {
    */
   async validateSubmissionFeatureSourceIdentity(submissionUploadId: string): Promise<number> {
     return this.submissionFeatureReconciliationRepository.replaceSourceIdentityErrors(submissionUploadId);
+  }
+
+  /**
+   * Refresh submission_feature planner statistics after an upload's rows have been bulk inserted.
+   *
+   * Callers run this in its own short transaction: ANALYZE holds a lock that conflicts with other
+   * ANALYZE runs until the transaction ends, so running it inside reconciliation would serialize
+   * concurrent reconciliation jobs.
+   *
+   * @returns {Promise<void>} Resolves after statistics are refreshed.
+   * @memberof SubmissionUploadReconciliationService
+   */
+  async analyzeSubmissionFeatures(): Promise<void> {
+    await this.submissionFeatureReconciliationRepository.analyzeSubmissionFeatures();
   }
 
   /**
@@ -92,6 +112,30 @@ export class SubmissionUploadReconciliationService extends DBService {
     return this.submissionFeatureReconciliationRepository.getSubmissionFeatureReconciliationOverviewCounts(
       submissionUploadId
     );
+  }
+
+  /**
+   * Get one page of an upload's features with one reconciliation outcome and their raw submitted data.
+   *
+   * The total is the outcome's stored overview count, which covers the same complete feature lifecycle as the page.
+   *
+   * @param {ReconciliationFeatureScope} scope Submission, upload, and outcome boundary.
+   * @param {ApiPaginationOptions} pagination Page size, offset and sort order.
+   * @returns {Promise<ReconciliationFeatureDataPage>} Raw feature data and pagination totals.
+   * @throws {ApiNotFoundError} When the upload does not belong to the submission.
+   * @memberof SubmissionUploadReconciliationService
+   */
+  async getReconciliationFeatureData(
+    scope: ReconciliationFeatureScope,
+    pagination: ApiPaginationOptions
+  ): Promise<ReconciliationFeatureDataPage> {
+    const counts = await this.getSubmissionFeatureReconciliationCounts(scope.submissionId, scope.submissionUploadId);
+    const features = await this.submissionFeatureReconciliationRepository.getReconciliationFeatureData(
+      scope,
+      pagination
+    );
+
+    return { features, pagination: makePaginationResponse(counts[scope.reconciliation], pagination) };
   }
 
   /**

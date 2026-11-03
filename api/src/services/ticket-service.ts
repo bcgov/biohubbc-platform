@@ -3,11 +3,20 @@ import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
 import { PolicyStatus } from '../models/policy';
 import { Team } from '../models/team';
-import { CreateTicketRequest, Ticket, TicketFilters, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
+import {
+  CreateTicketRequest,
+  Ticket,
+  TicketFilters,
+  TicketWithHistory,
+  TicketWithTags,
+  UpdateTicketRequest
+} from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
 import { TicketRepository } from '../repositories/ticket-repository';
+import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { BoardTicketService } from './board-ticket-service';
 import { DataRequestService } from './data-request-service';
 import { DBService } from './db-service';
 import { TicketCommentService } from './ticket-comment-service';
@@ -25,6 +34,8 @@ export class TicketService extends DBService {
   dataRequestService: DataRequestService;
   ticketSystemUserService: TicketSystemUserService;
   submissionUploadService: SubmissionUploadService;
+  ticketTagRepository: TicketTagRepository;
+  boardTicketService: BoardTicketService;
 
   /**
    * Creates an instance of TicketService.
@@ -42,6 +53,8 @@ export class TicketService extends DBService {
     this.dataRequestService = new DataRequestService(connection);
     this.ticketSystemUserService = new TicketSystemUserService(connection);
     this.submissionUploadService = new SubmissionUploadService(connection);
+    this.ticketTagRepository = new TicketTagRepository(connection);
+    this.boardTicketService = new BoardTicketService(connection);
   }
 
   /**
@@ -55,10 +68,11 @@ export class TicketService extends DBService {
     const { systemUserIds, ...ticketData } = ticket;
 
     // Ticket creation always provisions a dedicated ticket team plus a unique ticket slug.
-    const [team, slug] = await Promise.all([
-      this.createTicketTeam({ systemUserIds: systemUserIds ?? [] }),
-      this.ticketRepository.getNextTicketSlug()
-    ]);
+    const team = await this.createTicketTeam({ systemUserIds: systemUserIds ?? [] });
+
+    // The slug lock is held until commit; it must be taken before the latest slug is read.
+    await this.ticketRepository.lockTicketSlugGeneration();
+    const slug = await this.ticketRepository.getNextTicketSlug();
 
     const createdTicket = await this.ticketRepository.insertTicket({
       ...ticketData,
@@ -89,6 +103,18 @@ export class TicketService extends DBService {
     });
 
     return team;
+  }
+
+  /**
+   * Get a ticket's core fields by its UUID.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @returns {Promise<Ticket>} The ticket.
+   * @throws {ApiNotFoundError} If the ticket does not exist or is deleted.
+   * @memberof TicketService
+   */
+  async getTicketById(ticketId: string): Promise<Ticket> {
+    return this.ticketRepository.getTicketById(ticketId);
   }
 
   /**
@@ -167,6 +193,18 @@ export class TicketService extends DBService {
   }
 
   /**
+   * List tickets with their admin-only tags, with optional filters. Administrative callers only.
+   *
+   * @param {TicketFilters} [filters] - Optional ticket list filters, including `tag_ids` (any match).
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @returns {Promise<TicketWithTags[]>} Matching tickets with tags.
+   * @memberof TicketService
+   */
+  async getTicketsWithTags(filters?: TicketFilters, pagination?: ApiPaginationOptions): Promise<TicketWithTags[]> {
+    return this.ticketRepository.getTicketsWithTags(filters, pagination);
+  }
+
+  /**
    * Count tickets with optional filters.
    *
    * @param {TicketFilters} [filters] - Optional ticket list filters.
@@ -235,7 +273,7 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Soft delete an active ticket.
+   * Soft delete an active ticket, its linked data requests, and its tag links.
    *
    * @param {string} ticketId - Ticket UUID.
    * @returns {Promise<void>}
@@ -250,6 +288,8 @@ export class TicketService extends DBService {
       dataRequests.map((dataRequest) => this.dataRequestService.deleteDataRequest(dataRequest.data_request_id))
     );
 
+    await this.ticketTagRepository.deleteTicketTagsByTicketId(ticketId);
+    await this.boardTicketService.deleteBoardTicketsByTicketId(ticketId);
     await this.ticketRepository.deleteTicket(ticketId);
   }
 

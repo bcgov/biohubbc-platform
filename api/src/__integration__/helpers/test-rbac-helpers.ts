@@ -125,7 +125,7 @@ export async function computeAnchors(scopeRepo: SecurityScopeRepository, scopeId
   let lastId = 0;
 
   while (true) {
-    const batch = await scopeRepo.computeAnchorBatch(scopeId, urn, lastId);
+    const batch = await scopeRepo.computeAnchorBatch(scopeId, urn, lastId, null);
 
     if (!batch) {
       break;

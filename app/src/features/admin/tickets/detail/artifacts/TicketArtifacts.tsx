@@ -1,3 +1,4 @@
+import Typography from '@mui/material/Typography';
 import { keepPreviousDataWithin } from 'utils/query-client';
 import { mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
@@ -92,7 +93,14 @@ export const TicketArtifacts = () => {
   return (
     <PageSection
       id="ticket-artifacts"
-      label="Files"
+      label={
+        <>
+          Files{' '}
+          <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+            ({artifactsQuery.data?.pagination.total ?? 0})
+          </Typography>
+        </>
+      }
       headerContent={
         <Stack gap={1} direction="row" alignItems="center">
           <SearchTextField

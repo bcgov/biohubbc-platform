@@ -3,9 +3,9 @@ import { ApiConflictError, ApiValidationError } from '../errors/api-error';
 import {
   CreateSecurityRule,
   SecurityRule,
+  SecurityRuleFilters,
   SecurityRuleWithExpressions,
   SecurityRuleWithFeatureCount,
-  SecuritySearchFilters,
   UpdateSecurityRule
 } from '../models/security-rule';
 import { SecurityCategoryRepository } from '../repositories/security-category-repository';
@@ -72,13 +72,13 @@ export class SecurityRuleService extends DBService {
   /**
    * Get paginated security rules with a count of associated active submission features.
    *
-   * @param {SecuritySearchFilters} [filters]
+   * @param {SecurityRuleFilters} [filters] Optional name search and security category to limit the rules to.
    * @param {ApiPaginationOptions} [pagination]
    * @return {Promise<SecurityRuleWithFeatureCount[]>}
    * @memberof SecurityRuleService
    */
   async getSecurityRulesWithFeatureCount(
-    filters?: SecuritySearchFilters,
+    filters?: SecurityRuleFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SecurityRuleWithFeatureCount[]> {
     return this.securityRuleRepository.getSecurityRulesWithFeatureCount(filters, pagination);
@@ -87,11 +87,11 @@ export class SecurityRuleService extends DBService {
   /**
    * Get total count of active security rules matching optional filters.
    *
-   * @param {SecuritySearchFilters} [filters]
+   * @param {SecurityRuleFilters} [filters] Optional name search and security category to limit the rules to.
    * @return {Promise<number>}
    * @memberof SecurityRuleService
    */
-  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
+  async getSecurityRulesCount(filters?: SecurityRuleFilters): Promise<number> {
     return this.securityRuleRepository.getSecurityRulesCount(filters);
   }
 

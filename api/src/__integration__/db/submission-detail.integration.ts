@@ -28,7 +28,7 @@ describe('Submission detail (integration)', function () {
 
   it('returns metadata and an empty feature list for a submission without features', async () => {
     const submissionId = await createTestSubmission(connection);
-    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
     expect(result.submission_id).to.equal(submissionId);
     expect(result.name).to.equal('Integration Test Submission');
     expect(result.contributor_name).to.equal('SIMS');
@@ -44,7 +44,7 @@ describe('Submission detail (integration)', function () {
       WHERE submission_id = ${submissionId};
     `);
 
-    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
     const stored = await repository.getSubmissionRecordBySubmissionId(submissionId);
 
     expect(result).not.to.have.property('comment');
@@ -55,15 +55,14 @@ describe('Submission detail (integration)', function () {
     const submissionId = await createTestSubmission(connection);
     const root = await createTestFeature(connection, submissionId, 'survey', {});
     await createTestFeature(connection, submissionId, 'animal', {}, root);
-    await secureFeature(connection, root);
     const closure = new SubmissionFeatureClosureService(connection);
     await closure.computeClosureForSubmission(submissionId);
-    const before = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const before = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
     expect(before.feature_types).to.eql(['survey', 'animal']);
-    expect(before.security).to.equal(SECURITY_APPLIED_STATUS.PARTIALLY_SECURED);
+    expect(before.security).to.equal(SECURITY_APPLIED_STATUS.UNSECURED);
 
     await closure.invalidateClosureForSubmission(submissionId);
-    const pending = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const pending = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
     expect(pending.submission_id).to.equal(submissionId);
     expect(pending.name).to.equal(before.name);
     expect(pending.last_approved_upload_date).to.equal(before.last_approved_upload_date);
@@ -71,9 +70,53 @@ describe('Submission detail (integration)', function () {
     expect(pending.security).to.equal(SECURITY_APPLIED_STATUS.PENDING);
 
     await closure.computeClosureForSubmission(submissionId);
-    const rebuilt = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const rebuilt = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
     expect(rebuilt.feature_types).to.eql(before.feature_types);
     expect(rebuilt.security).to.equal(before.security);
+  });
+
+  it('counts features secured through an ancestor and hides tabs whose features the caller cannot see', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const root = await createTestFeature(connection, submissionId, 'survey', {});
+    await createTestFeature(connection, submissionId, 'animal', {}, root);
+    await secureFeature(connection, root);
+    await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
+
+    expect(result.security).to.equal(SECURITY_APPLIED_STATUS.SECURED);
+    expect(result.feature_types).to.eql([]);
+  });
+
+  it('reports partial security and lists only the visible feature types', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const root = await createTestFeature(connection, submissionId, 'survey', {});
+    const child = await createTestFeature(connection, submissionId, 'animal', {}, root);
+    await secureFeature(connection, child);
+    await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
+
+    expect(result.security).to.equal(SECURITY_APPLIED_STATUS.PARTIALLY_SECURED);
+    expect(result.feature_types).to.eql(['survey']);
+  });
+
+  it('counts a feature with several rules once', async () => {
+    const submissionId = await createTestSubmission(connection);
+    const feature = await createTestFeature(connection, submissionId, 'survey', {});
+    await secureFeature(connection, feature);
+    await connection.sql(SQL`
+      INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+      SELECT ${feature}, security_rule_id, ${connection.systemUserId()}
+      FROM security_rule
+      WHERE security_rule_id <> 1
+      LIMIT 1;
+    `);
+    await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
+
+    expect(result.security).to.equal(SECURITY_APPLIED_STATUS.SECURED);
   });
 
   it('returns metadata after all features have ended, excluding their stale closure and security', async () => {
@@ -84,7 +127,7 @@ describe('Submission detail (integration)', function () {
     await connection.sql(SQL`
       UPDATE submission_feature SET record_end_date = now() WHERE submission_feature_id = ${feature};
     `);
-    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+    const result = await repository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, null);
     expect(result.submission_id).to.equal(submissionId);
     expect(result.feature_types).to.eql([]);
     expect(result.security).to.equal(SECURITY_APPLIED_STATUS.UNSECURED);

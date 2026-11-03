@@ -8,6 +8,7 @@ import { SubmissionUploadReviewScope, SubmissionUploadReviewStatus } from '../..
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SubmissionFeatureSecurityRepository } from '../../repositories/submission-feature-security-repository';
 import { SubmissionUploadSecurityRepository } from '../../repositories/submission-upload-security-repository';
+import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SecurityRuleService } from '../../services/security-rule-service';
 import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
@@ -59,6 +60,10 @@ describe('Submission upload security review (integration)', function () {
 
   before(() => initDBPool(defaultPoolConfig));
   beforeEach(async () => {
+    // Security assignment changes queue scope-anchor recomputation; no queue runs in these tests.
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
     connection = getAPIUserDBConnection();
     await connection.open();
     service = new SubmissionUploadReviewSecurityService(connection);
@@ -1172,12 +1177,13 @@ describe('Submission upload security review (integration)', function () {
     await connection.sql(
       SQL`UPDATE submission_feature SET source_id = 'automatic-review-copy' WHERE submission_feature_id = ${parentId}`
     );
-    await connection.sql(SQL`UPDATE submission_feature SET source_id = 'automatic-review-copy', reconciliation = 'modified', record_effective_date = NULL
+    await connection.sql(SQL`UPDATE submission_feature SET source_id = 'automatic-review-copy', reconciliation = 'modified', record_effective_date = NULL,
+      baseline_submission_feature_id = ${parentId}
       WHERE submission_feature_id = ${otherId}`);
     const original =
       await connection.sql(SQL`SELECT submission_upload_review_id, record_end_date FROM submission_feature_security
       WHERE submission_feature_id = ${parentId} AND security_rule_id = ${securityRuleId}`);
-    await repository.copySubmissionFeatureSecurityToSuccessors(otherUploadId, submissionUploadId);
+    await repository.copySubmissionFeatureSecurityToSuccessors(otherUploadId);
     const copied = await repository.getSubmissionFeatureSecurities([otherId]);
     expect(copied).to.have.length(1);
     expect(copied[0].submission_upload_review_id).to.equal(reviewA);

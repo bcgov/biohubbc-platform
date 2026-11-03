@@ -2,9 +2,14 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
+import { TicketFilters } from '../../../models/ticket';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
-import { CreateTicketRequestSchema, TicketListResponseSchema, TicketSchema } from '../../../openapi/schemas/ticket';
+import {
+  AdminTicketListResponseSchema,
+  CreateTicketRequestSchema,
+  TicketSchema
+} from '../../../openapi/schemas/ticket';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TicketService } from '../../../services/ticket-service';
 import { getLogger } from '../../../utils/logger';
@@ -69,7 +74,7 @@ POST.apiDoc = {
 };
 
 GET.apiDoc = {
-  description: 'List tickets by team ID, optionally filtered by status or search text',
+  description: 'List tickets with their tags, optionally filtered by team, status, search text, or tags',
   tags: ['tickets'],
   security: [
     {
@@ -105,6 +110,16 @@ GET.apiDoc = {
       },
       description: 'Optional case-insensitive search across ticket slug, subject, and description.'
     },
+    {
+      in: 'query',
+      name: 'tag_ids',
+      required: false,
+      schema: {
+        type: 'array',
+        items: { type: 'string', format: 'uuid' }
+      },
+      description: 'Optional tag filter (repeat the parameter). Returns tickets with any of the given tags.'
+    },
     ...paginationRequestQueryParamSchema
   ],
   responses: {
@@ -112,7 +127,7 @@ GET.apiDoc = {
       description: 'Tickets retrieved successfully',
       content: {
         'application/json': {
-          schema: TicketListResponseSchema
+          schema: AdminTicketListResponseSchema
         }
       }
     },
@@ -154,11 +169,17 @@ export function getTickets(): RequestHandler {
       const teamId = req.query.team_id as string | undefined;
       const status = req.query.status as 'open' | 'closed' | undefined;
       const search = req.query.search as string | undefined;
+      const tagIds = req.query.tag_ids as string[] | undefined;
       const pagination = makePaginationOptionsFromRequest(req);
-      const filters = { team_id: teamId, status, search };
+      const filters: TicketFilters = {
+        team_ids: teamId ? [teamId] : undefined,
+        status,
+        search,
+        tag_ids: tagIds
+      };
 
       const [tickets, count] = await Promise.all([
-        ticketService.getTickets(filters, ensureCompletePaginationOptions(pagination)),
+        ticketService.getTicketsWithTags(filters, ensureCompletePaginationOptions(pagination)),
         ticketService.getTicketsCount(filters)
       ]);
 

@@ -8,14 +8,35 @@ import { ApiConflictError, ApiExecuteSQLError } from '../../../errors/api-error'
 import { ContributorInputSchema } from '../../../openapi/schemas/contributor-administration';
 import { ContributorSystemUserInputSchema } from '../../../openapi/schemas/contributor-system-user-administration';
 import { authorizationDependencies } from '../../../request-handlers/security/authorization';
+import { ContributorCodesetCodeService } from '../../../services/contributor-codeset-code-service';
 import { ContributorService } from '../../../services/contributor-service';
 import { GET as userOptionsGet } from '../contributor-users/available-users/index';
 import { GET as linksGet, POST as linksPost } from '../contributor-users/index';
 import { DELETE as linkDelete, GET as linkGet } from '../contributor-users/{contributorSystemUserId}/index';
 import { GET, insertAdministrativeContributor, listAdministrativeContributors, POST } from './index';
+import { GET as codesetsGet } from './{contributorId}/codesets/index';
+import {
+  GET as codesGet,
+  listAdministrativeContributorCodesetCodes
+} from './{contributorId}/codesets/{contributorCodesetId}/codes/index';
+import { GET as codesetGet } from './{contributorId}/codesets/{contributorCodesetId}/index';
 import { GET as contributorGet, DELETE, deleteAdministrativeContributor, PUT } from './{contributorId}/index';
 
-const operations = [GET, POST, contributorGet, PUT, DELETE, linksGet, linksPost, linkGet, linkDelete, userOptionsGet];
+const operations = [
+  GET,
+  POST,
+  contributorGet,
+  PUT,
+  DELETE,
+  linksGet,
+  linksPost,
+  linkGet,
+  linkDelete,
+  userOptionsGet,
+  codesetsGet,
+  codesetGet,
+  codesGet
+];
 
 describe('Contributor administrative endpoints', () => {
   afterEach(() => sinon.restore());
@@ -99,6 +120,30 @@ describe('Contributor administrative endpoints', () => {
     }
     expect(rollback.calledOnce).is.true;
     expect(commit.called).is.false;
+    expect(release.calledOnce).is.true;
+  });
+
+  it('scopes code values to the code category and contributor in the path', async () => {
+    const connection = getMockDBConnection();
+    sinon.stub(dbDependencies, 'getDBConnection').returns(connection);
+    const commit = sinon.spy(connection, 'commit');
+    const release = sinon.spy(connection, 'release');
+    const result = {
+      codes: [],
+      pagination: { total: 0, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
+    };
+    const list = sinon
+      .stub(ContributorCodesetCodeService.prototype, 'listAdministrativeContributorCodesetCodes')
+      .resolves(result);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { contributorId: '3', contributorCodesetId: '5' };
+    mockReq.query = { page: '2', limit: '10' };
+    await listAdministrativeContributorCodesetCodes()(mockReq, mockRes, mockNext);
+    expect(list.firstCall.args[0]).eql({ contributorId: 3, contributorCodesetId: 5 });
+    expect(list.firstCall.args[1]).to.include({ page: 2, limit: 10 });
+    expect(mockRes.statusValue).equals(200);
+    expect(mockRes.jsonValue).eql(result);
+    expect(commit.calledOnce).is.true;
     expect(release.calledOnce).is.true;
   });
 

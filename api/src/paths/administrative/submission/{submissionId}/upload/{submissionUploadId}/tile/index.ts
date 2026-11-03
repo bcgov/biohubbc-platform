@@ -8,6 +8,7 @@ import {
 } from '../../../../../../../constants/martin';
 import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../database/db';
+import { ReconciliationType } from '../../../../../../../models/reconciliation';
 import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import { martinExtentSessionResponseSchema } from '../../../../../../../openapi/schemas/martin';
 import { martinTokenRateLimiter } from '../../../../../../../request-handlers/rate-limit';
@@ -28,7 +29,8 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Create a tile session for the spatial properties of the active features of a submission upload.',
+  description:
+    'Create a tile session for the spatial properties of the active features of a submission upload, optionally limited to one reconciliation outcome.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -47,6 +49,24 @@ POST.apiDoc = {
       required: true
     }
   ],
+  requestBody: {
+    required: false,
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            reconciliation: {
+              description: 'Limit the map to features with this stored reconciliation outcome.',
+              type: 'string',
+              enum: ReconciliationType.options
+            }
+          }
+        }
+      }
+    }
+  },
   responses: {
     200: {
       description: 'A tile session, or a statement that the upload has no spatial properties to map.',
@@ -59,7 +79,9 @@ POST.apiDoc = {
 };
 
 /**
- * Create a tile session for every active feature of one submission upload.
+ * Create a tile session for every active feature of one submission upload, or only those with one
+ * reconciliation outcome when the request names one. The outcome travels in the token beside the
+ * identifiers, so the tiles drawn and the extent framed are limited by the same value.
  *
  * Follows the single-feature tile route rather than the search one: the token is scoped by
  * construction, its `ctx` claim carrying the submission and upload identifiers directly, and no
@@ -83,6 +105,7 @@ export function createSubmissionUploadTileSession(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const submissionId = Number(req.params.submissionId);
+    const reconciliation: ReconciliationType | null = req.body?.reconciliation ?? null;
 
     try {
       await connection.open();
@@ -94,7 +117,11 @@ export function createSubmissionUploadTileSession(): RequestHandler {
 
       // Extent under the same active-feature predicate the tile function applies.
       const geometryService = new SubmissionFeaturePropertyGeometryService(connection);
-      const extent = await geometryService.getSubmissionUploadGeometryExtent(submissionId, upload.submission_upload_id);
+      const extent = await geometryService.getSubmissionUploadGeometryExtent(
+        submissionId,
+        upload.submission_upload_id,
+        reconciliation
+      );
 
       await connection.commit();
 
@@ -108,12 +135,14 @@ export function createSubmissionUploadTileSession(): RequestHandler {
       }
 
       const tokenService = new MartinTokenService();
+      const uploadContext = `su:${submissionId}:${upload.submission_upload_id}`;
 
       const { token, expiresIn } = tokenService.mintToken({
         source: MARTIN_SOURCE.UPLOAD,
         // Parsed back out by biohub.martin_upload. Built from the stored upload id rather than the
         // path parameter, so a non-canonical spelling in the URL cannot vary the context string.
-        ctx: `su:${submissionId}:${upload.submission_upload_id}`
+        // The outcome is appended only when requested, so an unfiltered session keeps its context.
+        ctx: reconciliation ? `${uploadContext}:${reconciliation}` : uploadContext
       });
 
       return res.status(200).json({

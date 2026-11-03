@@ -1,5 +1,5 @@
-// Integration test for SearchRepository — verifies complex SQL (CTEs, JSONB aggregation,
-// multi-table joins, ILIKE search) executes correctly against the real database.
+// Integration test for SearchRepository — verifies the keyword summary SQL (CTEs, multi-table joins, ILIKE search and
+// caller security) executes correctly against the real database.
 //
 // The `_code` and `_taxon` value tables hold no production rows today (no feature_property is
 // declared with type=code or type=taxon yet). The corpus widening is forward-looking — these
@@ -15,14 +15,11 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { SearchRepository } from '../../repositories/search-repository';
-import {
-  addCodeProperty,
-  addStringProperty,
-  addTaxonProperty,
-  createCodesetCode,
-  createTaxon
-} from '../helpers/test-feature-property-helpers';
+import { SubmissionFeatureClosureService } from '../../services/submission-feature-closure-service';
+import { addCodeProperty, addStringProperty, createCodesetCode } from '../helpers/test-feature-property-helpers';
+import { secureFeature, setupFullAccess } from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 // Deterministic token: no seeded value contains it, so the keyword can't match pre-existing data.
@@ -51,54 +48,21 @@ describe('SearchRepository (integration)', function () {
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
-  async function tombstoneCodesetCode(codesetCodeId: number): Promise<void> {
-    await connection.sql(SQL`
-      UPDATE contributor_codeset_code
-      SET record_end_date = now()
-      WHERE contributor_codeset_code_id = ${codesetCodeId};
-    `);
+  /**
+   * Create a published survey in its own submission carrying a searchable description, with its closure built so the
+   * security filter can resolve it as it would after the post-approval rebuild.
+   */
+  async function createSearchableSurvey(description: string): Promise<{ submissionId: number; featureId: number }> {
+    const submissionId = await createTestSubmission(connection);
+    const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
+    await addStringProperty(connection, featureId, 'description', description);
+    await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+    return { submissionId, featureId };
   }
 
-  async function tombstoneTaxon(taxonId: number): Promise<void> {
-    await connection.sql(SQL`
-      UPDATE taxon
-      SET record_end_date = now()
-      WHERE taxon_id = ${taxonId};
-    `);
+  function surveyTotal(summary: { feature_type_name: string; total: number }[]): number | undefined {
+    return summary.find((row) => row.feature_type_name === 'survey')?.total;
   }
-
-  async function findFeatures(keyword: string) {
-    return repo.findFeatures({ keyword }, { page: 1, limit: 50 });
-  }
-
-  // ── Existing shape smoke tests ──────────────────────────────────────────
-
-  describe('findSubmissions', () => {
-    it('should return paginated results with total count', async () => {
-      const result = await repo.findSubmissions({ keyword: '' }, { page: 1, limit: 10 });
-
-      expect(result).to.have.property('data').that.is.an('array');
-      expect(result).to.have.property('total').that.is.a('number');
-
-      if (result.data.length > 0) {
-        expect(result.data[0]).to.have.property('submission_id');
-        expect(result.data[0]).to.have.property('name');
-      }
-    });
-
-    it('should respect pagination limits', async () => {
-      const result = await repo.findSubmissions({ keyword: '' }, { page: 1, limit: 1 });
-
-      expect(result.data.length).to.be.at.most(1);
-    });
-
-    it('should return empty results for non-matching search', async () => {
-      const result = await repo.findSubmissions({ keyword: 'zzz_no_match_xyz_999' }, { page: 1, limit: 10 });
-
-      expect(result.data).to.be.an('array').with.lengthOf(0);
-      expect(result.total).to.equal(0);
-    });
-  });
 
   describe('findSubmissionSummary', () => {
     it('should return a total count', async () => {
@@ -109,203 +73,9 @@ describe('SearchRepository (integration)', function () {
     });
   });
 
-  describe('findFeatures', () => {
-    it('should return paginated feature results', async () => {
-      const result = await repo.findFeatures({ keyword: '' }, { page: 1, limit: 10 });
-
-      expect(result).to.have.property('data').that.is.an('array');
-      expect(result).to.have.property('total').that.is.a('number');
-
-      if (result.data.length > 0) {
-        expect(result.data[0]).to.have.property('submission_feature_id');
-        expect(result.data[0]).to.have.property('feature_type_id');
-        expect(result.data[0]).to.have.property('label');
-      }
-    });
-
-    // ── Corpus widening ──────────────────────────────────────────────────
-
-    it('matches string-property values (baseline corpus)', async () => {
-      const keyword = `${TOKEN}_stringbase`;
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Survey alpha' });
-      await addStringProperty(connection, featureId, 'description', `moose habitat near ${keyword}`);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-
-    it('matches code-label values via the code arm', async () => {
-      const keyword = `${TOKEN}_codelabel`;
-      const codeId = await createCodesetCode(
-        connection,
-        'camera_trap',
-        `${keyword} Camera trap`,
-        'Camera-based observations'
-      );
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST alpha' });
-      await addCodeProperty(connection, featureId, 'attractant', codeId);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-
-    it('matches code-description values via the code arm', async () => {
-      const keyword = `${TOKEN}_codedesc`;
-      const codeId = await createCodesetCode(
-        connection,
-        'motion_cam',
-        'Motion Camera',
-        `${keyword} motion-activated lens`
-      );
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST beta' });
-      await addCodeProperty(connection, featureId, 'attractant', codeId);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-
-    it('matches code rows by their `key` column', async () => {
-      const keyword = `${TOKEN}_keyonly`;
-      const codeId = await createCodesetCode(connection, keyword, 'Friendly label', 'Friendly description');
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST keyonly' });
-      await addCodeProperty(connection, featureId, 'attractant', codeId);
-
-      const result = await findFeatures(keyword);
-
-      // The keyword exists only in c.key — codeset keys aren't always numeric, so they are searched.
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-
-    it('matches taxon scientific name via the taxon arm', async () => {
-      const keyword = `${TOKEN}_taxon`;
-      const taxonId = await createTaxon(connection, `Alces ${keyword}`, 'Moose');
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Bear-1' });
-      await addTaxonProperty(connection, featureId, 'associated_species', taxonId);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-
-    it('matches taxon by ITIS TSN', async () => {
-      const tsn = 9_876_543;
-      const taxonId = await createTaxon(connection, `Ursus ${TOKEN}`, 'Bear', tsn);
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Bear-2' });
-      await addTaxonProperty(connection, featureId, 'associated_species', taxonId);
-
-      const result = await findFeatures(String(tsn));
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-
-    it('hides tombstoned codeset code rows', async () => {
-      const keyword = `${TOKEN}_dead_code`;
-      const codeId = await createCodesetCode(connection, 'dead', `${keyword} Camera`, null);
-      await tombstoneCodesetCode(codeId);
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dead' });
-      await addCodeProperty(connection, featureId, 'attractant', codeId);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(0);
-    });
-
-    it('hides tombstoned taxon rows', async () => {
-      const keyword = `${TOKEN}_dead_taxon`;
-      const taxonId = await createTaxon(connection, `Vulpes ${keyword}`);
-      await tombstoneTaxon(taxonId);
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'habitat_feature', { name: 'Fox-1' });
-      await addTaxonProperty(connection, featureId, 'associated_species', taxonId);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(0);
-    });
-
-    // ── Allowlist + label fallback ────────────────────────────────────────
-
-    it('surfaces new allowlist types via the matched-fragment label', async () => {
-      const identifier = `${TOKEN}_bear37`;
-      const submissionId = await createTestSubmission(connection);
-      // `animal` features carry no `sf.data->>'name'` — label must fall back to the matched fragment.
-      const featureId = await createTestFeature(connection, submissionId, 'animal', { animal_identifier: identifier });
-      await addStringProperty(connection, featureId, 'animal_identifier', identifier);
-
-      const result = await findFeatures(identifier);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-      expect(result.data[0].label).to.equal(identifier);
-      expect(result.data[0].feature_type_name).to.equal('animal');
-    });
-
-    it('shows the canonical name when the keyword targets the name property', async () => {
-      // Production happy path: name is stored in both sf.data AND in submission_feature_property_string.
-      // A keyword hitting the name produces the name itself as the matched_value, which is what the
-      // dropdown should show.
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'study_area', { name: 'Salmon River' });
-      await addStringProperty(connection, featureId, 'name', `Salmon ${TOKEN} River`);
-      await addStringProperty(connection, featureId, 'description', 'unrelated description text');
-
-      const result = await findFeatures(`Salmon ${TOKEN}`);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-      expect(result.data[0].label).to.equal(`Salmon ${TOKEN} River`);
-    });
-
-    it('keeps non-allowlisted feature types out of the dropdown', async () => {
-      // `measurement` is excluded from LANDING_PAGE_FEATURE_TYPES; it carries a `description` string property.
-      const keyword = `${TOKEN}_excluded`;
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'measurement', { measurement_type: 'mass' });
-      await addStringProperty(connection, featureId, 'description', `payload ${keyword}`);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(0);
-      expect(result.data.find((r) => r.submission_feature_id === featureId)).to.equal(undefined);
-    });
-
-    // ── Dedup across arms ─────────────────────────────────────────────────
-
-    it('emits one row when a feature matches in multiple arms', async () => {
-      const keyword = `${TOKEN}_dedup`;
-      const codeId = await createCodesetCode(connection, 'dedupkey', `${keyword} method`, null);
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'sample_technique', { name: 'ST dedup' });
-      // Feature matches the keyword via _string AND via _code.
-      await addStringProperty(connection, featureId, 'description', `also ${keyword} text`);
-      await addCodeProperty(connection, featureId, 'attractant', codeId);
-
-      const result = await findFeatures(keyword);
-
-      expect(result.total).to.equal(1);
-      expect(result.data[0].submission_feature_id).to.equal(featureId);
-    });
-  });
-
   describe('findFeatureSummary', () => {
     it('should return feature type summaries', async () => {
-      const result = await repo.findFeatureSummary({ keyword: '' });
+      const result = await repo.findFeatureSummary({ keyword: '' }, null);
 
       expect(result).to.be.an('array');
       if (result.length > 0) {
@@ -314,23 +84,35 @@ describe('SearchRepository (integration)', function () {
       }
     });
 
-    it('counts a code-arm match (records/summary parity)', async () => {
-      // Summary only counts priority types (survey, species_observation, telemetry, report).
-      // Verify the code corpus widening reaches the summary by seeding a `survey` feature that
-      // matches only via the code arm.
+    it('counts a string-property match', async () => {
+      const keyword = `${TOKEN}_summary_string`;
+      await createSearchableSurvey(`moose habitat near ${keyword}`);
+
+      expect(surveyTotal(await repo.findFeatureSummary({ keyword }, null))).to.equal(1);
+    });
+
+    it('counts a code-arm match', async () => {
       const keyword = `${TOKEN}_summary_code`;
       const codeId = await createCodesetCode(connection, 'summarycode', `${keyword} Agency`, null);
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'survey', { name: 'Summary survey' });
+      const { submissionId, featureId } = await createSearchableSurvey('no keyword here');
+      await addCodeProperty(connection, featureId, 'collected_data', codeId);
+      await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
+
+      expect(surveyTotal(await repo.findFeatureSummary({ keyword }, null))).to.equal(1);
+    });
+
+    it('does not count retired codeset code rows', async () => {
+      const keyword = `${TOKEN}_summary_dead_code`;
+      const codeId = await createCodesetCode(connection, 'deadcode', `${keyword} Camera`, null);
+      await connection.sql(SQL`
+        UPDATE contributor_codeset_code SET record_end_date = now() WHERE contributor_codeset_code_id = ${codeId};
+      `);
+      const { featureId } = await createSearchableSurvey('no keyword here');
       await addCodeProperty(connection, featureId, 'collected_data', codeId);
 
-      const summary = await repo.findFeatureSummary({ keyword });
-      const records = await findFeatures(keyword);
-
-      const survey = summary.find((s) => s.feature_type_name === 'survey');
-      expect(survey?.total).to.equal(1);
-      expect(records.total).to.equal(1);
-      expect(records.data[0].submission_feature_id).to.equal(featureId);
+      expect(await repo.findFeatureSummary({ keyword }, null))
+        .to.be.an('array')
+        .with.lengthOf(0);
     });
 
     it('does not count keyword hits on excluded feature types', async () => {
@@ -340,12 +122,61 @@ describe('SearchRepository (integration)', function () {
         measurement_type: 'mass'
       });
       await addStringProperty(connection, featureId, 'description', `${keyword} payload`);
-
-      const summary = await repo.findFeatureSummary({ keyword });
+      await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(submissionId);
 
       // `measurement` is not in the allowlist and not a priority type — summary stays empty.
-      expect(summary).to.be.an('array').with.lengthOf(0);
-      expect(featureId).to.be.a('number');
+      expect(await repo.findFeatureSummary({ keyword }, null))
+        .to.be.an('array')
+        .with.lengthOf(0);
+    });
+  });
+
+  describe('findFeatureSummary security', () => {
+    it('does not count secured features for an anonymous caller', async () => {
+      const keyword = `${TOKEN}_summary_secured`;
+      const secured = await createSearchableSurvey(`${keyword} secured`);
+      await createSearchableSurvey(`${keyword} open`);
+      await secureFeature(connection, secured.featureId);
+
+      expect(surveyTotal(await repo.findFeatureSummary({ keyword }, null))).to.equal(1);
+    });
+
+    it('counts secured features for a caller whose team holds a scope over them', async () => {
+      const keyword = `${TOKEN}_summary_scoped`;
+      const secured = await createSearchableSurvey(`${keyword} secured`);
+      await secureFeature(connection, secured.featureId);
+      const userId = connection.systemUserId();
+      await setupFullAccess(
+        connection,
+        new SecurityScopeRepository(connection),
+        `urn:${secured.submissionId}:*:*`,
+        userId,
+        'summary-scope-team'
+      );
+
+      expect(await repo.findFeatureSummary({ keyword }, null))
+        .to.be.an('array')
+        .with.lengthOf(0);
+      expect(surveyTotal(await repo.findFeatureSummary({ keyword }, userId))).to.equal(1);
+    });
+
+    it('does not count superseded features or features whose closure is not built', async () => {
+      const keyword = `${TOKEN}_summary_lifecycle`;
+      const superseded = await createSearchableSurvey(`${keyword} old`);
+      const successor = await createTestFeature(connection, superseded.submissionId, 'survey', { name: 'New' });
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_end_date = now(), successor_submission_feature_id = ${successor}
+        WHERE submission_feature_id = ${superseded.featureId};
+      `);
+      await new SubmissionFeatureClosureService(connection).computeClosureForSubmission(superseded.submissionId);
+      const unbuiltSubmissionId = await createTestSubmission(connection);
+      const unbuilt = await createTestFeature(connection, unbuiltSubmissionId, 'survey', { name: 'Unbuilt' });
+      await addStringProperty(connection, unbuilt, 'description', `${keyword} unbuilt`);
+
+      expect(await repo.findFeatureSummary({ keyword }, null))
+        .to.be.an('array')
+        .with.lengthOf(0);
     });
   });
 });

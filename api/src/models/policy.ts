@@ -7,7 +7,9 @@ export const Policy = z.object({
   policy_id: z.string().uuid(),
   name: z.string().max(100),
   description: z.string().max(1000).nullable(),
-  status: PolicyStatus
+  status: PolicyStatus,
+  // Returned by the policy list and by-ID reads, which include ended policies; the other policy queries do not select it.
+  record_end_date: z.string().nullable().optional()
 });
 export type Policy = z.infer<typeof Policy>;
 

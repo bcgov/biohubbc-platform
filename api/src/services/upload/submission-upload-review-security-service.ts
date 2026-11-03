@@ -9,22 +9,30 @@ import {
 import { SubmissionUploadReview, SubmissionUploadReviewScope } from '../../models/submission-upload-review';
 import { makePaginationResponse } from '../../utils/pagination';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
+import { SecurityScopeService } from '../access-policy/security-scope-service';
 import { DBService } from '../db-service';
 import { SecurityRuleService } from '../security-rule-service';
 import { SubmissionFeatureSecurityService } from '../submission-feature-security-service';
 import { SubmissionUploadReviewService } from './submission-upload-review-service';
 
-/** Coordinates review validation and current feature-security operations through domain services. */
+/**
+ * Coordinates review validation and current feature-security operations through domain services.
+ *
+ * Security can be changed on already-published features, which can make existing scope anchors stale or create
+ * new ones, so every assignment change queues anchor recomputation limited to the submission.
+ */
 export class SubmissionUploadReviewSecurityService extends DBService {
   submissionUploadReviewService: SubmissionUploadReviewService;
   securityRuleService: SecurityRuleService;
   submissionFeatureSecurityService: SubmissionFeatureSecurityService;
+  securityScopeService: SecurityScopeService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.securityRuleService = new SecurityRuleService(connection);
     this.submissionUploadReviewService = new SubmissionUploadReviewService(connection);
     this.submissionFeatureSecurityService = new SubmissionFeatureSecurityService(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
@@ -94,7 +102,8 @@ export class SubmissionUploadReviewSecurityService extends DBService {
    * @param {number} securityRuleId Rule identifier.
    * @param {number[]} submissionFeatureIds Selected IDs; otherwise expression matches or all upload features.
    * @param {ExpressionTree} [expression] Applied expression used only without an explicit selection.
-   * @returns {Promise<void>} Resolves after the desired assignment state is established.
+   * @returns {Promise<void>} Resolves after the desired assignment state is established and anchor
+   *   recomputation for the submission is queued.
    */
   async insertSubmissionUploadReviewSecurityRuleAssignments(
     submissionId: number,
@@ -113,6 +122,7 @@ export class SubmissionUploadReviewSecurityService extends DBService {
       submissionUploadReviewId,
       featureScope: { submissionFeatureIds, expression }
     });
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**
@@ -124,7 +134,8 @@ export class SubmissionUploadReviewSecurityService extends DBService {
    * @param {number} securityRuleId Rule identifier.
    * @param {number[]} submissionFeatureIds Selected IDs; otherwise expression matches or all upload features.
    * @param {ExpressionTree} [expression] Applied expression used only without an explicit selection.
-   * @returns {Promise<void>} Resolves after the desired assignment state is established.
+   * @returns {Promise<void>} Resolves after the desired assignment state is established and anchor
+   *   recomputation for the submission is queued.
    */
   async deleteSubmissionUploadReviewSecurityRuleAssignments(
     submissionId: number,
@@ -141,6 +152,7 @@ export class SubmissionUploadReviewSecurityService extends DBService {
       securityRuleIds: [securityRuleId],
       featureScope: { submissionFeatureIds, expression }
     });
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**
@@ -151,7 +163,7 @@ export class SubmissionUploadReviewSecurityService extends DBService {
    * @param {string} submissionUploadReviewId Review identifier.
    * @param {number[]} submissionFeatureIds Selected IDs; otherwise expression matches or all upload features.
    * @param {ExpressionTree} [expression] Applied expression used only without an explicit selection.
-   * @returns {Promise<void>} Resolves after reset.
+   * @returns {Promise<void>} Resolves after reset and anchor recomputation for the submission is queued.
    * @throws {ApiNotFoundError} When the review does not belong to the submission/upload.
    * @throws {ApiValidationError} When the review is not security-scoped.
    */
@@ -168,6 +180,7 @@ export class SubmissionUploadReviewSecurityService extends DBService {
       submissionUploadId,
       featureScope: { submissionFeatureIds, expression }
     });
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**

@@ -50,7 +50,14 @@ export const SubmissionFeatureLayout = ({
           <ComponentSwitch<SubmissionFeatureTab>
             switch={activeTab}
             components={{
-              details: <SubmissionFeatureDetailContent feature={feature}>{children}</SubmissionFeatureDetailContent>
+              details: (
+                <SubmissionFeatureDetailContent
+                  feature={feature}
+                  submissionDetailBasePath={headerProps.submissionDetailBasePath}
+                  queryString={headerProps.queryString}>
+                  {children}
+                </SubmissionFeatureDetailContent>
+              )
             }}
           />
         </>

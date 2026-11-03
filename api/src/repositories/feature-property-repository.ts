@@ -50,6 +50,10 @@ export class FeaturePropertyRepository extends BaseRepository {
         JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
         UNION
         SELECT p.blueprint_feature_type_property_id
+        FROM submission_feature_property_paragraph p
+        JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
+        UNION
+        SELECT p.blueprint_feature_type_property_id
         FROM submission_feature_property_number p
         JOIN upload_features sf ON sf.submission_feature_id = p.submission_feature_id
         UNION

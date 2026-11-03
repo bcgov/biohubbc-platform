@@ -1,8 +1,15 @@
 import { IDBConnection } from '../database/db';
-import { ApiConflictError } from '../errors/api-error';
-import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
+import { ApiConflictError, ApiNotFoundError } from '../errors/api-error';
+import {
+  AdministrativeContributorCodeset,
+  ContributorCodeset,
+  ContributorCodesetScope,
+  CreateContributorCodeset
+} from '../models/contributor-codeset';
 import { ContributorCodesetRepository } from '../repositories/contributor-codeset-repository';
 import { hasSameContributorCodeDefinition, makeSlug } from '../utils/contributor-codeset';
+import { makePaginationResponse } from '../utils/pagination';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 
 export class ContributorCodesetService extends DBService {
@@ -158,5 +165,41 @@ export class ContributorCodesetService extends DBService {
         ]);
       }
     }
+  }
+
+  /**
+   * List a page of a contributor's code categories, including ended categories, with pagination metadata.
+   *
+   * @param {number} contributorId - Contributor that owns the code categories.
+   * @param {ApiPaginationOptions} pagination - Requested page and sort.
+   * @return {*} Code categories on the requested page and pagination metadata.
+   * @memberof ContributorCodesetService
+   */
+  async listAdministrativeContributorCodesets(contributorId: number, pagination: ApiPaginationOptions) {
+    const codesets = await this.contributorCodesetRepository.listAdministrativeContributorCodesets(
+      contributorId,
+      pagination
+    );
+    const count = await this.contributorCodesetRepository.countAdministrativeContributorCodesets(contributorId);
+
+    return { codesets, pagination: makePaginationResponse(count, pagination) };
+  }
+
+  /**
+   * Get one of a contributor's code categories, including an ended category.
+   *
+   * @param {ContributorCodesetScope} scope - Code category and the contributor that owns it.
+   * @return {Promise<AdministrativeContributorCodeset>} The code category.
+   * @throws {ApiNotFoundError} When the contributor has no such code category.
+   * @memberof ContributorCodesetService
+   */
+  async getAdministrativeContributorCodeset(scope: ContributorCodesetScope): Promise<AdministrativeContributorCodeset> {
+    const codeset = await this.contributorCodesetRepository.getAdministrativeContributorCodeset(scope);
+
+    if (!codeset) {
+      throw new ApiNotFoundError('Code category not found');
+    }
+
+    return codeset;
   }
 }

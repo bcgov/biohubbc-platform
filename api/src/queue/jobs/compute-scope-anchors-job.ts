@@ -12,6 +12,12 @@ const defaultLog = getLogger('queue/jobs/compute-scope-anchors-job');
 export interface IComputeScopeAnchorsJobData {
   /** The security scope ID to compute anchors for */
   securityScopeId: string;
+  /**
+   * The submission whose feature graph changed, limiting the recompute to that submission's features, or null
+   * to recompute the whole scope (a policy change). Jobs queued before this field existed carry no value and
+   * recompute the whole scope.
+   */
+  submissionId: number | null;
 }
 
 /**
@@ -38,12 +44,14 @@ export interface IComputeScopeAnchorsJobData {
 export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnchorsJobData> = async (jobs) => {
   for (const job of jobs) {
     const { securityScopeId } = job.data;
+    const triggeringSubmissionId = job.data.submissionId ?? null;
 
     defaultLog.info({
       label: 'computeScopeAnchorsJobHandler',
       message: 'Processing compute scope anchors job',
       jobId: job.id,
-      securityScopeId
+      securityScopeId,
+      triggeringSubmissionId
     });
 
     try {
@@ -63,13 +71,18 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
         continue;
       }
 
+      // Anchors never span submissions (closure is per submission), so a concrete scope URN or a
+      // submission-triggered run bounds both scans to one submission.
+      const anchorSubmissionId = SecurityScopeService.getAnchorSubmissionId(urn, triggeringSubmissionId);
+
       // Phase 2: Delete stale anchors in keyset-paginated batches
       let staleLastId = 0;
 
       while (true) {
-        const staleBatch = await withConnection((conn) =>
-          new SecurityScopeService(conn).deleteStaleAnchorBatch(securityScopeId, staleLastId)
-        );
+        const staleBatch = await withConnection((conn) => {
+          const securityScopeService = new SecurityScopeService(conn);
+          return securityScopeService.deleteStaleAnchorBatch(securityScopeId, staleLastId, anchorSubmissionId);
+        });
 
         if (!staleBatch) {
           break;
@@ -82,9 +95,10 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
       let lastId = 0;
 
       while (true) {
-        const batch = await withConnection((conn) =>
-          new SecurityScopeService(conn).computeAnchorBatch(securityScopeId, urn, lastId)
-        );
+        const batch = await withConnection((conn) => {
+          const securityScopeService = new SecurityScopeService(conn);
+          return securityScopeService.computeAnchorBatch(securityScopeId, urn, lastId, anchorSubmissionId);
+        });
 
         if (!batch) {
           break;
