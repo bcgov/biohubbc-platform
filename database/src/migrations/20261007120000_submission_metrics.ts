@@ -1,67 +1,77 @@
 import type { Knex } from 'knex';
 
-/** Store complete, platform-wide metric snapshots produced by the nightly calculation. */
+/** Create the summary metric dictionary and historical calculated values. */
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
 
-    CREATE TABLE submission_metrics (
-      submission_metrics_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-      calculated_at timestamptz(6) NOT NULL,
-      record_count bigint NOT NULL,
-      submission_count bigint NOT NULL,
-      survey_count bigint NOT NULL,
-      earliest_date date,
-      latest_date date,
+    CREATE TABLE summary_metrics (
+      summary_metric_id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+      key varchar(100) NOT NULL,
+      name varchar(200) NOT NULL,
+      description text NOT NULL,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
-      CONSTRAINT submission_metrics_pk PRIMARY KEY (submission_metrics_id),
-      CONSTRAINT submission_metrics_record_count_check CHECK (record_count >= 0),
-      CONSTRAINT submission_metrics_submission_count_check CHECK (submission_count >= 0),
-      CONSTRAINT submission_metrics_survey_count_check CHECK (survey_count >= 0),
-      CONSTRAINT submission_metrics_date_range_check CHECK (
-        (earliest_date IS NULL AND latest_date IS NULL)
-        OR (earliest_date IS NOT NULL AND latest_date IS NOT NULL AND earliest_date <= latest_date)
-      )
+      CONSTRAINT summary_metrics_pk PRIMARY KEY (summary_metric_id),
+      CONSTRAINT summary_metrics_uk1 UNIQUE (key)
     );
 
-    CREATE INDEX submission_metrics_idx1
-      ON submission_metrics (calculated_at DESC, submission_metrics_id DESC);
+    CREATE TABLE summary_metrics_data (
+      summary_metrics_data_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+      summary_metric_id integer NOT NULL,
+      run_id uuid NOT NULL,
+      calculated_at timestamptz(6) NOT NULL,
+      value jsonb,
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
+      CONSTRAINT summary_metrics_data_pk PRIMARY KEY (summary_metrics_data_id),
+      CONSTRAINT summary_metrics_data_fk1 FOREIGN KEY (summary_metric_id) REFERENCES summary_metrics(summary_metric_id),
+      CONSTRAINT summary_metrics_data_uk1 UNIQUE (run_id, summary_metric_id)
+    );
 
-    COMMENT ON TABLE submission_metrics IS
-      'Platform-wide submission metric snapshots. Insert a complete row only after a successful calculation; retain previous snapshots as history.';
-    COMMENT ON COLUMN submission_metrics.submission_metrics_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN submission_metrics.calculated_at IS
-      'Timestamp of the source snapshot used for the calculation. Order descending with submission_metrics_id as a tie-breaker to retrieve the latest snapshot.';
-    COMMENT ON COLUMN submission_metrics.record_count IS 'Total number of records included in the calculation.';
-    COMMENT ON COLUMN submission_metrics.submission_count IS 'Total number of submissions included in the calculation.';
-    COMMENT ON COLUMN submission_metrics.survey_count IS 'Total number of surveys included in the calculation.';
-    COMMENT ON COLUMN submission_metrics.earliest_date IS 'Earliest date covered by the included data; null when no dated data exists.';
-    COMMENT ON COLUMN submission_metrics.latest_date IS 'Latest date covered by the included data; null when no dated data exists.';
-    COMMENT ON COLUMN submission_metrics.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN submission_metrics.create_user IS 'The id of the user who created the record.';
-    COMMENT ON COLUMN submission_metrics.update_date IS 'The datetime the record was last updated.';
-    COMMENT ON COLUMN submission_metrics.update_user IS 'The id of the user who last updated the record.';
-    COMMENT ON COLUMN submission_metrics.revision_count IS 'Revision count used by the audit trigger for concurrency control.';
+    CREATE INDEX summary_metrics_data_idx1
+      ON summary_metrics_data (summary_metric_id, calculated_at DESC, summary_metrics_data_id DESC);
+    CREATE INDEX summary_metrics_data_idx2
+      ON summary_metrics_data (calculated_at DESC, summary_metrics_data_id DESC);
 
-    CREATE TRIGGER audit_submission_metrics
-      BEFORE INSERT OR UPDATE OR DELETE ON submission_metrics
+    COMMENT ON TABLE summary_metrics IS 'Dictionary of platform summary metrics. Keys identify calculations in application code; add a new key when the meaning of a metric changes.';
+    COMMENT ON COLUMN summary_metrics.key IS 'Stable machine-readable metric key, independent of its display name.';
+    COMMENT ON COLUMN summary_metrics.description IS 'Definition of what the metric measures and which data contributes.';
+    COMMENT ON TABLE summary_metrics_data IS 'Historical calculated summary values, grouped into complete snapshots by run_id. Each run is inserted atomically.';
+    COMMENT ON COLUMN summary_metrics_data.summary_metric_id IS 'Foreign key to the summary metric dictionary.';
+    COMMENT ON COLUMN summary_metrics_data.run_id IS 'Shared identifier for all metric values produced by one calculation.';
+    COMMENT ON COLUMN summary_metrics_data.calculated_at IS 'Timestamp of the source snapshot used for this calculation.';
+    COMMENT ON COLUMN summary_metrics_data.value IS 'Computed JSON value: numbers for counts, ISO date strings for dates, SQL NULL when no value exists.';
+
+    INSERT INTO summary_metrics (key, name, description, create_user) VALUES
+      ('record_count', 'Record count', 'Number of current published features.', 1),
+      ('submission_count', 'Submission count', 'Number of distinct submissions represented by current published features.', 1),
+      ('survey_count', 'Survey count', 'Number of current published survey features.', 1),
+      ('earliest_date', 'Earliest date', 'Earliest indexed submitted date across published features.', 1),
+      ('latest_date', 'Latest date', 'Latest indexed submitted date across published features.', 1);
+
+    CREATE TRIGGER audit_summary_metrics BEFORE INSERT OR UPDATE OR DELETE ON summary_metrics
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
-
-    CREATE TRIGGER journal_submission_metrics
-      AFTER INSERT OR UPDATE OR DELETE ON submission_metrics
+    CREATE TRIGGER journal_summary_metrics AFTER INSERT OR UPDATE OR DELETE ON summary_metrics
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    CREATE TRIGGER audit_summary_metrics_data BEFORE INSERT OR UPDATE OR DELETE ON summary_metrics_data
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_summary_metrics_data AFTER INSERT OR UPDATE OR DELETE ON summary_metrics_data
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
   `);
 }
 
-/** Remove metric snapshots. */
+/** Remove calculated values before their dictionary. */
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
-
-    DROP TABLE submission_metrics;
+    DROP TABLE summary_metrics_data;
+    DROP TABLE summary_metrics;
   `);
 }
