@@ -1,6 +1,5 @@
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
-import { ApiExecuteSQLError } from '../errors/api-error';
 import { SubmissionMetricRecord } from '../models/submission-metrics';
 import { BaseRepository } from './base-repository';
 import { isSubmissionFeatureCurrent } from './sql-fragments';
@@ -14,8 +13,11 @@ export class SubmissionMetricsRepository extends BaseRepository {
    * Secured features still contribute: approval and public visibility are different concerns.
    */
   async calculateMetrics(): Promise<string> {
+    const runId = randomUUID();
     const statement = SQL`
-      WITH eligible_features AS MATERIALIZED (
+      WITH snapshot AS MATERIALIZED (
+        SELECT ${runId}::uuid AS run_id, statement_timestamp() AS calculated_at
+      ), eligible_features AS MATERIALIZED (
         SELECT sf.submission_feature_id, sf.submission_id, ft.name AS feature_type
         FROM submission_feature sf
         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
@@ -36,8 +38,6 @@ export class SubmissionMetricsRepository extends BaseRepository {
         SELECT min(p.date_value) AS earliest_date, max(p.date_value) AS latest_date
         FROM submission_feature_property_timestamp p
         JOIN eligible_features sf USING (submission_feature_id)
-      ), snapshot AS MATERIALIZED (
-        SELECT gen_random_uuid() AS run_id, statement_timestamp() AS calculated_at
       ), computed_metrics AS (
         SELECT metrics.key, metrics.value
         FROM counts CROSS JOIN dates
@@ -54,17 +54,13 @@ export class SubmissionMetricsRepository extends BaseRepository {
       FROM computed_metrics computed
       JOIN summary_metrics dictionary ON dictionary.key = computed.key
       CROSS JOIN snapshot
-      RETURNING run_id, (SELECT count(*)::integer FROM computed_metrics) AS expected_count;
+      WHERE dictionary.record_end_date IS NULL
+        AND dictionary.record_effective_date <= now();
     `);
-    const result = await this.connection.sql(
-      statement,
-      z.object({ run_id: z.string().uuid(), expected_count: z.number() })
-    );
-    // Never commit a partial snapshot if required dictionary entries are missing.
-    if (!result.rows.length || result.rows.length !== result.rows[0].expected_count) {
-      throw new ApiExecuteSQLError('Summary metric dictionary is missing required calculation keys');
-    }
-    return result.rows[0].run_id;
+    // Dictionary retirement intentionally removes a metric from future calculations. The single
+    // INSERT still commits every enabled calculation atomically, including when none are enabled.
+    await this.connection.sql(statement);
+    return runId;
   }
 
   /** Read the metric values in a single calculation run. */

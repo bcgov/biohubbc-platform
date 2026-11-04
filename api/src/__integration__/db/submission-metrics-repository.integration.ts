@@ -2,7 +2,6 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SubmissionMetricsRepository } from '../../repositories/submission-metrics-repository';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -118,22 +117,19 @@ describe('SubmissionMetricsRepository (integration)', function () {
     expect(Object.keys(await getValues(await repository.calculateMetrics()))).to.have.length(5);
   });
 
-  it('rejects incomplete dictionaries so the caller can roll back partial results', async () => {
+  it('skips retired definitions without failing the remaining calculations', async () => {
     await connection.sql(SQL`
-      UPDATE summary_metrics SET key = 'integration_missing_survey_count' WHERE key = 'survey_count';
+      UPDATE summary_metrics SET record_end_date = now() WHERE key = 'survey_count';
     `);
-    const before = await connection.sql(SQL`SELECT count(*)::int AS count FROM summary_metrics_data;`);
-    await connection.query('SAVEPOINT calculation');
-    let caught: unknown;
-    try {
-      await repository.calculateMetrics();
-    } catch (error) {
-      caught = error;
-      await connection.query('ROLLBACK TO SAVEPOINT calculation');
-    }
-    expect(caught).to.be.instanceOf(ApiExecuteSQLError);
-    const after = await connection.sql(SQL`SELECT count(*)::int AS count FROM summary_metrics_data;`);
-    expect(after.rows[0].count).to.equal(before.rows[0].count);
+    const values = await getValues(await repository.calculateMetrics());
+    expect(values).not.to.have.property('survey_count');
+    expect(values).to.have.property('record_count');
+    expect(Object.keys(values)).to.have.length(4);
+  });
+
+  it('allows every definition to be retired without creating values or failing the job', async () => {
+    await connection.sql(SQL`UPDATE summary_metrics SET record_end_date = now();`);
+    expect(await getValues(await repository.calculateMetrics())).to.deep.equal({});
   });
 
   async function getValues(runId: string): Promise<Record<string, unknown>> {
