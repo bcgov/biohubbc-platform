@@ -61,11 +61,19 @@ export const SearchMetrics = () => {
           <Grid container spacing={2} justifyContent="center">
             {metrics.map((metric) => (
               <Grid key={metric.summary_metric_id} size={{ xs: 12, sm: 6, md: 4 }}>
-                <Paper component="dl" variant="outlined" sx={{ p: 3, height: 1, m: 0, textAlign: 'center' }}>
-                  <Typography component="dd" variant="h3" sx={{ m: 0, mt: 1 }}>
+                <Paper
+                  component="dl"
+                  variant="outlined"
+                  sx={{ p: 3, height: 1, m: 0, textAlign: 'center', backgroundColor: '#003366' }}>
+                  <Typography component="dd" variant="h3" sx={{ m: 0, mt: 1, color: 'white' }}>
                     {metric.formattedValue}
                   </Typography>
-                  <Typography component="dt" variant="body2" color="text.secondary" title={metric.description}>
+                  <Typography
+                    component="dt"
+                    variant="body2"
+                    color="text.secondary"
+                    title={metric.description}
+                    sx={{ color: 'white' }}>
                     {metric.label}
                   </Typography>
                 </Paper>
