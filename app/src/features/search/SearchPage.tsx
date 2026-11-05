@@ -1,8 +1,9 @@
-import { Container, Divider, Paper, Stack, Typography } from '@mui/material';
+import { Container, Paper, Stack, Typography } from '@mui/material';
 import { useCodesQuery } from 'hooks/useCodesQuery';
 import { useMemo } from 'react';
 import { SearchContainer } from './container/SearchContainer';
 import { FeaturedDownloadsSection } from './gallery/FeaturedDownloadsSection';
+import { SearchMetrics } from './metrics/SearchMetrics';
 import { buildSearchFeatureTypeLinks } from './utils/search-feature-type-links';
 
 /**
@@ -35,8 +36,8 @@ export const SearchPage = () => {
           </Stack>
         </Paper>
       </Container>
-      <Divider sx={{ borderColor: '#003366', borderWidth: 1, my: 2 }} />
-      <Container maxWidth="md" sx={{ pb: 10, borderColor: '#003366', borderStyle: 'solid', borderWidth: 1 }}>
+      <SearchMetrics />
+      <Container maxWidth="md" sx={{ pb: 10 }}>
         <FeaturedDownloadsSection />
       </Container>
     </>
