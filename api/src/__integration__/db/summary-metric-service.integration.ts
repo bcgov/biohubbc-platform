@@ -94,7 +94,7 @@ describe('Summary metric CRUD and latest values (integration)', function () {
       (row) => row.summary_metric_id === metric.summary_metric_id
     );
     expect(latest?.summary_metrics_data_id).to.equal(second.summary_metrics_data_id);
-    expect(latest?.value).to.equal(null);
+    expect(latest?.value).to.be.null;
     expect(latest?.key).to.equal(metric.key);
     await dataService.deleteSummaryMetricData(second.summary_metrics_data_id);
     latest = (await dataService.getLatestSummaryMetricsData()).find(
@@ -104,7 +104,7 @@ describe('Summary metric CRUD and latest values (integration)', function () {
     const ended = await connection.sql(SQL`
       SELECT record_end_date FROM summary_metrics_data WHERE summary_metrics_data_id = ${second.summary_metrics_data_id};
     `);
-    expect(ended.rows[0].record_end_date).not.to.equal(null);
+    expect(ended.rows[0].record_end_date).to.not.be.null;
     expect(await dataService.getSummaryMetricsDataCount({ summary_metric_id: metric.summary_metric_id })).to.equal(3);
   });
 
