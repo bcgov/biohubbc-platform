@@ -14,6 +14,7 @@
     "typecheck": "tsc --project tsconfig.production.json",
     "start-reload": "tsx watch src/app.ts",
     "queue": "tsx src/queue.ts",
+    "compute-submission-metrics": "tsx src/compute-submission-metrics.ts",
     "queue-reload": "tsx watch src/queue.ts",
     "test:mocha": "cross-env TSX_TSCONFIG_PATH=./tsconfig.mocha.json node --import tsx ./node_modules/mocha/bin/mocha.js",
     "test": "npm run test:mocha -- --config .mocharc.json",
