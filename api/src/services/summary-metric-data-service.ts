@@ -45,7 +45,7 @@ export class SummaryMetricDataService extends DBService {
 
   /** Read a single calculated value. */
   async getSummaryMetricData(summaryMetricsDataId: string): Promise<SummaryMetricData> {
-    if (!/^[1-9][0-9]{0,18}$/.test(summaryMetricsDataId) || BigInt(summaryMetricsDataId) > 9223372036854775807n) {
+    if (!/^[1-9]\d{0,18}$/.test(summaryMetricsDataId) || BigInt(summaryMetricsDataId) > 9223372036854775807n) {
       throw new HTTP400('Invalid summary metric data identifier');
     }
     return this.summaryMetricDataRepository.getSummaryMetricData(summaryMetricsDataId);

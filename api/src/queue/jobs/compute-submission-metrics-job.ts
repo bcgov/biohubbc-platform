@@ -10,26 +10,28 @@ export type IComputeSubmissionMetricsJobData = Record<string, never>;
 
 /** Commit a complete snapshot, or roll back and let pg-boss retry on failure. */
 export const computeSubmissionMetricsJobHandler: PgBoss.WorkHandler<IComputeSubmissionMetricsJobData> = async (
-  jobs
+  jobs: Parameters<PgBoss.WorkHandler<IComputeSubmissionMetricsJobData>>[0]
 ) => {
-  for (const job of jobs) {
-    try {
-      await withConnection((connection) => new SubmissionMetricsService(connection).calculateMetrics());
-      defaultLog.info({
-        label: 'computeSubmissionMetricsJobHandler',
-        jobId: job.id,
-        message: 'Metrics snapshot saved'
-      });
-    } catch (error) {
-      defaultLog.error({
-        label: 'computeSubmissionMetricsJobHandler',
-        message: 'Metrics calculation failed',
-        jobId: job.id,
-        error
-      });
-      throw error;
-    }
-  }
+  await Promise.all(
+    jobs.map(async (job) => {
+      try {
+        await withConnection((connection) => new SubmissionMetricsService(connection).calculateMetrics());
+        defaultLog.info({
+          label: 'computeSubmissionMetricsJobHandler',
+          jobId: job.id,
+          message: 'Metrics snapshot saved'
+        });
+      } catch (error) {
+        defaultLog.error({
+          label: 'computeSubmissionMetricsJobHandler',
+          message: 'Metrics calculation failed',
+          jobId: job.id,
+          error
+        });
+        throw error;
+      }
+    })
+  );
 };
 
 /** Log exhausted retries; previous successful snapshots remain available. */
