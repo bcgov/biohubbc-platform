@@ -22,7 +22,9 @@ async function computeSubmissionMetrics(): Promise<void> {
   }
 }
 
-computeSubmissionMetrics().catch((error) => {
+try {
+  await computeSubmissionMetrics();
+} catch (error) {
   defaultLog.error({ label: 'computeSubmissionMetrics', message: 'Submission metrics calculation failed', error });
   process.exitCode = 1;
-});
+}

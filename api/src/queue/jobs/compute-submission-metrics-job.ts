@@ -33,9 +33,7 @@ export const computeSubmissionMetricsJobHandler: PgBoss.WorkHandler<IComputeSubm
 };
 
 /** Log exhausted retries; previous successful snapshots remain available. */
-export const computeSubmissionMetricsFailedHandler: PgBoss.WorkHandler<IComputeSubmissionMetricsJobData> = async (
-  jobs
-) => {
+export const computeSubmissionMetricsFailedHandler: PgBoss.WorkHandler<IComputeSubmissionMetricsJobData> = (jobs) => {
   for (const job of jobs) {
     defaultLog.error({
       label: 'computeSubmissionMetricsFailedHandler',
@@ -43,4 +41,5 @@ export const computeSubmissionMetricsFailedHandler: PgBoss.WorkHandler<IComputeS
       message: 'Metrics retries exhausted'
     });
   }
+  return Promise.resolve();
 };
