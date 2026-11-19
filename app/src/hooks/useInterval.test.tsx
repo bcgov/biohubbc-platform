@@ -22,10 +22,12 @@ describe('useInterval', () => {
     vi.useRealTimers();
   });
 
-  it('calls the callback 5 times: once every 50 milliseconds for 250 milliseconds', async () => {
+  it('calls the callback 5 times: once every 50 milliseconds until a 275 millisecond timeout', async () => {
     const callbackMock = vi.fn();
 
-    render(<TestComponent callback={callbackMock} period={50} timeout={250} />);
+    // The timeout falls between ticks: one due at the same instant as a tick races it, and which of the two runs
+    // first is not specified.
+    render(<TestComponent callback={callbackMock} period={50} timeout={275} />);
 
     expect(callbackMock.mock.calls.length).toEqual(0); // 0 milliseconds
 
