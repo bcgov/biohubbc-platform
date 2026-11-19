@@ -202,8 +202,12 @@ const mocks = vi.hoisted(() => {
     }
   }
 
+  // Returns how many maps existed when the worker was configured, so a test can tell it ran before construction.
+  const configureMapLibreWorker = vi.fn(() => MockMaplibreMap.instances.length);
+
   return {
     MockMaplibreMap,
+    configureMapLibreWorker,
     MockTerraDraw,
     MockTerraDrawAdapter,
     MockPointMode,
@@ -216,6 +220,8 @@ const mocks = vi.hoisted(() => {
 vi.mock('maplibre-gl', () => ({ Map: mocks.MockMaplibreMap }));
 
 vi.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}));
+
+vi.mock('./maplibre-worker', () => ({ configureMapLibreWorker: mocks.configureMapLibreWorker }));
 
 vi.mock('terra-draw', () => ({
   TerraDraw: mocks.MockTerraDraw,
@@ -361,6 +367,14 @@ describe('SlippyMap', () => {
           trackResize: false
         })
       );
+    });
+
+    it('configures the MapLibre worker before constructing the map', () => {
+      renderSlippyMap();
+
+      expect(mocks.configureMapLibreWorker).toHaveBeenCalledOnce();
+      expect(mocks.configureMapLibreWorker.mock.results[0].value).toBe(0);
+      expect(mocks.MockMaplibreMap.instances).toHaveLength(1);
     });
 
     it('initializes the map with the provided style and additional map options', () => {
