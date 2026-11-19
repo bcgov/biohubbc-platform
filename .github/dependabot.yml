@@ -15,3 +15,30 @@ updates:
       actions:
         patterns:
           - "*" 
+  - package-ecosystem: "npm"
+    directories:
+      - "/api"
+      - "/app"
+      - "/database"
+      - "/martin-gateway"
+    schedule:
+      interval: "weekly"
+      time: "18:00"
+      timezone: "America/Vancouver"
+    commit-message:
+      prefix: "SIMSBIOHUB-000"
+    labels:
+      - "Ready For Review"
+    open-pull-requests-limit: 4
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      npm-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
