@@ -29,7 +29,8 @@ describe('paths/administrative/policies/{policyId}/teams/index', () => {
         team_id: 'team-1',
         policy_id: 'policy-1',
         team_name: 'Team Alpha',
-        policy_name: 'Sensitive Wildlife Policy'
+        policy_name: 'Sensitive Wildlife Policy',
+        record_end_date: null
       };
       const getTeamsStub = sinon.stub(TeamPolicyService.prototype, 'getTeamsByPolicyId').resolves([mockTeam]);
       const getTeamsCountStub = sinon.stub(TeamPolicyService.prototype, 'getTeamsByPolicyIdCount').resolves(1);
