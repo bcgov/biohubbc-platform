@@ -30,6 +30,9 @@ updates:
     labels:
       - "Ready For Review"
     open-pull-requests-limit: 4
+    # Each group raises one pull request spanning every directory above that has updates, so a
+    # run opens at most one PR per group. Minor and patch updates are kept apart from majors so
+    # the routine bumps can merge while the breaking ones wait for review.
     groups:
       npm-security:
         applies-to: security-updates
@@ -40,5 +43,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+        patterns:
+          - "*"
+      npm-major:
+        applies-to: version-updates
+        update-types:
+          - "major"
         patterns:
           - "*"
