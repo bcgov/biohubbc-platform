@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { PATCH, updateSubmission } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import * as db from '../../../../database/db';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
@@ -19,7 +19,7 @@ describe('updateSubmission endpoint', () => {
     const { mockReq, mockRes } = getRequestHandlerMocks();
     const next = sinon.stub();
     try {
-      await (PATCH[0] as RequestHandler)(mockReq, mockRes, next);
+      await getOperationHandler(PATCH, 0)(mockReq, mockRes, next);
       expect.fail('Expected authorization rejection');
     } catch (error) {
       expect((error as Error).message).to.equal('Access Denied');

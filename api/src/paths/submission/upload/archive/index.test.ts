@@ -1,8 +1,8 @@
 import { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import { POST, startUpload } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../__mocks__/operation';
 import { dbDependencies } from '../../../../database/db';
 import { HTTP403 } from '../../../../errors/http-error';
 import { SystemUserExtended } from '../../../../models/system-user';
@@ -46,7 +46,7 @@ describe('Submission upload request contributor selection', () => {
         .stub(ContributorRepository.prototype, 'findContributorMembershipByClientId')
         .withArgs(selection.selected, 5)
         .resolves({ contributor_id: 77, is_member: true });
-      await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(POST, 0)(mockReq, mockRes, mockNext);
       expect(mockReq.authorization_scheme).eql({
         or: [{ discriminator: 'Contributor', clientId: selection.selected }]
       });
@@ -81,7 +81,7 @@ describe('Submission upload request contributor selection', () => {
       mockReq.keycloak_token = { clientId: 'valid-token-client' };
       mockReq.system_user = { system_user_id: 5, role_names: [] } as unknown as SystemUserExtended;
       try {
-        await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(POST, 0)(mockReq, mockRes, mockNext);
         expect.fail('Expected authorization rejection');
       } catch (error_) {
         expect(error_).to.be.instanceOf(HTTP403);
@@ -98,7 +98,7 @@ describe('Submission upload request contributor selection', () => {
     mockReq.keycloak_token = {};
     mockReq.system_user = { system_user_id: 5, role_names: [] } as unknown as SystemUserExtended;
     try {
-      await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(POST, 0)(mockReq, mockRes, mockNext);
       expect.fail('Expected missing contributor rejection');
     } catch (error_) {
       expect(error_).to.be.instanceOf(HTTP403);
@@ -129,7 +129,7 @@ describe('Submission upload request contributor selection', () => {
     sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     try {
-      await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(POST, 0)(mockReq, mockRes, mockNext);
       expect.fail('Expected authorization failure');
     } catch (error) {
       expect(error).instanceOf(HTTP403);

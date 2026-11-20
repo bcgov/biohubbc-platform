@@ -1,9 +1,8 @@
 import Ajv from 'ajv';
 import { expect } from 'chai';
-import { RequestHandler } from 'express';
-import { OpenAPIV3 } from 'openapi-types';
 import sinon from 'sinon';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { getOperationHandler, getRequestBodySchema } from '../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { dbDependencies } from '../../../database/db';
 import { ensureHTTPError } from '../../../errors/http-error';
@@ -61,7 +60,7 @@ describe('Blueprint composition API boundaries', () => {
       const authorize = sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       try {
-        await (operation[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(operation, 0)(mockReq, mockRes, mockNext);
         expect.fail('Expected forbidden');
       } catch (error) {
         expect(ensureHTTPError(error).status).to.equal(403);
@@ -139,15 +138,9 @@ describe('Blueprint composition API boundaries', () => {
 
   it('rejects sort and mutable identities while preserving boolean/omission semantics', () => {
     const ajv = new Ajv({ strict: false });
-    const createBlueprintFeatureType = ajv.compile(
-      (typesPOST.apiDoc!.requestBody as OpenAPIV3.RequestBodyObject).content['application/json'].schema!
-    );
-    const createBlueprintFeatureTypeProperty = ajv.compile(
-      (propertiesPOST.apiDoc!.requestBody as OpenAPIV3.RequestBodyObject).content['application/json'].schema!
-    );
-    const updateBlueprintFeatureTypeProperty = ajv.compile(
-      (propertyPUT.apiDoc!.requestBody as OpenAPIV3.RequestBodyObject).content['application/json'].schema!
-    );
+    const createBlueprintFeatureType = ajv.compile(getRequestBodySchema(typesPOST));
+    const createBlueprintFeatureTypeProperty = ajv.compile(getRequestBodySchema(propertiesPOST));
+    const updateBlueprintFeatureTypeProperty = ajv.compile(getRequestBodySchema(propertyPUT));
     expect(createBlueprintFeatureType({ featureTypeId: 3 })).equal(true);
     expect(createBlueprintFeatureType({ featureTypeId: 3, sort: 1 })).equal(false);
     expect(createBlueprintFeatureTypeProperty({ blueprintFeatureTypeId: 2, featurePropertyId: 5, sort: null })).equal(

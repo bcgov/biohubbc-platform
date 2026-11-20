@@ -1,10 +1,10 @@
 import Ajv from 'ajv';
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET, listSubmissionUploadFeatureTypes } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../../../../../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../../../../../../../../constants/roles';
 import * as db from '../../../../../../../../../../database/db';
 import { ApiNotFoundError } from '../../../../../../../../../../errors/api-error';
@@ -22,7 +22,7 @@ describe('administrative submission upload feature type list', () => {
   it('requires system or data administrator authorization', async () => {
     sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    await (GET[0] as RequestHandler)(mockReq, mockRes, mockNext);
+    await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
     expect(mockReq.authorization_scheme).to.eql({
       and: [
         { discriminator: 'SystemRole', validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR] }
@@ -36,7 +36,7 @@ describe('administrative submission upload feature type list', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     let caught: unknown;
     try {
-      await (GET[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
     } catch (error) {
       caught = error;
     }
