@@ -6,7 +6,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
-import { SystemUser, SystemUserExtended } from '../../models/system-user';
+import { SystemUserExtended } from '../../models/system-user';
 import { ContributorService } from '../contributor-service';
 import { DownloadService } from '../download/download-service';
 import { UserService } from '../user-service';
@@ -731,7 +731,7 @@ describe('authorizeByPolicy', function () {
     sinon.restore();
   });
 
-  const systemUser: SystemUser = {
+  const systemUser: SystemUserExtended = {
     system_user_id: 1,
     user_identity_source_id: 2,
     user_identifier: 'test-user',
@@ -748,7 +748,10 @@ describe('authorizeByPolicy', function () {
     family_name: null,
     email: null,
     agency: null,
-    notes: null
+    notes: null,
+    identity_source: 'IDIR',
+    role_ids: [],
+    role_names: []
   };
 
   it('returns true when the feature is accessible, passing the authenticated user id and entity ids', async function () {
