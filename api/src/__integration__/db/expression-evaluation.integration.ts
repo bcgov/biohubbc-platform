@@ -898,6 +898,48 @@ describe('expression-evaluation (integration)', function () {
       expect(grantedIds.has(securedTarget)).to.equal(true);
     });
 
+    it('4b: a grant on one secured feature does not expose another secured feature the expression matches', async () => {
+      // Each feature sits in its own submission and upload so neither is an ancestor of the other: the
+      // grant anchored on the first feature must not reach the second through the closure.
+      const grantedSubmissionId = await createTestSubmission(connection);
+      const grantedUploadId = await createTestUpload(connection, grantedSubmissionId);
+      const grantedFeature = await insertFeatureRow({
+        submissionId: grantedSubmissionId,
+        submissionUploadId: grantedUploadId,
+        featureTypeName: 'sample_site'
+      });
+      await indexNameProperty(grantedFeature, 'Granted-isolation');
+      await secureFeature(grantedFeature);
+
+      const ungrantedSubmissionId = await createTestSubmission(connection);
+      const ungrantedUploadId = await createTestUpload(connection, ungrantedSubmissionId);
+      const ungrantedFeature = await insertFeatureRow({
+        submissionId: ungrantedSubmissionId,
+        submissionUploadId: ungrantedUploadId,
+        featureTypeName: 'sample_site'
+      });
+      await indexNameProperty(ungrantedFeature, 'Ungranted-isolation');
+      await secureFeature(ungrantedFeature);
+
+      const closure = new SubmissionFeatureClosureService(connection);
+      await closure.computeClosureForUpload(grantedUploadId);
+      await closure.computeClosureForUpload(ungrantedUploadId);
+
+      await grantPrivilegedAccess(grantedFeature);
+
+      const tree: NormalizedExpressionTree = {
+        type: 'expression',
+        operator: 'OR',
+        clauses: [namePredicate('Granted-isolation'), namePredicate('Ungranted-isolation')]
+      };
+      const ids = await runSubquery(
+        buildExpressionTreeFeatureIdsSubquery('sample_site', tree, connection.systemUserId())
+      );
+
+      expect(ids.has(grantedFeature)).to.equal(true);
+      expect(ids.has(ungrantedFeature)).to.equal(false);
+    });
+
     /**
      * Reflexive reach. A single feature E(sample_site) returns itself because the closure self-loop makes
      * same-type evidence search-eligible and the anchor row is the evidence row.
