@@ -150,6 +150,7 @@ describe('SubmissionUploadService', () => {
       upload_id: 'upload-1',
       team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       status: 'uploaded',
+      decision: 'pending',
       ticket_id: '11111111-1111-1111-1111-111111111111',
       blueprint_id: 1
     };
@@ -477,6 +478,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'uploaded',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -501,6 +503,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'uploaded',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -520,6 +523,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'indexed',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -531,7 +535,7 @@ describe('SubmissionUploadService', () => {
       const update = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload');
 
       try {
-        await service.updateSubmissionUpload('artifact-1', { comment: 'changed' });
+        await service.updateSubmissionUpload('artifact-1', { ticket_id: '22222222-2222-2222-2222-222222222222' });
         expect.fail('Expected HTTP409');
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP409);
@@ -677,6 +681,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'uploaded',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -925,6 +930,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'ingesting',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -941,6 +947,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'indexed',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -962,7 +969,9 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'reconciled',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -977,7 +986,9 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'indexing',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -992,6 +1003,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'uploaded',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -1013,7 +1025,9 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'indexing',
+        decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
         blueprint_id: 1
       });
@@ -1028,6 +1042,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'indexed',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -1044,6 +1059,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'ingested',
         decision: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111',
