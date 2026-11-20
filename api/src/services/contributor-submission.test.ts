@@ -12,6 +12,35 @@ import { SubmissionService } from './submission-service';
 import { UploadIngestionService } from './upload/upload-ingestion-service';
 import { PresignedUploadUrlResponse } from './upload/upload-ingestion-service.interface';
 
+/**
+ * Builds an active system user holding the given system roles.
+ *
+ * @param {string[]} roleNames The user's system role names.
+ * @return {*}  {SystemUserExtended} The system user.
+ */
+const systemUserWithRoles = (roleNames: string[]): SystemUserExtended => ({
+  system_user_id: 5,
+  user_identity_source_id: 1,
+  user_identifier: 'test-user',
+  user_guid: 'test-guid',
+  record_effective_date: '2026-01-01',
+  record_end_date: null,
+  create_date: '2026-01-01',
+  create_user: 1,
+  update_date: null,
+  update_user: null,
+  revision_count: 0,
+  display_name: null,
+  given_name: null,
+  family_name: null,
+  email: null,
+  agency: null,
+  notes: null,
+  identity_source: 'IDIR',
+  role_ids: [],
+  role_names: roleNames
+});
+
 describe('Explicit submission contributor selection', () => {
   afterEach(() => sinon.restore());
 
@@ -173,7 +202,7 @@ describe('Submission owner access', () => {
         .stub(service.submissionRepository, 'findSubmissionContributorMembership')
         .withArgs('submission', 5)
         .resolves({ is_member: scenario.member });
-      sinon.stub(service.userService, 'getUserById').resolves({ role_names: scenario.roles } as SystemUserExtended);
+      sinon.stub(service.userService, 'getUserById').resolves(systemUserWithRoles(scenario.roles));
       let failure: unknown;
       try {
         await service.assertSubmissionContributorWriteAccess('submission');
@@ -194,7 +223,7 @@ describe('Submission owner access', () => {
     sinon
       .stub(uploads.submissionService.submissionRepository, 'findSubmissionContributorMembership')
       .resolves({ is_member: false });
-    sinon.stub(uploads.submissionService.userService, 'getUserById').resolves({ role_names: [] } as SystemUserExtended);
+    sinon.stub(uploads.submissionService.userService, 'getUserById').resolves(systemUserWithRoles([]));
     sinon.stub(uploads.submissionUploadRepository, 'findSubmissionUploadDecisionHistoryBySubmissionUuid').resolves([]);
     sinon.stub(uploads.submissionService, 'getSubmissionIdByUUID').resolves({ submission_id: 1 });
 
@@ -212,9 +241,7 @@ describe('Submission owner access', () => {
       sinon
         .stub(submissionService.submissionRepository, 'findSubmissionContributorMembership')
         .resolves({ is_member: false });
-      sinon
-        .stub(submissionService.userService, 'getUserById')
-        .resolves({ role_names: [] } as unknown as SystemUserExtended);
+      sinon.stub(submissionService.userService, 'getUserById').resolves(systemUserWithRoles([]));
       sinon.stub(uploads, 'getSubmissionUploadBySubmissionUuid').resolves({ submission_id: 1 } as any);
       const addMembers = sinon.stub(ingestion.submissionService, 'addSubmissionTeamMembers');
       const start = sinon.stub(ingestion, '_startArchiveUploadForSubmission');
