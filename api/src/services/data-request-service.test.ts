@@ -76,11 +76,14 @@ describe('DataRequestService', () => {
     name: 'Data request policy - uuid',
     description: null,
     status: 'requested',
+    expressions: [],
     statements: statementIds.map((id, idx) => ({
       policy_statement_id: id,
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
       effect: PolicyEffect.ALLOW,
-      submission_feature_urn: `urn:*:f${idx}:*`
+      submission_feature_urn: `urn:*:f${idx}:*`,
+      security_scope_id: '55555555-5555-5555-5555-555555555555',
+      policy_expression_id: null
     }))
   });
 

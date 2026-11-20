@@ -305,7 +305,9 @@ describe('paths/administrative/policies/index', () => {
             policy_statement_id: 's1',
             policy_id: '1',
             effect: PolicyEffect.ALLOW,
-            submission_feature_urn: 'urn:*:*:*'
+            submission_feature_urn: 'urn:*:*:*',
+            security_scope_id: '55555555-5555-5555-5555-555555555555',
+            policy_expression_id: null
           }
         ]
       };
