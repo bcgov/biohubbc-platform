@@ -106,7 +106,7 @@ describe('sql-fragments', () => {
       expect(sql).to.include('urn_submission_id');
       expect(sql).to.include('urn_feature_type');
       expect(sql).to.include('urn_feature_id');
-      expect(sql).to.include('anchor_sf.record_effective_date <= now()');
+      expect(sql).to.include('scope_anchor_sf.record_effective_date <= now()');
     });
 
     it('probes the closure ancestry for a scope anchor instead of a recursive parent walk', () => {
@@ -129,6 +129,14 @@ describe('sql-fragments', () => {
       // Step 4: Verify it does NOT use the recursive parent walk
       expect(sql).to.not.include('with recursive');
       expect(sql).to.not.include('ancestor_chain');
+    });
+
+    it('keeps the candidate feature expression bound to the caller when the caller aliases its row anchor_sf', () => {
+      const sql = isAccessibleToUser('anchor_sf.submission_feature_id');
+
+      expect(sql).to.include('WHERE c.source_submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.not.match(/JOIN submission_feature anchor_sf\b/);
+      expect(sql).to.not.match(/JOIN feature_type anchor_ft\b/);
     });
 
     it('contains exactly one bound placeholder for systemUserId', () => {

@@ -218,6 +218,11 @@ export function isEffectivelySecured(featureIdExpr: string): string {
  * `isEffectivelySecured` (a couple of indexed PK probes) and short-circuits to Branch 2. The cost
  * is small, and using the canonical check keeps the probe consistent with the visible-results filter.
  *
+ * The fragment's own table aliases are prefixed (`scope_anchor_sf`, `scope_anchor_ft`) so they cannot
+ * capture a caller's alias. `featureIdExpr` is interpolated inside the inner subquery, so an inner alias
+ * with the same name as the caller's would silently rebind the expression to the anchor row and turn the
+ * grant check into "the user holds any anchor".
+ *
  * @param featureIdExpr SQL expression for the starting submission_feature_id
  *   (e.g. 'wf.submission_feature_id', 'aggregated_results.submission_feature_id')
  */
@@ -233,10 +238,10 @@ export function isAccessibleToUser(featureIdExpr: string): string {
         FROM submission_feature_closure c
         JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
         JOIN security_scope ss ON ss.security_scope_id = ssa.security_scope_id
-        JOIN submission_feature anchor_sf
-          ON anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
-          AND ${isSubmissionFeatureCurrent('anchor_sf')}
-        JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor_sf.feature_type_id
+        JOIN submission_feature scope_anchor_sf
+          ON scope_anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
+          AND ${isSubmissionFeatureCurrent('scope_anchor_sf')}
+        JOIN feature_type scope_anchor_ft ON scope_anchor_ft.feature_type_id = scope_anchor_sf.feature_type_id
         JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
         JOIN team t ON t.team_id = tss.team_id
           AND t.record_end_date IS NULL
@@ -250,13 +255,13 @@ export function isAccessibleToUser(featureIdExpr: string): string {
           AND EXISTS (
             SELECT 1
             FROM submission_feature_closure closure_ready
-            WHERE closure_ready.source_submission_feature_id = anchor_sf.submission_feature_id
-              AND closure_ready.target_submission_feature_id = anchor_sf.submission_feature_id
+            WHERE closure_ready.source_submission_feature_id = scope_anchor_sf.submission_feature_id
+              AND closure_ready.target_submission_feature_id = scope_anchor_sf.submission_feature_id
           )
-          AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
-          AND (ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
-          AND (ss.urn_feature_type = anchor_ft.name OR ss.urn_feature_type = '*')
-          AND (ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
+          AND ${isEffectivelySecured('scope_anchor_sf.submission_feature_id')}
+          AND (ss.urn_submission_id = scope_anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
+          AND (ss.urn_feature_type = scope_anchor_ft.name OR ss.urn_feature_type = '*')
+          AND (ss.urn_feature_id = scope_anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
       )
   )`;
 }
