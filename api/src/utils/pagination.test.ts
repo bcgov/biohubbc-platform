@@ -29,7 +29,7 @@ describe('pagination', () => {
       const cursor = Buffer.from(JSON.stringify({ direction: 'unsupported' })).toString('base64url');
 
       expect(() => decodeSearchFeatureCursor(cursor))
-        .to.throw(Error)
+        .to.throw(Error, /Invalid option: expected one of \W*next\W*previous/)
         .that.is.instanceOf(ZodError);
     });
   });
