@@ -13,9 +13,6 @@ on:
 permissions:
   pull-requests: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   syncOpenshiftURLComment:
     name: Sync OpenShift URL Comment
@@ -26,7 +23,7 @@ jobs:
       github.event.label.name == 'No Preview' }}
     steps:
       - name: Sync Comment
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           # deploy.yml's deployPreview rule: open, not draft, not labelled "No Preview".
           PREVIEW_EXPECTED: ${{ github.event.pull_request.draft == false &&
