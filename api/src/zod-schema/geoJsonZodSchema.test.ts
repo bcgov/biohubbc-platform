@@ -31,7 +31,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONPointZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /expected number, received array/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -56,7 +56,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONLineStringZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /expected array to have >=2 items/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -90,7 +90,7 @@ describe('geoJsonZodSchema', () => {
         type: 'Polygon'
       };
       expect(() => GeoJSONPolygonZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /expected array to have >=4 items/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -115,7 +115,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONMultiPointZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /expected number, received array/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -149,7 +149,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONMultiLineStringZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /expected array, received number/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -198,7 +198,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONMultiPolygonZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /expected array, received number/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -292,7 +292,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONGeometryCollectionZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /Invalid input: expected \W*GeometryCollection\W/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -326,7 +326,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONFeatureZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /Invalid input: expected \W*Feature\W/)
         .that.is.instanceOf(ZodError);
     });
   });
@@ -390,7 +390,7 @@ describe('geoJsonZodSchema', () => {
       };
 
       expect(() => GeoJSONFeatureCollectionZodSchema.parse(geoJson))
-        .to.throw(Error)
+        .to.throw(Error, /Invalid input: expected \W*FeatureCollection\W/)
         .that.is.instanceOf(ZodError);
     });
   });

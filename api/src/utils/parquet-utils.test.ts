@@ -1206,7 +1206,7 @@ describe('parquet-utils', () => {
     it('rejects a footer entry that is not a property list', async () => {
       await writeAndOpen({ [PARQUET_PROPERTIES_METADATA_KEY]: '{"not":"a list"}' }, (reader) => {
         expect(() => readParquetPropertiesMetadata(reader))
-          .to.throw(Error)
+          .to.throw(Error, /expected array, received object/)
           .that.is.instanceOf(ZodError);
       });
     });
