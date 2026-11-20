@@ -140,7 +140,7 @@ describe('biohub-tar-parser', () => {
             content: JSON.stringify({ id: 'feature-1', type: 'survey', properties: {}, content: [], parent: null })
           }
         ]);
-        let compressed = gzipSync(tarBuffer);
+        let compressed: Buffer = gzipSync(tarBuffer);
         if (failure === 'truncated') {
           compressed = compressed.subarray(0, compressed.length - 8);
         } else if (failure === 'checksum') {
