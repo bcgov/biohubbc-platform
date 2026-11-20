@@ -9,7 +9,7 @@ export const CreateTicketUpload = z.object({
 export type CreateTicketUpload = z.infer<typeof CreateTicketUpload>;
 
 export const CreateTicketUploadResponse = z.object({
-  upload_id: z.string().uuid(),
+  upload_id: z.guid(),
   presigned_upload_url: z.string().url()
 });
 

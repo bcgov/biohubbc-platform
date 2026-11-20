@@ -70,7 +70,7 @@ export const SubmissionFeatureRecord = z.object({
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
-  data: z.record(z.any()),
+  data: z.record(z.string(), z.any()),
   content_hash: z.string().nullable(),
   reconciliation: z.enum(['new', 'modified', 'unmodified']).nullable(),
   successor_submission_feature_id: z.number().nullable(),

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 export const DownloadVersionExportArtifactRecord = z.object({
-  download_version_export_artifact_id: z.string().uuid(),
-  download_version_export_artifact_group_id: z.string().uuid(),
-  artifact_id: z.string().uuid(),
+  download_version_export_artifact_id: z.guid(),
+  download_version_export_artifact_group_id: z.guid(),
+  artifact_id: z.guid(),
   chunk_id: z.number()
 });
 export type DownloadVersionExportArtifactRecord = z.infer<typeof DownloadVersionExportArtifactRecord>;

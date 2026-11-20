@@ -20,7 +20,7 @@ export type ArtifactMetadata = z.infer<typeof ArtifactMetadata>;
 export const Artifact = ArtifactMetadata.extend({
   artifact_id: z.number(),
   submission_id: z.number(),
-  uuid: z.string().uuid(),
+  uuid: z.guid(),
   key: z.string(),
   foi_reason: z.boolean().nullable().optional(),
   security_review_timestamp: z.string().nullable().optional(),

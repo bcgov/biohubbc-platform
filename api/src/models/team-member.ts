@@ -1,15 +1,15 @@
 import { z } from 'zod';
 
 export const TeamMember = z.object({
-  team_member_id: z.string().uuid(),
+  team_member_id: z.guid(),
   system_user_id: z.number().int(),
-  team_id: z.string().uuid()
+  team_id: z.guid()
 });
 
 export type TeamMember = z.infer<typeof TeamMember>;
 
 export const TeamMemberWithUser = z.object({
-  team_member_id: z.string().uuid(),
+  team_member_id: z.guid(),
   system_user_id: z.number().int(),
   user_identifier: z.string(),
   display_name: z.string().nullable(),

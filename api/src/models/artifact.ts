@@ -14,7 +14,7 @@ export enum ArtifactStatusEnum {
  * Artifact table schema
  */
 export const Artifact = z.object({
-  artifact_id: z.string().uuid(),
+  artifact_id: z.guid(),
   artifact_status: ArtifactStatusZod,
   bucket: z.string().max(200),
   object_key: z.string(),

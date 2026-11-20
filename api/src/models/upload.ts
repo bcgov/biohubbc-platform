@@ -11,7 +11,7 @@ export enum UploadStatusEnum {
 }
 
 export const Upload = z.object({
-  upload_id: z.string().uuid(),
+  upload_id: z.guid(),
   upload_status: UploadStatusZod,
   record_end_date: z.string(),
   s3_upload_id: z.string().nullable(),

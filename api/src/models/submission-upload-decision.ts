@@ -16,7 +16,7 @@ export type UpdateSubmissionUploadDecision = z.infer<typeof UpdateSubmissionUplo
  * queued when an approval is applied.
  */
 export const SubmissionUploadDecisionRow = z.object({
-  submission_upload_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
   decision: SubmissionUploadDecision,
   revision_count: z.number()
 });
@@ -38,7 +38,7 @@ export type SubmissionUploadDecisionResult = z.infer<typeof SubmissionUploadDeci
  */
 export const SubmissionUploadDecisionHistoryRow = z.object({
   submission_id: z.number(),
-  submission_upload_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
   decision: SubmissionUploadDecision,
   record_end_date: z.string().nullable(),
   create_date: z.string()

@@ -1,21 +1,21 @@
 import { z } from 'zod';
 
 export const DataRequestRecord = z.object({
-  data_request_id: z.string().uuid(),
+  data_request_id: z.guid(),
   record_end_date: z.string().nullable()
 });
 
 export type DataRequestRecord = z.infer<typeof DataRequestRecord>;
 
 export const TicketRecord = z.object({
-  ticket_id: z.string().uuid(),
+  ticket_id: z.guid(),
   record_end_date: z.string().nullable()
 });
 
 export type TicketRecord = z.infer<typeof TicketRecord>;
 
 export const SubmissionUploadRecord = z.object({
-  submission_upload_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
   record_end_date: z.string().nullable()
 });
 

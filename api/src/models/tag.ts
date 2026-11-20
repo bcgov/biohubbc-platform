@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const Tag = z.object({
-  tag_id: z.string().uuid(),
+  tag_id: z.guid(),
   name: z.string(),
   description: z.string().nullable(),
   color: z.string(),
@@ -13,14 +13,14 @@ export type Tag = z.infer<typeof Tag>;
  * Minimal tag shape embedded in ticket responses.
  */
 export const TagSummary = z.object({
-  tag_id: z.string().uuid(),
+  tag_id: z.guid(),
   name: z.string(),
   color: z.string()
 });
 export type TagSummary = z.infer<typeof TagSummary>;
 
 export const TagId = z.object({
-  tag_id: z.string().uuid()
+  tag_id: z.guid()
 });
 export type TagId = z.infer<typeof TagId>;
 

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const TicketStatus = z.object({
-  ticket_status_id: z.string().uuid(),
-  ticket_id: z.string().uuid(),
+  ticket_status_id: z.guid(),
+  ticket_id: z.guid(),
   user_identifier: z.string(),
   create_date: z.string(),
   status: z.enum(['open', 'closed'])

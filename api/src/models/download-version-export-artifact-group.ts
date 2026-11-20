@@ -10,8 +10,8 @@ import { DownloadStatusZod } from './download-status';
  * attaches to an already-`ready` group without re-running the pipeline.
  */
 export const DownloadVersionExportArtifactGroupRecord = z.object({
-  download_version_export_artifact_group_id: z.string().uuid(),
-  download_version_id: z.string().uuid(),
+  download_version_export_artifact_group_id: z.guid(),
+  download_version_id: z.guid(),
   // The recipe, re-parsed back from the JSONB column.
   config: ExportConfig,
   // sha256 hex of the canonical config — the active-group dedupe key.

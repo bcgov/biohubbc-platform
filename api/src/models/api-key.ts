@@ -5,7 +5,7 @@ import { z } from 'zod';
  * `key_hash` is included for internal verification only.
  */
 export const ApiKey = z.object({
-  api_key_id: z.string().uuid(),
+  api_key_id: z.guid(),
   system_user_id: z.number(),
   name: z.string(),
   key_prefix: z.string(),

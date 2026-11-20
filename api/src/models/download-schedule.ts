@@ -9,7 +9,7 @@ import { z } from 'zod';
  */
 export const DownloadScheduleRecord = z.object({
   download_schedule_id: z.number(),
-  download_id: z.string().uuid(),
+  download_id: z.guid(),
   cron_expression: z.string(),
   timezone: z.string(),
   next_run_date: z.string().nullable(),
@@ -23,7 +23,7 @@ export type DownloadScheduleRecord = z.infer<typeof DownloadScheduleRecord>;
  */
 export const DownloadScheduleDueRecord = z.object({
   download_schedule_id: z.number(),
-  download_id: z.string().uuid(),
+  download_id: z.guid(),
   cron_expression: z.string(),
   timezone: z.string()
 });
@@ -34,7 +34,7 @@ export type DownloadScheduleDueRecord = z.infer<typeof DownloadScheduleDueRecord
  * expression and timezone before the write — the repository never derives it.
  */
 export const CreateDownloadSchedule = z.object({
-  download_id: z.string().uuid(),
+  download_id: z.guid(),
   cron_expression: z.string(),
   timezone: z.string(),
   next_run_date: z.string()

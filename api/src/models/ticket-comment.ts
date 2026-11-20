@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { TicketArtifact } from './ticket-artifact';
 
 export const TicketComment = z.object({
-  ticket_comment_id: z.string().uuid(),
-  ticket_id: z.string().uuid(),
+  ticket_comment_id: z.guid(),
+  ticket_id: z.guid(),
   user_identifier: z.string(),
   create_date: z.string(),
   comment: z.string(),
@@ -25,15 +25,15 @@ export const UpdateTicketCommentRequest = z.object({
 export type UpdateTicketCommentRequest = z.infer<typeof UpdateTicketCommentRequest>;
 
 export const CreateTicketComment = z.object({
-  ticketId: z.string().uuid(),
+  ticketId: z.guid(),
   comment: z.string().min(1).max(3000)
 });
 
 export type CreateTicketComment = z.infer<typeof CreateTicketComment>;
 
 export const UpdateTicketComment = z.object({
-  ticketId: z.string().uuid(),
-  ticketCommentId: z.string().uuid(),
+  ticketId: z.guid(),
+  ticketCommentId: z.guid(),
   comment: z.string().min(1).max(3000)
 });
 
