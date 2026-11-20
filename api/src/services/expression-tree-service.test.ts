@@ -11,6 +11,7 @@ import {
   NormalizedExpressionTreeClause,
   NormalizedExpressionTreePredicate
 } from '../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { Predicate, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
 import { ExpressionRepository } from '../repositories/expression-repository';
@@ -27,7 +28,7 @@ const normalizePredicateForTest = (predicate: ExpressionTreePredicate): Normaliz
     return {
       ...predicate,
       feature_property_type_id: 4,
-      feature_property_type_name: 'datetime',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.DATETIME,
       internal_predicate: {
         type: 'timestamp',
         operator: predicate.operator,
@@ -40,7 +41,7 @@ const normalizePredicateForTest = (predicate: ExpressionTreePredicate): Normaliz
     return {
       ...predicate,
       feature_property_type_id: 2,
-      feature_property_type_name: 'number',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
       internal_predicate: {
         type: 'number',
         operator: predicate.operator,
@@ -53,7 +54,7 @@ const normalizePredicateForTest = (predicate: ExpressionTreePredicate): Normaliz
     return {
       ...predicate,
       feature_property_type_id: 3,
-      feature_property_type_name: 'boolean',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.BOOLEAN,
       internal_predicate: {
         type: 'boolean',
         operator: predicate.operator,
@@ -65,7 +66,7 @@ const normalizePredicateForTest = (predicate: ExpressionTreePredicate): Normaliz
   return {
     ...predicate,
     feature_property_type_id: 1,
-    feature_property_type_name: 'string',
+    feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING,
     internal_predicate: {
       type: 'string',
       operator: predicate.operator,
