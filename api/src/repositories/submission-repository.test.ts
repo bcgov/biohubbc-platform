@@ -113,7 +113,8 @@ describe('SubmissionRepository', () => {
         name: 'name',
         contributor_id: 1,
         system_user_id: 1,
-        team_id: '11111111-1111-1111-1111-111111111111'
+        team_id: '11111111-1111-1111-1111-111111111111',
+        default_blueprint_id: 1
       });
 
       expect(response.submission_id).to.equal(1);
@@ -672,6 +673,9 @@ describe('SubmissionRepository', () => {
         feature_type_id: 1,
         source_id: 'source-id',
         data: {},
+        content_hash: null,
+        reconciliation: null,
+        successor_submission_feature_id: null,
         parent_submission_feature_id: 1,
         record_effective_date: '2024-01-01',
         record_end_date: null,
