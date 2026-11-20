@@ -110,13 +110,13 @@ describe('getSubmissionUploadReview', () => {
     sinon.stub(connection, 'commit').resolves();
     sinon.stub(connection, 'release').resolves();
 
-    const review = {
+    const review: SubmissionUploadReview = {
       submission_upload_review_id: '22222222-2222-4222-8222-222222222222',
       submission_upload_id: '11111111-1111-4111-8111-111111111111',
       name: 'Validation pass',
       description: 'Check the features',
-      scope: 'validation' as const,
-      status: 'in_progress' as const,
+      scope: SubmissionUploadReviewScope.VALIDATION,
+      status: SubmissionUploadReviewStatus.IN_PROGRESS,
       requested_by: 1
     };
     const getReview = sinon.stub(SubmissionUploadReviewService.prototype, 'getSubmissionUploadReview').resolves(review);

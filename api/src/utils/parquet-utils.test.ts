@@ -1,4 +1,4 @@
-import parquetjs from '@dsnp/parquetjs';
+import * as parquetjs from '@dsnp/parquetjs';
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import fs from 'node:fs/promises';
@@ -1067,7 +1067,16 @@ describe('parquet-utils', () => {
         const schema = buildParquetSchema(properties);
         const writer = await parquetjs.ParquetWriter.openFile(schema, tmpFile);
         await writer.appendRow(
-          featureToRow({ uuid: 'u-1', parent_uuid: null, submission_feature_id: 1, data: featureData }, properties)
+          featureToRow(
+            {
+              uuid: 'u-1',
+              parent_uuid: null,
+              submission_feature_id: 1,
+              feature_type_name: 'observation',
+              data: featureData
+            },
+            properties
+          )
         );
         await writer.close();
 
