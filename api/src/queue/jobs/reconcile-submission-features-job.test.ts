@@ -35,7 +35,8 @@ describe('reconcile-submission-features-job', () => {
       team_id: 'team',
       ticket_id: 'ticket',
       blueprint_id: 1,
-      status: 'ingested'
+      status: 'ingested',
+      decision: 'pending'
     });
     sinon.stub(SubmissionFeatureSecurityService.prototype, 'copySubmissionFeatureSecurityToSuccessors').resolves();
     sinon.stub(SubmissionUploadReconciliationService.prototype, 'analyzeSubmissionFeatures').resolves();

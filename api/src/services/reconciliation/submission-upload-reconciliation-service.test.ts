@@ -19,7 +19,8 @@ describe('SubmissionUploadReconciliationService', () => {
       team_id: '880e8400-e29b-41d4-a716-446655440000',
       ticket_id: '770e8400-e29b-41d4-a716-446655440000',
       blueprint_id: 1,
-      status: 'indexed'
+      status: 'indexed',
+      decision: 'pending'
     });
     sinon.stub(SubmissionService.prototype, 'lockSubmissionFeatureStateForSubmissionId').resolves();
   }

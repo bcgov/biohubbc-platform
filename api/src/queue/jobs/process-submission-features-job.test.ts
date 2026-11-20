@@ -31,8 +31,11 @@ describe('process-submission-features-job', () => {
     submission_upload_id: 'test-sub-upload-id',
     submission_id: 123,
     upload_id: 'test-upload-id',
+    team_id: '44444444-4444-4444-4444-444444444444',
     status: 'uploaded',
-    ticket_id: '11111111-1111-1111-1111-111111111111'
+    decision: 'pending',
+    ticket_id: '11111111-1111-1111-1111-111111111111',
+    blueprint_id: 1
   };
 
   const createMockJob = (data: Partial<SubmissionUpload> = {}, jobId = 'test-job-id') =>

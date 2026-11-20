@@ -116,7 +116,9 @@ describe('SubmissionUploadRepository', () => {
         upload_id: 'upload-id',
         team_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
+        decision: 'pending',
+        ticket_id: '11111111-1111-1111-1111-111111111111',
+        blueprint_id: 1
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
