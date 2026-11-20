@@ -5,6 +5,7 @@
 import { expect } from 'chai';
 import { Knex } from 'knex';
 import { randomUUID } from 'node:crypto';
+import { buffer } from 'node:stream/consumers';
 import { gzipSync } from 'node:zlib';
 import * as tar from 'tar-stream';
 import { defaultPoolConfig, getAPIUserDBConnection, initDBPool } from '../../database/db';
@@ -20,19 +21,16 @@ import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 const TEST_PREFIX = '__integration-test__';
 const SYSTEM_USER_ID = 2; // biohub_api system user
 
-async function createTarBuffer(files: { name: string; content: string }[]): Promise<Buffer> {
+function createTarBuffer(files: { name: string; content: string }[]): Promise<Buffer> {
   const prefix = randomUUID();
-  return new Promise((resolve) => {
-    const pack = tar.pack();
-    const chunks: Buffer[] = [];
-    pack.on('data', (chunk: Buffer) => chunks.push(chunk));
-    pack.on('end', () => resolve(Buffer.concat(chunks)));
-    pack.entry({ name: `${prefix}/`, type: 'directory', size: 0 }, '');
-    for (const file of files) {
-      pack.entry({ name: `${prefix}/${file.name}` }, file.content);
-    }
-    pack.finalize();
-  });
+  const pack = tar.pack();
+  pack.entry({ name: `${prefix}/`, type: 'directory', size: 0 }, '');
+  for (const file of files) {
+    pack.entry({ name: `${prefix}/${file.name}` }, file.content);
+  }
+  pack.finalize();
+
+  return buffer(pack);
 }
 
 async function waitForValidationStatus(

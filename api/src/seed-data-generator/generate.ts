@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { buffer } from 'node:stream/consumers';
 import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
 import { IDBConnection } from '../database/db';
@@ -281,7 +282,6 @@ async function readOrPackTarBuffer(tarPath: string): Promise<Buffer> {
  */
 function packDirectoryToTarBuffer(sourceDir: string): Promise<Buffer> {
   const pack = tar.pack();
-  const chunks: Buffer[] = [];
 
   const scopes = ['features', 'codes', 'files'];
   for (const scope of scopes) {
@@ -298,11 +298,7 @@ function packDirectoryToTarBuffer(sourceDir: string): Promise<Buffer> {
 
   pack.finalize();
 
-  return new Promise((resolve, reject) => {
-    pack.on('data', (chunk: Buffer) => chunks.push(chunk));
-    pack.on('end', () => resolve(Buffer.concat(chunks)));
-    pack.on('error', reject);
-  });
+  return buffer(pack);
 }
 
 /**
