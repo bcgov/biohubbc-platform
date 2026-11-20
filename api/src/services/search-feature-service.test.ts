@@ -13,6 +13,7 @@ import { SubmissionRepository } from '../repositories/submission-repository';
 import { decodeSearchFeatureCursor } from '../utils/pagination';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureService } from './search-feature-service';
+import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 import { SubmissionUploadService } from './upload/submission-upload-service';
 
 chai.use(sinonChai);
@@ -74,9 +75,11 @@ describe('SearchFeatureService', () => {
     });
   });
 
-  const mockFeatures = [
+  const mockFeatures: SearchFeatureResultWithRelevancy[] = [
     {
       submission_feature_id: 1,
+      parent_submission_feature_id: null,
+      provenance: null,
       submission_id: 10,
       uuid: '11111111-1111-1111-1111-111111111111',
       feature_type_id: 1,
@@ -354,6 +357,8 @@ describe('SearchFeatureService', () => {
             : undefined;
           const result = await service.searchFeaturesByExpressionTreeWithMetadata('survey', null, {
             limit: 2,
+            sort: 'relevancy_score',
+            order: 'desc',
             boundary
           });
           expect(search.firstCall.args[2]?.limit).to.equal(3);
