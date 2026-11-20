@@ -49,7 +49,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       submission_upload_id: 'submission-upload-1',
       submission_id: 777,
       upload_id: 'upload-1',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'reconciled',
+      decision: 'pending',
       ticket_id: '11111111-1111-1111-1111-111111111111',
       blueprint_id: 1
     } as const;

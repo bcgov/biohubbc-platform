@@ -6,6 +6,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { Contributor } from '../../models/contributor';
+import { SubmissionUpload } from '../../models/submission-upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ContributorService } from '../contributor-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
@@ -21,12 +22,15 @@ describe('SubmissionIngestionService', () => {
   });
 
   describe('ingestSubmissionUpload', () => {
-    const mockSubmissionUpload = {
+    const mockSubmissionUpload: SubmissionUpload = {
       submission_upload_id: 'sub-upload-uuid-1',
       submission_id: 123,
       upload_id: 'upload-1',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'uploaded' as const,
-      ticket_id: '11111111-1111-1111-1111-111111111111'
+      decision: 'pending',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
     };
 
     const mockUploadArchive: UploadArchive = {

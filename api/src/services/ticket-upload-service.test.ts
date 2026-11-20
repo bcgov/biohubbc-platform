@@ -108,7 +108,7 @@ describe('TicketUploadService', () => {
         artifact_id: artifactId,
         record_end_date: null,
         create_date: '2026-04-29T00:00:00.000Z',
-        key: objectKey
+        object_key: objectKey
       };
 
       sinon.stub(UploadService.prototype, 'getUpload').resolves({

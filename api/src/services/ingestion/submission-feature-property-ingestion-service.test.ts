@@ -27,7 +27,9 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
       submission_id: 1,
       upload_id: '660e8400-e29b-41d4-a716-446655440000',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'indexing',
+      decision: 'pending',
       ticket_id: '770e8400-e29b-41d4-a716-446655440000',
       blueprint_id: 42
     });
@@ -209,7 +211,9 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
       submission_id: 1,
       upload_id: '660e8400-e29b-41d4-a716-446655440000',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'indexing',
+      decision: 'pending',
       ticket_id: '770e8400-e29b-41d4-a716-446655440000',
       blueprint_id: 42
     });
@@ -372,7 +376,9 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
       submission_id: 1,
       upload_id: '660e8400-e29b-41d4-a716-446655440000',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'indexing',
+      decision: 'pending',
       ticket_id: '770e8400-e29b-41d4-a716-446655440000',
       blueprint_id: 42
     });
