@@ -1,7 +1,6 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { initialize } from 'express-openapi';
 import multer from 'multer';
-import { OpenAPIV3 } from 'openapi-types';
 import swaggerUIExperss from 'swagger-ui-express';
 import { getDefaultPoolConfig, initDBPool } from './database/db';
 import { initDBConstants } from './database/db-constants';
@@ -50,7 +49,7 @@ app.use(function (req: Request, res: Response, next: NextFunction) {
 // Initialize express-openapi framework
 const openAPIFramework = initialize({
   apiDoc: {
-    ...(rootAPIDoc as OpenAPIV3.Document), // base open api spec
+    ...rootAPIDoc, // base open api spec
     'x-express-openapi-additional-middleware': getAdditionalMiddleware(),
     'x-express-openapi-validation-strict': true
   },

@@ -1,3 +1,5 @@
+import { OpenAPIV3 } from 'openapi-types';
+
 export const rootAPIDoc = {
   openapi: '3.0.0',
   info: {
@@ -312,4 +314,4 @@ export const rootAPIDoc = {
       }
     }
   }
-};
+} satisfies OpenAPIV3.Document;

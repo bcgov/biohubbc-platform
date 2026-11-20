@@ -1,9 +1,10 @@
 import chai, { expect } from 'chai';
-import { Request, RequestHandler } from 'express';
+import { Request } from 'express';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
+import { getOperationHandler } from '../../__mocks__/operation';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../models/system-user';
 import { GET as history } from '../../paths/submission/{submissionUuid}/history';
@@ -304,7 +305,7 @@ describe('submission route team authorization', () => {
         system_user_id: 12,
         role_names: ['System Administrator']
       } as unknown as SystemUserExtended;
-      await (operation[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(operation, 0)(mockReq, mockRes, mockNext);
       expect(mockNext).to.have.been.calledOnce;
     });
 
@@ -326,7 +327,7 @@ describe('submission route team authorization', () => {
         mockReq.system_user = { system_user_id: 12, role_names: [] } as unknown as SystemUserExtended;
         let failure: unknown;
         try {
-          await (operation[0] as RequestHandler)(mockReq, mockRes, mockNext);
+          await getOperationHandler(operation, 0)(mockReq, mockRes, mockNext);
         } catch (error_) {
           failure = error_;
         }
