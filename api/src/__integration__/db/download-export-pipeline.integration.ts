@@ -13,7 +13,7 @@
 
 import * as parquetjs from '@dsnp/parquetjs';
 import AdmZip from 'adm-zip';
-import archiver from 'archiver';
+import { type Archiver, ZipArchive } from 'archiver';
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
 import { PassThrough, Readable } from 'node:stream';
@@ -191,11 +191,11 @@ function parseCsv(text: string): { header: string[]; rows: string[][] } {
  * into a no-op S3 sink.
  */
 function buildArchiverBundle(): {
-  archive: archiver.Archiver;
+  archive: Archiver;
   uploadPromise: Promise<void>;
   hashCount: ReturnType<typeof createHashCountStream>;
 } {
-  const archive = archiver('zip', { zlib: { level: 5 } });
+  const archive = new ZipArchive({ zlib: { level: 5 } });
   const passThrough = new PassThrough();
   const hashCount = createHashCountStream();
 
