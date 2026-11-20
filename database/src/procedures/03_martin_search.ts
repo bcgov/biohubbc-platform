@@ -182,7 +182,8 @@ export async function seed(knex: Knex): Promise<void> {
     COST 100000
     AS $fn$
     DECLARE
-      v_p record;
+      v_p            record;
+      v_evidence_ids integer[];
     BEGIN
       -- The predicate anchor plus whichever typed payload row it carries (exactly one exists).
       -- A missing or end-dated predicate fails closed: the candidate does not match.
@@ -231,6 +232,30 @@ export async function seed(knex: Knex): Promise<void> {
         RETURN false;
       END IF;
 
+      -- The features whose values can count as evidence for this anchor: the anchor itself, and the
+      -- features of other types it reaches through the closure in either direction. Collecting them
+      -- once lets each typed branch read its value rows through the presence index on
+      -- (submission_feature_id, ...), so the cost of a call follows the anchor's relatives rather than
+      -- how many rows the property holds across every submission.
+      v_evidence_ids := ARRAY(
+        SELECT sf.submission_feature_id
+        FROM biohub.submission_feature sf
+        WHERE sf.submission_feature_id = p_anchor_id
+          AND sf.feature_type_id = p_anchor_feature_type_id
+        UNION ALL
+        SELECT sf.submission_feature_id
+        FROM biohub.submission_feature_closure cf
+        JOIN biohub.submission_feature sf ON sf.submission_feature_id = cf.target_submission_feature_id
+        WHERE cf.source_submission_feature_id = p_anchor_id
+          AND sf.feature_type_id <> p_anchor_feature_type_id
+        UNION ALL
+        SELECT sf.submission_feature_id
+        FROM biohub.submission_feature_closure cr
+        JOIN biohub.submission_feature sf ON sf.submission_feature_id = cr.source_submission_feature_id
+        WHERE cr.target_submission_feature_id = p_anchor_id
+          AND sf.feature_type_id <> p_anchor_feature_type_id
+      );
+
       IF v_p.string_id IS NOT NULL THEN
         IF v_p.string_op = 'NotEquals' THEN
           RETURN EXISTS (
@@ -241,24 +266,7 @@ export async function seed(knex: Knex): Promise<void> {
             JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND (
-                (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-                OR (
-                  esf.feature_type_id <> p_anchor_feature_type_id
-                  AND (
-                    EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cf
-                      WHERE cf.source_submission_feature_id = p_anchor_id
-                        AND cf.target_submission_feature_id = esf.submission_feature_id
-                    )
-                    OR EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cr
-                      WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                        AND cr.target_submission_feature_id = p_anchor_id
-                    )
-                  )
-                )
-              )
+              AND pv.submission_feature_id = ANY(v_evidence_ids)
               AND NOT EXISTS (
                 SELECT 1
                 FROM biohub.submission_feature_property_string pne
@@ -288,24 +296,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.string_op = 'Equals' AND pv.value = v_p.string_value)
               OR (v_p.string_op = 'Like' AND pv.value LIKE v_p.string_value)
@@ -328,24 +319,7 @@ export async function seed(knex: Knex): Promise<void> {
             JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND (
-                (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-                OR (
-                  esf.feature_type_id <> p_anchor_feature_type_id
-                  AND (
-                    EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cf
-                      WHERE cf.source_submission_feature_id = p_anchor_id
-                        AND cf.target_submission_feature_id = esf.submission_feature_id
-                    )
-                    OR EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cr
-                      WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                        AND cr.target_submission_feature_id = p_anchor_id
-                    )
-                  )
-                )
-              )
+              AND pv.submission_feature_id = ANY(v_evidence_ids)
               AND NOT EXISTS (
                 SELECT 1
                 FROM biohub.submission_feature_property_paragraph pne
@@ -375,24 +349,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.paragraph_op = 'Equals' AND pv.value = v_p.paragraph_value)
               OR (v_p.paragraph_op = 'Like' AND pv.value LIKE v_p.paragraph_value)
@@ -415,24 +372,7 @@ export async function seed(knex: Knex): Promise<void> {
             JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND (
-                (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-                OR (
-                  esf.feature_type_id <> p_anchor_feature_type_id
-                  AND (
-                    EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cf
-                      WHERE cf.source_submission_feature_id = p_anchor_id
-                        AND cf.target_submission_feature_id = esf.submission_feature_id
-                    )
-                    OR EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cr
-                      WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                        AND cr.target_submission_feature_id = p_anchor_id
-                    )
-                  )
-                )
-              )
+              AND pv.submission_feature_id = ANY(v_evidence_ids)
               AND NOT EXISTS (
                 SELECT 1
                 FROM biohub.submission_feature_property_number pne
@@ -462,24 +402,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.number_op = 'Equals' AND pv.value = v_p.number_value)
               OR (v_p.number_op = 'GreaterThan' AND pv.value > v_p.number_value)
@@ -501,24 +424,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.boolean_op = 'Equals' AND pv.value = v_p.boolean_value)
               OR (v_p.boolean_op = 'Exists' AND pv.value IS NOT NULL)
@@ -536,24 +442,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.ts_op = 'Exists' AND (pv.date_value IS NOT NULL OR pv.time_value IS NOT NULL))
               OR (v_p.ts_op = 'OnDate' AND pv.date_value = v_p.ts_date_value)
@@ -595,24 +484,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.taxon tx ON tx.taxon_id = pv.taxon_id AND tx.record_end_date IS NULL
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.taxon_op = 'Equals' AND pv.taxon_id = v_p.taxon_value)
               OR (v_p.taxon_op = 'Exists' AND pv.taxon_id IS NOT NULL)
@@ -682,24 +554,7 @@ export async function seed(knex: Knex): Promise<void> {
           JOIN biohub.blueprint_feature_type_property bftp ON bftp.blueprint_feature_type_property_id = pv.blueprint_feature_type_property_id
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.geometry_op = 'Within' AND public.ST_Within(pv.value, public.ST_Force2D(v_p.geometry_value)))
               OR (v_p.geometry_op = 'Intersects' AND public.ST_Intersects(pv.value, public.ST_Force2D(v_p.geometry_value)))
@@ -724,24 +579,7 @@ export async function seed(knex: Knex): Promise<void> {
               AND cs.record_end_date IS NULL
             WHERE bftp.feature_property_id = v_p.fp_id
               AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-              AND (
-                (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-                OR (
-                  esf.feature_type_id <> p_anchor_feature_type_id
-                  AND (
-                    EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cf
-                      WHERE cf.source_submission_feature_id = p_anchor_id
-                        AND cf.target_submission_feature_id = esf.submission_feature_id
-                    )
-                    OR EXISTS (
-                      SELECT 1 FROM biohub.submission_feature_closure cr
-                      WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                        AND cr.target_submission_feature_id = p_anchor_id
-                    )
-                  )
-                )
-              )
+              AND pv.submission_feature_id = ANY(v_evidence_ids)
               AND NOT EXISTS (
                 SELECT 1
                 FROM biohub.submission_feature_property_code pne
@@ -775,24 +613,7 @@ export async function seed(knex: Knex): Promise<void> {
             AND cs.record_end_date IS NULL
           WHERE bftp.feature_property_id = v_p.fp_id
             AND (v_p.bftp_id IS NULL OR pv.blueprint_feature_type_property_id = v_p.bftp_id)
-            AND (
-              (esf.feature_type_id = p_anchor_feature_type_id AND esf.submission_feature_id = p_anchor_id)
-              OR (
-                esf.feature_type_id <> p_anchor_feature_type_id
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cf
-                    WHERE cf.source_submission_feature_id = p_anchor_id
-                      AND cf.target_submission_feature_id = esf.submission_feature_id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM biohub.submission_feature_closure cr
-                    WHERE cr.source_submission_feature_id = esf.submission_feature_id
-                      AND cr.target_submission_feature_id = p_anchor_id
-                  )
-                )
-              )
-            )
+            AND pv.submission_feature_id = ANY(v_evidence_ids)
             AND (
               (v_p.code_op = 'Equals' AND pv.contributor_codeset_code_id = v_p.code_value)
               OR (v_p.code_op = 'Exists' AND pv.contributor_codeset_code_id IS NOT NULL)
