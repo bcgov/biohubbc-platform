@@ -4,7 +4,7 @@ import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { createMockExportArtifactGroup } from '../../__mocks__/download';
+import { createMockDownloadVersionStatusRecord, createMockExportArtifactGroup } from '../../__mocks__/download';
 import { DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS } from '../../constants/download';
 import { ApiConflictError } from '../../errors/api-error';
 import { MergeStep, OutputColumn } from '../../models/download-export-config';
@@ -288,9 +288,13 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup({ download_version_id: DOWNLOAD_VERSION_ID }));
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
-        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
+        createMockDownloadVersionStatusRecord({
+          download_version_id: DOWNLOAD_VERSION_ID,
+          download_id: DOWNLOAD_ID,
+          status: DownloadStatusEnum.READY
+        })
+      );
       sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: Stub the transition + the streaming seams so no real S3/archiver runs
@@ -333,9 +337,13 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
-        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
+        createMockDownloadVersionStatusRecord({
+          download_version_id: DOWNLOAD_VERSION_ID,
+          download_id: DOWNLOAD_ID,
+          status: DownloadStatusEnum.READY
+        })
+      );
       sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: Discovery returns no feature types
@@ -369,9 +377,13 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
-        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
+        createMockDownloadVersionStatusRecord({
+          download_version_id: DOWNLOAD_VERSION_ID,
+          download_id: DOWNLOAD_ID,
+          status: DownloadStatusEnum.READY
+        })
+      );
       sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: One feature type discovered, but the writer reports zero chunks written
@@ -406,9 +418,13 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
-        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
+        createMockDownloadVersionStatusRecord({
+          download_version_id: DOWNLOAD_VERSION_ID,
+          download_id: DOWNLOAD_ID,
+          status: DownloadStatusEnum.READY
+        })
+      );
       sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
 
       // Step 2: The writer rejects
@@ -900,6 +916,7 @@ describe('DownloadExportPipelineService', () => {
       await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties: twoColProps,
         maxPartSizeBytes: 1_000_000n,
@@ -939,6 +956,7 @@ describe('DownloadExportPipelineService', () => {
       await service.writeFeatureTypeExport({
         groupId: GROUP_ID,
         downloadId: DOWNLOAD_ID,
+        downloadVersionId: DOWNLOAD_VERSION_ID,
         featureTypeName: 'observation',
         properties: twoColProps,
         maxPartSizeBytes: 1_000_000n,
@@ -1163,9 +1181,13 @@ describe('DownloadExportPipelineService', () => {
           }
         })
       );
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
-        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
+        createMockDownloadVersionStatusRecord({
+          download_version_id: DOWNLOAD_VERSION_ID,
+          download_id: DOWNLOAD_ID,
+          status: DownloadStatusEnum.READY
+        })
+      );
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
       sinon
         .stub(DownloadExportPipelineService.prototype, 'readSchemaLookup')
@@ -1206,9 +1228,13 @@ describe('DownloadExportPipelineService', () => {
       sinon
         .stub(DownloadVersionExportRepository.prototype, 'getExportArtifactGroupById')
         .resolves(createMockExportArtifactGroup());
-      sinon
-        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
-        .resolves({ download_version_id: DOWNLOAD_VERSION_ID, download_id: DOWNLOAD_ID });
+      sinon.stub(DownloadVersionRepository.prototype, 'getDownloadVersion').resolves(
+        createMockDownloadVersionStatusRecord({
+          download_version_id: DOWNLOAD_VERSION_ID,
+          download_id: DOWNLOAD_ID,
+          status: DownloadStatusEnum.READY
+        })
+      );
       sinon.stub(DownloadExportPipelineService.prototype, 'readSchemaLookup').resolves(observationSchemaLookup);
       sinon.stub(DownloadExportPipelineService.prototype, 'transitionGroupStatus').resolves();
       sinon.stub(DownloadExportPipelineService.prototype, 'listExportFeatureTypes').resolves(['observation']);
