@@ -10,7 +10,7 @@ import { SubmissionUploadJobStatus } from './submission-upload';
  */
 export const SubmissionUploadProcessingStatus = z.object({
   submission_upload_status_id: z.number(),
-  submission_upload_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
   status: SubmissionUploadJobStatus,
   record_end_date: z.string().nullable(),
   create_date: z.string()
@@ -26,13 +26,13 @@ export type SubmissionUploadProcessingStatus = z.infer<typeof SubmissionUploadPr
  */
 export const SubmissionUploadProcessingStatusHistoryRow = z.union([
   z.object({
-    submission_upload_id: z.string().uuid(),
+    submission_upload_id: z.guid(),
     submission_upload_status_id: z.number(),
     status: SubmissionUploadJobStatus,
     create_date: z.string()
   }),
   z.object({
-    submission_upload_id: z.string().uuid(),
+    submission_upload_id: z.guid(),
     submission_upload_status_id: z.null(),
     status: z.null(),
     create_date: z.null()

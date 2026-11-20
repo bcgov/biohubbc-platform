@@ -154,7 +154,7 @@ export class UploadArtifactRepository extends BaseRepository {
       RETURNING upload_artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ upload_artifact_id: z.string().uuid() }));
+    const response = await this.connection.sql(sqlStatement, z.object({ upload_artifact_id: z.guid() }));
 
     if (response.rowCount !== uploadArtifacts.length) {
       throw new ApiExecuteSQLError('Failed to insert upload artifact records', [

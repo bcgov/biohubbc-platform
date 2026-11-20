@@ -3,12 +3,12 @@ import { ExpressionTree } from './expression-tree';
 import { NormalizedExpressionTree } from './expression-tree-internal';
 
 export const TagRule = z.object({
-  tag_rule_id: z.string().uuid(),
-  tag_id: z.string().uuid(),
+  tag_rule_id: z.guid(),
+  tag_id: z.guid(),
   name: z.string(),
   description: z.string().nullable(),
   is_enabled: z.boolean(),
-  expression_id: z.string().uuid(),
+  expression_id: z.guid(),
   create_date: z.string()
 });
 export type TagRule = z.infer<typeof TagRule>;
@@ -43,7 +43,7 @@ export interface TagRulePayload {
  */
 export const TicketSubmissionUploadScope = z.object({
   submission_id: z.number(),
-  submission_upload_id: z.string().uuid()
+  submission_upload_id: z.guid()
 });
 export type TicketSubmissionUploadScope = z.infer<typeof TicketSubmissionUploadScope>;
 
@@ -56,7 +56,7 @@ export interface RuleTicketTag {
 }
 
 export const TagRuleId = z.object({
-  tag_rule_id: z.string().uuid()
+  tag_rule_id: z.guid()
 });
 export type TagRuleId = z.infer<typeof TagRuleId>;
 

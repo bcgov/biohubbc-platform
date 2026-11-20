@@ -28,7 +28,9 @@ describe('pagination', () => {
     it('should reject a decoded cursor that does not match the cursor schema', () => {
       const cursor = Buffer.from(JSON.stringify({ direction: 'unsupported' })).toString('base64url');
 
-      expect(() => decodeSearchFeatureCursor(cursor)).to.throw(ZodError);
+      expect(() => decodeSearchFeatureCursor(cursor))
+        .to.throw(Error, /Invalid option: expected one of \W*next\W*previous/)
+        .that.is.instanceOf(ZodError);
     });
   });
 

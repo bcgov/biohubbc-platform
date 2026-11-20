@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const ExpressionClause = z.object({
-  expression_clause_id: z.string().uuid(),
-  expression_id: z.string().uuid(),
+  expression_clause_id: z.guid(),
+  expression_id: z.guid(),
   sequence: z.number().int().positive(),
-  predicate_id: z.string().uuid().nullable(),
-  child_expression_id: z.string().uuid().nullable()
+  predicate_id: z.guid().nullable(),
+  child_expression_id: z.guid().nullable()
 });
 
 export const CreateExpressionClause = ExpressionClause.pick({

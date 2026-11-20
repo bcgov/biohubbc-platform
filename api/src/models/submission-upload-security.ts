@@ -10,11 +10,11 @@ export type SubmissionUploadSecurityStatus = z.infer<typeof SubmissionUploadSecu
  */
 export const SubmissionUploadSecurityRecord = z.object({
   submission_upload_security_id: z.number(),
-  submission_upload_id: z.string().uuid(),
-  submission_upload_review_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
+  submission_upload_review_id: z.guid(),
   job_id: z.string().nullable(),
   status: SubmissionUploadSecurityStatus,
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   started_at: z.string().nullable(),
   ended_at: z.string().nullable()
 });

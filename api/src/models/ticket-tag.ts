@@ -5,7 +5,7 @@ import { TagSummary } from './tag';
  * A ticket's active tag, with the rule that applied it. Rule-applied tags are ordinary tags that admins can remove.
  */
 export const TicketTagSummary = TagSummary.extend({
-  tag_rule_id: z.string().uuid().nullable(),
+  tag_rule_id: z.guid().nullable(),
   tag_rule_name: z.string().nullable()
 });
 export type TicketTagSummary = z.infer<typeof TicketTagSummary>;
@@ -18,8 +18,8 @@ export type TicketTagEventAction = z.infer<typeof TicketTagEventAction>;
  * Admin timeline only; never returned by portal endpoints.
  */
 export const TicketTagEvent = z.object({
-  ticket_tag_id: z.string().uuid(),
-  tag_id: z.string().uuid(),
+  ticket_tag_id: z.guid(),
+  tag_id: z.guid(),
   tag_name: z.string(),
   tag_color: z.string(),
   action: TicketTagEventAction,

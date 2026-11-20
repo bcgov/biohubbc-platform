@@ -185,7 +185,7 @@ describe('bc-basemap-protocol', () => {
       // The pixels are compared by reference: this is the very bitmap the handler decoded, and deep-comparing a
       // tile's worth of them costs far more than the assertion is worth.
       expect(response.data).toMatchObject({ width: TILE_SIZE, height: TILE_SIZE });
-      expect(response.data.pixels).toBe(pixels);
+      expect((response.data as IFakeBitmap).pixels).toBe(pixels);
       expect(findBcTileClassification('11/323/700')).toBe('content');
     });
 

@@ -16,6 +16,7 @@ import {
   MediaUploadContext,
   StreamSubmissionArchiveOptions,
   TarEntryHeader,
+  TarEntryStream,
   TarNext,
   UploadMediaEntryOptions
 } from './biohub-tar-parser.interface';
@@ -38,7 +39,7 @@ import { getLogger } from './logger';
 const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   id: z.string().min(1, 'Feature entry is missing required string field: id'),
   type: z.string().min(1, 'Feature entry is missing required string field: type'),
-  properties: z.record(z.unknown()),
+  properties: z.record(z.string(), z.unknown()),
   content: z.array(z.string()),
   parent: z.string().nullable(),
   universal_id: z.string().min(1).max(200).optional()
@@ -46,9 +47,34 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
 const defaultLog = getLogger('utils/biohub-tar-parser');
 
 /**
+ * Convert one chunk of a tar entry stream to a Buffer.
+ *
+ * tar-stream types entry chunks as `unknown`. In Node they arrive as Buffers; a string or other byte array is copied.
+ *
+ * @param {unknown} chunk - One `data` chunk from a tar entry stream.
+ * @returns {Buffer} The chunk's bytes.
+ * @throws {TypeError} When the chunk is not bytes or a string.
+ */
+function chunkToBuffer(chunk: unknown): Buffer {
+  if (Buffer.isBuffer(chunk)) {
+    return chunk;
+  }
+
+  if (typeof chunk === 'string') {
+    return Buffer.from(chunk);
+  }
+
+  if (chunk instanceof Uint8Array) {
+    return Buffer.from(chunk);
+  }
+
+  throw new TypeError(`Unexpected tar entry chunk type: ${typeof chunk}`);
+}
+
+/**
  * Collect all bytes from a readable stream with a strict max byte cap.
  *
- * @param {Readable} stream - Source stream to buffer.
+ * @param {TarEntryStream} stream - Source stream to buffer.
  * @param {number} maxBytes - Maximum bytes allowed before rejecting.
  * @param {string} entryName - Entry name used for stable error context.
  * @param {number} [expectedBytes] - Optional tar header size; when provided, a fixed
@@ -56,7 +82,7 @@ const defaultLog = getLogger('utils/biohub-tar-parser');
  * @returns {Promise<Buffer>} Buffer containing all chunks from `stream`.
  */
 function streamToBuffer(
-  stream: Readable,
+  stream: TarEntryStream,
   maxBytes: number,
   entryName: string,
   expectedBytes?: number
@@ -82,8 +108,8 @@ function streamToBuffer(
       reject(error);
     };
 
-    stream.on('data', (chunk: Buffer | string) => {
-      const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    stream.on('data', (chunk: unknown) => {
+      const chunkBuffer = chunkToBuffer(chunk);
       totalBytes += chunkBuffer.byteLength;
 
       if (totalBytes > maxBytes) {
@@ -154,13 +180,13 @@ function assertEntrySizeWithinLimit(entrySizeBytes: number | undefined, entryNam
  * - header-level check (`entrySizeBytes`) when available
  * - streamed-byte check during buffering
  *
- * @param {Readable} stream - Tar entry stream.
+ * @param {TarEntryStream} stream - Tar entry stream.
  * @param {string} entryName - Entry name used for stable error context.
  * @param {number} entrySizeBytes - Tar header declared byte size.
  * @returns {Promise<{ parsed: unknown; byteLength: number }>} Parsed payload and buffered byte length.
  */
 async function parseJsonArchiveEntry(
-  stream: Readable,
+  stream: TarEntryStream,
   entryName: string,
   entrySizeBytes?: number
 ): Promise<{ parsed: unknown; byteLength: number }> {
@@ -195,10 +221,10 @@ function normalizeEntryName(entryName: string): string {
  *
  * Used for tar entries we intentionally skip so the extractor can continue.
  *
- * @param {Readable} stream - Source stream to consume.
+ * @param {TarEntryStream} stream - Source stream to consume.
  * @returns {Promise<void>}
  */
-function drainStream(stream: Readable): Promise<void> {
+function drainStream(stream: TarEntryStream): Promise<void> {
   return new Promise((resolve, reject) => {
     stream.on('end', resolve);
     stream.on('error', reject);
@@ -340,13 +366,13 @@ function createChecksumTransform(checksum: ReturnType<typeof createHash>): Trans
 /**
  * Upload a single media entry to object storage while computing checksum metadata.
  *
- * @param {Readable} stream - Tar entry stream.
+ * @param {TarEntryStream} stream - Tar entry stream.
  * @param {MediaUploadContext} context - Derived upload and metadata fields.
  * @param {UploadMediaEntryOptions} options - Storage dependency and post-upload callbacks.
  * @returns {Promise<void>}
  */
 async function uploadMediaEntry(
-  stream: Readable,
+  stream: TarEntryStream,
   context: MediaUploadContext,
   options: UploadMediaEntryOptions
 ): Promise<void> {
@@ -400,7 +426,7 @@ async function uploadMediaEntry(
  * - Returns `true` once the entry has been fully consumed and processed.
  *
  * @param {TarEntryHeader} header Tar entry header.
- * @param {Readable} stream Tar entry data stream.
+ * @param {TarEntryStream} stream Tar entry data stream.
  * @param {{
  *   ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
  * }} options
@@ -409,7 +435,7 @@ async function uploadMediaEntry(
  */
 async function processFeatureArchiveEntry(
   header: TarEntryHeader,
-  stream: Readable,
+  stream: TarEntryStream,
   options: {
     ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
   }
@@ -440,7 +466,7 @@ async function processFeatureArchiveEntry(
  * - Persists via `ingestCodesets` and increments caller-owned counters.
  *
  * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
- * @param {Readable} stream Tar entry data stream.
+ * @param {TarEntryStream} stream Tar entry data stream.
  * @param {{
  *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
  *   onCodesetFileParsed: () => void;
@@ -449,7 +475,7 @@ async function processFeatureArchiveEntry(
  */
 async function processCodesArchiveEntry(
   header: TarEntryHeader,
-  stream: Readable,
+  stream: TarEntryStream,
   options: {
     ingestCodesets: (codesets: TarCodesets) => Promise<void>;
     onCodesetFileParsed: () => void;
@@ -468,6 +494,23 @@ async function processCodesArchiveEntry(
 }
 
 /**
+ * Read the archive path a GNU sparse entry records in its PAX headers, in place of the internal name its tar header
+ * carries.
+ *
+ * @param {unknown} pax - PAX extended header records of a tar entry, as the archive wrote them.
+ * @returns {string | undefined} The `GNU.sparse.name` record when it is a string, otherwise undefined.
+ */
+function findGnuSparseName(pax: unknown): string | undefined {
+  if (typeof pax !== 'object' || pax === null || !('GNU.sparse.name' in pax)) {
+    return undefined;
+  }
+
+  const sparseName = pax['GNU.sparse.name'];
+
+  return typeof sparseName === 'string' ? sparseName : undefined;
+}
+
+/**
  * Attempt to process one `files/*` media entry with bounded concurrency.
  *
  * Behavior:
@@ -478,7 +521,7 @@ async function processCodesArchiveEntry(
  *   configured concurrency ceiling.
  *
  * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
- * @param {Readable} stream Tar entry data stream.
+ * @param {TarEntryStream} stream Tar entry data stream.
  * @param {(err: unknown) => void} reject Error callback for async upload failures.
  * @param {{
  *   objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
@@ -492,7 +535,7 @@ async function processCodesArchiveEntry(
  */
 async function processConcurrentMediaArchiveEntry(
   header: TarEntryHeader,
-  stream: Readable,
+  stream: TarEntryStream,
   reject: (err: unknown) => void,
   options: {
     objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
@@ -504,7 +547,7 @@ async function processConcurrentMediaArchiveEntry(
   }
 ): Promise<boolean> {
   // GNU sparse entries may expose an internal header name while preserving the archive path in PAX metadata.
-  const entryName = header.pax?.['GNU.sparse.name'] || header.name || '';
+  const entryName = findGnuSparseName(header.pax) || header.name || '';
   const resolvedMediaEntryName = resolveScopedEntryName(entryName, 'files');
   if (!(resolvedMediaEntryName && header.type === 'file')) {
     return false;
@@ -540,7 +583,7 @@ async function processConcurrentMediaArchiveEntry(
  * This function is responsible for always calling `next()` exactly once per entry.
  *
  * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
- * @param {Readable} stream Tar entry data stream.
+ * @param {TarEntryStream} stream Tar entry data stream.
  * @param {TarNext} next Tar continuation callback.
  * @param {(err: unknown) => void} reject Error callback for asynchronous failures.
  * @param {{
@@ -558,7 +601,7 @@ async function processConcurrentMediaArchiveEntry(
  */
 async function processSubmissionArchiveEntry(
   header: TarEntryHeader,
-  stream: Readable,
+  stream: TarEntryStream,
   next: TarNext,
   reject: (err: unknown) => void,
   options: {

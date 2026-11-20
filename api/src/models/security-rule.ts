@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const SecurityRuleRecord = z.object({
   security_rule_id: z.number(),
-  policy_id: z.string().uuid().nullable(),
+  policy_id: z.guid().nullable(),
   name: z.string(),
   description: z.string(),
   is_active: z.boolean(),
@@ -22,14 +22,14 @@ export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
  * expression to evaluate, so screening skips it.
  */
 export const SecurityRuleWithExpressions = SecurityRuleRecord.pick({ security_rule_id: true, name: true }).extend({
-  expression_ids: z.array(z.string().uuid())
+  expression_ids: z.array(z.guid())
 });
 
 export type SecurityRuleWithExpressions = z.infer<typeof SecurityRuleWithExpressions>;
 
 export const SecurityRuleAndCategory = z.object({
   security_rule_id: z.number(),
-  policy_id: z.string().uuid().nullable(),
+  policy_id: z.guid().nullable(),
   name: z.string(),
   description: z.string().nullable(),
   is_active: z.boolean(),

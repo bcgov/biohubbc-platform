@@ -3,12 +3,12 @@ import { ExpressionTree } from './expression-tree';
 import { PolicyStatus } from './policy';
 
 export const DataRequest = z.object({
-  data_request_id: z.string().uuid(),
+  data_request_id: z.guid(),
   reason: z.string(),
-  team_id: z.string().uuid(),
+  team_id: z.guid(),
   requested_by: z.number(),
-  ticket_id: z.string().uuid(),
-  policy_id: z.string().uuid(),
+  ticket_id: z.guid(),
+  policy_id: z.guid(),
   create_date: z.string(),
   // Status is derived from joined policy.status (not persisted on data_request).
   status: PolicyStatus
@@ -19,20 +19,20 @@ export const DataRequestFilters = z.object({
   date_from: z.string().optional(),
   date_to: z.string().optional(),
   requested_by: z.number().int().optional(),
-  team_id: z.string().uuid().optional(),
+  team_id: z.guid().optional(),
   status: PolicyStatus.optional()
 });
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
 
 export const DataRequestListItem = z.object({
-  data_request_id: z.string().uuid(),
+  data_request_id: z.guid(),
   reason: z.string(),
   status: PolicyStatus,
   create_date: z.string(),
   requested_by: z.number(),
   requested_by_name: z.string().nullable(),
-  ticket_id: z.string().uuid(),
-  policy_id: z.string().uuid()
+  ticket_id: z.guid(),
+  policy_id: z.guid()
 });
 export type DataRequestListItem = z.infer<typeof DataRequestListItem>;
 
@@ -62,9 +62,9 @@ export interface DataRequestFeatureType {
 export const CreateDataRequest = z.object({
   requested_by: z.number().int(),
   reason: z.string(),
-  ticket_id: z.string().uuid(),
-  team_id: z.string().uuid(),
-  policy_id: z.string().uuid()
+  ticket_id: z.guid(),
+  team_id: z.guid(),
+  policy_id: z.guid()
 });
 export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
 

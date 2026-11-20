@@ -294,7 +294,7 @@ export class ArtifactRepository extends BaseRepository {
       RETURNING a.artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.guid() }));
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update artifact record', [
@@ -342,7 +342,7 @@ export class ArtifactRepository extends BaseRepository {
       RETURNING a.artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.guid() }));
 
     if (response.rowCount !== artifacts.length) {
       throw new ApiExecuteSQLError('Failed to update artifact records', [
@@ -368,7 +368,7 @@ export class ArtifactRepository extends BaseRepository {
       RETURNING artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.guid() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to delete artifact record', [

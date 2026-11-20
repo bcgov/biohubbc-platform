@@ -1,5 +1,5 @@
 import { ParquetReader } from '@dsnp/parquetjs';
-import archiver from 'archiver';
+import { type Archiver, ZipArchive } from 'archiver';
 import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { DOWNLOAD_EXPORT_DIMENSION_MAX_ROWS } from '../../constants/download';
@@ -67,7 +67,7 @@ export interface FileFeatureRef {
  * blows past `max_part_size_bytes`.
  */
 export interface PartArchiverBundle {
-  archive: archiver.Archiver;
+  archive: Archiver;
   uploadPromise: Promise<void>;
   passThrough: PassThrough;
   hashCount: ReturnType<typeof createHashCountStream>;
@@ -559,7 +559,7 @@ export class DownloadExportPipelineService extends DBService {
     downloadId: string;
     downloadVersionId: string;
     partIndex: number;
-    archive: archiver.Archiver;
+    archive: Archiver;
     uploadPromise: Promise<void>;
     hashCount: ReturnType<typeof createHashCountStream>;
   }): Promise<{ artifactId: string; byteCount: number }> {
@@ -1103,7 +1103,7 @@ export class DownloadExportPipelineService extends DBService {
     downloadVersionId: string,
     partIndex: number
   ): PartArchiverBundle {
-    const archive = archiver('zip', { zlib: { level: 5 } });
+    const archive = new ZipArchive({ zlib: { level: 5 } });
     const passThrough = new PassThrough();
     const hashCount = createHashCountStream();
 
@@ -1406,7 +1406,7 @@ export class DownloadExportPipelineService extends DBService {
    * `DownloadPipelineService.streamFilesToArchive`.
    */
   private async appendBinaryToArchive(
-    archive: archiver.Archiver,
+    archive: Archiver,
     objectStorageService: ObjectStorageService,
     filePath: string,
     entryName: string

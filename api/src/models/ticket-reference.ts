@@ -13,11 +13,11 @@ export const TicketRelationshipType = z.enum([
 export type TicketRelationshipType = z.infer<typeof TicketRelationshipType>;
 
 export const TicketReference = z.object({
-  ticket_reference_id: z.string().uuid(),
-  source_ticket_id: z.string().uuid(),
+  ticket_reference_id: z.guid(),
+  source_ticket_id: z.guid(),
   source_ticket_slug: z.string().regex(/^\d{8}$/),
   source_ticket_subject: z.string(),
-  target_ticket_id: z.string().uuid(),
+  target_ticket_id: z.guid(),
   target_ticket_slug: z.string().regex(/^\d{8}$/),
   target_ticket_subject: z.string(),
   relationship: TicketRelationshipType,
@@ -28,8 +28,8 @@ export const TicketReference = z.object({
 export type TicketReference = z.infer<typeof TicketReference>;
 
 export const CreateTicketReference = z.object({
-  source_ticket_id: z.string().uuid(),
-  target_ticket_id: z.string().uuid(),
+  source_ticket_id: z.guid(),
+  target_ticket_id: z.guid(),
   relationship: TicketRelationshipType
 });
 
@@ -38,7 +38,7 @@ export type CreateTicketReference = z.infer<typeof CreateTicketReference>;
 export const CreateTicketReferenceRequest = z.object({
   references: z.array(
     z.object({
-      target_ticket_id: z.string().uuid(),
+      target_ticket_id: z.guid(),
       relationship: TicketRelationshipType
     })
   )
@@ -47,7 +47,7 @@ export const CreateTicketReferenceRequest = z.object({
 export type CreateTicketReferenceRequest = z.infer<typeof CreateTicketReferenceRequest>;
 
 export const CreateTicketReferenceRequestItem = z.object({
-  target_ticket_id: z.string().uuid(),
+  target_ticket_id: z.guid(),
   relationship: TicketRelationshipType
 });
 

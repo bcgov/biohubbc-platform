@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { PassThrough, Readable } from 'node:stream';
+import { buffer } from 'node:stream/consumers';
 import { gzipSync } from 'node:zlib';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
@@ -11,30 +12,26 @@ import { streamSubmissionArchive } from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
-async function createTestTar(files: { name: string; content: string | Buffer }[]): Promise<Buffer> {
+function createTestTar(files: { name: string; content: string | Buffer }[]): Promise<Buffer> {
   const prefix = randomUUID();
+  const pack = tar.pack();
+  pack.entry({ name: `${prefix}/`, type: 'directory', size: 0 }, '');
 
-  return new Promise((resolve) => {
-    const pack = tar.pack();
-    const chunks: Buffer[] = [];
-    pack.on('data', (chunk: Buffer) => chunks.push(chunk));
-    pack.on('end', () => resolve(Buffer.concat(chunks)));
-    pack.entry({ name: `${prefix}/`, type: 'directory', size: 0 }, '');
+  for (const file of files) {
+    pack.entry({ name: `${prefix}/${file.name}`, size: Buffer.byteLength(file.content) }, file.content);
+  }
 
-    for (const file of files) {
-      pack.entry({ name: `${prefix}/${file.name}`, size: Buffer.byteLength(file.content) }, file.content);
-    }
+  pack.finalize();
 
-    pack.finalize();
-  });
+  return buffer(pack);
 }
 
-async function createTarWithSparseMediaEntry(): Promise<Buffer> {
-  return new Promise((resolve) => {
-    const pack = tar.pack();
-    const chunks: Buffer[] = [];
-    const content = Buffer.from('jpeg-data');
-    const sparseHeader = {
+function createTarWithSparseMediaEntry(): Promise<Buffer> {
+  const pack = tar.pack();
+  const content = Buffer.from('jpeg-data');
+
+  pack.entry(
+    {
       name: 'files/images/GNUSparseFile.0/img-001.jpg',
       size: content.byteLength,
       type: 'file',
@@ -44,17 +41,16 @@ async function createTarWithSparseMediaEntry(): Promise<Buffer> {
         'GNU.sparse.name': 'files/images/img-001.jpg',
         'GNU.sparse.realsize': '8192'
       }
-    } as tar.Headers & { pax: Record<string, string> };
+    },
+    content
+  );
+  pack.finalize();
 
-    pack.on('data', (chunk: Buffer) => chunks.push(chunk));
-    pack.on('end', () => resolve(Buffer.concat(chunks)));
-    pack.entry(sparseHeader, content);
-    pack.finalize();
-  });
+  return buffer(pack);
 }
 
-function bufferToStream(buffer: Buffer): Readable {
-  return Readable.from(buffer);
+function bufferToStream(bytes: Buffer): Readable {
+  return Readable.from(bytes);
 }
 
 describe('biohub-tar-parser', () => {

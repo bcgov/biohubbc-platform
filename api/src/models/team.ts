@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const Team = z.object({
-  team_id: z.string().uuid(),
+  team_id: z.guid(),
   name: z.string().max(250),
   description: z.string().max(1000).nullable(),
   member_count: z.number().int()
