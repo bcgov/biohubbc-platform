@@ -222,8 +222,7 @@ describe('TeamRepository', () => {
 
       await repository.updateTeam('1', {
         name: 'Team A Updated',
-        description: 'Updated Desc',
-        record_end_date: new Date().toISOString()
+        description: 'Updated Desc'
       });
 
       expect(knexStub).to.have.been.calledOnce;
@@ -237,8 +236,7 @@ describe('TeamRepository', () => {
       try {
         await repository.updateTeam('1', {
           name: 'Team A Updated',
-          description: 'Updated Desc',
-          record_end_date: new Date().toISOString()
+          description: 'Updated Desc'
         });
         expect.fail();
       } catch (error) {

@@ -138,7 +138,12 @@ describe('SecurityRuleRepository', () => {
       });
 
       const repo = new SecurityRuleRepository(mockDBConnection);
-      const result = await repo.insertSecurityRule({ name: 'rule-a', description: 'desc', security_category_id: 2 });
+      const result = await repo.insertSecurityRule({
+        name: 'rule-a',
+        description: 'desc',
+        security_category_id: 2,
+        is_active: true
+      });
 
       expect(result).to.eql(mockRow);
     });
@@ -151,7 +156,12 @@ describe('SecurityRuleRepository', () => {
       const repo = new SecurityRuleRepository(mockDBConnection);
 
       try {
-        await repo.insertSecurityRule({ name: 'rule-a', description: 'desc', security_category_id: 2 });
+        await repo.insertSecurityRule({
+          name: 'rule-a',
+          description: 'desc',
+          security_category_id: 2,
+          is_active: true
+        });
         expect.fail();
       } catch (error) {
         expect((error as ApiGeneralError).message).to.equal('Failed to insert security rule');
