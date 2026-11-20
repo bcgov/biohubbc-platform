@@ -34,6 +34,7 @@ describe('paths/administrative/tickets/{ticketId}', () => {
     comments: [],
     references: [],
     data_requests: [],
+    submission_uploads: [],
     ticket_system_users: []
   };
 
