@@ -24,6 +24,7 @@
 
 import { expect } from 'chai';
 import { describe } from 'mocha';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
@@ -207,10 +208,19 @@ describe('SubmissionFeaturePropertyIngestionRepository (integration)', function 
 
     it('records every candidate the taxonomy lookup would have repaired, and no complete taxa', async () => {
       const { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId } = await seedSourceAndConfig();
-      const kingdomId = await createTaxon(connection, 'Animalia', null, null, null, 'Kingdom');
-      const completeId = await createTaxon(connection, 'Complete species', null, null, null, 'Species');
-      const missingRankId = await createTaxon(connection, 'Rankless species', null, null, null, null);
-      const missingParentId = await createTaxon(connection, 'Orphan species', null, null, null, 'Species');
+      // Scientific names are unique among active taxa, and a database that has ingested real data already caches some.
+      const nameSuffix = randomUUID().slice(0, 8);
+      const kingdomId = await createTaxon(connection, `Test kingdom ${nameSuffix}`, null, null, null, 'Kingdom');
+      const completeId = await createTaxon(connection, `Complete species ${nameSuffix}`, null, null, null, 'Species');
+      const missingRankId = await createTaxon(connection, `Rankless species ${nameSuffix}`, null, null, null, null);
+      const missingParentId = await createTaxon(
+        connection,
+        `Orphan species ${nameSuffix}`,
+        null,
+        null,
+        null,
+        'Species'
+      );
       await setTaxonParent(completeId, kingdomId);
       await setTaxonParent(missingRankId, kingdomId);
       const candidate = { uploadId, sourceFeatureId, blueprintFeatureTypePropertyId };

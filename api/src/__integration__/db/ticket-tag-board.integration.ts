@@ -14,14 +14,18 @@
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTPError } from '../../errors/http-error';
 import { TicketPriority } from '../../models/ticket';
+import { TicketRepository } from '../../repositories/ticket-repository';
+import { TeamService } from '../../services/access-policy/team-service';
 import { BoardService } from '../../services/board-service';
 import { BoardSwimlaneService } from '../../services/board-swimlane-service';
 import { TagService } from '../../services/tag-service';
 import { TicketService } from '../../services/ticket-service';
+import { TicketStatusService } from '../../services/ticket-status-service';
 import { TicketTagService } from '../../services/ticket-tag-service';
 
 describe('Ticket tags, boards, and swimlanes (integration)', function () {
@@ -73,6 +77,50 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
     }
 
     return ticket.ticket_id;
+  }
+
+  /**
+   * Create a ticket with an explicit creation time, the way `TicketService.createTicket` provisions one (its own team, the
+   * next slug and an initial status). Rows written in one transaction share `now()`, and the audit trigger keeps
+   * `create_date` fixed on update, so the time has to be set when the row is inserted.
+   *
+   * @param {string} label Distinguishes the ticket's subject within the run.
+   * @param {string[]} tagIds Tags to apply to the ticket.
+   * @param {TicketPriority} priority Ticket priority.
+   * @param {string} createDate ISO timestamp to record as the ticket's creation time.
+   * @returns {Promise<string>} The ticket's id.
+   */
+  async function createTicketCreatedAt(
+    label: string,
+    tagIds: string[],
+    priority: TicketPriority,
+    createDate: string
+  ): Promise<string> {
+    const team = await new TeamService(connection).createTeam({
+      name: `Ticket Team ${randomUUID()}`,
+      description: 'Auto-generated team for ticket system users.',
+      system_user_ids: []
+    });
+    const ticketRepository = new TicketRepository(connection);
+    await ticketRepository.lockTicketSlugGeneration();
+    const slug = await ticketRepository.getNextTicketSlug();
+
+    const inserted = await connection.sql(
+      SQL`
+        INSERT INTO ticket (subject, team_id, ticket_slug, priority, create_date)
+        VALUES (${`tagboard-${runId}-${label}`}, ${team.team_id}, ${slug}, ${priority}, ${createDate})
+        RETURNING ticket_id;
+      `,
+      z.object({ ticket_id: z.string() })
+    );
+    const ticketId = inserted.rows[0].ticket_id;
+    await new TicketStatusService(connection).insertTicketStatus(ticketId, 'open');
+
+    if (tagIds.length) {
+      await ticketTagService.replaceTicketTags(ticketId, tagIds);
+    }
+
+    return ticketId;
   }
 
   async function createBoard(label = 'Board'): Promise<string> {
@@ -168,7 +216,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
 
       try {
         await connection.sql(
-          SQL`INSERT INTO board_ticket (board_id, ticket_id, board_swimlane_id) VALUES (${boardId}, ${ticketId}, ${otherLane})`
+          SQL`INSERT INTO board_ticket (board_id, ticket_id, board_swimlane_id, sort_order) VALUES (${boardId}, ${ticketId}, ${otherLane}, 0)`
         );
         expect.fail('Expected foreign key violation');
       } catch (error) {
@@ -184,7 +232,7 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
 
       try {
         await connection.sql(
-          SQL`INSERT INTO board_ticket (board_id, ticket_id, board_swimlane_id) VALUES (${boardId}, ${ticketId}, ${done})`
+          SQL`INSERT INTO board_ticket (board_id, ticket_id, board_swimlane_id, sort_order) VALUES (${boardId}, ${ticketId}, ${done}, 0)`
         );
         expect.fail('Expected unique violation');
       } catch (error) {
@@ -305,17 +353,10 @@ describe('Ticket tags, boards, and swimlanes (integration)', function () {
 
     it('orders tickets within a lane oldest first, whatever their priority, each with its active tags', async () => {
       const fish = await createTag('Fish');
-      const oldest = await createTicket('oldest', [fish], 'low');
-      const newest = await createTicket('newest', [], 'critical');
-      const middle = await createTicket('middle', [], 'high');
-      // Rows written in one transaction share now(), so the tickets are given distinct creation times.
-      const createDates: [string, string][] = [
-        [oldest, '2026-01-01T00:00:00Z'],
-        [middle, '2026-02-01T00:00:00Z'],
-        [newest, '2026-03-01T00:00:00Z']
-      ];
-      for (const [ticketId, createDate] of createDates) {
-        await connection.sql(SQL`UPDATE ticket SET create_date = ${createDate} WHERE ticket_id = ${ticketId}`);
+      const oldest = await createTicketCreatedAt('oldest', [fish], 'low', '2026-01-01T00:00:00Z');
+      const newest = await createTicketCreatedAt('newest', [], 'critical', '2026-03-01T00:00:00Z');
+      const middle = await createTicketCreatedAt('middle', [], 'high', '2026-02-01T00:00:00Z');
+      for (const ticketId of [oldest, middle, newest]) {
         await boardService.ensureBoardTicket(boardId, ticketId, { boardSwimlaneId: doing });
       }
 

@@ -1245,7 +1245,7 @@ describe('Submission upload security review (integration)', function () {
     expect(closure.rows).to.eql([]);
   });
 
-  it('does not inherit review search security across upload boundaries or ended parents', async () => {
+  it('does not inherit review search security across upload boundaries, and keeps an ended parent and its inheritance in view', async () => {
     await service.insertSubmissionUploadReviewSecurityRuleAssignments(
       submissionId,
       submissionUploadId,
@@ -1262,13 +1262,12 @@ describe('Submission upload security review (integration)', function () {
     await connection.sql(
       SQL`UPDATE submission_feature SET record_end_date = now() WHERE submission_feature_id = ${parentId}`
     );
+    // Upload-scoped reads show every feature of the upload whatever its lifecycle, so the ended parent is still listed
+    // and its child still inherits the parent's review security.
     const result = await search.searchSubmissionUploadFeatures(submissionId, submissionUploadId, {});
-    expect(result.features).to.have.length(1);
-    expect(result.features[0]).to.include({
-      submission_feature_id: childId,
-      is_secured: false,
-      provenance: null
-    });
+    expect(result.features.map((row) => row.submission_feature_id)).to.eql([parentId, childId]);
+    expect(result.features.map((row) => row.provenance)).to.eql(['direct', 'inherited']);
+    expect(result.features.map((row) => row.is_secured)).to.eql([true, true]);
   });
 
   it('searches mixed-type unpublished upload features with matching counts and stable cursors, including secured features', async () => {
