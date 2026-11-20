@@ -58,7 +58,7 @@ describe('SecurityScopeRepository (integration)', function () {
       // concrete submission_id to reference a real submission, and no default seed creates one
       // with a stable, known id. '*' skips that existence check, so the test stays independent
       // of seed volume while still exercising the ON CONFLICT (scope_hash) path.
-      const scopeHash = computeScopeHash('urn:*:survey:*');
+      const scopeHash = computeScopeHash(`urn:*:survey:${randomUUID()}`);
 
       // First insert succeeds
       const first = await repo.insertSecurityScope(scopeHash, scopeUrn('urn:*:survey:*'));
