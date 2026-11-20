@@ -1,7 +1,6 @@
 import { expect } from 'chai';
-import { QueryResult } from 'pg';
 import sinon from 'sinon';
-import { getMockDBConnection } from '../../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   SubmissionUploadReview,
@@ -18,7 +17,7 @@ describe('SubmissionUploadReviewRepository', () => {
   describe('insertSubmissionUploadReview', () => {
     it('returns the inserted review row', async () => {
       const review = buildReview({ submission_upload_review_id: '11111111-1111-4111-8111-111111111111' });
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
+      const sqlStub = sinon.stub().resolves(mockQueryResult([review]));
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.insertSubmissionUploadReview(17, {
@@ -37,7 +36,7 @@ describe('SubmissionUploadReviewRepository', () => {
     });
 
     it('throws ApiNotFoundError when the submission upload does not belong to the submission', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<SubmissionUploadReview>);
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
       try {
@@ -61,7 +60,7 @@ describe('SubmissionUploadReviewRepository', () => {
 
     it('uses an append-only insert with no conflict or update clause', async () => {
       const review = buildReview({ submission_upload_review_id: '11111111-1111-4111-8111-111111111111' });
-      const sqlStub = sinon.stub().resolves({ rowCount: 1, rows: [review] } as QueryResult<SubmissionUploadReview>);
+      const sqlStub = sinon.stub().resolves(mockQueryResult([review]));
       const repository = new SubmissionUploadReviewRepository(getMockDBConnection({ sql: sqlStub }));
 
       await repository.insertSubmissionUploadReview(17, {
@@ -83,7 +82,7 @@ describe('SubmissionUploadReviewRepository', () => {
     it('throws ApiExecuteSQLError when no active review row is updated', async () => {
       const repository = new SubmissionUploadReviewRepository(
         getMockDBConnection({
-          sql: sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<SubmissionUploadReview>)
+          sql: sinon.stub().resolves(mockQueryResult([]))
         })
       );
 
@@ -107,7 +106,7 @@ describe('SubmissionUploadReviewRepository', () => {
     it('throws ApiExecuteSQLError when no active review row is deleted', async () => {
       const repository = new SubmissionUploadReviewRepository(
         getMockDBConnection({
-          sql: sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<SubmissionUploadReview>)
+          sql: sinon.stub().resolves(mockQueryResult([]))
         })
       );
 
