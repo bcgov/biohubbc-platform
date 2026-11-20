@@ -92,6 +92,10 @@ jobs:
         working-directory: api
         run: CI=true npm run typecheck
 
+      - name: Run api test typecheck
+        working-directory: api
+        run: CI=true npm run typecheck:test
+
       - name: Run api tests with coverage
         working-directory: api
         run: CI=true npm run coverage

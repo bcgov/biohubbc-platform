@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import { afterEach, describe, it } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { createSubmissionUpload, POST } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../__mocks__/operation';
 import * as db from '../../../../database/db';
 import { HTTP403 } from '../../../../errors/http-error';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
@@ -40,7 +40,7 @@ describe('append submission upload handler', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionUuid };
 
-    await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+    await getOperationHandler(POST, 0)(mockReq, mockRes, mockNext);
 
     expect(mockReq.authorization_scheme).to.eql({
       and: [{ discriminator: 'Team', entity: 'submission', submissionUuid }]
@@ -53,7 +53,7 @@ describe('append submission upload handler', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     try {
-      await (POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(POST, 0)(mockReq, mockRes, mockNext);
       expect.fail('Expected authorization failure');
     } catch (error_) {
       expect(error_).to.be.instanceOf(HTTP403);

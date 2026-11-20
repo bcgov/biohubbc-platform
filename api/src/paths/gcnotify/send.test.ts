@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { mockAxiosResponse } from '../../__mocks__/axios';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { GCNotifyService } from '../../services/gcnotify-service';
@@ -32,16 +33,14 @@ describe('gcnotify', () => {
       }
     } as any;
 
-    const sampleRes = {
-      data: {
-        content: { item: 'object' },
-        id: 'string',
-        reference: 'string',
-        scheduled_for: 'string',
-        template: { item: 'object' },
-        uri: 'string'
-      }
-    };
+    const sampleRes = mockAxiosResponse({
+      content: { item: 'object' },
+      id: 'string',
+      reference: 'string',
+      scheduled_for: 'string',
+      template: { item: 'object' },
+      uri: 'string'
+    });
 
     it('sends email notification and returns 200 on success', async () => {
       const dbConnectionObj = getMockDBConnection({

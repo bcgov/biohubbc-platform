@@ -1,9 +1,8 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
-import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection } from '../../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { Artifact } from '../../models/artifact';
 import {
@@ -23,8 +22,8 @@ describe('UploadArtifactRepository', () => {
 
   describe('getUploadArtifact', () => {
     it('throws an error if no record found', async () => {
-      const mockQueryResponse: QueryResult<UploadArtifact> = { rowCount: 0, rows: [] } as QueryResult<UploadArtifact>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([]);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       try {
@@ -45,11 +44,8 @@ describe('UploadArtifactRepository', () => {
         upload_archive_id: null,
         path: null
       };
-      const mockQueryResponse: QueryResult<UploadArtifact> = {
-        rowCount: 1,
-        rows: [mockRow]
-      } as QueryResult<UploadArtifact>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([mockRow]);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       const result = await repo.getUploadArtifact('upload-artifact-id-1');
@@ -69,11 +65,8 @@ describe('UploadArtifactRepository', () => {
           path: null
         }
       ];
-      const mockQueryResponse: QueryResult<UploadArtifact> = {
-        rowCount: 1,
-        rows: mockRows
-      } as QueryResult<UploadArtifact>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult(mockRows, 1);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       const result = await repo.getUploadArtifacts();
@@ -114,11 +107,8 @@ describe('UploadArtifactRepository', () => {
 
   describe('insertUploadArtifacts', () => {
     it('throws an error if inserted row count does not match input size', async () => {
-      const mockQueryResponse: QueryResult<{ upload_artifact_id: string }> = {
-        rowCount: 0,
-        rows: []
-      } as QueryResult<{ upload_artifact_id: string }>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([]);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       const payload: CreateUploadArtifact[] = [
@@ -182,11 +172,8 @@ describe('UploadArtifactRepository', () => {
 
   describe('updateUploadArtifact', () => {
     it('throws an error if update fails', async () => {
-      const mockQueryResponse: QueryResult<{ upload_artifact_id: string }> = {
-        rowCount: 0,
-        rows: []
-      } as QueryResult<{ upload_artifact_id: string }>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([]);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       const payload: UpdateUploadArtifact = {
@@ -207,11 +194,8 @@ describe('UploadArtifactRepository', () => {
 
     it('returns the updated record ID if successful', async () => {
       const mockRow: { upload_artifact_id: string } = { upload_artifact_id: 'upload-artifact-id-1' };
-      const mockQueryResponse: QueryResult<{ upload_artifact_id: string }> = {
-        rowCount: 1,
-        rows: [mockRow]
-      } as QueryResult<{ upload_artifact_id: string }>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([mockRow]);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       const payload: UpdateUploadArtifact = {
@@ -227,8 +211,8 @@ describe('UploadArtifactRepository', () => {
 
   describe('deleteUploadArtifact', () => {
     it('throws an error if delete fails', async () => {
-      const mockQueryResponse: QueryResult<UploadArtifact> = { rowCount: 0, rows: [] } as QueryResult<UploadArtifact>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([]);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       try {
@@ -241,8 +225,8 @@ describe('UploadArtifactRepository', () => {
     });
 
     it('succeeds if delete succeeds', async () => {
-      const mockQueryResponse: QueryResult<UploadArtifact> = { rowCount: 1, rows: [] } as QueryResult<UploadArtifact>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockQueryResponse = mockQueryResult([], 1);
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
       const repo = new UploadArtifactRepository(mockDBConnection);
 
       const result = await repo.deleteUploadArtifact('upload-artifact-id-1');

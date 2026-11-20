@@ -86,7 +86,13 @@ describe('SecurityRuleService', () => {
   describe('createSecurityRule', () => {
     it('validates the category exists and inserts the rule', async () => {
       const mockCategory = { security_category_id: 2, name: 'Health', description: 'Health category' };
-      const mockRule = { security_rule_id: 1, security_category_id: 2, name: 'rule-a', description: 'desc' };
+      const mockRule = {
+        security_rule_id: 1,
+        security_category_id: 2,
+        name: 'rule-a',
+        description: 'desc',
+        is_active: true
+      };
 
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityRuleService(mockDBConnection);
@@ -135,7 +141,13 @@ describe('SecurityRuleService', () => {
   describe('updateSecurityRule', () => {
     it('validates the category, updates the rule, and returns the refreshed record', async () => {
       const mockCategory = { security_category_id: 2, name: 'Health', description: 'Health category' };
-      const mockRule = { security_rule_id: 1, security_category_id: 2, name: 'updated', description: 'desc' };
+      const mockRule = {
+        security_rule_id: 1,
+        security_category_id: 2,
+        name: 'updated',
+        description: 'desc',
+        is_active: true
+      };
 
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityRuleService(mockDBConnection);
@@ -149,7 +161,8 @@ describe('SecurityRuleService', () => {
       const result = await service.updateSecurityRule(1, {
         name: 'updated',
         description: 'desc',
-        security_category_id: 2
+        security_category_id: 2,
+        is_active: true
       });
 
       expect(getCategoryStub).to.have.been.calledOnceWith(2);

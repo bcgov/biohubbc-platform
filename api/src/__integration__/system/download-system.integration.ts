@@ -205,13 +205,31 @@ describe('Download Worker', function () {
   }
 
   /**
-   * Insert a test submission and return its ID. Tracked for cleanup.
+   * Insert a test submission, owned by a dedicated access team, and return its ID. Both are tracked
+   * for cleanup.
+   *
+   * @return {Promise<number>} The new submission's ID.
    */
   async function createTestSubmission(): Promise<number> {
+    const [submissionTeam] = await db('biohub.team')
+      .insert({
+        name: `${TEST_PREFIX} submission team ${randomUUID()}`,
+        description: 'Dedicated submission access team for download integration testing.',
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('team_id');
+    createdTeamIds.push(submissionTeam.team_id);
+    await db('biohub.team_member').insert({
+      system_user_id: SYSTEM_USER_ID,
+      team_id: submissionTeam.team_id,
+      create_user: SYSTEM_USER_ID
+    });
+
     const [row] = await db('biohub.submission')
       .insert({
         uuid: db.raw('gen_random_uuid()'),
         system_user_id: SYSTEM_USER_ID,
+        team_id: submissionTeam.team_id,
         contributor_id: 1,
         name: `${TEST_PREFIX} Download Integration Test`,
         description: 'Test submission for download worker integration test',
@@ -293,8 +311,7 @@ describe('Download Worker', function () {
         // The download broad-path only projects effective (published) features
         // (isSubmissionFeatureCurrent: record_effective_date <= now(), not end-dated, no successor); without this the feature
         // is treated as an unpublished draft and never appears in the export.
-        record_effective_date: db.fn.now(),
-        create_user: SYSTEM_USER_ID
+        record_effective_date: db.fn.now()
       })
       .returning('submission_feature_id');
 

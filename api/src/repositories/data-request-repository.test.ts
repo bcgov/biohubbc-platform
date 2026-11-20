@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection } from '../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { DataRequestRepository } from './data-request-repository';
@@ -277,7 +277,7 @@ describe('DataRequestRepository', () => {
           expect(sql).to.include('join "team" as "t" on "t"."team_id" = "dr"."team_id"');
           expect(sql).to.include('"t"."record_end_date" is null');
           expect(sql).to.include('"tm"."record_end_date" is null');
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 

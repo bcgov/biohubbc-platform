@@ -4,13 +4,16 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import type { ExpressionTree } from '../models/expression-tree';
+import type { ExpressionTree, ExpressionTreePredicate } from '../models/expression-tree';
 import type { NormalizedExpressionTree } from '../models/expression-tree-internal';
+import { NormalizedExpressionTreePredicate } from '../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { decodeSearchFeatureCursor } from '../utils/pagination';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
 import { SearchFeatureService } from './search-feature-service';
+import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 import { SubmissionUploadService } from './upload/submission-upload-service';
 
 chai.use(sinonChai);
@@ -72,9 +75,11 @@ describe('SearchFeatureService', () => {
     });
   });
 
-  const mockFeatures = [
+  const mockFeatures: SearchFeatureResultWithRelevancy[] = [
     {
       submission_feature_id: 1,
+      parent_submission_feature_id: null,
+      provenance: null,
       submission_id: 10,
       uuid: '11111111-1111-1111-1111-111111111111',
       feature_type_id: 1,
@@ -98,25 +103,24 @@ describe('SearchFeatureService', () => {
       allow_multiple: false
     }
   ];
+  const existsPredicate: ExpressionTreePredicate = {
+    type: 'predicate',
+    feature_property_id: 14,
+    blueprint_feature_type_property_id: null,
+    operator: 'Exists'
+  };
   const expressionTree: ExpressionTree = {
     type: 'expression',
     operator: 'AND',
-    clauses: [
-      {
-        type: 'predicate',
-        feature_property_id: 14,
-        blueprint_feature_type_property_id: null,
-        operator: 'Exists'
-      }
-    ]
+    clauses: [existsPredicate]
   };
   const normalizedExpression: NormalizedExpressionTree = {
     ...expressionTree,
     clauses: [
       {
-        ...expressionTree.clauses[0],
+        ...existsPredicate,
         feature_property_type_id: 5,
-        feature_property_type_name: 'number',
+        feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
         internal_predicate: { type: 'number', operator: 'Exists' }
       }
     ]
@@ -353,6 +357,8 @@ describe('SearchFeatureService', () => {
             : undefined;
           const result = await service.searchFeaturesByExpressionTreeWithMetadata('survey', null, {
             limit: 2,
+            sort: 'relevancy_score',
+            order: 'desc',
             boundary
           });
           expect(search.firstCall.args[2]?.limit).to.equal(3);
@@ -401,26 +407,26 @@ describe('SearchFeatureService', () => {
 
   it('passes the same deduplicated range expression to result and count queries', async () => {
     const service = new SearchFeatureService(getMockDBConnection());
-    const lowerBound = {
+    const lowerBound: NormalizedExpressionTreePredicate = {
       type: 'predicate',
       feature_property_id: 14,
       blueprint_feature_type_property_id: null,
       feature_property_type_id: 5,
-      feature_property_type_name: 'number',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
       operator: 'GreaterThan',
       value: 7,
       internal_predicate: { type: 'number', operator: 'GreaterThan', value: 7 }
-    } as const;
-    const upperBound = {
+    };
+    const upperBound: NormalizedExpressionTreePredicate = {
       type: 'predicate',
       feature_property_id: 14,
       blueprint_feature_type_property_id: null,
       feature_property_type_id: 5,
-      feature_property_type_name: 'number',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
       operator: 'LessThan',
       value: 9,
       internal_predicate: { type: 'number', operator: 'LessThan', value: 9 }
-    } as const;
+    };
     const normalizedRange: NormalizedExpressionTree = {
       type: 'expression',
       operator: 'AND',

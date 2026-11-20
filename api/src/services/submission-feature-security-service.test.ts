@@ -108,7 +108,10 @@ describe('SubmissionFeatureSecurityService assignment-state scope', () => {
           } else {
             sinon.assert.notCalled(normalize);
           }
-          sinon.assert.calledOnceWithExactly(mutate, { ...input, featureScope });
+          // The three repository methods take different inputs, so the stub is a union that sinon's
+          // typed assertions cannot accept; compare the recorded call instead.
+          expect(mutate.callCount).to.equal(1);
+          expect(mutate.firstCall.args).to.deep.equal([{ ...input, featureScope }]);
         });
       }
     }

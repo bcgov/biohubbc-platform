@@ -159,7 +159,7 @@ describe('Submission upload expression evaluation (integration)', function () {
     expect(await evaluate(allOf(predicate(colour.featurePropertyId, 'NotEquals', 'red')))).to.eql([surveyId, blueId]);
   });
 
-  it('walks through features of an ended feature type without returning them', async () => {
+  it('returns and walks through features of an ended feature type, as published evaluation does', async () => {
     const region = await createAssignedFeatureProperty(connection, 'string', ['stratum']);
     const species = await createAssignedFeatureProperty(connection, 'string', ['telemetry_deployment']);
     const surveyId = await insertFeature('survey');
@@ -171,10 +171,12 @@ describe('Submission upload expression evaluation (integration)', function () {
 
     expect(await evaluate(allOf(predicate(region.featurePropertyId, 'Equals', 'east')))).to.eql([
       surveyId,
+      stratumId,
       deploymentId
     ]);
     expect(await evaluate(allOf(predicate(species.featurePropertyId, 'Equals', 'owl')))).to.eql([
       surveyId,
+      stratumId,
       deploymentId
     ]);
   });

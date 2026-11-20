@@ -1,7 +1,7 @@
 import { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { getOperationHandler } from '../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { dbDependencies } from '../../../database/db';
 import { ensureHTTPError } from '../../../errors/http-error';
@@ -52,6 +52,7 @@ const mockBoardDetail: BoardDetail = {
   name: 'Fisheries',
   description: null,
   create_date: '2026-10-19T00:00:00.000Z',
+  default_swimlane_id: null,
   swimlanes: []
 };
 
@@ -64,7 +65,7 @@ describe('paths/administrative/boards', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       try {
-        await (operation[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(operation, 0)(mockReq, mockRes, mockNext);
         expect.fail('Expected forbidden');
       } catch (error) {
         expect(ensureHTTPError(error).status).to.equal(403);

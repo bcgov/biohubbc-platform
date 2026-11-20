@@ -156,7 +156,12 @@ describe('SearchFeatureRepository', () => {
 
       const subqueryStub = Sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
 
-      await repository.searchFeaturesByExpressionTree('telemetry', null, { limit: 25 }, { type: 'anonymous' });
+      await repository.searchFeaturesByExpressionTree(
+        'telemetry',
+        null,
+        { limit: 25, sort: 'relevancy_score', order: 'desc' },
+        { type: 'anonymous' }
+      );
 
       expect(subqueryStub.notCalled).to.equal(true);
 

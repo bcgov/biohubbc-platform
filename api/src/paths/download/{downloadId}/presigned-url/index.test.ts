@@ -4,26 +4,25 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getDownloadPresignedUrl } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { createMockDownloadRecord } from '../../../../__mocks__/download';
 import * as db from '../../../../database/db';
 import { HTTP409 } from '../../../../errors/http-error';
-import { DownloadRecord } from '../../../../models/download';
+import { DownloadDetailRecord } from '../../../../models/download';
 import { DownloadStatusEnum } from '../../../../models/download-status';
 import { DownloadService } from '../../../../services/download/download-service';
 
 chai.use(sinonChai);
 
-const makeDownloadRecord = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
-  download_id: 'aaaa0000-0000-0000-0000-000000000001',
-  download_version_id: 'dddd0000-0000-0000-0000-000000000002',
-  download_status: DownloadStatusEnum.READY,
-  format: 'parquet',
-  metadata: null,
-  started_at: '2026-01-01T00:00:00Z',
-  completed_at: '2026-01-01T00:01:00Z',
-  downloaded_at: null,
-  create_date: '2026-01-01T00:00:00Z',
-  ...overrides
-});
+const makeDownloadRecord = (overrides: Partial<DownloadDetailRecord> = {}): DownloadDetailRecord =>
+  createMockDownloadRecord({
+    download_id: 'aaaa0000-0000-0000-0000-000000000001',
+    download_version_id: 'dddd0000-0000-0000-0000-000000000002',
+    download_status: DownloadStatusEnum.READY,
+    started_at: '2026-01-01T00:00:00Z',
+    completed_at: '2026-01-01T00:01:00Z',
+    create_date: '2026-01-01T00:00:00Z',
+    ...overrides
+  });
 
 const makeParts = () => [
   {

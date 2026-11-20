@@ -12,6 +12,7 @@ import {
 } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
+import { SubmissionUpload } from '../../models/submission-upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
@@ -313,12 +314,15 @@ describe('ArtifactSecurityService', () => {
       archive_status: ProcessStatusStatusEnum.BLOCKED
     };
 
-    const mockSubmissionUpload = {
+    const mockSubmissionUpload: SubmissionUpload = {
       submission_upload_id: 'su-1',
       submission_id: 123,
       upload_id: 'upload-1',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'uploaded' as const,
-      ticket_id: '11111111-1111-1111-1111-111111111111'
+      decision: 'pending',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      blueprint_id: 1
     };
 
     const createOutcome = (securityStatus: SecurityStatusEnum): ScanOutcome => ({
@@ -565,13 +569,17 @@ describe('ArtifactSecurityService', () => {
     it('should publish process-submission-features job with correct submissionId', async () => {
       // Verifies: looks up submission via upload_id and publishes with correct submissionId
 
-      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
+      const submissionUpload: SubmissionUpload = {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'uploaded',
-        ticket_id: '22222222-2222-2222-2222-222222222222'
-      });
+        decision: 'pending',
+        ticket_id: '22222222-2222-2222-2222-222222222222',
+        blueprint_id: 1
+      };
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves(submissionUpload);
       const publishStub = sinon
         .stub(ArtifactSecurityService.dependencies, 'publishProcessSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'job-1' });
@@ -579,14 +587,8 @@ describe('ArtifactSecurityService', () => {
       await service.publishNextPipelineStep(mockUploadArchive);
 
       expect(publishStub.calledOnce).to.be.true;
-      // Publisher now receives the full SubmissionUpload record
-      expect(publishStub.firstCall.args[1]).to.deep.equal({
-        submission_upload_id: 'su-1',
-        submission_id: 999,
-        upload_id: 'upload-1',
-        status: 'uploaded',
-        ticket_id: '22222222-2222-2222-2222-222222222222'
-      });
+      // Publisher receives the full SubmissionUpload record
+      expect(publishStub.firstCall.args[1]).to.deep.equal(submissionUpload);
     });
 
     it('should propagate error when submission_upload lookup throws', async () => {
@@ -609,8 +611,11 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
+        team_id: '44444444-4444-4444-4444-444444444444',
         status: 'uploaded',
-        ticket_id: '22222222-2222-2222-2222-222222222222'
+        decision: 'pending',
+        ticket_id: '22222222-2222-2222-2222-222222222222',
+        blueprint_id: 1
       });
       sinon
         .stub(ArtifactSecurityService.dependencies, 'publishProcessSubmissionFeaturesJob')
@@ -633,12 +638,15 @@ describe('ArtifactSecurityService', () => {
       archive_status: ProcessStatusStatusEnum.PENDING
     };
 
-    const mockSubmissionUpload = {
+    const mockSubmissionUpload: SubmissionUpload = {
       submission_upload_id: 'su-1',
       submission_id: 999,
       upload_id: 'upload-1',
+      team_id: '44444444-4444-4444-4444-444444444444',
       status: 'uploaded' as const,
-      ticket_id: '22222222-2222-2222-2222-222222222222'
+      decision: 'pending',
+      ticket_id: '22222222-2222-2222-2222-222222222222',
+      blueprint_id: 1
     };
 
     it('transitions the owning submission upload to failed', async () => {

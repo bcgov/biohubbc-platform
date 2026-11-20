@@ -31,8 +31,11 @@ describe('SubmissionUploadReviewService', () => {
           submission_upload_id: '550e8400-e29b-41d4-a716-446655440000',
           submission_id: 99,
           upload_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          team_id: '44444444-4444-4444-4444-444444444444',
           status: 'uploaded',
-          ticket_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+          decision: 'pending',
+          ticket_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          blueprint_id: 1
         });
       const findStub = sinon
         .stub(SubmissionUploadReviewRepository.prototype, 'findReviewsBySubmissionUploadId')
