@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import type { PredicateOperator } from '../models/expression-predicate';
 import type { NormalizedExpressionTree, NormalizedExpressionTreePredicate } from '../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { hasCompatiblePredicates, optimizeExpression } from './expression-optimization';
 
 /**
@@ -22,7 +23,7 @@ const numberPredicate = (
   feature_property_id: featurePropertyId,
   blueprint_feature_type_property_id: blueprintFeatureTypePropertyId,
   feature_property_type_id: 5,
-  feature_property_type_name: 'number',
+  feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
   operator,
   value,
   internal_predicate: { type: 'number', operator, value }

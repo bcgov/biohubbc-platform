@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
+import { ExpressionTree } from '../../models/expression-tree';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
@@ -656,7 +657,7 @@ describe('PolicyService', () => {
 
   describe('createPolicyExpression', () => {
     it('creates a policy expression when the policy does not already use the resolved expression id', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -668,7 +669,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
       const policyExpression = {
         policy_expression_id: 'pe-new',
         policy_id: 'policy-1',
@@ -708,7 +709,7 @@ describe('PolicyService', () => {
     });
 
     it('throws conflict when the policy already has an active policy expression for the resolved expression id', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -720,7 +721,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
         policy_id: 'policy-1',
@@ -756,7 +757,7 @@ describe('PolicyService', () => {
 
   describe('updatePolicyExpression', () => {
     it('throws conflict when another active policy expression already uses the resolved expression id', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -768,7 +769,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
         policy_id: 'policy-1',
@@ -805,7 +806,7 @@ describe('PolicyService', () => {
     });
 
     it('allows updating metadata when the resolved expression id belongs to the same policy expression', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -817,7 +818,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
       const policyExpression = {
         policy_expression_id: 'pe-current',
         policy_id: 'policy-1',

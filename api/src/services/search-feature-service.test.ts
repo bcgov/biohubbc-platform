@@ -4,8 +4,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import type { ExpressionTree } from '../models/expression-tree';
+import type { ExpressionTree, ExpressionTreePredicate } from '../models/expression-tree';
 import type { NormalizedExpressionTree } from '../models/expression-tree-internal';
+import { NormalizedExpressionTreePredicate } from '../models/expression-tree-internal';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { decodeSearchFeatureCursor } from '../utils/pagination';
@@ -98,25 +100,24 @@ describe('SearchFeatureService', () => {
       allow_multiple: false
     }
   ];
+  const existsPredicate: ExpressionTreePredicate = {
+    type: 'predicate',
+    feature_property_id: 14,
+    blueprint_feature_type_property_id: null,
+    operator: 'Exists'
+  };
   const expressionTree: ExpressionTree = {
     type: 'expression',
     operator: 'AND',
-    clauses: [
-      {
-        type: 'predicate',
-        feature_property_id: 14,
-        blueprint_feature_type_property_id: null,
-        operator: 'Exists'
-      }
-    ]
+    clauses: [existsPredicate]
   };
   const normalizedExpression: NormalizedExpressionTree = {
     ...expressionTree,
     clauses: [
       {
-        ...expressionTree.clauses[0],
+        ...existsPredicate,
         feature_property_type_id: 5,
-        feature_property_type_name: 'number',
+        feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
         internal_predicate: { type: 'number', operator: 'Exists' }
       }
     ]
@@ -401,26 +402,26 @@ describe('SearchFeatureService', () => {
 
   it('passes the same deduplicated range expression to result and count queries', async () => {
     const service = new SearchFeatureService(getMockDBConnection());
-    const lowerBound = {
+    const lowerBound: NormalizedExpressionTreePredicate = {
       type: 'predicate',
       feature_property_id: 14,
       blueprint_feature_type_property_id: null,
       feature_property_type_id: 5,
-      feature_property_type_name: 'number',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
       operator: 'GreaterThan',
       value: 7,
       internal_predicate: { type: 'number', operator: 'GreaterThan', value: 7 }
-    } as const;
-    const upperBound = {
+    };
+    const upperBound: NormalizedExpressionTreePredicate = {
       type: 'predicate',
       feature_property_id: 14,
       blueprint_feature_type_property_id: null,
       feature_property_type_id: 5,
-      feature_property_type_name: 'number',
+      feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER,
       operator: 'LessThan',
       value: 9,
       internal_predicate: { type: 'number', operator: 'LessThan', value: 9 }
-    } as const;
+    };
     const normalizedRange: NormalizedExpressionTree = {
       type: 'expression',
       operator: 'AND',
