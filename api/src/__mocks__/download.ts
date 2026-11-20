@@ -48,8 +48,6 @@ export const createMockDownloadVersionExportListRow = (
   overrides?: Partial<DownloadVersionExportListRow>
 ): DownloadVersionExportListRow => ({
   download_version_export_id: 'eeee0000-0000-0000-0000-000000000001',
-  download_version_id: 'dddd0000-0000-0000-0000-000000000001',
-  download_version_export_artifact_group_id: 'cccc0000-0000-0000-0000-000000000001',
   format: 'csv',
   mode: 'per_feature_type',
   max_part_size_bytes: '524288000',
