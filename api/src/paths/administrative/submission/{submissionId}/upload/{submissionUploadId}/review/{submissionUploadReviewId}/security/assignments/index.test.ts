@@ -4,6 +4,7 @@ import { getSubmissionUploadReviewSecurityAssignments, POST } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../../../../__mocks__/db';
 import * as db from '../../../../../../../../../../database/db';
 import { HTTP400 } from '../../../../../../../../../../errors/http-error';
+import { ExpressionTree } from '../../../../../../../../../../models/expression-tree';
 import { SubmissionUploadReviewSecurityService } from '../../../../../../../../../../services/upload/submission-upload-review-security-service';
 import { insertSubmissionUploadReviewSecurityRuleAssignments } from '../rules/{securityRuleId}/assignments';
 import { deleteSubmissionUploadReviewSecurityRuleAssignments } from '../rules/{securityRuleId}/assignments/remove';
@@ -11,7 +12,7 @@ import { deleteSubmissionUploadReviewSecurityAssignments } from './reset';
 
 describe('review assignment search and reset bodies', () => {
   afterEach(() => sinon.restore());
-  const expression = {
+  const expression: ExpressionTree = {
     type: 'expression',
     operator: 'AND',
     clauses: [
