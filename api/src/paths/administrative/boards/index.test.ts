@@ -52,6 +52,7 @@ const mockBoardDetail: BoardDetail = {
   name: 'Fisheries',
   description: null,
   create_date: '2026-10-19T00:00:00.000Z',
+  default_swimlane_id: null,
   swimlanes: []
 };
 

@@ -280,12 +280,17 @@ describe('ArtifactService', () => {
         format: 'csv'
       };
 
-      const stub = sinon.stub(ArtifactRepository.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-new' });
+      const insertedArtifact: Artifact = {
+        ...fakeInput,
+        artifact_id: 'artifact-new',
+        byte_size: '1234'
+      };
+      const stub = sinon.stub(ArtifactRepository.prototype, 'insertArtifact').resolves(insertedArtifact);
 
       const result = await service.insertArtifact(fakeInput);
 
       expect(stub).to.have.been.calledWith(fakeInput);
-      expect(result).to.eql({ artifact_id: 'artifact-new' });
+      expect(result).to.equal(insertedArtifact);
     });
 
     it('should throw an error if repository fails', async () => {
