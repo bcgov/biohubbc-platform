@@ -40,7 +40,7 @@
     "@dsnp/parquetjs": "^1.8.8",
     "@types/tar-stream": "^3.1.4",
     "ajv": "^8.20.0",
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "axios": "^1.21.1",
     "clamscan": "^2.2.1",
     "cron-parser": "^5.5.0",
@@ -76,7 +76,7 @@
     "@swc/cli": "^0.8.2",
     "@swc/core": "^1.15.3",
     "@types/adm-zip": "^0.4.34",
-    "@types/archiver": "^7.0.0",
+    "@types/archiver": "^8.0.0",
     "@types/chai": "^4.3.14",
     "@types/clamscan": "^2.0.8",
     "@types/express": "^4.17.13",
@@ -127,6 +127,9 @@
     "test-exclude": {
       "glob": "^14.0.6",
       "minimatch": "^11.0.9"
+    },
+    "archiver": {
+      "readdir-glob": "^4.0.0"
     }
   }
 }
