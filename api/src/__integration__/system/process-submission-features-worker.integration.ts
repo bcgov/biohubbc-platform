@@ -16,6 +16,7 @@ import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { createTestKnex } from '../helpers/test-db-setup';
+import { removePipelineJobs } from '../helpers/test-queue-helpers';
 import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = '__integration-test__';
@@ -112,10 +113,22 @@ describe('Process Submission Features Worker', function () {
 
   after(async () => {
     try {
+      // A completed job publishes the next pipeline stage; settle the queue before deleting its rows.
+      const submissionUploadIds = await db('biohub.submission_upload')
+        .whereIn('submission_id', createdSubmissionIds)
+        .pluck('submission_upload_id');
+      await removePipelineJobs(db, { submissionUploadIds, ticketIds: createdTicketIds });
+
       // Clean up in reverse FK order
       for (const submissionId of createdSubmissionIds) {
         await db('biohub.submission_feature').where('submission_id', submissionId).del();
         await db('biohub.submission_validation').where('submission_id', submissionId).del();
+        await db('biohub.submission_upload_status')
+          .whereIn(
+            'submission_upload_id',
+            db('biohub.submission_upload').select('submission_upload_id').where('submission_id', submissionId)
+          )
+          .del();
         await db('biohub.submission_upload').where('submission_id', submissionId).del();
       }
 
@@ -180,11 +193,18 @@ describe('Process Submission Features Worker', function () {
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
     createdObjectKeys.push(objectKey);
 
-    // 1. submission (uuid, system_user_id, contributor_id, name, description, comment required)
+    const [submissionTeam] = await db('biohub.team')
+      .insert({ name: `${TEST_PREFIX} submission team ${randomUUID()}`, description: 'Submission access team.' })
+      .returning('team_id');
+    createdTeamIds.push(submissionTeam.team_id);
+    await db('biohub.team_member').insert({ system_user_id: SYSTEM_USER_ID, team_id: submissionTeam.team_id });
+
+    // 1. submission (uuid, system_user_id, team_id, contributor_id, name, description, comment required)
     const [submission] = await db('biohub.submission')
       .insert({
         uuid: randomUUID(),
         system_user_id: SYSTEM_USER_ID,
+        team_id: submissionTeam.team_id,
         contributor_id: 1,
         name: TEST_PREFIX,
         description: TEST_PREFIX,
@@ -224,6 +244,7 @@ describe('Process Submission Features Worker', function () {
 
     // 5. ticket (required FK for submission_upload)
     const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
+    createdTicketIds.push(ticketId);
     const [uploadTeam] = await db('biohub.team')
       .insert({
         name: `${TEST_PREFIX} upload team ${upload.upload_id}`,
