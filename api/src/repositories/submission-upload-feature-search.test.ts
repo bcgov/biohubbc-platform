@@ -37,14 +37,13 @@ function render(expression?: NormalizedExpressionTree): { sql: string; bindings:
 }
 
 describe('buildSubmissionUploadFeatureIdsSubquery', () => {
-  it('selects current upload features of active types without walking when no expression is given', () => {
+  it('selects every upload feature, whatever its feature type lifecycle, without walking when no expression is given', () => {
     const { sql, bindings } = render();
 
-    expect(sql).to.include('from "submission_feature" as "anchor_sf"');
-    expect(sql).to.include(
-      'anchor_sf.feature_type_id = ANY(ARRAY((select "feature_type_id" from "feature_type" where "record_end_date" is null)))'
+    expect(sql).to.equal(
+      'select "anchor_sf"."submission_feature_id" from "submission_feature" as "anchor_sf" ' +
+        'where "anchor_sf".submission_id = $1 AND "anchor_sf".submission_upload_id = $2'
     );
-    expect(sql).not.to.include('upload_evidence');
     expect(bindings).to.eql([7, UPLOAD_ID]);
   });
 
