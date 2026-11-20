@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET, getSubmissionHistory } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../__mocks__/operation';
 import * as db from '../../../../database/db';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
 import { SubmissionUploadService } from '../../../../services/upload/submission-upload-service';
@@ -20,7 +20,7 @@ describe('submission history handler', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionUuid: '11111111-1111-1111-1111-111111111111' };
 
-    await (GET[0] as RequestHandler)(mockReq, mockRes, mockNext);
+    await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
 
     expect(mockReq.authorization_scheme).to.eql({
       and: [

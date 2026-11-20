@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
+import { getOperationHandler } from '../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { HTTP403 } from '../../errors/http-error';
@@ -70,7 +70,7 @@ describe('artifact deletion authorization', () => {
       mockReq.system_user = { system_user_id: 5, role_names: roleNames } as SystemUserExtended;
       let failure: unknown;
       try {
-        await (path.POST[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(path.POST, 0)(mockReq, mockRes, mockNext);
       } catch (error_) {
         failure = error_;
       }

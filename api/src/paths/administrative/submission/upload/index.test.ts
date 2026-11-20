@@ -1,10 +1,10 @@
 import Ajv from 'ajv';
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET, getAdminSubmissionUploadList } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import * as db from '../../../../database/db';
 import { HTTP403 } from '../../../../errors/http-error';
@@ -19,7 +19,7 @@ describe('administrative list of every submission upload', () => {
   it('requires system or data administrator authorization', async () => {
     sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    await (GET[0] as RequestHandler)(mockReq, mockRes, mockNext);
+    await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
     expect(mockReq.authorization_scheme).to.eql({
       and: [
         { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }
@@ -33,7 +33,7 @@ describe('administrative list of every submission upload', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     let caught: unknown;
     try {
-      await (GET[0] as RequestHandler)(mockReq, mockRes, mockNext);
+      await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
     } catch (error) {
       caught = error;
     }

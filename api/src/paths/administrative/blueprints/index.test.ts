@@ -1,8 +1,8 @@
 import Ajv from 'ajv';
 import { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { getOperationHandler } from '../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { dbDependencies } from '../../../database/db';
 import { ensureHTTPError } from '../../../errors/http-error';
@@ -25,7 +25,7 @@ describe('Configuration API boundaries', () => {
       const authorize = sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       try {
-        await (operation[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(operation, 0)(mockReq, mockRes, mockNext);
         expect.fail('Expected forbidden');
       } catch (error) {
         expect(ensureHTTPError(error).status).to.equal(403);
@@ -45,7 +45,7 @@ describe('Configuration API boundaries', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { blueprintId: '1' };
     mockReq.body = { name: 'Renamed', description: null };
-    await (PUT[1] as RequestHandler)(mockReq, mockRes, mockNext);
+    await getOperationHandler(PUT, 1)(mockReq, mockRes, mockNext);
     sinon.assert.calledWithExactly(update, 1, mockReq.body);
     sinon.assert.calledWith(mockRes.status, 200);
     sinon.assert.calledWith(mockRes.json, result);
