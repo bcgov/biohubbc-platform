@@ -40,7 +40,9 @@ describe('DownloadPolicyService', () => {
         policy_statement_id: 'ps-1',
         policy_id: 'p1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:*:*'
+        submission_feature_urn: 'urn:*:*:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: null
       };
 
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
@@ -95,7 +97,9 @@ describe('DownloadPolicyService', () => {
         policy_statement_id: 'ps-1',
         policy_id: 'p1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:*:*'
+        submission_feature_urn: 'urn:*:*:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: null
       };
 
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
@@ -112,7 +116,8 @@ describe('DownloadPolicyService', () => {
       const insertTeamPolicyStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves({
         team_policy_id: 'tp1',
         team_id: 't1',
-        policy_id: 'p1'
+        policy_id: 'p1',
+        record_end_date: null
       });
 
       await downloadPolicyService.createDownloadPolicy({
@@ -135,7 +140,9 @@ describe('DownloadPolicyService', () => {
         policy_statement_id: 'ps-1',
         policy_id: 'p1',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:*:*'
+        submission_feature_urn: 'urn:*:*:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: null
       };
 
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
@@ -178,7 +185,9 @@ describe('DownloadPolicyService', () => {
         policy_statement_id: 'ps-1',
         policy_id: 'p-returned',
         effect: PolicyEffect.ALLOW,
-        submission_feature_urn: 'urn:*:*:*'
+        submission_feature_urn: 'urn:*:*:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: null
       };
 
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
