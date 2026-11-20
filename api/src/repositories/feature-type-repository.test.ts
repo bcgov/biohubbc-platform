@@ -100,3 +100,22 @@ describe('FeatureTypeRepository', () => {
     });
   });
 });
+
+describe('FeatureTypeRepository.getActiveFeatureTypeIds', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('selects only the supplied feature types that are not retired', async () => {
+    const knexStub = sinon.stub().resolves({ rowCount: 1, rows: [{ feature_type_id: 1 }] });
+    const repository = new FeatureTypeRepository(getMockDBConnection({ knex: knexStub }));
+
+    const result = await repository.getActiveFeatureTypeIds([1, 2]);
+
+    const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
+    expect(result).to.eql([{ feature_type_id: 1 }]);
+    expect(sql).to.include('"feature_type_id" in');
+    expect(sql).to.include('"record_end_date" is null');
+    expect(bindings).to.eql([1, 2]);
+  });
+});

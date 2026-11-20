@@ -10,6 +10,7 @@ import { useBlueprintFeatureTypePropertiesApi } from './api/useBlueprintFeatureT
 import { useBlueprintsApi } from './api/useBlueprintsApi';
 import { useFeaturePropertiesApi } from './api/useFeaturePropertiesApi';
 import { useFeatureTypesApi } from './api/useFeatureTypesApi';
+import { useFormsApi } from './api/useFormsApi';
 import useCodesApi from './api/useCodesApi';
 import { useContributorsApi } from './api/useContributorsApi';
 import { useDataRequestApi } from './api/useDataRequestApi';
@@ -102,12 +103,15 @@ export const useApi = () => {
 
   const blueprintFeatureTypeProperties = useBlueprintFeatureTypePropertiesApi(apiAxios);
 
+  const forms = useFormsApi(apiAxios);
+
   const apis = {
     blueprints,
     blueprintFeatureTypes,
     blueprintFeatureTypeProperties,
     featureProperties,
     featureTypes,
+    forms,
     contributors,
     user,
     admin,

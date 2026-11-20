@@ -27,3 +27,17 @@ export const SubmissionRecord = z.object({
 });
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+
+export const FormRecord = z.object({
+  form_id: z.number(),
+  record_end_date: z.string().nullable()
+});
+
+export type FormRecord = z.infer<typeof FormRecord>;
+
+export const FormSubmissionRecord = z.object({
+  form_submission_id: z.number(),
+  record_end_date: z.string().nullable()
+});
+
+export type FormSubmissionRecord = z.infer<typeof FormSubmissionRecord>;

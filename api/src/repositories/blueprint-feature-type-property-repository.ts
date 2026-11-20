@@ -1,10 +1,14 @@
 import { Knex } from 'knex';
+import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CreateBlueprintFeatureTypePropertyRecord } from '../models/blueprint';
 import {
   BlueprintFeaturePropertyAssignment,
   BlueprintFeaturePropertyFilters,
+  BlueprintFeatureTypePropertyKey,
+  BlueprintFeatureTypePropertyPair,
+  EnsureBlueprintFeatureTypeProperty,
   UpdateBlueprintFeaturePropertyAssignment
 } from '../models/blueprint-composition';
 import { CountResult } from '../models/count';
@@ -281,5 +285,79 @@ export class BlueprintFeatureTypePropertyRepository extends BaseRepository {
     }
 
     return response.rows[0].blueprint_feature_type_property_id;
+  }
+
+  /**
+   * Ensure each property has an active membership in its blueprint feature type with the given sort, in one
+   * statement. Existing active memberships keep their identifiers and settings.
+   *
+   * @param properties Property memberships and their sort order.
+   * @returns Active membership identifiers of the supplied properties.
+   */
+  async ensureBlueprintFeatureTypeProperties(
+    properties: EnsureBlueprintFeatureTypeProperty[]
+  ): Promise<BlueprintFeatureTypePropertyKey[]> {
+    if (!properties.length) {
+      return [];
+    }
+
+    const blueprintFeatureTypeIds = properties.map((property) => property.blueprintFeatureTypeId);
+    const featurePropertyIds = properties.map((property) => property.featurePropertyId);
+    const sorts = properties.map((property) => property.sort);
+
+    const sqlStatement = SQL`
+      INSERT INTO blueprint_feature_type_property (blueprint_feature_type_id, feature_property_id, sort)
+      SELECT requested.blueprint_feature_type_id, requested.feature_property_id, requested.sort
+      FROM unnest(
+        ${blueprintFeatureTypeIds}::integer[],
+        ${featurePropertyIds}::integer[],
+        ${sorts}::integer[]
+      ) AS requested(blueprint_feature_type_id, feature_property_id, sort)
+      ON CONFLICT (blueprint_feature_type_id, feature_property_id) WHERE record_end_date IS NULL
+      DO UPDATE SET sort = EXCLUDED.sort
+      RETURNING blueprint_feature_type_property_id, blueprint_feature_type_id, feature_property_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, BlueprintFeatureTypePropertyKey);
+
+    return response.rows;
+  }
+
+  /**
+   * End the active property memberships of a blueprint that are not retained, including every membership of a feature
+   * type that is not retained. An empty list ends every active property membership of that blueprint only.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param pairs Property memberships to retain.
+   * @param date Database lifecycle date shared with parent deletion.
+   * @returns Resolves after persistence.
+   */
+  async deleteBlueprintFeatureTypePropertiesNotIn(
+    blueprintId: number,
+    pairs: BlueprintFeatureTypePropertyPair[],
+    date: string
+  ): Promise<void> {
+    const blueprintFeatureTypeIds = pairs.map((pair) => pair.blueprintFeatureTypeId);
+    const featurePropertyIds = pairs.map((pair) => pair.featurePropertyId);
+
+    const sqlStatement = SQL`
+      UPDATE blueprint_feature_type_property bftp
+      SET record_end_date = ${date}
+      FROM blueprint_feature_type bft
+      WHERE bft.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+        AND bft.blueprint_id = ${blueprintId}
+        AND bftp.record_end_date IS NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM unnest(
+            ${blueprintFeatureTypeIds}::integer[],
+            ${featurePropertyIds}::integer[]
+          ) AS retained(blueprint_feature_type_id, feature_property_id)
+          WHERE retained.blueprint_feature_type_id = bftp.blueprint_feature_type_id
+            AND retained.feature_property_id = bftp.feature_property_id
+        );
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 }

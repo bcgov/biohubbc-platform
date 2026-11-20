@@ -136,4 +136,16 @@ export class FeatureTypeService extends DBService {
   getAdminFeatureType(featureTypeId: number): Promise<FeatureType> {
     return this.featureTypeRepository.getAdminFeatureType(featureTypeId);
   }
+
+  /**
+   * Get the identifiers, among those supplied, of feature types that are not retired.
+   *
+   * @param featureTypeIds Feature type identifiers to check.
+   * @returns Active feature type identifiers.
+   */
+  async getActiveFeatureTypeIds(featureTypeIds: number[]): Promise<number[]> {
+    const rows = await this.featureTypeRepository.getActiveFeatureTypeIds(featureTypeIds);
+
+    return rows.map((row) => row.feature_type_id);
+  }
 }

@@ -2,6 +2,8 @@ import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import { DownloadPage } from 'features/download/DownloadPage';
 import { DownloadVersionPage } from 'features/download/DownloadVersionPage';
+import { FormSubmissionPage } from 'features/forms/FormSubmissionPage';
+import { FormSubmissionsPage } from 'features/forms/FormSubmissionsPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -121,6 +123,42 @@ export const AppRouter = () => {
           <BaseLayout>
             <PageTitle title="Download" description="Download status and details" />
             <DownloadPage />
+          </BaseLayout>
+        }
+      />
+
+      {/* Form submission page — open for a public form, otherwise for members of the form's teams. */}
+      <Route
+        path="/forms/:slug"
+        element={
+          <BaseLayout>
+            <PageTitle title="Form" description="Submit data through a form" />
+            <FormSubmissionPage />
+          </BaseLayout>
+        }
+      />
+
+      {/* A form's submissions and one form submission — signed-in members of the form submission or administration teams. */}
+      <Route
+        path="/forms/:slug/submissions"
+        element={
+          <BaseLayout>
+            <PageTitle title="Form Submissions" description="Submissions of a form" />
+            <AuthenticatedRouteGuard>
+              <FormSubmissionsPage />
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="/forms/:slug/submissions/:formSubmissionUuid"
+        element={
+          <BaseLayout>
+            <PageTitle title="Form Submission" description="Edit, submit or review a form submission" />
+            <AuthenticatedRouteGuard>
+              <FormSubmissionPage />
+            </AuthenticatedRouteGuard>
           </BaseLayout>
         }
       />

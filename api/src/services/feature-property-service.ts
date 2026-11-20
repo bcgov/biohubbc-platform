@@ -1,5 +1,10 @@
 import { IDBConnection } from '../database/db';
-import { CreateFeatureProperty, FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
+import {
+  CreateFeatureProperty,
+  FeatureProperty,
+  FeaturePropertyWithTypeName,
+  UpdateFeatureProperty
+} from '../models/feature-property';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { FeaturePropertyTypeRepository } from '../repositories/feature-property-type-repository';
 import { makePaginationResponse } from '../utils/pagination';
@@ -155,5 +160,15 @@ export class FeaturePropertyService extends DBService {
    */
   getAdminFeatureProperty(featurePropertyId: number): Promise<FeatureProperty> {
     return this.featurePropertyRepository.getAdminFeatureProperty(featurePropertyId);
+  }
+
+  /**
+   * Get the type names, among the supplied feature properties, of those that are not retired.
+   *
+   * @param featurePropertyIds Feature property identifiers to check.
+   * @returns Active feature property identifiers and their type names.
+   */
+  getActiveFeaturePropertyTypes(featurePropertyIds: number[]): Promise<FeaturePropertyWithTypeName[]> {
+    return this.featurePropertyRepository.getActiveFeaturePropertyTypes(featurePropertyIds);
   }
 }
