@@ -80,7 +80,8 @@ const validPerTypeRequest = (): CreateDownloadVersionExportRequest => ({
   version: 1,
   export_type: 'csv',
   mode: 'per_feature_type',
-  feature_types: ['observation']
+  feature_types: ['observation'],
+  merge_steps: []
 });
 
 describe('DownloadExportService', () => {
@@ -532,6 +533,7 @@ describe('DownloadExportService', () => {
             DOWNLOAD_ID,
             SYSTEM_USER_ID,
             {
+              download_version_id: VERSION_ID,
               version: 1,
               export_type: 'csv',
               mode: 'denormalized',

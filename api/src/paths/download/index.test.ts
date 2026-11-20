@@ -292,6 +292,7 @@ describe('paths/download/index', () => {
       const mockDownloads: DownloadListRecord[] = [
         {
           download_id: 'uuid-1',
+          download_version_id: 'dddd0000-0000-0000-0000-000000000001',
           download_status: 'ready',
           format: 'parquet',
           metadata: null,
@@ -330,6 +331,7 @@ describe('paths/download/index', () => {
       const mockDownloads: DownloadListRecord[] = [
         {
           download_id: 'uuid-1',
+          download_version_id: 'dddd0000-0000-0000-0000-000000000001',
           download_status: 'ready',
           format: 'csv',
           metadata: null,
@@ -341,7 +343,7 @@ describe('paths/download/index', () => {
           description: null,
           exports: [
             {
-              download_export_id: 'eeee0000-0000-0000-0000-000000000001',
+              download_version_export_id: 'eeee0000-0000-0000-0000-000000000001',
               download_id: 'uuid-1',
               format: 'csv',
               status: 'ready',
@@ -369,9 +371,9 @@ describe('paths/download/index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue.downloads[0].exports).to.have.length(1);
+      expect(mockRes.jsonValue.downloads[0].exports).to.have.lengthOf(1);
       expect(mockRes.jsonValue.downloads[0].exports[0]).to.have.property(
-        'download_export_id',
+        'download_version_export_id',
         'eeee0000-0000-0000-0000-000000000001'
       );
       expect(mockRes.jsonValue.downloads[0].exports[0]).to.have.property('part_count', 2);
