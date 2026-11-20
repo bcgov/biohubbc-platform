@@ -179,27 +179,27 @@ export interface IDBConnection {
    * Performs a query against this connection, returning the results.
    *
    * @param {SQLStatement} sqlStatement SQL statement object
-   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
+   * @param {z.ZodType<T>} zodSchema An optional zod schema
    * @return {*}  {(Promise<QueryResult<any>>)}
    * @throws If the connection is not open.
    * @memberof IDBConnection
    */
   sql: <T extends pg.QueryResultRow = any>(
     sqlStatement: SQLStatement,
-    zodSchema?: z.Schema<T, any, any>
+    zodSchema?: z.ZodType<T>
   ) => Promise<pg.QueryResult<T>>;
   /**
    * Performs a query against this connection, returning the results.
    *
    * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
-   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
+   * @param {z.ZodType<T>} zodSchema An optional zod schema
    * @return {*}  {(Promise<QueryResult<any>>)}
    * @throws If the connection is not open.
    * @memberof IDBConnection
    */
   knex: <T extends pg.QueryResultRow = any>(
     queryBuilder: Knex.QueryBuilder | Knex.Raw,
-    zodSchema?: z.Schema<T, any, any>
+    zodSchema?: z.ZodType<T>
   ) => Promise<pg.QueryResult<T>>;
   /**
    * Get the ID of the system user in context.
@@ -460,13 +460,13 @@ const getDBConnectionInternal = function (keycloakToken: object, options: IDBCon
    *
    * @template T
    * @param {SQLStatement} sqlStatement SQL statement object
-   * @param {z.ZodSchema<T, any, any>} [ZodSchema] An optional zod schema that defines the expected shape of a `row`.
+   * @param {z.ZodType<T>} [ZodSchema] An optional zod schema that defines the expected shape of a `row`.
    * @throws {Error} if the connection is not open
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
   const _sql = async <T extends pg.QueryResultRow = any>(
     sqlStatement: SQLStatement,
-    ZodSchema?: z.ZodSchema<T, any, any>
+    ZodSchema?: z.ZodType<T>
   ): Promise<pg.QueryResult<T>> => {
     const queryStart = Date.now();
 
@@ -511,7 +511,7 @@ const getDBConnectionInternal = function (keycloakToken: object, options: IDBCon
         zodResponse
       });
 
-      throw new ApiExecuteSQLError('Failed to validate database response', zodResponse.error.errors);
+      throw new ApiExecuteSQLError('Failed to validate database response', zodResponse.error.issues);
     }
 
     return response;
@@ -522,13 +522,13 @@ const getDBConnectionInternal = function (keycloakToken: object, options: IDBCon
    *
    * @template T
    * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
-   * @param {z.ZodSchema<T, any, any>} [ZodSchema] An optional zod schema that defines the expected shape of a `row`.
+   * @param {z.ZodType<T>} [ZodSchema] An optional zod schema that defines the expected shape of a `row`.
    * @throws {Error} if the connection is not open
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
   const _knex = async <T extends pg.QueryResultRow = any>(
     queryBuilder: Knex.QueryBuilder | Knex.Raw,
-    ZodSchema?: z.ZodSchema<T, any, any>
+    ZodSchema?: z.ZodType<T>
   ) => {
     const { sql, bindings } = queryBuilder.toSQL().toNative();
 
@@ -575,7 +575,7 @@ const getDBConnectionInternal = function (keycloakToken: object, options: IDBCon
         zodResponse
       });
 
-      throw new ApiExecuteSQLError('Failed to validate database response', zodResponse.error.errors);
+      throw new ApiExecuteSQLError('Failed to validate database response', zodResponse.error.issues);
     }
 
     return response;

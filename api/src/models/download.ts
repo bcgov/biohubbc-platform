@@ -5,7 +5,7 @@ import { ExpressionTree } from './expression-tree';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
-  download_version_id: z.string().uuid(), // resolved most-recent version (a committed download always has one)
+  download_version_id: z.guid(), // resolved most-recent version (a committed download always has one)
   download_status: DownloadStatusZod,
   format: z.string(),
   metadata: z.object({}).passthrough().nullable(),
@@ -59,9 +59,9 @@ export const DownloadFeatureData = z.object({
   submission_id: z.number(),
   uuid: z.string(),
   feature_type_name: z.string(),
-  data: z.record(z.any()),
+  data: z.record(z.string(), z.any()),
   // Parent denormalization columns - present when feature has a parent
-  parent_data: z.record(z.any()).nullable().optional(),
+  parent_data: z.record(z.string(), z.any()).nullable().optional(),
   parent_feature_type_name: z.string().nullable().optional()
 });
 export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
@@ -84,7 +84,7 @@ export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
  * user's grants and leak secured data into a public-by-link download.
  */
 export const DownloadSource = z.object({
-  policy_id: z.string().uuid(),
+  policy_id: z.guid(),
   requested_by: z.number().nullable()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
@@ -103,7 +103,7 @@ export type DownloadSource = z.infer<typeof DownloadSource>;
  * user's grants and leak secured data into a public-by-link download.
  */
 export const CreateDownload = z.object({
-  policyId: z.string().uuid(),
+  policyId: z.guid(),
   format: z.string(),
   requestedBy: z.number().nullable()
 });
@@ -140,7 +140,7 @@ export type HasTeams = z.infer<typeof HasTeams>;
  * JOINs download_artifact to artifact to get the object key.
  */
 export const DownloadArtifactInfo = z.object({
-  artifact_id: z.string().uuid(),
+  artifact_id: z.guid(),
   object_key: z.string()
 });
 export type DownloadArtifactInfo = z.infer<typeof DownloadArtifactInfo>;
@@ -175,7 +175,7 @@ export const ParquetFeatureData = z.object({
   submission_feature_id: z.number(),
   uuid: z.string(),
   feature_type_name: z.string(),
-  data: z.record(z.any()),
+  data: z.record(z.string(), z.any()),
   parent_uuid: z.string().nullable()
 });
 export type ParquetFeatureData = z.infer<typeof ParquetFeatureData>;

@@ -17,7 +17,7 @@ export const TicketSubmissionValidation = z.object({
   submission_validation_id: z.number(),
   job_id: z.string(),
   status: SubmissionValidationStatus,
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
   create_date: z.string()

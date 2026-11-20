@@ -38,7 +38,7 @@ import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpe
 
 // ── Typed row schemas for raw SELECTs ────────────────────────────────────
 
-const SecurityScopeIdRow = z.object({ security_scope_id: z.string().uuid() });
+const SecurityScopeIdRow = z.object({ security_scope_id: z.guid() });
 
 const CountRow = z.object({ count: z.number() });
 
@@ -46,9 +46,9 @@ const CountRow = z.object({ count: z.number() });
 // orphan — a row whose policy chain is missing or whose policy/statement gates
 // no longer satisfy the access invariant.
 const OrphanRow = z.object({
-  team_id: z.string().uuid().nullable(),
-  security_scope_id: z.string().uuid(),
-  policy_statement_id: z.string().uuid().nullable()
+  team_id: z.guid().nullable(),
+  security_scope_id: z.guid(),
+  policy_statement_id: z.guid().nullable()
 });
 
 describe('Policy status orchestration (integration)', function () {

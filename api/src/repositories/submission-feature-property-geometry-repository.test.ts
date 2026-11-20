@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
+import { GeoJSONGeometry } from '../zod-schema/geoJsonZodSchema';
 import { SubmissionFeaturePropertyGeometryRepository } from './submission-feature-property-geometry-repository';
 
 describe('SubmissionFeaturePropertyGeometryRepository', () => {
@@ -11,7 +12,7 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
     sinon.restore();
   });
 
-  const mockGeometry = {
+  const mockGeometry: GeoJSONGeometry = {
     type: 'Point',
     coordinates: [-123.1, 49.2]
   };

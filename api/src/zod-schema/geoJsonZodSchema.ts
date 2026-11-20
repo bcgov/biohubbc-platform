@@ -36,7 +36,20 @@ export const GeoJSONMultiPolygonZodSchema = z.object({
   bbox: z.array(z.number()).min(4).optional()
 });
 
-export const GeoJSONGeometryZodSchema: z.ZodTypeAny = z.lazy(() =>
+/**
+ * A GeoJSON geometry as {@link GeoJSONGeometryZodSchema} parses it. Declared by hand because a geometry collection
+ * contains geometries, and a schema that refers to itself cannot have its type inferred.
+ */
+export type GeoJSONGeometry =
+  | z.infer<typeof GeoJSONPointZodSchema>
+  | z.infer<typeof GeoJSONLineStringZodSchema>
+  | z.infer<typeof GeoJSONPolygonZodSchema>
+  | z.infer<typeof GeoJSONMultiPointZodSchema>
+  | z.infer<typeof GeoJSONMultiLineStringZodSchema>
+  | z.infer<typeof GeoJSONMultiPolygonZodSchema>
+  | { type: 'GeometryCollection'; geometries: GeoJSONGeometry[]; bbox?: number[] };
+
+export const GeoJSONGeometryZodSchema: z.ZodType<GeoJSONGeometry> = z.lazy(() =>
   z.union([
     GeoJSONPointZodSchema,
     GeoJSONLineStringZodSchema,

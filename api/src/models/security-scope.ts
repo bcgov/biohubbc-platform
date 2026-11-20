@@ -6,7 +6,7 @@ import { z } from 'zod';
  * regardless of which policy defined it.
  */
 export const SecurityScope = z.object({
-  security_scope_id: z.string().uuid(),
+  security_scope_id: z.guid(),
   scope_hash: z.string(),
   urn_submission_id: z.string(),
   urn_feature_type: z.string(),
@@ -21,8 +21,8 @@ export type SecurityScope = z.infer<typeof SecurityScope>;
  * strategy checks from candidates up to anchors, never expanding down.
  */
 export const SecurityScopeAnchor = z.object({
-  security_scope_anchor_id: z.string().uuid(),
-  security_scope_id: z.string().uuid(),
+  security_scope_anchor_id: z.guid(),
+  security_scope_id: z.guid(),
   anchor_submission_feature_id: z.number()
 });
 
@@ -34,9 +34,9 @@ export type SecurityScopeAnchor = z.infer<typeof SecurityScopeAnchor>;
  * Rebuilt synchronously on policy/team-policy mutations (~30 rows per team at scale).
  */
 export const TeamSecurityScope = z.object({
-  team_security_scope_id: z.string().uuid(),
-  team_id: z.string().uuid(),
-  security_scope_id: z.string().uuid()
+  team_security_scope_id: z.guid(),
+  team_id: z.guid(),
+  security_scope_id: z.guid()
 });
 
 export type TeamSecurityScope = z.infer<typeof TeamSecurityScope>;

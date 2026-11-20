@@ -38,7 +38,7 @@ import { getLogger } from './logger';
 const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   id: z.string().min(1, 'Feature entry is missing required string field: id'),
   type: z.string().min(1, 'Feature entry is missing required string field: type'),
-  properties: z.record(z.unknown()),
+  properties: z.record(z.string(), z.unknown()),
   content: z.array(z.string()),
   parent: z.string().nullable(),
   universal_id: z.string().min(1).max(200).optional()

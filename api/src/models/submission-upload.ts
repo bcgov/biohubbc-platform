@@ -38,15 +38,15 @@ export type RequestedSubmissionUploadDecision = z.infer<typeof RequestedSubmissi
  * SubmissionUpload table schema
  */
 export const SubmissionUpload = z.object({
-  submission_upload_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
   submission_id: z.number(),
-  upload_id: z.string().uuid(),
-  team_id: z.string().uuid(),
+  upload_id: z.guid(),
+  team_id: z.guid(),
   status: SubmissionUploadJobStatus,
   decision: SubmissionUploadDecision,
-  ticket_id: z.string().uuid(),
+  ticket_id: z.guid(),
   blueprint_id: z.number(),
-  successor_submission_upload_id: z.string().uuid().nullable().optional(),
+  successor_submission_upload_id: z.guid().nullable().optional(),
   comment: z.string().nullable().optional(),
   record_end_date: z.coerce.date().nullable().optional()
 });
@@ -94,8 +94,8 @@ export interface AdminSubmissionUploadListResponse {
  */
 export const CreateSubmissionUpload = z.object({
   submission_id: z.number(),
-  upload_id: z.string().uuid(),
-  ticket_id: z.string().uuid(),
+  upload_id: z.guid(),
+  ticket_id: z.guid(),
   status: SubmissionUploadJobStatus,
   blueprint_id: z.number(),
   comment: z.string().nullable().optional()
@@ -106,7 +106,7 @@ export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
  * SubmissionUpload payload after its owning team has been created.
  */
 export const CreateSubmissionUploadWithTeam = CreateSubmissionUpload.extend({
-  team_id: z.string().uuid()
+  team_id: z.guid()
 });
 export type CreateSubmissionUploadWithTeam = z.infer<typeof CreateSubmissionUploadWithTeam>;
 
@@ -119,8 +119,8 @@ export type CreateSubmissionUploadWithTeam = z.infer<typeof CreateSubmissionUplo
  */
 export const UpdateSubmissionUpload = z.object({
   submission_id: z.number().optional(),
-  upload_id: z.string().uuid().optional(),
-  ticket_id: z.string().uuid().optional()
+  upload_id: z.guid().optional(),
+  ticket_id: z.guid().optional()
 });
 export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
 
@@ -135,9 +135,9 @@ export const TicketSubmissionUploadReviews = z.object({
 export type TicketSubmissionUploadReviews = z.infer<typeof TicketSubmissionUploadReviews>;
 
 export const TicketSubmissionUpload = z.object({
-  submission_upload_id: z.string().uuid(),
+  submission_upload_id: z.guid(),
   submission_id: z.number().int().positive(),
-  upload_id: z.string().uuid(),
+  upload_id: z.guid(),
   create_date: z.string(),
   submission_name: z.string().nullable(),
   submission_description: z.string().nullable(),

@@ -4,8 +4,8 @@ export const TicketSystemUserStatus = z.enum(['requested', 'started', 'blocked',
 export type TicketSystemUserStatus = z.infer<typeof TicketSystemUserStatus>;
 
 export const TicketSystemUser = z.object({
-  ticket_system_user_id: z.string().uuid(),
-  ticket_id: z.string().uuid(),
+  ticket_system_user_id: z.guid(),
+  ticket_id: z.guid(),
   system_user_id: z.number().int(),
   status: TicketSystemUserStatus
 });

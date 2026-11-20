@@ -8,9 +8,9 @@ export { DownloadVersionExportMode };
  * Thin row returned by the `download_version_export` INSERT RETURNING — the table's own columns only.
  */
 export const DownloadVersionExportRow = z.object({
-  download_version_export_id: z.string().uuid(),
-  download_version_id: z.string().uuid(),
-  download_version_export_artifact_group_id: z.string().uuid(),
+  download_version_export_id: z.guid(),
+  download_version_id: z.guid(),
+  download_version_export_artifact_group_id: z.guid(),
   format: z.string(),
   mode: DownloadVersionExportMode,
   // BIGINT → string via pg default INT8 parser.
@@ -35,7 +35,7 @@ export const DownloadVersionExportRecord = DownloadVersionExportRow.omit({
   download_version_id: true,
   download_version_export_artifact_group_id: true
 }).extend({
-  download_id: z.string().uuid(),
+  download_id: z.guid(),
   status: DownloadStatusZod,
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
@@ -59,7 +59,7 @@ export type DownloadVersionExportRecord = z.infer<typeof DownloadVersionExportRe
  */
 export const CreateDownloadVersionExportRequest = ExportConfig.and(
   z.object({
-    download_version_id: z.string().uuid(),
+    download_version_id: z.guid(),
     max_part_size_bytes: z.string().optional()
   })
 );
@@ -77,11 +77,11 @@ export type CreateDownloadVersionExportRequest = z.infer<typeof CreateDownloadVe
  * insert, so an export is never persisted without a group.
  */
 export const CreateDownloadVersionExportPayload = z.object({
-  download_version_id: z.string().uuid(),
+  download_version_id: z.guid(),
   format: z.literal('csv'),
   mode: DownloadVersionExportMode,
   max_part_size_bytes: z.string(),
-  download_version_export_artifact_group_id: z.string().uuid()
+  download_version_export_artifact_group_id: z.guid()
 });
 export type CreateDownloadVersionExportPayload = z.infer<typeof CreateDownloadVersionExportPayload>;
 

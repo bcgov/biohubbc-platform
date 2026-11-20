@@ -9,8 +9,8 @@ import { DownloadStatusZod } from './download-status';
  * Minimal shape: these two columns are what the repository's INSERT RETURNING selects.
  */
 export const DownloadVersionRecord = z.object({
-  download_version_id: z.string().uuid(),
-  download_id: z.string().uuid()
+  download_version_id: z.guid(),
+  download_id: z.guid()
 });
 export type DownloadVersionRecord = z.infer<typeof DownloadVersionRecord>;
 
@@ -19,8 +19,8 @@ export type DownloadVersionRecord = z.infer<typeof DownloadVersionRecord>;
  * (not the download) owns the lifecycle, so status/timing/error live here.
  */
 export const DownloadVersionStatusRecord = z.object({
-  download_version_id: z.string().uuid(),
-  download_id: z.string().uuid(),
+  download_version_id: z.guid(),
+  download_id: z.guid(),
   status: DownloadStatusZod,
   feature_count: z.number().nullable(),
   started_at: z.string().nullable(),
