@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
-import { getMockDBConnection } from '../../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
   SubmissionUploadProcessingStatus,
@@ -20,9 +20,7 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
   describe('insertSubmissionUploadProcessingStatus', () => {
     it('returns the inserted row', async () => {
       const row = buildRow({ status: 'ingesting' });
-      const sqlStub = sinon
-        .stub()
-        .resolves({ rowCount: 1, rows: [row] } as QueryResult<SubmissionUploadProcessingStatus>);
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row]));
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.insertSubmissionUploadProcessingStatus(SUBMISSION_UPLOAD_ID, 'ingesting');
@@ -32,7 +30,7 @@ describe('SubmissionUploadProcessingStatusRepository', () => {
     });
 
     it('throws ApiExecuteSQLError when the insert does not return one row', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] } as QueryResult<any>);
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const repository = new SubmissionUploadProcessingStatusRepository(getMockDBConnection({ sql: sqlStub }));
 
       try {
