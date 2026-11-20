@@ -67,8 +67,9 @@ describe('SubmissionUploadReviewSecurityService', () => {
   }
 
   it('returns an empty rule page for a feature outside the upload using the scoped query', async () => {
-    const connection = getMockDBConnection({ sql: sinon.stub(), knex: sinon.stub() });
-    const service = new SubmissionUploadReviewSecurityService(connection);
+    const sql = sinon.stub();
+    const knex = sinon.stub();
+    const service = new SubmissionUploadReviewSecurityService(getMockDBConnection({ sql, knex }));
     sinon
       .stub(service.submissionUploadReviewService, 'getSubmissionUploadReview')
       .resolves({ scope: 'security' } as any);
@@ -80,7 +81,7 @@ describe('SubmissionUploadReviewSecurityService', () => {
     expect(rules.calledOnceWithExactly('upload', [999], {}, pagination)).equal(true);
     expect(result.rules).deep.equal([]);
     expect(result.pagination.total).equal(0);
-    expect((connection.sql as sinon.SinonStub).called).equal(false);
-    expect((connection.knex as sinon.SinonStub).called).equal(false);
+    expect(sql.called).to.be.false;
+    expect(knex.called).to.be.false;
   });
 });
