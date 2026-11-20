@@ -5,6 +5,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
 import { Ticket } from '../models/ticket';
+import { TicketTagSummary } from '../models/ticket-tag';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { TicketTagRepository } from '../repositories/ticket-tag-repository';
 import { BoardTicketService } from './board-ticket-service';
@@ -14,7 +15,13 @@ import { TicketTagService } from './ticket-tag-service';
 chai.use(sinonChai);
 
 const ticketId = '99999999-9999-9999-9999-999999999999';
-const tagA = { tag_id: '11111111-1111-1111-1111-111111111111', name: 'A', color: '#000000' };
+const tagA: TicketTagSummary = {
+  tag_id: '11111111-1111-1111-1111-111111111111',
+  name: 'A',
+  color: '#000000',
+  tag_rule_id: null,
+  tag_rule_name: null
+};
 
 describe('TicketTagService', () => {
   let service: TicketTagService;
