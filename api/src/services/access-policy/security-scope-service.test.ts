@@ -67,6 +67,9 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'stub-job-id' });
 
       const insertTeamGrantStub = sinon
         .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
@@ -126,6 +129,9 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'stub-job-id' });
       const insertTeamGrantStub = sinon
         .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
         .resolves();
@@ -146,6 +152,9 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'stub-job-id' });
       const insertTeamGrantStub = sinon
         .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesForPolicy')
         .resolves();
@@ -181,6 +190,70 @@ describe('SecurityScopeService', () => {
 
       // Sequential for-await — second statement never reached, team grant never runs.
       expect(insertTeamGrantStub).not.to.have.been.called;
+    });
+  });
+
+  describe('materializePolicyStatementScopes', () => {
+    const policyId = 'policy-1';
+    const scopeIdOne = '11111111-1111-1111-1111-111111111111';
+    const scopeIdTwo = '22222222-2222-2222-2222-222222222222';
+
+    it("publishes a bitmap job for each statement scope, after that scope's anchor job", async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ security_scope_id: scopeIdOne }, { security_scope_id: scopeIdTwo }]);
+      const anchorPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      const bitmapPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
+
+      const materialized = await service.materializePolicyStatementScopes(policyId);
+
+      expect(materialized).to.be.true;
+      expect(bitmapPublishStub).to.have.been.calledTwice;
+      expect(bitmapPublishStub.firstCall).to.have.been.calledWithExactly(mockDBConnection, {
+        securityScopeId: scopeIdOne
+      });
+      expect(bitmapPublishStub.secondCall).to.have.been.calledWithExactly(mockDBConnection, {
+        securityScopeId: scopeIdTwo
+      });
+      expect(anchorPublishStub.firstCall).to.have.been.calledBefore(bitmapPublishStub.firstCall);
+      expect(bitmapPublishStub.firstCall).to.have.been.calledBefore(anchorPublishStub.secondCall);
+    });
+
+    it('publishes neither job when the policy has no active ALLOW statements', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy').resolves([]);
+      const anchorPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob');
+      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
+
+      const materialized = await service.materializePolicyStatementScopes(policyId);
+
+      expect(materialized).to.be.false;
+      expect(anchorPublishStub).not.to.have.been.called;
+      expect(bitmapPublishStub).not.to.have.been.called;
+    });
+
+    it('throws when the bitmap publish fails, before the next statement is reached', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ security_scope_id: scopeIdOne }, { security_scope_id: scopeIdTwo }]);
+      const anchorPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.materializePolicyStatementScopes(policyId);
+        expect.fail('expected materializePolicyStatementScopes to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+
+      expect(anchorPublishStub).to.have.been.calledOnce;
     });
   });
 
@@ -235,6 +308,20 @@ describe('SecurityScopeService', () => {
         securityScopeId: 'scope-2',
         submissionId: 42
       });
+    });
+
+    it('does not publish a bitmap job: bitmaps are rebuilt on policy change only', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
+
+      await service.triggerAnchorComputationForSubmission(42);
+
+      expect(bitmapPublishStub).not.to.have.been.called;
     });
 
     it('does not publish when no scopes match the submission', async () => {

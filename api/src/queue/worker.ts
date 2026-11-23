@@ -12,6 +12,11 @@ import {
   IComputeScopeAnchorsJobData
 } from './jobs/compute-scope-anchors-job';
 import {
+  computeScopeFeatureBitmapFailedHandler,
+  computeScopeFeatureBitmapJobHandler,
+  IComputeScopeFeatureBitmapJobData
+} from './jobs/compute-scope-feature-bitmap-job';
+import {
   computeSubmissionFeatureClosureFailedHandler,
   computeSubmissionFeatureClosureJobHandler,
   IComputeSubmissionFeatureClosureJobData
@@ -87,6 +92,8 @@ export interface WorkerDependencies {
   indexSubmissionFeaturesFailedHandler: typeof indexSubmissionFeaturesFailedHandler;
   computeScopeAnchorsJobHandler: typeof computeScopeAnchorsJobHandler;
   computeScopeAnchorsFailedHandler: typeof computeScopeAnchorsFailedHandler;
+  computeScopeFeatureBitmapJobHandler: typeof computeScopeFeatureBitmapJobHandler;
+  computeScopeFeatureBitmapFailedHandler: typeof computeScopeFeatureBitmapFailedHandler;
   computeSubmissionFeatureClosureJobHandler: typeof computeSubmissionFeatureClosureJobHandler;
   computeSubmissionFeatureClosureFailedHandler: typeof computeSubmissionFeatureClosureFailedHandler;
   pollDownloadSchedulesJobHandler: typeof pollDownloadSchedulesJobHandler;
@@ -117,6 +124,8 @@ export const workerDependencies: WorkerDependencies = {
   indexSubmissionFeaturesFailedHandler,
   computeScopeAnchorsJobHandler,
   computeScopeAnchorsFailedHandler,
+  computeScopeFeatureBitmapJobHandler,
+  computeScopeFeatureBitmapFailedHandler,
   computeSubmissionFeatureClosureJobHandler,
   computeSubmissionFeatureClosureFailedHandler,
   pollDownloadSchedulesJobHandler,
@@ -294,6 +303,31 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IComputeScopeAnchorsJobData>(
     JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
     workerDependencies.computeScopeAnchorsFailedHandler
+  );
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' enforces the per-scope singletonKey used by bitmap jobs.
+  await boss.createQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, {
+    deadLetter: JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  // Register compute scope feature bitmap job handler
+  await boss.work<IComputeScopeFeatureBitmapJobData>(
+    JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP,
+    workerDependencies.computeScopeFeatureBitmapJobHandler
+  );
+
+  // Register dead letter queue handler for failed compute scope feature bitmap jobs
+  await boss.work<IComputeScopeFeatureBitmapJobData>(
+    JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED,
+    workerDependencies.computeScopeFeatureBitmapFailedHandler
   );
 
   // Create dead letter queue first (must exist before main queue references it)

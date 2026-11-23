@@ -68,6 +68,15 @@ export const JobQueues = {
    */
   COMPUTE_SCOPE_ANCHORS_FAILED: 'compute-scope-anchors-failed',
   /**
+   * Compute scope feature bitmap queue for async rebuild of a scope's granted feature ids after a policy change.
+   */
+  COMPUTE_SCOPE_FEATURE_BITMAP: 'compute-scope-feature-bitmap',
+  /**
+   * Dead letter queue for failed compute-scope-feature-bitmap jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  COMPUTE_SCOPE_FEATURE_BITMAP_FAILED: 'compute-scope-feature-bitmap-failed',
+  /**
    * Compute submission feature closure queue for async reachability recomputation after indexing.
    */
   COMPUTE_SUBMISSION_FEATURE_CLOSURE: 'compute-submission-feature-closure',

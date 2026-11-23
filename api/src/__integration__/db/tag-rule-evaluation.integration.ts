@@ -55,6 +55,9 @@ describe('Tag rule evaluation (integration)', function () {
     sinon
       .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
       .resolves({ status: 'published', jobId: 'stub-job-id' });
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
 
     connection = getAPIUserDBConnection();
     await connection.open();

@@ -12,6 +12,7 @@ import { SubmissionValidationService } from '../services/submission-validation-s
 import { JobQueues } from './jobs';
 import {
   publishComputeScopeAnchorsJob,
+  publishComputeScopeFeatureBitmapJob,
   publishComputeSubmissionFeatureClosureJob,
   publisherDependencies,
   publishEvaluateTicketTagRulesJob,
@@ -866,6 +867,103 @@ describe('publisher', () => {
 
       try {
         await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1', submissionId: null });
+        expect.fail('expected publisher to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss not initialized');
+      }
+    });
+  });
+
+  describe('publishComputeScopeFeatureBitmapJob', () => {
+    it('publishes job to correct queue with securityScopeId in payload', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('bitmap-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const data = { securityScopeId: 'scope-uuid-1' };
+      const result = await publishComputeScopeFeatureBitmapJob(mockConnection, data);
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('bitmap-job-id');
+    });
+
+    it('uses 30 minute timeout with retry backoff and a 10 second delay', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('bitmap-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishComputeScopeFeatureBitmapJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 30);
+      expect(options.startAfter).to.equal(10);
+    });
+
+    it('passes db option using caller connection for transactional job insert', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('bitmap-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishComputeScopeFeatureBitmapJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+    });
+
+    it('uses a per-scope singletonKey, distinct from the anchor job key, to coalesce repeated builds', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('bitmap-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishComputeScopeFeatureBitmapJob(mockConnection, { securityScopeId: 'scope-uuid-456' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('scope-feature-bitmap-scope-uuid-456');
+    });
+
+    it('returns duplicate status when send returns null', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      const result = await publishComputeScopeFeatureBitmapJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this security scope'
+      );
+    });
+
+    it('throws when pg-boss throws', async () => {
+      const mockConnection = getMockDBConnection();
+      sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      try {
+        await publishComputeScopeFeatureBitmapJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
         expect.fail('expected publisher to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss not initialized');
