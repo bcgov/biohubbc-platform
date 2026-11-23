@@ -19,6 +19,7 @@ RUN apt-get -qq install -y --no-install-recommends postgresql-$PG_MAJOR-postgis-
 RUN apt-get -qq install -y --no-install-recommends postgresql-$PG_MAJOR-postgis-$POSTGIS_VERSION-scripts
 RUN apt-get -qq install -y --no-install-recommends postgresql-$PG_MAJOR-pgrouting
 RUN apt-get -qq install -y --no-install-recommends postgresql-$PG_MAJOR-pgrouting-scripts
+RUN apt-get -qq install -y --no-install-recommends postgresql-$PG_MAJOR-roaringbitmap
 RUN apt-get -qq install -y --no-install-recommends postgresql-server-dev-$PG_MAJOR
 RUN apt-get -qq install -y --no-install-recommends pgbadger pg-activity wget unzip nano
 # pg_roaringbitmap is built from source: the PGDG apt repository has no release of this version. Keep
