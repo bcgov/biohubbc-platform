@@ -327,6 +327,40 @@ describe('SecurityScopeService', () => {
     });
   });
 
+  describe('buildScopeFeatureBitmap', () => {
+    it('builds a wildcard scope across every submission', async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      const stub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      await service.buildScopeFeatureBitmap('scope-1', urn);
+
+      expect(stub).to.have.been.calledOnceWith('scope-1', urn, null);
+    });
+
+    it('limits a scope naming one submission to that submission', async () => {
+      const urn = { urn_submission_id: '7', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      const stub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      await service.buildScopeFeatureBitmap('scope-1', urn);
+
+      expect(stub).to.have.been.calledOnceWith('scope-1', urn, 7);
+    });
+
+    it('propagates a repository failure', async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds')
+        .rejects(new Error('update failed'));
+
+      try {
+        await service.buildScopeFeatureBitmap('scope-1', urn);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('update failed');
+      }
+    });
+  });
+
   describe('getAnchorSubmissionId', () => {
     const wildcard = { urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' };
 

@@ -337,4 +337,19 @@ export class SecurityScopeService extends DBService {
   ): Promise<AnchorBatchResult | null> {
     return this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, afterId, submissionId);
   }
+
+  /**
+   * Rebuild the feature bitmap of a security scope from the features its anchors grant.
+   *
+   * A scope URN naming one submission limits the build to that submission; a wildcard scope spans
+   * every submission. Rebuilding on unchanged data stores the same bitmap, so a retry is safe.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @param urn URN components resolved via `resolveUrnForScope`
+   */
+  async buildScopeFeatureBitmap(securityScopeId: string, urn: SecurityScopeUrn): Promise<void> {
+    const submissionId = SecurityScopeService.getAnchorSubmissionId(urn, null);
+
+    await this.securityScopeRepository.updateSecurityScopeFeatureIds(securityScopeId, urn, submissionId);
+  }
 }

@@ -9,6 +9,65 @@ import { BaseRepository } from '../base-repository';
 import { isEffectivelySecured, isSubmissionFeatureCurrent } from '../sql-fragments';
 
 /**
+ * SQL text standing for the three components of a scope URN: positional placeholders (`'$2'`) or
+ * column references. Trusted text only, never user input.
+ */
+interface ScopeUrnSql {
+  submissionId: string;
+  featureType: string;
+  featureId: string;
+}
+
+/**
+ * Predicate for a feature that prunes a scope-anchor candidate below it: it matches the scope URN
+ * and is effectively secured.
+ *
+ * Feature lifecycle and the closure self-loop are deliberately not checked. A candidate is pruned by
+ * any URN-matching, effectively-secured proper ancestor in the closure snapshot, current or not.
+ *
+ * The result is an AND-joined list for use inside a WHERE or ON clause's AND chain.
+ *
+ * @param featureAlias SQL alias for submission_feature.
+ * @param featureTypeAlias SQL alias for the feature's feature_type row.
+ * @param urn SQL text for the scope URN components.
+ * @returns SQL predicate; its only placeholders are the ones passed in `urn`.
+ */
+function scopeAnchorAncestorPredicate(featureAlias: string, featureTypeAlias: string, urn: ScopeUrnSql): string {
+  return `(${urn.submissionId} = ${featureAlias}.submission_id::text OR ${urn.submissionId} = '*')
+           AND (${urn.featureType} = ${featureTypeAlias}.name OR ${urn.featureType} = '*')
+           AND (${urn.featureId} = ${featureAlias}.submission_feature_id::text OR ${urn.featureId} = '*')
+           AND ${isEffectivelySecured(`${featureAlias}.submission_feature_id`)}`;
+}
+
+/**
+ * Predicate for a scope-anchor candidate: a current feature with a closure self-loop that matches
+ * the scope URN and is effectively secured.
+ *
+ * `isEffectivelySecured` deliberately fails closed when closure is missing, so cache writers require
+ * the self-loop as positive evidence that the derived graph is available before they store anything.
+ *
+ * A candidate is an anchor when no proper ancestor satisfies {@link scopeAnchorAncestorPredicate}.
+ * The anchor batch and the feature bitmap build share both predicates so the two cannot drift.
+ *
+ * The result is an AND-joined list for use inside a WHERE or ON clause's AND chain.
+ *
+ * @param featureAlias SQL alias for submission_feature.
+ * @param featureTypeAlias SQL alias for the feature's feature_type row.
+ * @param urn SQL text for the scope URN components.
+ * @returns SQL predicate; its only placeholders are the ones passed in `urn`.
+ */
+function scopeAnchorCandidatePredicate(featureAlias: string, featureTypeAlias: string, urn: ScopeUrnSql): string {
+  return `${isSubmissionFeatureCurrent(featureAlias)}
+           AND EXISTS (
+             SELECT 1
+             FROM submission_feature_closure closure_ready
+             WHERE closure_ready.source_submission_feature_id = ${featureAlias}.submission_feature_id
+               AND closure_ready.target_submission_feature_id = ${featureAlias}.submission_feature_id
+           )
+           AND ${scopeAnchorAncestorPredicate(featureAlias, featureTypeAlias, urn)}`;
+}
+
+/**
  * Repository for security scope tables — the normalized access model that replaces
  * the materialized team_feature cache.
  *
@@ -376,6 +435,7 @@ export class SecurityScopeRepository extends BaseRepository {
       urn.urn_feature_id,
       SECURITY_SCOPE_ANCHOR_BATCH_SIZE
     ];
+    const urnSql: ScopeUrnSql = { submissionId: '$2', featureType: '$3', featureId: '$4' };
     let candidateSubmissionPredicate = '';
 
     if (submissionId !== null) {
@@ -391,21 +451,9 @@ export class SecurityScopeRepository extends BaseRepository {
          SELECT candidate.submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
-         WHERE ${isSubmissionFeatureCurrent('candidate')}
-           AND EXISTS (
-             -- isEffectivelySecured deliberately fails closed when closure is missing; cache writers
-             -- require positive evidence that the derived graph is available before creating anchors.
-             SELECT 1
-             FROM submission_feature_closure closure_ready
-             WHERE closure_ready.source_submission_feature_id = candidate.submission_feature_id
-               AND closure_ready.target_submission_feature_id = candidate.submission_feature_id
-           )
+         WHERE ${scopeAnchorCandidatePredicate('candidate', 'ft', urnSql)}
            AND candidate.submission_feature_id > $1
            ${candidateSubmissionPredicate}
-           AND ($2 = candidate.submission_id::text OR $2 = '*')
-           AND ($3 = ft.name                       OR $3 = '*')
-           AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
-           AND ${isEffectivelySecured('candidate.submission_feature_id')}
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ),
@@ -422,10 +470,7 @@ export class SecurityScopeRepository extends BaseRepository {
          JOIN submission_feature ancestor
            ON ancestor.submission_feature_id = ancestry.target_submission_feature_id
          JOIN feature_type ft ON ft.feature_type_id = ancestor.feature_type_id
-         WHERE ($2 = ancestor.submission_id::text OR $2 = '*')
-           AND ($3 = ft.name                      OR $3 = '*')
-           AND ($4 = ancestor.submission_feature_id::text OR $4 = '*')
-           AND ${isEffectivelySecured('ancestor.submission_feature_id')}
+         WHERE ${scopeAnchorAncestorPredicate('ancestor', 'ft', urnSql)}
        )
 
        -- Prune to topmost candidates only (anchors). A candidate with a candidate
@@ -457,27 +502,17 @@ export class SecurityScopeRepository extends BaseRepository {
 
     // All candidates in this batch were pruned (every candidate had a candidate
     // ancestor). Re-query for just the page boundary to advance the keyset.
-    // This boundary query uses the same candidate criteria as the batch CTE above —
-    // they MUST stay in sync or the keyset will skip/repeat candidates.
+    // This boundary query uses the same candidate criteria as the batch CTE above (one shared
+    // predicate and the same cursor and submission tests) or the keyset will skip/repeat candidates.
     const boundaryResult = await this.connection.query<{ last_id: number }>(
       `SELECT MAX(candidate.submission_feature_id) AS last_id
        FROM (
          SELECT candidate.submission_feature_id
          FROM submission_feature candidate
          JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
-         WHERE ${isSubmissionFeatureCurrent('candidate')}
-           AND EXISTS (
-             SELECT 1
-             FROM submission_feature_closure closure_ready
-             WHERE closure_ready.source_submission_feature_id = candidate.submission_feature_id
-               AND closure_ready.target_submission_feature_id = candidate.submission_feature_id
-           )
+         WHERE ${scopeAnchorCandidatePredicate('candidate', 'ft', urnSql)}
            AND candidate.submission_feature_id > $1
            ${candidateSubmissionPredicate}
-           AND ($2 = candidate.submission_id::text OR $2 = '*')
-           AND ($3 = ft.name                       OR $3 = '*')
-           AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
-           AND ${isEffectivelySecured('candidate.submission_feature_id')}
          ORDER BY candidate.submission_feature_id
          LIMIT $5
        ) candidate`,
@@ -489,6 +524,97 @@ export class SecurityScopeRepository extends BaseRepository {
     }
 
     return { pageLastId: boundaryResult.rows[0].last_id };
+  }
+
+  /**
+   * Rebuild the feature bitmap of a security scope: `security_scope.feature_ids`.
+   *
+   * The bitmap holds every feature the scope grants: each anchor of the scope and the anchor's
+   * descendants (closure rows with `is_ancestor = true`, which include the anchor's own self-loop),
+   * limited to available features — current, with a closure self-loop. Descendants are not tested
+   * against the URN or for security: an anchor grants its whole subtree, other feature types included.
+   *
+   * Anchors are re-derived here with the predicates `computeAnchorBatch` uses rather than read from
+   * `security_scope_anchor`, because the anchor job may not have run when this does. A scope that
+   * grants nothing stores an empty bitmap, not NULL.
+   *
+   * The whole set is aggregated and run-optimised inside the database in one statement; no feature
+   * id is returned to the caller. Rebuilding on unchanged data stores the same value, so a retry is safe.
+   *
+   * **Submission scope:** when `submissionId` is set, anchors are limited to that submission's features
+   * with an indexable equality on `submission_feature (submission_id, submission_feature_id)`. Closure
+   * is per submission, so the members are that submission's features too.
+   *
+   * @param {string} securityScopeId Security scope identifier whose bitmap is rebuilt.
+   * @param {SecurityScopeUrn} urn URN components resolved through {@link resolveUrnForScope}.
+   * @param {number | null} submissionId Submission the scope URN names, or null for every submission.
+   * @returns {Promise<void>}
+   * @throws {ApiExecuteSQLError} If the scope row was not updated.
+   * @memberof SecurityScopeRepository
+   */
+  async updateSecurityScopeFeatureIds(
+    securityScopeId: string,
+    urn: SecurityScopeUrn,
+    submissionId: number | null
+  ): Promise<void> {
+    const values: (string | number)[] = [
+      securityScopeId,
+      urn.urn_submission_id,
+      urn.urn_feature_type,
+      urn.urn_feature_id
+    ];
+    const urnSql: ScopeUrnSql = { submissionId: '$2', featureType: '$3', featureId: '$4' };
+    let anchorSubmissionPredicate = '';
+
+    if (submissionId !== null) {
+      values.push(submissionId);
+      anchorSubmissionPredicate = 'AND anchor.submission_id = $5::integer';
+    }
+
+    const result = await this.connection.query(
+      `UPDATE security_scope ss
+       SET feature_ids = rb_runoptimize(COALESCE((
+         SELECT rb_build_agg(member.submission_feature_id)
+         FROM submission_feature anchor
+         JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor.feature_type_id
+         JOIN submission_feature_closure reach
+           ON reach.target_submission_feature_id = anchor.submission_feature_id
+          AND reach.is_ancestor = true
+         JOIN submission_feature member
+           ON member.submission_feature_id = reach.source_submission_feature_id
+         WHERE ${scopeAnchorCandidatePredicate('anchor', 'anchor_ft', urnSql)}
+           ${anchorSubmissionPredicate}
+           -- A candidate with a candidate ancestor is not an anchor; its ancestor's anchor reaches it.
+           AND NOT EXISTS (
+             SELECT 1
+             FROM submission_feature_closure ancestry
+             JOIN submission_feature ancestor
+               ON ancestor.submission_feature_id = ancestry.target_submission_feature_id
+             JOIN feature_type ancestor_ft ON ancestor_ft.feature_type_id = ancestor.feature_type_id
+             WHERE ancestry.source_submission_feature_id = anchor.submission_feature_id
+               AND ancestry.target_submission_feature_id <> anchor.submission_feature_id
+               AND ancestry.is_ancestor = true
+               AND ${scopeAnchorAncestorPredicate('ancestor', 'ancestor_ft', urnSql)}
+           )
+           -- Only available members count: current, with a closure self-loop.
+           AND ${isSubmissionFeatureCurrent('member')}
+           AND EXISTS (
+             SELECT 1
+             FROM submission_feature_closure member_ready
+             WHERE member_ready.source_submission_feature_id = member.submission_feature_id
+               AND member_ready.target_submission_feature_id = member.submission_feature_id
+           )
+       ), rb_build('{}'::integer[])))
+       WHERE ss.security_scope_id = $1`,
+      values
+    );
+
+    if (result.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update security scope feature ids', [
+        'SecurityScopeRepository->updateSecurityScopeFeatureIds',
+        `rowCount was ${result.rowCount}, expected 1`
+      ]);
+    }
   }
 
   /**
