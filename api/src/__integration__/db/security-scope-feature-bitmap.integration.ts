@@ -14,11 +14,16 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { JobQueues } from '../../queue/jobs';
+import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { createTestUpload } from '../helpers/test-feature-property-helpers';
 import { computeAnchors, createPolicy, createPolicyStatement, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
+
+// The bitmap build queue. No JobQueues constant is assumed: the name is the contract.
+const COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE = 'compute-scope-feature-bitmap';
 
 describe('Security scope feature bitmap (integration)', function () {
   this.timeout(15000);
@@ -389,5 +394,108 @@ describe('Security scope feature bitmap (integration)', function () {
     expect(comparedScopeIds).to.include.members([surveyScopeId, submissionScopeId]);
     expect(comparedScopesWithAnchors, 'compared scopes that grant at least one feature').to.be.greaterThan(0);
     expect(await getIdsGrantedByAnchors(surveyScopeId)).to.eql(fixture.grantedIds);
+  });
+
+  // Publishes through the real pg-boss publishers: `SecurityScopeService.dependencies` is not stubbed.
+  // The publishers insert the job rows through the test's connection, so the rows are visible to
+  // the test and rolled back with it.
+  describe('policy change publishes the scope jobs', () => {
+    let createdBitmapQueue = false;
+
+    before(async () => {
+      const boss = await initPgBoss();
+      // The worker creates the anchor queue with the `short` policy.
+      await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS, { policy: 'short' });
+
+      // A queue must exist before a job can be sent to it. Create the bitmap queue only when no
+      // worker has, and remove it again afterwards, so the spec leaves no queue definition behind.
+      if (!(await boss.getQueue(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE))) {
+        await boss.createQueue(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, { policy: 'short' });
+        createdBitmapQueue = true;
+      }
+    });
+
+    after(async () => {
+      if (createdBitmapQueue) {
+        const boss = await initPgBoss();
+        await boss.deleteQueue(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE);
+      }
+
+      await stopPgBoss();
+    });
+
+    /**
+     * Create a policy with one ALLOW statement on a URN no other scope uses, so the statement's
+     * scope has no queued job from anywhere else.
+     */
+    async function createPolicyWithAllowStatement(
+      status: 'approved' | 'requested'
+    ): Promise<{ policyId: string; statementId: string; securityScopeId: string }> {
+      const submissionId = await createTestSubmission(connection);
+      const policyId = await createPolicy(connection, `Bitmap job policy ${submissionId}`, status);
+      const statementId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:survey:*`);
+      const result = await connection.sql(SQL`
+        SELECT security_scope_id
+        FROM policy_statement
+        WHERE policy_statement_id = ${statementId};
+      `);
+
+      return { policyId, statementId, securityScopeId: result.rows[0].security_scope_id };
+    }
+
+    /**
+     * Read the scope ids of the jobs queued under `queueName` for the given scope.
+     */
+    async function getQueuedScopeIds(queueName: string, securityScopeId: string): Promise<string[]> {
+      const result = await connection.sql(SQL`
+        SELECT data->>'securityScopeId' AS security_scope_id
+        FROM pgboss.job
+        WHERE name = ${queueName}
+          AND data->>'securityScopeId' = ${securityScopeId};
+      `);
+
+      return result.rows.map((row) => row.security_scope_id);
+    }
+
+    it('AC5 (a): an approved policy with an active ALLOW statement publishes one anchor job and one bitmap job for the statement scope', async () => {
+      const { policyId, securityScopeId } = await createPolicyWithAllowStatement('approved');
+
+      const materialized = await scopeService.materializePolicyStatementScopes(policyId);
+
+      expect(materialized).to.be.true;
+      expect(
+        await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_ANCHORS, securityScopeId),
+        `${JobQueues.COMPUTE_SCOPE_ANCHORS} jobs for the scope`
+      ).to.eql([securityScopeId]);
+      expect(
+        await getQueuedScopeIds(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, securityScopeId),
+        `${COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE} jobs for the scope`
+      ).to.eql([securityScopeId]);
+    });
+
+    it('AC5 (b): an unapproved policy with an active ALLOW statement publishes neither job', async () => {
+      const { policyId, securityScopeId } = await createPolicyWithAllowStatement('requested');
+
+      const materialized = await scopeService.materializePolicyStatementScopes(policyId);
+
+      expect(materialized).to.be.false;
+      expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_ANCHORS, securityScopeId)).to.eql([]);
+      expect(await getQueuedScopeIds(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, securityScopeId)).to.eql([]);
+    });
+
+    it('AC5 (c): an approved policy whose only ALLOW statement is ended publishes neither job', async () => {
+      const { policyId, statementId, securityScopeId } = await createPolicyWithAllowStatement('approved');
+      await connection.sql(SQL`
+        UPDATE policy_statement
+        SET record_end_date = now()
+        WHERE policy_statement_id = ${statementId};
+      `);
+
+      const materialized = await scopeService.materializePolicyStatementScopes(policyId);
+
+      expect(materialized).to.be.false;
+      expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_ANCHORS, securityScopeId)).to.eql([]);
+      expect(await getQueuedScopeIds(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, securityScopeId)).to.eql([]);
+    });
   });
 });
