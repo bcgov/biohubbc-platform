@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import { Navigate, useLocation, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { buildSubmissionPropertyValuePathResolvers, getSearchFeatureTypeRouteConfig } from 'utils/routes';
-import { buildSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
+import { buildAllSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultMapContainer } from './layout/map/SearchResultMapContainer';
 import { SearchResultSecuredAlert } from './content/SearchResultSecuredAlert';
@@ -40,7 +40,7 @@ export const SearchResultPage = () => {
 
   const routeConfig = getSearchFeatureTypeRouteConfig(featureType, codesQuery.data?.feature_type_with_properties);
   const featureTypeLinks = useMemo(
-    () => buildSearchFeatureTypeLinks(codesQuery.data?.feature_type_with_properties),
+    () => buildAllSearchFeatureTypeLinks(codesQuery.data?.feature_type_with_properties),
     [codesQuery.data?.feature_type_with_properties]
   );
   const pathResolvers = useMemo(
