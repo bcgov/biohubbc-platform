@@ -33,10 +33,12 @@ interface ScopeUrnSql {
  * @returns SQL predicate; its only placeholders are the ones passed in `urn`.
  */
 function scopeAnchorAncestorPredicate(featureAlias: string, featureTypeAlias: string, urn: ScopeUrnSql): string {
+  const featureIdColumn = `${featureAlias}.submission_feature_id`;
+
   return `(${urn.submissionId} = ${featureAlias}.submission_id::text OR ${urn.submissionId} = '*')
            AND (${urn.featureType} = ${featureTypeAlias}.name OR ${urn.featureType} = '*')
-           AND (${urn.featureId} = ${featureAlias}.submission_feature_id::text OR ${urn.featureId} = '*')
-           AND ${isEffectivelySecured(`${featureAlias}.submission_feature_id`)}`;
+           AND (${urn.featureId} = ${featureIdColumn}::text OR ${urn.featureId} = '*')
+           AND ${isEffectivelySecured(featureIdColumn)}`;
 }
 
 /**
