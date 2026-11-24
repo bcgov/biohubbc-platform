@@ -17,6 +17,7 @@ import { SubmissionUploadReviewSecurityService } from '../../services/upload/sub
 import { SubmissionUploadReviewService } from '../../services/upload/submission-upload-review-service';
 import { decodeSearchFeatureCursor } from '../../utils/pagination';
 import { createTestUpload } from '../helpers/test-feature-property-helpers';
+import { createPolicy, createPolicyStatement, createTeam, createTeamPolicy } from '../helpers/test-rbac-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
 
 // Every fixture and mutation is rolled back, including review completion and reset.
@@ -36,6 +37,9 @@ describe('Submission upload security review (integration)', function () {
   let service: SubmissionUploadReviewSecurityService;
   let reviewService: SubmissionUploadReviewService;
   let repository: SubmissionFeatureSecurityRepository;
+  let publishBitmapJobStub: sinon.SinonStubbedMember<
+    typeof SecurityScopeService.dependencies.publishComputeScopeFeatureBitmapJob
+  >;
   const pagination = { page: 1, limit: 50 };
 
   /**
@@ -63,6 +67,9 @@ describe('Submission upload security review (integration)', function () {
     // Security assignment changes queue scope-anchor recomputation; no queue runs in these tests.
     sinon
       .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
+    publishBitmapJobStub = sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
       .resolves({ status: 'published', jobId: 'stub-job-id' });
     connection = getAPIUserDBConnection();
     await connection.open();
@@ -1657,5 +1664,50 @@ describe('Submission upload security review (integration)', function () {
       }
     }
     expect(await repository.getSubmissionFeatureSecurities([parentId, childId])).to.eql([]);
+  });
+
+  // AC2
+  it('adding a rule assignment and then removing it each publish one bitmap refresh job, carrying the submission, per team-linked scope matching it', async () => {
+    // Team-linked wildcard scopes already in the database match every submission. End every live
+    // team link (rolled back with the test) so that exactly the two scopes below match this one.
+    await connection.sql(SQL`UPDATE team_policy SET record_end_date = now() WHERE record_end_date IS NULL`);
+    const securityScopeIds: string[] = [];
+    for (const urn of [`urn:${submissionId}:*:*`, 'urn:*:*:*']) {
+      const policyId = await createPolicy(connection, `Bitmap refresh policy ${urn} for ${submissionId}`);
+      const statementId = await createPolicyStatement(connection, policyId, urn);
+      const teamId = await createTeam(connection, `Bitmap refresh team ${urn} for ${submissionId}`);
+      await createTeamPolicy(connection, teamId, policyId);
+      const scope = await connection.sql(
+        SQL`SELECT security_scope_id FROM policy_statement WHERE policy_statement_id = ${statementId}`
+      );
+      securityScopeIds.push(scope.rows[0].security_scope_id);
+    }
+    const expected = securityScopeIds.map((securityScopeId) => ({ securityScopeId, submissionId }));
+    publishBitmapJobStub.resetHistory();
+
+    await service.insertSubmissionUploadReviewSecurityRuleAssignments(
+      submissionId,
+      submissionUploadId,
+      reviewA,
+      securityRuleId,
+      [parentId]
+    );
+    expect(
+      publishBitmapJobStub.getCalls().map((call) => call.args[1]),
+      'bitmap jobs published by adding the rule assignment'
+    ).to.have.deep.members(expected);
+
+    publishBitmapJobStub.resetHistory();
+    await service.deleteSubmissionUploadReviewSecurityRuleAssignments(
+      submissionId,
+      submissionUploadId,
+      reviewA,
+      securityRuleId,
+      [parentId]
+    );
+    expect(
+      publishBitmapJobStub.getCalls().map((call) => call.args[1]),
+      'bitmap jobs published by removing the rule assignment'
+    ).to.have.deep.members(expected);
   });
 });

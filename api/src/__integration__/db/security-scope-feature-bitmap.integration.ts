@@ -23,7 +23,14 @@ import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { createTestUpload } from '../helpers/test-feature-property-helpers';
-import { computeAnchors, createPolicy, createPolicyStatement, secureFeature } from '../helpers/test-rbac-helpers';
+import {
+  computeAnchors,
+  createPolicy,
+  createPolicyStatement,
+  createTeam,
+  createTeamPolicy,
+  secureFeature
+} from '../helpers/test-rbac-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('Security scope feature bitmap (integration)', function () {
@@ -497,6 +504,89 @@ describe('Security scope feature bitmap (integration)', function () {
       expect(materialized).to.be.false;
       expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_ANCHORS, securityScopeId)).to.eql([]);
       expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, securityScopeId)).to.eql([]);
+    });
+
+    /**
+     * Create a team-linked scope for the URN: an active ALLOW statement on an approved policy that a
+     * team is linked to through a live `team_policy` row.
+     */
+    async function createTeamLinkedScope(urn: string, label: string): Promise<string> {
+      const policyId = await createPolicy(connection, `Bitmap refresh policy ${label}`);
+      const statementId = await createPolicyStatement(connection, policyId, urn);
+      const teamId = await createTeam(connection, `Bitmap refresh team ${label}`);
+      await createTeamPolicy(connection, teamId, policyId);
+      const result = await connection.sql(SQL`
+        SELECT security_scope_id
+        FROM policy_statement
+        WHERE policy_statement_id = ${statementId};
+      `);
+
+      return result.rows[0].security_scope_id;
+    }
+
+    /**
+     * Read the scope and submission carried by the jobs queued under `queueName` for the submission.
+     */
+    async function getQueuedSubmissionJobs(
+      queueName: string,
+      submissionId: number
+    ): Promise<{ securityScopeId: string; submissionId: number }[]> {
+      const result = await connection.sql(SQL`
+        SELECT
+          data->>'securityScopeId' AS security_scope_id,
+          (data->>'submissionId')::int AS submission_id
+        FROM pgboss.job
+        WHERE name = ${queueName}
+          AND (data->>'submissionId')::int = ${submissionId};
+      `);
+
+      return result.rows.map((row) => ({ securityScopeId: row.security_scope_id, submissionId: row.submission_id }));
+    }
+
+    // AC1 (a)
+    it('the submission trigger publishes one bitmap refresh job and one anchor job, each carrying the submission, for every team-linked scope matching it', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const submissionScopeId = await createTeamLinkedScope(`urn:${submissionId}:*:*`, `submission ${submissionId}`);
+      const wildcardScopeId = await createTeamLinkedScope('urn:*:*:*', `wildcard ${submissionId}`);
+
+      await scopeService.triggerAnchorComputationForSubmission(submissionId);
+
+      const bitmapJobs = await getQueuedSubmissionJobs(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, submissionId);
+      const anchorJobs = await getQueuedSubmissionJobs(JobQueues.COMPUTE_SCOPE_ANCHORS, submissionId);
+
+      for (const securityScopeId of [submissionScopeId, wildcardScopeId]) {
+        expect(
+          anchorJobs.filter((job) => job.securityScopeId === securityScopeId),
+          `${JobQueues.COMPUTE_SCOPE_ANCHORS} jobs for scope ${securityScopeId}`
+        ).to.eql([{ securityScopeId, submissionId }]);
+        expect(
+          bitmapJobs.filter((job) => job.securityScopeId === securityScopeId),
+          `${JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP} jobs for scope ${securityScopeId}`
+        ).to.eql([{ securityScopeId, submissionId }]);
+      }
+    });
+
+    // AC1 (b)
+    it('the submission trigger publishes neither job for a submission that no team-linked scope matches', async () => {
+      // Team-linked wildcard scopes already in the database match every submission. End every live
+      // team link (rolled back with the test) so that nothing matches this one.
+      await connection.sql(SQL`
+        UPDATE team_policy
+        SET record_end_date = now()
+        WHERE record_end_date IS NULL;
+      `);
+      const submissionId = await createTestSubmission(connection);
+      // A team-linked scope that names a different submission must not match.
+      const otherSubmissionId = await createTestSubmission(connection);
+      await createTeamLinkedScope(`urn:${otherSubmissionId}:*:*`, `submission ${otherSubmissionId}`);
+
+      // Fixture check: no scope matches the submission.
+      expect(await scopeRepo.findScopeIdsMatchingSubmission(submissionId)).to.eql([]);
+
+      await scopeService.triggerAnchorComputationForSubmission(submissionId);
+
+      expect(await getQueuedSubmissionJobs(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, submissionId)).to.eql([]);
+      expect(await getQueuedSubmissionJobs(JobQueues.COMPUTE_SCOPE_ANCHORS, submissionId)).to.eql([]);
     });
   });
 });
