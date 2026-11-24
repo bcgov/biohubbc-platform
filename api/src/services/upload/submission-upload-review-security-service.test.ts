@@ -23,6 +23,9 @@ describe('SubmissionUploadReviewSecurityService', () => {
       const triggerAnchors = sinon
         .stub(service.securityScopeService, 'triggerAnchorComputationForSubmission')
         .resolves();
+      const revokeFromBitmaps = sinon
+        .stub(service.securityScopeService, 'revokeSubmissionFromScopeFeatureBitmaps')
+        .resolves();
       const input = {
         submissionId: 7,
         submissionUploadId: 'upload',
@@ -42,8 +45,12 @@ describe('SubmissionUploadReviewSecurityService', () => {
       });
       sinon.assert.calledOnceWithExactly(remove, { ...input, securityRuleIds: [8] });
       sinon.assert.calledOnceWithExactly(reset, input);
-      sinon.assert.calledThrice(triggerAnchors);
-      sinon.assert.alwaysCalledWithExactly(triggerAnchors, 7);
+      // Adding a rule queues recomputation only; both removals clear the bitmaps, which queues it too.
+      sinon.assert.calledOnceWithExactly(triggerAnchors, 7);
+      sinon.assert.callOrder(insert, triggerAnchors);
+      sinon.assert.calledTwice(revokeFromBitmaps);
+      sinon.assert.alwaysCalledWithExactly(revokeFromBitmaps, 7);
+      sinon.assert.callOrder(remove, revokeFromBitmaps, reset, revokeFromBitmaps);
     });
   }
 

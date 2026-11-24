@@ -713,6 +713,72 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
+   * Lock the row of every security scope whose URN matches a submission — the scopes naming it and the
+   * wildcard scopes — for a write to their feature bitmaps, until the transaction ends.
+   *
+   * Scopes are matched on the URN alone: no team link is required and a bitmap that was never built
+   * is locked too, so a removal waits for a first full build in flight and then clears what it wrote.
+   * Rows are locked in `security_scope_id` order, so two removals that share scopes cannot deadlock.
+   *
+   * A scope committed while this statement waited on a lock is not in its result; the caller repeats
+   * the statement until it locks nothing new.
+   *
+   * @param {number} submissionId Submission whose matching scopes are locked.
+   * @returns {Promise<SecurityScopeId[]>} The locked scopes.
+   * @memberof SecurityScopeRepository
+   */
+  async lockSecurityScopesForSubmissionFeatureIdsUpdate(submissionId: number): Promise<SecurityScopeId[]> {
+    const sqlStatement = SQL`
+      SELECT security_scope_id
+      FROM security_scope
+      WHERE urn_submission_id = ${String(submissionId)} OR urn_submission_id = '*'
+      ORDER BY security_scope_id
+      FOR NO KEY UPDATE;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SecurityScopeId);
+
+    return response.rows;
+  }
+
+  /**
+   * Remove every feature id of a submission from the feature bitmap of every security scope whose
+   * URN matches it: `security_scope.feature_ids`.
+   *
+   * Run when rule assignments are removed, in the transaction that removes them, so no bitmap keeps
+   * granting a feature that was covered only through a removed rule. Every feature row of the
+   * submission is removed, current or not; ids of other submissions are untouched. Scopes are
+   * matched on the URN alone, with or without a linked team. The caller locks the matching rows
+   * first ({@link lockSecurityScopesForSubmissionFeatureIdsUpdate}).
+   *
+   * Updating no row is a normal result and does not throw: a bitmap that was never built stays NULL,
+   * and a bitmap holding none of the submission's ids is not rewritten.
+   *
+   * @param {number} submissionId Submission whose ids are removed from the bitmaps.
+   * @returns {Promise<void>}
+   * @memberof SecurityScopeRepository
+   */
+  async updateSecurityScopeFeatureIdsWithoutSubmission(submissionId: number): Promise<void> {
+    await this.connection.query(
+      `UPDATE security_scope ss
+       SET feature_ids = rb_runoptimize(rb_andnot(ss.feature_ids, part.submission_ids))
+       FROM (
+         -- Every feature row of the submission, current or not.
+         SELECT COALESCE((
+           SELECT rb_build_agg(sf.submission_feature_id)
+           FROM submission_feature sf
+           WHERE sf.submission_id = $1::integer
+         ), rb_build('{}'::integer[])) AS submission_ids
+       ) part
+       WHERE (ss.urn_submission_id = $1::text OR ss.urn_submission_id = '*')
+         AND ss.feature_ids IS NOT NULL
+         -- Skip bitmaps that hold none of the submission's ids.
+         AND rb_intersect(ss.feature_ids, part.submission_ids)`,
+      [submissionId]
+    );
+  }
+
+  /**
    * Filter a list of scope IDs to those with no remaining active approved ALLOW
    * statement references.
    *

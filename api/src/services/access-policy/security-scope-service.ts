@@ -382,4 +382,40 @@ export class SecurityScopeService extends DBService {
     await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
     await this.securityScopeRepository.updateSecurityScopeFeatureIdsForSubmission(securityScopeId, urn, submissionId);
   }
+
+  /**
+   * Remove a submission's ids from the feature bitmap of every security scope whose URN matches it,
+   * then queue the recomputation that adds back what each scope still grants.
+   *
+   * Called in the transaction that removes rule assignments, after the rows are deleted, so no bitmap
+   * keeps granting a feature that was covered only through a removed rule once the removal commits.
+   * Every matching scope is cleared, with or without a linked team.
+   *
+   * The matching rows are locked first, so the clear waits for any other writer of those bitmaps (a
+   * full build, a refresh) and then works from what it committed. A scope committed while a lock
+   * pass was waiting is not seen by that pass, so the pass is repeated until it locks nothing new.
+   *
+   * @param submissionId The submission whose rule assignments were removed
+   */
+  async revokeSubmissionFromScopeFeatureBitmaps(submissionId: number): Promise<void> {
+    const lockedScopeIds = new Set<string>();
+    let lockedNewScope = true;
+
+    while (lockedNewScope) {
+      const scopes = await this.securityScopeRepository.lockSecurityScopesForSubmissionFeatureIdsUpdate(submissionId);
+
+      lockedNewScope = scopes.some((scope) => !lockedScopeIds.has(scope.security_scope_id));
+
+      for (const scope of scopes) {
+        lockedScopeIds.add(scope.security_scope_id);
+      }
+    }
+
+    // No matching scope means no bitmap to clear, so the scan of the submission's features is skipped.
+    if (lockedScopeIds.size > 0) {
+      await this.securityScopeRepository.updateSecurityScopeFeatureIdsWithoutSubmission(submissionId);
+    }
+
+    await this.triggerAnchorComputationForSubmission(submissionId);
+  }
 }

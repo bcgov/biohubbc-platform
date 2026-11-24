@@ -1198,5 +1198,84 @@ describe('Security scope feature bitmap refresh (integration)', function () {
         );
       }
     });
+
+    // Discovery: a removal waits for a scope's first full build, then clears what the build wrote.
+    it('a rule removal started while the first full build of a scope is uncommitted clears the revoked parent and child from the bitmap that build writes', async () => {
+      const scope = await commitRows(async (db) => {
+        const seeded = await seedReviewedSubmissionScope(db);
+
+        // A scope that was never built: other connections see a NULL bitmap until the build commits.
+        await db.sql(SQL`
+          UPDATE security_scope
+          SET feature_ids = NULL
+          WHERE security_scope_id = ${seeded.securityScopeId};
+        `);
+
+        return seeded;
+      });
+      committedScope = scope;
+      const { submission } = scope;
+
+      try {
+        firstConnection = await openConnection();
+        secondConnection = await openConnection();
+
+        // Connection 1: the scope's first full build, uncommitted.
+        await new SecurityScopeService(firstConnection).buildScopeFeatureBitmap(scope.securityScopeId, scope.urn);
+
+        // Fixture checks: the build wrote the parent and the child, and nobody else sees them yet.
+        const built = await getBitmap(firstConnection, scope.securityScopeId);
+        const committed = await connection.sql(SQL`
+          SELECT feature_ids IS NULL AS is_null
+          FROM security_scope
+          WHERE security_scope_id = ${scope.securityScopeId};
+        `);
+
+        expect(built.ids, 'fixture: feature_ids written by the uncommitted full build').to.eql(submission.builtIds);
+        expect(committed.rows[0].is_null, 'fixture: committed feature_ids IS NULL while the build is open').to.be.true;
+
+        // Connection 2: start removing the rule that is the only cover of the child.
+        const pending = new SubmissionUploadReviewSecurityService(
+          secondConnection
+        ).deleteSubmissionUploadReviewSecurityRuleAssignments(
+          submission.submissionId,
+          submission.submissionUploadId,
+          scope.submissionUploadReviewId,
+          SEEDED_SECURITY_RULE_ID,
+          [submission.anchorId]
+        );
+        // Awaited below; this only keeps an early rejection from being reported as unhandled.
+        pending.catch(() => undefined);
+
+        await delay(OVERLAP_MS);
+        await firstConnection.commit();
+        await pending;
+        await secondConnection.commit();
+
+        const bitmap = await getBitmap(connection, scope.securityScopeId);
+
+        expect(bitmap.ids, 'parent the rule was removed from').to.not.include(submission.anchorId);
+        expect(bitmap.ids, 'child covered only through the removed rule').to.not.include(submission.childId);
+      } finally {
+        // As in the test above: both transactions end, the first connection's before the second's, so
+        // nothing holds a lock on the scope when the review and then the fixture rows are deleted.
+        for (const openedConnection of [firstConnection, secondConnection]) {
+          if (openedConnection) {
+            await openedConnection.rollback();
+            openedConnection.release();
+          }
+        }
+
+        firstConnection = null;
+        secondConnection = null;
+
+        await commitRows((db) =>
+          db.sql(SQL`
+            DELETE FROM submission_upload_review
+            WHERE submission_upload_review_id = ${scope.submissionUploadReviewId}::uuid;
+          `)
+        );
+      }
+    });
   });
 });
