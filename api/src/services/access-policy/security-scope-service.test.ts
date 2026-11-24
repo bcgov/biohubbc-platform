@@ -446,6 +446,97 @@ describe('SecurityScopeService', () => {
         expect((error as Error).message).to.equal('update failed');
       }
     });
+
+    it("locks the scope's row before it rebuilds the bitmap", async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      const lockStub = sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      const updateStub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      await service.buildScopeFeatureBitmap('scope-1', urn);
+
+      expect(lockStub).to.have.been.calledOnceWith('scope-1');
+      expect(lockStub).to.have.been.calledBefore(updateStub);
+    });
+
+    it('does not rebuild the bitmap when the lock fails', async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate')
+        .rejects(new Error('lock failed'));
+      const updateStub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      try {
+        await service.buildScopeFeatureBitmap('scope-1', urn);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('lock failed');
+      }
+
+      expect(updateStub).not.to.have.been.called;
+    });
+  });
+
+  describe('refreshScopeFeatureBitmapForSubmission', () => {
+    const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+
+    it("locks the scope's row, then refreshes the submission's part of the bitmap", async () => {
+      const lockStub = sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      const refreshStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .resolves();
+      const buildStub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      await service.refreshScopeFeatureBitmapForSubmission('scope-1', urn, 42);
+
+      expect(lockStub).to.have.been.calledOnceWith('scope-1');
+      expect(refreshStub).to.have.been.calledOnceWith('scope-1', urn, 42);
+      expect(lockStub).to.have.been.calledBefore(refreshStub);
+      expect(buildStub).not.to.have.been.called;
+    });
+
+    it('refreshes the triggering submission, not the one a scope URN names', async () => {
+      const namedUrn = { ...urn, urn_submission_id: '7' };
+      sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      const refreshStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .resolves();
+
+      await service.refreshScopeFeatureBitmapForSubmission('scope-1', namedUrn, 42);
+
+      expect(refreshStub).to.have.been.calledOnceWith('scope-1', namedUrn, 42);
+    });
+
+    it('does not refresh the bitmap when the lock fails', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate')
+        .rejects(new Error('lock failed'));
+      const refreshStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .resolves();
+
+      try {
+        await service.refreshScopeFeatureBitmapForSubmission('scope-1', urn, 42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('lock failed');
+      }
+
+      expect(refreshStub).not.to.have.been.called;
+    });
+
+    it('propagates a repository failure', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .rejects(new Error('update failed'));
+
+      try {
+        await service.refreshScopeFeatureBitmapForSubmission('scope-1', urn, 42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('update failed');
+      }
+    });
   });
 
   describe('getAnchorSubmissionId', () => {

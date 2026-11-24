@@ -8,7 +8,7 @@
 // the spec can hold shapes the recompute never produces together: a non-current feature that still
 // has closure rows, and a current feature with ancestry rows but no self-loop.
 //
-// The first four tests write their rows in a transaction that is ROLLED BACK. The two tests under
+// The first six tests write their rows in a transaction that is ROLLED BACK. The two tests under
 // "with two connections" need rows other connections can see, so they COMMIT their fixture and
 // delete it again in `afterEach`. What stays behind from those two: the audit_log entries the
 // journal triggers write for the committed inserts and deletes.
@@ -444,6 +444,55 @@ describe('Security scope feature bitmap refresh (integration)', function () {
     expect(second.hex, 'feature_ids::bytea after the second refresh').to.equal(first.hex);
   });
 
+  // Discovery: the full build owns the first build.
+  it('a refresh leaves a bitmap that was never built NULL', async () => {
+    const scope = await seedBuiltScope(connection, 1);
+    const [submissionA] = scope.submissions;
+
+    await connection.sql(SQL`
+      UPDATE security_scope
+      SET feature_ids = NULL
+      WHERE security_scope_id = ${scope.securityScopeId};
+    `);
+
+    await refreshServiceFor(connection).refreshScopeFeatureBitmapForSubmission(
+      scope.securityScopeId,
+      scope.urn,
+      submissionA.submissionId
+    );
+
+    const result = await connection.sql(SQL`
+      SELECT feature_ids IS NULL AS is_null
+      FROM security_scope
+      WHERE security_scope_id = ${scope.securityScopeId};
+    `);
+
+    expect(result.rows[0].is_null, 'feature_ids IS NULL after the refresh').to.be.true;
+  });
+
+  // Discovery: zero rows updated is a normal result for the refresh.
+  it('a refresh of a scope id that does not exist resolves and writes no other scope', async () => {
+    const scope = await seedBuiltScope(connection, 1);
+    const [submissionA] = scope.submissions;
+    const missingScopeId = randomUUID();
+
+    const before = await getScopeRowVersion(connection, scope.securityScopeId);
+
+    await refreshServiceFor(connection).refreshScopeFeatureBitmapForSubmission(
+      missingScopeId,
+      scope.urn,
+      submissionA.submissionId
+    );
+
+    const missing = await connection.sql(SQL`
+      SELECT 1 FROM security_scope WHERE security_scope_id = ${missingScopeId};
+    `);
+    const after = await getScopeRowVersion(connection, scope.securityScopeId);
+
+    expect(missing.rows, 'rows for the missing scope id').to.have.length(0);
+    expect(after.ctid, 'ctid of the existing scope').to.equal(before.ctid);
+  });
+
   describe('with two connections', function () {
     // Long enough for a lock wait that ends when the first connection commits; short enough that a
     // call that never returns fails the test instead of hanging the suite.
@@ -647,9 +696,19 @@ describe('Security scope feature bitmap refresh (integration)', function () {
       expect(afterBoth.ids, 'new id of submission A').to.include(newId);
       expect(afterBoth.ids, 'ended id of submission A').to.not.include(endedId);
 
-      // One more full build on the same data, on the test's rolled-back connection.
-      await new SecurityScopeService(connection).buildScopeFeatureBitmap(scope.securityScopeId, scope.urn);
-      const rebuilt = await getBitmap(connection, scope.securityScopeId);
+      // One more full build on the same data, on a connection that is rolled back before the cleanup
+      // hook runs: the build holds the scope's row lock, which the hook's DELETE would wait on.
+      const rebuildConnection = getAPIUserDBConnection();
+      await rebuildConnection.open();
+      let rebuilt: Awaited<ReturnType<typeof getBitmap>>;
+
+      try {
+        await new SecurityScopeService(rebuildConnection).buildScopeFeatureBitmap(scope.securityScopeId, scope.urn);
+        rebuilt = await getBitmap(rebuildConnection, scope.securityScopeId);
+      } finally {
+        await rebuildConnection.rollback();
+        rebuildConnection.release();
+      }
 
       expect(afterBoth.hex, 'feature_ids::bytea after both commits vs after one more full build').to.equal(rebuilt.hex);
     });

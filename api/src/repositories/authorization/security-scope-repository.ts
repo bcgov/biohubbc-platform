@@ -529,6 +529,52 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
+   * SQL text of the subquery that aggregates the features a scope grants into one bitmap, shared by
+   * the full build ({@link updateSecurityScopeFeatureIds}) and the per-submission refresh
+   * ({@link updateSecurityScopeFeatureIdsForSubmission}) so the two cannot drift.
+   *
+   * The result is NULL, not an empty bitmap, when the scope grants nothing; callers COALESCE it.
+   *
+   * @param {ScopeUrnSql} urnSql SQL text for the scope URN components.
+   * @param {string} submissionPredicate `AND`-prefixed predicate limiting `anchor` to one submission, or
+   * an empty string for every submission. Trusted text only, never user input.
+   * @returns {string} A scalar `SELECT rb_build_agg(...)` subquery, without enclosing parentheses.
+   * @memberof SecurityScopeRepository
+   */
+  private buildScopeFeatureIdsQuery(urnSql: ScopeUrnSql, submissionPredicate: string): string {
+    return `SELECT rb_build_agg(member.submission_feature_id)
+         FROM submission_feature anchor
+         JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor.feature_type_id
+         JOIN submission_feature_closure reach
+           ON reach.target_submission_feature_id = anchor.submission_feature_id
+          AND reach.is_ancestor = true
+         JOIN submission_feature member
+           ON member.submission_feature_id = reach.source_submission_feature_id
+         WHERE ${scopeAnchorCandidatePredicate('anchor', 'anchor_ft', urnSql)}
+           ${submissionPredicate}
+           -- A candidate with a candidate ancestor is not an anchor; its ancestor's anchor reaches it.
+           AND NOT EXISTS (
+             SELECT 1
+             FROM submission_feature_closure ancestry
+             JOIN submission_feature ancestor
+               ON ancestor.submission_feature_id = ancestry.target_submission_feature_id
+             JOIN feature_type ancestor_ft ON ancestor_ft.feature_type_id = ancestor.feature_type_id
+             WHERE ancestry.source_submission_feature_id = anchor.submission_feature_id
+               AND ancestry.target_submission_feature_id <> anchor.submission_feature_id
+               AND ancestry.is_ancestor = true
+               AND ${scopeAnchorAncestorPredicate('ancestor', 'ancestor_ft', urnSql)}
+           )
+           -- Only available members count: current, with a closure self-loop.
+           AND ${isSubmissionFeatureCurrent('member')}
+           AND EXISTS (
+             SELECT 1
+             FROM submission_feature_closure member_ready
+             WHERE member_ready.source_submission_feature_id = member.submission_feature_id
+               AND member_ready.target_submission_feature_id = member.submission_feature_id
+           )`;
+  }
+
+  /**
    * Rebuild the feature bitmap of a security scope: `security_scope.feature_ids`.
    *
    * The bitmap holds every feature the scope grants: each anchor of the scope and the anchor's
@@ -576,36 +622,7 @@ export class SecurityScopeRepository extends BaseRepository {
     const result = await this.connection.query(
       `UPDATE security_scope ss
        SET feature_ids = rb_runoptimize(COALESCE((
-         SELECT rb_build_agg(member.submission_feature_id)
-         FROM submission_feature anchor
-         JOIN feature_type anchor_ft ON anchor_ft.feature_type_id = anchor.feature_type_id
-         JOIN submission_feature_closure reach
-           ON reach.target_submission_feature_id = anchor.submission_feature_id
-          AND reach.is_ancestor = true
-         JOIN submission_feature member
-           ON member.submission_feature_id = reach.source_submission_feature_id
-         WHERE ${scopeAnchorCandidatePredicate('anchor', 'anchor_ft', urnSql)}
-           ${anchorSubmissionPredicate}
-           -- A candidate with a candidate ancestor is not an anchor; its ancestor's anchor reaches it.
-           AND NOT EXISTS (
-             SELECT 1
-             FROM submission_feature_closure ancestry
-             JOIN submission_feature ancestor
-               ON ancestor.submission_feature_id = ancestry.target_submission_feature_id
-             JOIN feature_type ancestor_ft ON ancestor_ft.feature_type_id = ancestor.feature_type_id
-             WHERE ancestry.source_submission_feature_id = anchor.submission_feature_id
-               AND ancestry.target_submission_feature_id <> anchor.submission_feature_id
-               AND ancestry.is_ancestor = true
-               AND ${scopeAnchorAncestorPredicate('ancestor', 'ancestor_ft', urnSql)}
-           )
-           -- Only available members count: current, with a closure self-loop.
-           AND ${isSubmissionFeatureCurrent('member')}
-           AND EXISTS (
-             SELECT 1
-             FROM submission_feature_closure member_ready
-             WHERE member_ready.source_submission_feature_id = member.submission_feature_id
-               AND member_ready.target_submission_feature_id = member.submission_feature_id
-           )
+         ${this.buildScopeFeatureIdsQuery(urnSql, anchorSubmissionPredicate)}
        ), rb_build('{}'::integer[])))
        WHERE ss.security_scope_id = $1`,
       values
@@ -617,6 +634,82 @@ export class SecurityScopeRepository extends BaseRepository {
         `rowCount was ${result.rowCount}, expected 1`
       ]);
     }
+  }
+
+  /**
+   * Refresh one submission's part of a security scope's feature bitmap: `security_scope.feature_ids`.
+   *
+   * Every feature id of the submission, current or not, is removed from the stored bitmap, and the
+   * ids a full build would grant for that submission are added back, so superseded and ended
+   * features leave the bitmap and ids of other submissions are untouched. The stored bitmap is read
+   * from the row being updated; the caller locks that row first
+   * ({@link lockSecurityScopeForFeatureIdsUpdate}) so writers of one scope's bitmap run one at a time.
+   *
+   * Updating no row is a normal result and does not throw: the refreshed bitmap equals the stored
+   * one (the row is not rewritten), the bitmap is NULL (the full build owns the first build), or the
+   * scope no longer exists.
+   *
+   * @param {string} securityScopeId Security scope identifier whose bitmap is refreshed.
+   * @param {SecurityScopeUrn} urn URN components resolved through {@link resolveUrnForScope}.
+   * @param {number} submissionId Submission whose ids are replaced in the bitmap.
+   * @returns {Promise<void>}
+   * @memberof SecurityScopeRepository
+   */
+  async updateSecurityScopeFeatureIdsForSubmission(
+    securityScopeId: string,
+    urn: SecurityScopeUrn,
+    submissionId: number
+  ): Promise<void> {
+    const values: (string | number)[] = [
+      securityScopeId,
+      urn.urn_submission_id,
+      urn.urn_feature_type,
+      urn.urn_feature_id,
+      submissionId
+    ];
+    const urnSql: ScopeUrnSql = { submissionId: '$2', featureType: '$3', featureId: '$4' };
+
+    await this.connection.query(
+      `UPDATE security_scope ss
+       SET feature_ids = rb_runoptimize(rb_or(rb_andnot(ss.feature_ids, part.submission_ids), part.fresh_ids))
+       FROM (
+         SELECT
+           -- Every feature row of the submission, current or not.
+           COALESCE((
+             SELECT rb_build_agg(sf.submission_feature_id)
+             FROM submission_feature sf
+             WHERE sf.submission_id = $5::integer
+           ), rb_build('{}'::integer[])) AS submission_ids,
+           COALESCE((
+         ${this.buildScopeFeatureIdsQuery(urnSql, 'AND anchor.submission_id = $5::integer')}
+           ), rb_build('{}'::integer[])) AS fresh_ids
+       ) part
+       WHERE ss.security_scope_id = $1
+         AND ss.feature_ids IS NOT NULL
+         -- Skip the write when the refreshed bitmap equals the stored one.
+         AND ss.feature_ids IS DISTINCT FROM
+             rb_runoptimize(rb_or(rb_andnot(ss.feature_ids, part.submission_ids), part.fresh_ids))`,
+      values
+    );
+  }
+
+  /**
+   * Lock a security scope's row for a write to its feature bitmap, until the transaction ends.
+   *
+   * `FOR NO KEY UPDATE` is the lock the bitmap UPDATE takes anyway: it blocks other writers of the
+   * row, not readers or inserts that reference the scope. Taken as its own statement, it makes the
+   * UPDATE that follows start after any in-flight writer of the bitmap has committed, and see its data.
+   *
+   * @param {string} securityScopeId Security scope identifier whose row is locked.
+   * @returns {Promise<void>}
+   * @memberof SecurityScopeRepository
+   */
+  async lockSecurityScopeForFeatureIdsUpdate(securityScopeId: string): Promise<void> {
+    const sqlStatement = SQL`
+      SELECT 1 FROM security_scope WHERE security_scope_id = ${securityScopeId} FOR NO KEY UPDATE;
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 
   /**

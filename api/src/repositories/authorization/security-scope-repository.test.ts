@@ -540,6 +540,147 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
+  describe('updateSecurityScopeFeatureIdsForSubmission', () => {
+    const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+
+    it("replaces the submission's ids in the stored bitmap in one statement", async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIdsForSubmission('scope-uuid-1', urn, 42);
+
+      expect(queryStub).to.have.been.calledOnce;
+      const sqlText: string = queryStub.firstCall.args[0];
+      expect(sqlText).to.include('UPDATE security_scope ss');
+      expect(sqlText).to.include(
+        'SET feature_ids = rb_runoptimize(rb_or(rb_andnot(ss.feature_ids, part.submission_ids), part.fresh_ids))'
+      );
+      expect(sqlText).to.include('WHERE ss.security_scope_id = $1');
+      expect(sqlText).not.to.include('RETURNING');
+      expect(queryStub.firstCall.args[1]).to.eql(['scope-uuid-1', '*', 'telemetry', '*', 42]);
+    });
+
+    it('removes every feature id of the submission, current or not', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIdsForSubmission('scope-uuid-1', urn, 42);
+
+      const sqlText: string = queryStub.firstCall.args[0];
+      expect(sqlText).to.include('SELECT rb_build_agg(sf.submission_feature_id)');
+      expect(sqlText).to.include('WHERE sf.submission_id = $5::integer');
+      // No lifecycle test on the removed ids: superseded and ended features must leave the bitmap.
+      expect(sqlText).not.to.include('sf.successor_submission_feature_id');
+      expect(sqlText).not.to.include('sf.record_end_date');
+    });
+
+    it("adds back the full build's ids, always limited to the submission", async () => {
+      const refreshQueryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const buildQueryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+
+      await new SecurityScopeRepository(
+        getMockDBConnection({ query: refreshQueryStub })
+      ).updateSecurityScopeFeatureIdsForSubmission('scope-uuid-1', urn, 42);
+      await new SecurityScopeRepository(getMockDBConnection({ query: buildQueryStub })).updateSecurityScopeFeatureIds(
+        'scope-uuid-1',
+        urn,
+        42
+      );
+
+      const refreshSql: string = refreshQueryStub.firstCall.args[0];
+      const buildSql: string = buildQueryStub.firstCall.args[0];
+
+      // The subquery between the full build's COALESCE(( and its closing fallback is the shared text.
+      const sharedSubquery = buildSql.slice(
+        buildSql.indexOf('SELECT rb_build_agg(member.submission_feature_id)'),
+        buildSql.indexOf("), rb_build('{}'::integer[])))")
+      );
+
+      expect(sharedSubquery).to.include('AND anchor.submission_id = $5::integer');
+      expect(sharedSubquery).to.include('member_ready.target_submission_feature_id = member.submission_feature_id');
+      expect(refreshSql).to.include(sharedSubquery);
+    });
+
+    it('skips a bitmap that was never built and a bitmap the refresh would not change', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIdsForSubmission('scope-uuid-1', urn, 42);
+
+      const sqlText: string = queryStub.firstCall.args[0];
+      expect(sqlText).to.include('AND ss.feature_ids IS NOT NULL');
+      expect(sqlText).to.match(
+        /AND ss\.feature_ids IS DISTINCT FROM\s+rb_runoptimize\(rb_or\(rb_andnot\(ss\.feature_ids, part\.submission_ids\), part\.fresh_ids\)\)/
+      );
+    });
+
+    it('resolves when no row is updated', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIdsForSubmission('scope-uuid-1', urn, 42);
+
+      expect(queryStub).to.have.been.calledOnce;
+    });
+
+    it('propagates errors from the update', async () => {
+      const queryStub = sinon.stub().rejects(new Error('query failed'));
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      try {
+        await repository.updateSecurityScopeFeatureIdsForSubmission('scope-uuid-1', urn, 42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('query failed');
+      }
+    });
+  });
+
+  describe('lockSecurityScopeForFeatureIdsUpdate', () => {
+    it("locks the scope's row with FOR NO KEY UPDATE in one statement", async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ '?column?': 1 }]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.lockSecurityScopeForFeatureIdsUpdate('scope-uuid-1');
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlStatement = sqlStub.firstCall.args[0];
+      expect(sqlStatement.text).to.include('FROM security_scope WHERE security_scope_id = $1 FOR NO KEY UPDATE');
+      expect(sqlStatement.values).to.eql(['scope-uuid-1']);
+    });
+
+    it('resolves when the scope row does not exist', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.lockSecurityScopeForFeatureIdsUpdate('scope-uuid-1');
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+
+    it('propagates errors from the lock', async () => {
+      const sqlStub = sinon.stub().rejects(new Error('lock failed'));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      try {
+        await repository.lockSecurityScopeForFeatureIdsUpdate('scope-uuid-1');
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('lock failed');
+      }
+    });
+  });
+
   describe('findScopeIdsWithoutActiveApprovedAllowStatements', () => {
     it('returns scope IDs that have no remaining active approved ALLOW statement references', async () => {
       const knexFake = sinon.fake.resolves(mockQueryResult([{ security_scope_id: 'scope-2' }]));

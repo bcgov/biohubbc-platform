@@ -349,12 +349,37 @@ export class SecurityScopeService extends DBService {
    * A scope URN naming one submission limits the build to that submission; a wildcard scope spans
    * every submission. Rebuilding on unchanged data stores the same bitmap, so a retry is safe.
    *
+   * The scope's row is locked first, so a build that overlaps a per-submission refresh waits for it
+   * and then reads the data it committed, instead of overwriting it with an older view.
+   *
    * @param securityScopeId UUID of the security scope
    * @param urn URN components resolved via `resolveUrnForScope`
    */
   async buildScopeFeatureBitmap(securityScopeId: string, urn: SecurityScopeUrn): Promise<void> {
     const submissionId = SecurityScopeService.getAnchorSubmissionId(urn, null);
 
+    await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
     await this.securityScopeRepository.updateSecurityScopeFeatureIds(securityScopeId, urn, submissionId);
+  }
+
+  /**
+   * Refresh one submission's part of a security scope's feature bitmap, leaving the ids of every
+   * other submission as they are.
+   *
+   * The scope's row is locked first, so the refresh waits for any other writer of the bitmap (a full
+   * build, another refresh) and then works from what it committed. A bitmap that was never built
+   * stays NULL, and an unchanged bitmap is not rewritten, so a retry is safe.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @param urn URN components resolved via `resolveUrnForScope`
+   * @param submissionId Submission whose ids are replaced in the bitmap
+   */
+  async refreshScopeFeatureBitmapForSubmission(
+    securityScopeId: string,
+    urn: SecurityScopeUrn,
+    submissionId: number
+  ): Promise<void> {
+    await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
+    await this.securityScopeRepository.updateSecurityScopeFeatureIdsForSubmission(securityScopeId, urn, submissionId);
   }
 }
