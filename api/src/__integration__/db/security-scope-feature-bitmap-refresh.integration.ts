@@ -19,13 +19,24 @@
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { SubmissionUploadReviewScope, SubmissionUploadReviewStatus } from '../../models/submission-upload-review';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
+import { SubmissionUploadReviewSecurityService } from '../../services/upload/submission-upload-review-security-service';
+import { SubmissionUploadReviewService } from '../../services/upload/submission-upload-review-service';
 import { createTestUpload } from '../helpers/test-feature-property-helpers';
-import { computeAnchors, createPolicy, createPolicyStatement, secureFeature } from '../helpers/test-rbac-helpers';
+import {
+  computeAnchors,
+  createPolicy,
+  createPolicyStatement,
+  createTeam,
+  createTeamPolicy,
+  secureFeature
+} from '../helpers/test-rbac-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
 
 /**
@@ -79,6 +90,50 @@ interface BuiltScope {
   submissions: SeededSubmission[];
 }
 
+/** A scope added to an existing fixture: its own policy and statement, anchors computed, bitmap built. */
+interface AddedScope {
+  securityScopeId: string;
+  urn: SecurityScopeUrn;
+  policyId: string;
+}
+
+/**
+ * A scope naming one submission (`urn:<submission>:<type>:*`) with its bitmap built, and a security
+ * review of the submission's upload.
+ *
+ *   anchor (secured by the seeded rule)         the parent
+ *   └── child                                   covered only through the parent's rule
+ *   secondAnchor (secured by the seeded rule)
+ *   └── secondChild
+ */
+interface ReviewedSubmissionScope extends BuiltScope {
+  submission: SeededSubmission;
+  secondChildId: number;
+  submissionUploadReviewId: string;
+}
+
+/** The fixture of the rule-removal tests: three scopes holding submission A's ids, and one that holds none. */
+interface RemovalFixture {
+  submissionA: SeededSubmission;
+  submissionUploadReviewId: string;
+  /** `urn:*:<type 1>:*`, no team linked. Holds ids of A and B. */
+  unlinkedWildcardScope: AddedScope;
+  /** `urn:*:<type 2>:*`, a team linked. Holds ids of A and B. */
+  linkedWildcardScope: AddedScope;
+  /** `urn:<A>:<type 1>:*`. Holds ids of A only. */
+  scopeNamingA: AddedScope;
+  /** `urn:<C>:<type 3>:*`. Holds ids of a third submission only. */
+  scopeNamingC: AddedScope;
+  /** Ids of submission B in each wildcard bitmap, ascending. */
+  idsOfBInUnlinkedWildcard: number[];
+  idsOfBInLinkedWildcard: number[];
+  /** `feature_ids::bytea` of the scope naming C, before any removal. */
+  hexOfScopeNamingC: string;
+}
+
+/** The rule `secureFeature` assigns. */
+const SEEDED_SECURITY_RULE_ID = 1;
+
 describe('Security scope feature bitmap refresh (integration)', function () {
   this.timeout(15000);
 
@@ -96,6 +151,20 @@ describe('Security scope feature bitmap refresh (integration)', function () {
   afterEach(async () => {
     await connection.rollback();
     connection.release();
+  });
+
+  // Removing rule assignments publishes anchor and bitmap jobs; pg-boss is not running under this suite.
+  beforeEach(() => {
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
+  });
+
+  afterEach(() => {
+    sinon.restore();
   });
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -334,6 +403,275 @@ describe('Security scope feature bitmap refresh (integration)', function () {
     return { xmin: result.rows[0].xmin, ctid: result.rows[0].ctid };
   }
 
+  async function insertFeatureType(db: IDBConnection): Promise<string> {
+    const featureTypeName = `bitmap_refresh_${randomUUID().replace(/-/g, '_')}`;
+
+    await db.sql(SQL`
+      INSERT INTO feature_type (name, display_name, create_user)
+      VALUES (${featureTypeName}, 'Bitmap refresh test type', ${db.systemUserId()});
+    `);
+
+    return featureTypeName;
+  }
+
+  /**
+   * Add a scope for the URN, referenced by an active ALLOW statement of an approved policy of its
+   * own; compute its anchors and build its bitmap in full. `teamLinked` links a new team to the policy.
+   */
+  async function addBuiltScope(
+    db: IDBConnection,
+    urnText: string,
+    options: { teamLinked?: boolean } = {}
+  ): Promise<AddedScope> {
+    const policyId = await createPolicy(db, `Bitmap refresh policy ${randomUUID()}`);
+    const statementId = await createPolicyStatement(db, policyId, urnText);
+    const statement = await db.sql(SQL`
+      SELECT security_scope_id
+      FROM policy_statement
+      WHERE policy_statement_id = ${statementId};
+    `);
+    const securityScopeId: string = statement.rows[0].security_scope_id;
+
+    if (options.teamLinked) {
+      const teamId = await createTeam(db, `Bitmap refresh team ${randomUUID()}`);
+      await createTeamPolicy(db, teamId, policyId);
+      await new SecurityScopeRepository(db).insertTeamSecurityScopesForPolicy(teamId, policyId);
+    }
+
+    const scopeService = new SecurityScopeService(db);
+    const urn = await scopeService.resolveUrnForScope(securityScopeId);
+
+    if (!urn) {
+      throw new Error(`Fixture scope ${securityScopeId} does not resolve to a URN`);
+    }
+
+    await recomputeAnchors(db, securityScopeId);
+    await scopeService.buildScopeFeatureBitmap(securityScopeId, urn);
+
+    return { securityScopeId, urn, policyId };
+  }
+
+  /**
+   * Open a security review of the upload, in progress.
+   */
+  async function insertSecurityReview(
+    db: IDBConnection,
+    submissionId: number,
+    submissionUploadId: string
+  ): Promise<string> {
+    const review = await new SubmissionUploadReviewService(db).insertSubmissionUploadReview(submissionId, {
+      submission_upload_id: submissionUploadId,
+      name: `Bitmap refresh review ${randomUUID()}`,
+      description: null,
+      scope: SubmissionUploadReviewScope.SECURITY,
+      status: SubmissionUploadReviewStatus.IN_PROGRESS,
+      requested_by: null
+    });
+
+    return review.submission_upload_review_id;
+  }
+
+  /**
+   * The security rule assignments on the given features, as `<feature id>:<rule id>`, ascending.
+   */
+  async function getRuleAssignments(db: IDBConnection, submissionFeatureIds: number[]): Promise<string[]> {
+    const result = await db.sql(SQL`
+      SELECT submission_feature_id, security_rule_id
+      FROM submission_feature_security
+      WHERE submission_feature_id = ANY(${submissionFeatureIds}::integer[])
+      ORDER BY submission_feature_id, security_rule_id;
+    `);
+
+    return result.rows.map((row) => `${row.submission_feature_id}:${row.security_rule_id}`);
+  }
+
+  /**
+   * Three scopes whose bitmaps hold submission A's ids — a wildcard scope with no team, a wildcard
+   * scope a team is linked to, and a scope naming A — and a scope naming a third submission C. Both
+   * wildcard bitmaps also hold ids of a second submission B. Each wildcard scope has a feature type
+   * of its own, and so does C, so every bitmap holds only what is listed here.
+   */
+  async function seedRemovalFixture(db: IDBConnection): Promise<RemovalFixture> {
+    // Type 1: A and B, under `urn:*:<type 1>:*` with no team linked.
+    const typeOne = await seedBuiltScope(db, 2);
+    const [submissionA, submissionB] = typeOne.submissions;
+
+    // Type 2: one secured root in each of A and B, under `urn:*:<type 2>:*` with a team linked.
+    const typeTwoName = await insertFeatureType(db);
+    const typeTwoIdOfA = await insertSecuredFeature(db, { ...submissionA, featureTypeName: typeTwoName });
+    const typeTwoIdOfB = await insertSecuredFeature(db, { ...submissionB, featureTypeName: typeTwoName });
+    const linkedWildcardScope = await addBuiltScope(db, `urn:*:${typeTwoName}:*`, { teamLinked: true });
+
+    const scopeNamingA = await addBuiltScope(db, `urn:${submissionA.submissionId}:${typeOne.featureTypeName}:*`);
+
+    // Type 3: a third submission, under a scope naming it.
+    const typeThree = await seedBuiltScope(db, 1);
+    const [submissionC] = typeThree.submissions;
+    const scopeNamingC = await addBuiltScope(db, `urn:${submissionC.submissionId}:${typeThree.featureTypeName}:*`);
+
+    const submissionUploadReviewId = await insertSecurityReview(
+      db,
+      submissionA.submissionId,
+      submissionA.submissionUploadId
+    );
+
+    // Fixture checks: every bitmap holds what the tests say it holds before a removal.
+    const linkedBitmap = await getBitmap(db, linkedWildcardScope.securityScopeId);
+    const bitmapNamingA = await getBitmap(db, scopeNamingA.securityScopeId);
+    const bitmapNamingC = await getBitmap(db, scopeNamingC.securityScopeId);
+
+    expect(linkedBitmap.ids, 'fixture: feature_ids of the team-linked wildcard scope').to.eql(
+      [typeTwoIdOfA, typeTwoIdOfB].sort((a, b) => a - b)
+    );
+    expect(bitmapNamingA.ids, 'fixture: feature_ids of the scope naming A').to.eql(submissionA.builtIds);
+    expect(bitmapNamingC.ids, 'fixture: feature_ids of the scope naming C').to.eql(submissionC.builtIds);
+
+    return {
+      submissionA,
+      submissionUploadReviewId,
+      unlinkedWildcardScope: typeOne,
+      linkedWildcardScope,
+      scopeNamingA,
+      scopeNamingC,
+      idsOfBInUnlinkedWildcard: submissionB.builtIds,
+      idsOfBInLinkedWildcard: [typeTwoIdOfB],
+      hexOfScopeNamingC: bitmapNamingC.hex
+    };
+  }
+
+  /**
+   * Read the four bitmaps on the connection and expect: none of the three that held A's ids holds
+   * one, both wildcard bitmaps hold exactly B's ids, and the scope naming C is as it was.
+   */
+  async function expectSubmissionARevoked(db: IDBConnection, fixture: RemovalFixture): Promise<void> {
+    const submissionId = fixture.submissionA.submissionId;
+
+    expect(
+      await getBitmapIdsOfSubmission(db, fixture.unlinkedWildcardScope.securityScopeId, submissionId),
+      'ids of submission A in the wildcard bitmap with no team linked'
+    ).to.eql([]);
+    expect(
+      await getBitmapIdsOfSubmission(db, fixture.linkedWildcardScope.securityScopeId, submissionId),
+      'ids of submission A in the team-linked wildcard bitmap'
+    ).to.eql([]);
+    expect(
+      await getBitmapIdsOfSubmission(db, fixture.scopeNamingA.securityScopeId, submissionId),
+      'ids of submission A in the bitmap of the scope naming A'
+    ).to.eql([]);
+
+    const unlinkedBitmap = await getBitmap(db, fixture.unlinkedWildcardScope.securityScopeId);
+    const linkedBitmap = await getBitmap(db, fixture.linkedWildcardScope.securityScopeId);
+    const bitmapNamingC = await getBitmap(db, fixture.scopeNamingC.securityScopeId);
+
+    expect(unlinkedBitmap.ids, 'feature_ids of the wildcard scope with no team linked').to.eql(
+      fixture.idsOfBInUnlinkedWildcard
+    );
+    expect(linkedBitmap.ids, 'feature_ids of the team-linked wildcard scope').to.eql(fixture.idsOfBInLinkedWildcard);
+    expect(bitmapNamingC.hex, 'feature_ids::bytea of the scope naming a third submission').to.equal(
+      fixture.hexOfScopeNamingC
+    );
+  }
+
+  /**
+   * Create a feature type of its own, one submission of two secured parents with a child each, a
+   * `urn:<submission>:<type>:*` scope with its anchors computed and its bitmap built in full, and a
+   * security review of the submission's upload.
+   */
+  async function seedReviewedSubmissionScope(db: IDBConnection): Promise<ReviewedSubmissionScope> {
+    const featureTypeName = await insertFeatureType(db);
+    const seeded = await seedSubmission(db, featureTypeName);
+
+    const secondChildId = await insertFeatureRow(db, {
+      submissionId: seeded.submissionId,
+      submissionUploadId: seeded.submissionUploadId,
+      featureTypeName,
+      parentFeatureId: seeded.secondAnchorId
+    });
+    await insertClosureRow(db, secondChildId, secondChildId);
+    await insertClosureRow(db, secondChildId, seeded.secondAnchorId);
+
+    const submission: SeededSubmission = {
+      ...seeded,
+      builtIds: [...seeded.builtIds, secondChildId].sort((a, b) => a - b)
+    };
+
+    const scope = await addBuiltScope(db, `urn:${submission.submissionId}:${featureTypeName}:*`);
+    const submissionUploadReviewId = await insertSecurityReview(
+      db,
+      submission.submissionId,
+      submission.submissionUploadId
+    );
+
+    // Fixture check: the full build holds both parents and both children, and nothing else.
+    const built = await getBitmap(db, scope.securityScopeId);
+
+    expect(built.ids, 'fixture: feature_ids after the first full build').to.eql(submission.builtIds);
+
+    return {
+      ...scope,
+      featureTypeName,
+      submissions: [submission],
+      submission,
+      secondChildId,
+      submissionUploadReviewId
+    };
+  }
+
+  /**
+   * Bring the scope's anchors up to date on the connection, as the anchor job does: add the missing
+   * ones, then delete the stale ones.
+   */
+  async function syncAnchors(db: IDBConnection, securityScopeId: string): Promise<void> {
+    await recomputeAnchors(db, securityScopeId);
+
+    const scopeService = new SecurityScopeService(db);
+    let lastId = 0;
+
+    while (true) {
+      const batch = await scopeService.deleteStaleAnchorBatch(securityScopeId, lastId, null);
+
+      if (!batch) {
+        break;
+      }
+
+      lastId = batch.pageLastId;
+    }
+  }
+
+  /**
+   * The features of the submission the scope's anchors grant, ascending: every current feature with
+   * a closure self-loop that is an anchor of the scope or has one among its ancestors.
+   */
+  async function getAnchorGrantedIds(
+    db: IDBConnection,
+    securityScopeId: string,
+    submissionId: number
+  ): Promise<number[]> {
+    const result = await db.sql(SQL`
+      SELECT DISTINCT feature.submission_feature_id
+      FROM security_scope_anchor anchor
+      JOIN submission_feature_closure closure
+        ON closure.target_submission_feature_id = anchor.anchor_submission_feature_id
+        AND closure.is_ancestor = true
+      JOIN submission_feature feature
+        ON feature.submission_feature_id = closure.source_submission_feature_id
+      WHERE anchor.security_scope_id = ${securityScopeId}
+        AND feature.submission_id = ${submissionId}
+        AND feature.record_effective_date <= now()
+        AND (feature.record_end_date IS NULL OR feature.record_end_date > now())
+        AND feature.successor_submission_feature_id IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM submission_feature_closure self_loop
+          WHERE self_loop.source_submission_feature_id = feature.submission_feature_id
+            AND self_loop.target_submission_feature_id = feature.submission_feature_id
+        )
+      ORDER BY feature.submission_feature_id;
+    `);
+
+    return result.rows.map((row) => row.submission_feature_id);
+  }
+
   // ── Tests ────────────────────────────────────────────────────────────
 
   // AC5
@@ -491,6 +829,92 @@ describe('Security scope feature bitmap refresh (integration)', function () {
 
     expect(missing.rows, 'rows for the missing scope id').to.have.length(0);
     expect(after.ctid, 'ctid of the existing scope').to.equal(before.ctid);
+  });
+
+  // AC3
+  it('removing one rule from a feature clears the submission from every matching bitmap before the change commits', async () => {
+    const fixture = await seedRemovalFixture(connection);
+    const { submissionA } = fixture;
+
+    await new SubmissionUploadReviewSecurityService(connection).deleteSubmissionUploadReviewSecurityRuleAssignments(
+      submissionA.submissionId,
+      submissionA.submissionUploadId,
+      fixture.submissionUploadReviewId,
+      SEEDED_SECURITY_RULE_ID,
+      [submissionA.anchorId]
+    );
+
+    // Fixture check: the rule is gone from the selected feature and from no other.
+    expect(
+      await getRuleAssignments(connection, [submissionA.anchorId, submissionA.secondAnchorId]),
+      'fixture: rule assignments after the removal'
+    ).to.eql([`${submissionA.secondAnchorId}:${SEEDED_SECURITY_RULE_ID}`]);
+
+    await expectSubmissionARevoked(connection, fixture);
+  });
+
+  // AC3
+  it("resetting a review's rule assignments clears the submission from every matching bitmap before the change commits", async () => {
+    const fixture = await seedRemovalFixture(connection);
+    const { submissionA } = fixture;
+
+    await new SubmissionUploadReviewSecurityService(connection).deleteSubmissionUploadReviewSecurityAssignments(
+      submissionA.submissionId,
+      submissionA.submissionUploadId,
+      fixture.submissionUploadReviewId
+    );
+
+    // Fixture check: the reset removed every assignment of the upload.
+    expect(
+      await getRuleAssignments(connection, [submissionA.anchorId, submissionA.secondAnchorId]),
+      'fixture: rule assignments after the reset'
+    ).to.eql([]);
+
+    await expectSubmissionARevoked(connection, fixture);
+  });
+
+  // AC4
+  it('after the only rule covering a child is removed, the bitmap grants nothing the anchor check denies, and a refresh restores what the scope still grants', async () => {
+    const scope = await seedReviewedSubmissionScope(connection);
+    const { submission } = scope;
+
+    await new SubmissionUploadReviewSecurityService(connection).deleteSubmissionUploadReviewSecurityRuleAssignments(
+      submission.submissionId,
+      submission.submissionUploadId,
+      scope.submissionUploadReviewId,
+      SEEDED_SECURITY_RULE_ID,
+      [submission.anchorId]
+    );
+
+    await syncAnchors(connection, scope.securityScopeId);
+
+    const anchorGranted = await getAnchorGrantedIds(connection, scope.securityScopeId, submission.submissionId);
+
+    // Fixture check: the anchor check now grants the second parent and its child, and denies the
+    // first parent and its child.
+    expect(anchorGranted, 'fixture: features the anchor check grants after the removal').to.eql(
+      [submission.secondAnchorId, scope.secondChildId].sort((a, b) => a - b)
+    );
+
+    const afterRemoval = await getBitmap(connection, scope.securityScopeId);
+
+    expect(
+      afterRemoval.ids.filter((id) => !anchorGranted.includes(id)),
+      'ids in feature_ids that the anchor check denies, after the removal and before the refresh'
+    ).to.eql([]);
+    expect(afterRemoval.ids, 'child covered only through the removed rule, before the refresh').to.not.include(
+      submission.childId
+    );
+
+    await refreshServiceFor(connection).refreshScopeFeatureBitmapForSubmission(
+      scope.securityScopeId,
+      scope.urn,
+      submission.submissionId
+    );
+
+    const afterRefresh = await getBitmap(connection, scope.securityScopeId);
+
+    expect(afterRefresh.ids, 'feature_ids after the refresh vs features the anchor check grants').to.eql(anchorGranted);
   });
 
   describe('with two connections', function () {
@@ -711,6 +1135,68 @@ describe('Security scope feature bitmap refresh (integration)', function () {
       }
 
       expect(afterBoth.hex, 'feature_ids::bytea after both commits vs after one more full build').to.equal(rebuilt.hex);
+    });
+
+    // AC12
+    it('a refresh started while a rule removal is uncommitted does not put the revoked parent or child back', async () => {
+      const scope = await commitRows((db) => seedReviewedSubmissionScope(db));
+      committedScope = scope;
+      const { submission } = scope;
+
+      try {
+        firstConnection = await openConnection();
+        secondConnection = await openConnection();
+
+        // Connection 1: remove the rule from the parent, uncommitted.
+        await new SubmissionUploadReviewSecurityService(
+          firstConnection
+        ).deleteSubmissionUploadReviewSecurityRuleAssignments(
+          submission.submissionId,
+          submission.submissionUploadId,
+          scope.submissionUploadReviewId,
+          SEEDED_SECURITY_RULE_ID,
+          [submission.anchorId]
+        );
+
+        // Connection 2: start a refresh of the same submission.
+        const pending = refreshServiceFor(secondConnection).refreshScopeFeatureBitmapForSubmission(
+          scope.securityScopeId,
+          scope.urn,
+          submission.submissionId
+        );
+        // Awaited below; this only keeps an early rejection from being reported as unhandled.
+        pending.catch(() => undefined);
+
+        await delay(OVERLAP_MS);
+        await firstConnection.commit();
+        await pending;
+        await secondConnection.commit();
+
+        const bitmap = await getBitmap(connection, scope.securityScopeId);
+
+        expect(bitmap.ids, 'parent the rule was removed from').to.not.include(submission.anchorId);
+        expect(bitmap.ids, 'child covered only through the removed rule').to.not.include(submission.childId);
+      } finally {
+        // The review is this test's own committed row, and the cleanup hook's delete of the upload
+        // would fail on it. Both transactions end first, the first connection's before the second's,
+        // so nothing holds a lock on the scope or waits on one when the rows are deleted.
+        for (const openedConnection of [firstConnection, secondConnection]) {
+          if (openedConnection) {
+            await openedConnection.rollback();
+            openedConnection.release();
+          }
+        }
+
+        firstConnection = null;
+        secondConnection = null;
+
+        await commitRows((db) =>
+          db.sql(SQL`
+            DELETE FROM submission_upload_review
+            WHERE submission_upload_review_id = ${scope.submissionUploadReviewId}::uuid;
+          `)
+        );
+      }
     });
   });
 });
