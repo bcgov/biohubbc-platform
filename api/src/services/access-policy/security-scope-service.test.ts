@@ -214,10 +214,12 @@ describe('SecurityScopeService', () => {
       expect(materialized).to.be.true;
       expect(bitmapPublishStub).to.have.been.calledTwice;
       expect(bitmapPublishStub.firstCall).to.have.been.calledWithExactly(mockDBConnection, {
-        securityScopeId: scopeIdOne
+        securityScopeId: scopeIdOne,
+        submissionId: null
       });
       expect(bitmapPublishStub.secondCall).to.have.been.calledWithExactly(mockDBConnection, {
-        securityScopeId: scopeIdTwo
+        securityScopeId: scopeIdTwo,
+        submissionId: null
       });
       expect(anchorPublishStub.firstCall).to.have.been.calledBefore(bitmapPublishStub.firstCall);
       expect(bitmapPublishStub.firstCall).to.have.been.calledBefore(anchorPublishStub.secondCall);
@@ -295,6 +297,9 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
 
       await service.triggerAnchorComputationForSubmission(42);
 
@@ -310,18 +315,30 @@ describe('SecurityScopeService', () => {
       });
     });
 
-    it('does not publish a bitmap job: bitmaps are rebuilt on policy change only', async () => {
+    it("publishes a bitmap refresh job carrying the submission for each matching scope, after that scope's anchor job", async () => {
       sinon
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
-        .resolves([{ security_scope_id: 'scope-1' }]);
-      sinon
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      const anchorPublishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
-      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
+      const bitmapPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
 
       await service.triggerAnchorComputationForSubmission(42);
 
-      expect(bitmapPublishStub).not.to.have.been.called;
+      expect(bitmapPublishStub).to.have.been.calledTwice;
+      expect(bitmapPublishStub.firstCall).to.have.been.calledWithExactly(mockDBConnection, {
+        securityScopeId: 'scope-1',
+        submissionId: 42
+      });
+      expect(bitmapPublishStub.secondCall).to.have.been.calledWithExactly(mockDBConnection, {
+        securityScopeId: 'scope-2',
+        submissionId: 42
+      });
+      expect(anchorPublishStub.firstCall).to.have.been.calledBefore(bitmapPublishStub.firstCall);
+      expect(bitmapPublishStub.firstCall).to.have.been.calledBefore(anchorPublishStub.secondCall);
     });
 
     it('does not publish when no scopes match the submission', async () => {
@@ -329,11 +346,13 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
 
       await service.triggerAnchorComputationForSubmission(999);
 
       expect(findStub).to.have.been.calledOnceWith(999);
       expect(publishStub).not.to.have.been.called;
+      expect(bitmapPublishStub).not.to.have.been.called;
     });
 
     it('throws when publishComputeScopeAnchorsJob throws (trigger loop)', async () => {
@@ -343,6 +362,7 @@ describe('SecurityScopeService', () => {
       sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .rejects(new Error('pg-boss unavailable'));
+      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
 
       try {
         await service.triggerAnchorComputationForSubmission(1);
@@ -350,6 +370,29 @@ describe('SecurityScopeService', () => {
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss unavailable');
       }
+
+      expect(bitmapPublishStub).not.to.have.been.called;
+    });
+
+    it('throws when the bitmap publish fails, before the next scope is reached', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      const anchorPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.triggerAnchorComputationForSubmission(1);
+        expect.fail('expected triggerAnchorComputationForSubmission to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+
+      expect(anchorPublishStub).to.have.been.calledOnce;
     });
   });
 

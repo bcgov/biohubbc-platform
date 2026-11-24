@@ -150,7 +150,8 @@ export class SecurityScopeService extends DBService {
         submissionId: null
       });
       await SecurityScopeService.dependencies.publishComputeScopeFeatureBitmapJob(this.connection, {
-        securityScopeId: statement.security_scope_id
+        securityScopeId: statement.security_scope_id,
+        submissionId: null
       });
     }
 
@@ -243,14 +244,17 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Find scopes matching a submission and trigger anchor recomputation.
+   * Find scopes matching a submission and trigger anchor recomputation and a feature bitmap refresh.
    *
-   * Called when security rules are applied to features in a submission.
+   * Called when a submission's feature graph is rebuilt or its security rule assignments change.
    * New secured features may become anchors for existing scopes that cover
-   * the affected submission's URN pattern. Each job is limited to the submission,
-   * so a wildcard scope does not rescan every other submission's features.
+   * the affected submission's URN pattern, and the features each scope grants in that
+   * submission may change. Each job is limited to the submission, so a wildcard scope
+   * does not rescan every other submission's features: the anchor job recomputes the
+   * submission's anchors, and the bitmap job refreshes the submission's part of the
+   * scope's `feature_ids`.
    *
-   * @param submissionId The submission whose features gained security rules
+   * @param submissionId The submission whose feature graph or security rule assignments changed
    */
   async triggerAnchorComputationForSubmission(submissionId: number): Promise<void> {
     const scopes = await this.securityScopeRepository.findScopeIdsMatchingSubmission(submissionId);
@@ -261,6 +265,10 @@ export class SecurityScopeService extends DBService {
 
     for (const scope of scopes) {
       await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
+        securityScopeId: scope.security_scope_id,
+        submissionId
+      });
+      await SecurityScopeService.dependencies.publishComputeScopeFeatureBitmapJob(this.connection, {
         securityScopeId: scope.security_scope_id,
         submissionId
       });

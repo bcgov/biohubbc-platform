@@ -757,12 +757,15 @@ const COMPUTE_SCOPE_FEATURE_BITMAP_OPTIONS: IPublishOptions = {
 /**
  * Publish a compute scope feature bitmap job to the queue.
  *
- * Queues the async rebuild of a security scope's `feature_ids` bitmap. Each scope
- * gets its own delayed singleton job, so a burst of policy edits coalesces into
- * one queued rebuild without dropping rebuilds for other scopes.
+ * Queues the async rebuild of a security scope's `feature_ids` bitmap, or the
+ * refresh of one submission's part of it. Each scope gets its own delayed
+ * singleton job, and each (scope, submission) pair for refreshes limited to one
+ * submission, so a burst of policy or security-rule edits coalesces into one
+ * queued job without dropping rebuilds for other scopes or refreshes for other
+ * submissions.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IComputeScopeFeatureBitmapJobData} data Job data containing securityScopeId
+ * @param {IComputeScopeFeatureBitmapJobData} data Job data containing securityScopeId and submissionId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
  * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
@@ -776,12 +779,19 @@ export const publishComputeScopeFeatureBitmapJob = async (
   try {
     const mergedOptions = { ...COMPUTE_SCOPE_FEATURE_BITMAP_OPTIONS, ...options };
 
+    // A full build and each submission-limited refresh coalesce separately: a queued refresh for one submission
+    // must not absorb a policy change or another submission's change, which it would not write.
+    const singletonKey =
+      data.submissionId === null
+        ? `scope-feature-bitmap-${data.securityScopeId}`
+        : `scope-feature-bitmap-${data.securityScopeId}-submission-${data.submissionId}`;
+
     const jobId = await sendDelayedRecomputeJob(
       connection,
       JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP,
       data,
       mergedOptions,
-      `scope-feature-bitmap-${data.securityScopeId}`
+      singletonKey
     );
 
     if (jobId) {

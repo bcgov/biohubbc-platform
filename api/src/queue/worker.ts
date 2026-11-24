@@ -309,7 +309,7 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.createQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED);
 
   // Create main queue with dead letter queue and retry configuration.
-  // policy: 'short' enforces the per-scope singletonKey used by bitmap jobs.
+  // policy: 'short' enforces the singletonKey used by bitmap jobs: per scope, or per scope and submission.
   await boss.createQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, {
     deadLetter: JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED,
     retryLimit: 3,
