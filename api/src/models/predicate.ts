@@ -6,7 +6,7 @@ import { z } from 'zod';
  * The typed predicate value is stored in one companion payload table.
  */
 export const Predicate = z.object({
-  predicate_id: z.string().uuid(),
+  predicate_id: z.guid(),
   feature_property_id: z.number().int(),
   blueprint_feature_type_property_id: z.number().int().nullable(),
   feature_property_type_id: z.number().int(),
@@ -27,7 +27,7 @@ export type PredicateResolveInput = Pick<
 >;
 
 export const ReadPredicateNodeRow = z.object({
-  predicate_id: z.string().uuid(),
+  predicate_id: z.guid(),
   payload_count: z.number().int().nullable(),
   predicate_node: z.unknown().nullable()
 });

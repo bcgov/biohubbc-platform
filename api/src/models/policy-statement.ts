@@ -6,10 +6,10 @@ export enum PolicyEffect {
 }
 
 export const PolicyStatement = z.object({
-  policy_statement_id: z.string().uuid(),
-  policy_id: z.string().uuid(),
+  policy_statement_id: z.guid(),
+  policy_id: z.guid(),
   effect: z.nativeEnum(PolicyEffect),
-  security_scope_id: z.string().uuid(),
+  security_scope_id: z.guid(),
   submission_feature_urn: z.string().max(500),
   policy_expression_id: z.string().nullable()
 });

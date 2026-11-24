@@ -5,8 +5,8 @@ import { SecurityStatusZod } from './security-status';
  * Full record of a scanned file
  */
 export const ArtifactSecurityScanFile = z.object({
-  artifact_security_scan_file_id: z.string().uuid(),
-  artifact_security_scan_id: z.string().uuid(),
+  artifact_security_scan_file_id: z.guid(),
+  artifact_security_scan_id: z.guid(),
   file_path: z.string(),
   result: SecurityStatusZod
 });
@@ -16,7 +16,7 @@ export type ArtifactSecurityScanFile = z.infer<typeof ArtifactSecurityScanFile>;
  * Payload for creating a new scan file record
  */
 export const CreateArtifactSecurityScanFile = z.object({
-  artifact_security_scan_id: z.string().uuid(),
+  artifact_security_scan_id: z.guid(),
   file_path: z.string(),
   result: SecurityStatusZod
 });
@@ -26,7 +26,7 @@ export type CreateArtifactSecurityScanFile = z.infer<typeof CreateArtifactSecuri
  * Payload for updating an existing scan file record
  */
 export const UpdateArtifactSecurityScanFile = z.object({
-  artifact_security_scan_id: z.string().uuid().optional(),
+  artifact_security_scan_id: z.guid().optional(),
   file_path: z.string().optional(),
   result: SecurityStatusZod.optional()
 });

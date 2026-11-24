@@ -10,7 +10,7 @@ import { LogicalOperator } from './logical-operator';
  * in `expression-tree.ts`.
  */
 export const Expression = z.object({
-  expression_id: z.string().uuid(),
+  expression_id: z.guid(),
   operator: LogicalOperator,
   expression_hash: z.string()
 });

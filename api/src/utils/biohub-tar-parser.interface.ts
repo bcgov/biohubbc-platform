@@ -1,3 +1,4 @@
+import type { ExtractEvents } from 'tar-stream';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { SubmissionArchiveFormat } from '../models/submission-upload';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
@@ -20,11 +21,18 @@ export interface IUploadedMediaFile {
 
 export type TarNext = () => void;
 
+/**
+ * The data stream of one tar entry, as tar-stream hands it to an `entry` listener. It is a streamx `Readable`, which
+ * tar-stream does not export by name, and its chunks are typed `unknown`.
+ */
+export type TarEntryStream = ExtractEvents['entry'][1];
+
 export type TarEntryHeader = {
   name?: string | null;
   type?: string | null;
   size?: number;
-  pax?: Record<string, string | undefined> | null;
+  /** PAX extended header records, carried as the archive wrote them. */
+  pax?: unknown;
 };
 
 export interface MediaUploadContext {

@@ -11,9 +11,9 @@ import { z } from 'zod';
  * mirror that and deliberately offer no third identity.
  */
 export const MartinContext = z.object({
-  martin_context_id: z.string().uuid(),
+  martin_context_id: z.guid(),
   context_hash: z.string(),
-  expression_id: z.string().uuid().nullable(),
+  expression_id: z.guid().nullable(),
   feature_type_id: z.number(),
   system_user_id: z.number().nullable(),
   submission_ids: z.array(z.number()).nullable().optional(),

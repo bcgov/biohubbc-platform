@@ -3,14 +3,12 @@ import { fireEvent, render } from 'test-helpers/test-utils';
 import { vi } from 'vitest';
 import NotFoundPage from './NotFoundPage';
 
-const mockedUsedNavigate = vi.fn();
+const mockedUsedNavigate = vi.hoisted(() => vi.fn());
 
-beforeEach(() => {
-  vi.mock('react-router', () => ({
-    ...vi.importActual('react-router'),
-    useNavigate: () => mockedUsedNavigate
-  }));
-});
+vi.mock('react-router', async () => ({
+  ...(await vi.importActual('react-router')),
+  useNavigate: () => mockedUsedNavigate
+}));
 
 describe('NotFoundPage', () => {
   it('renders correctly', () => {

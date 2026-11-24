@@ -24,11 +24,11 @@ export const TicketStatus = z.enum(['open', 'closed']);
 export type TicketStatus = z.infer<typeof TicketStatus>;
 
 export const Ticket = z.object({
-  ticket_id: z.string().uuid(),
+  ticket_id: z.guid(),
   ticket_slug: z.string().regex(/^\d{8}$/),
   subject: z.string(),
   description: z.string().nullable(),
-  team_id: z.string().uuid(),
+  team_id: z.guid(),
   create_date: z.string(),
   priority: TicketPriority,
   status: TicketStatus

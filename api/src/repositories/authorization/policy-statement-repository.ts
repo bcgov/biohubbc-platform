@@ -22,10 +22,10 @@ import { BaseRepository } from '../base-repository';
  * can see at export time".
  */
 export const ActivePolicyStatementWithExpression = z.object({
-  policy_statement_id: z.string().uuid(),
+  policy_statement_id: z.guid(),
   effect: z.nativeEnum(PolicyEffect),
   urn_feature_type: z.string(),
-  expression_id: z.string().uuid().nullable()
+  expression_id: z.guid().nullable()
 });
 export type ActivePolicyStatementWithExpression = z.infer<typeof ActivePolicyStatementWithExpression>;
 

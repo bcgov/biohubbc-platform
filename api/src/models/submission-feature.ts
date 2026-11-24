@@ -15,7 +15,7 @@ export interface SubmissionFeaturePropertyFilters {
 export const PostSubmissionFeatureSchema: z.ZodType<any> = z.object({
   id: z.string().min(1, 'Feature id is required'),
   type: z.string().min(1, 'Feature type is required'),
-  properties: z.record(z.any()),
+  properties: z.record(z.string(), z.any()),
   child_features: z.array(z.lazy(() => PostSubmissionFeatureSchema)).optional()
 });
 
@@ -64,8 +64,8 @@ export interface SubmissionFeatureIngestionRecord {
  * Now includes a reference to the artifact security record
  */
 export const SubmissionRecordSchema = z.object({
-  submission_id: z.string().uuid(),
-  uuid: z.string().uuid(),
+  submission_id: z.guid(),
+  uuid: z.guid(),
   uri: z.string().nullable(),
   artifact_security: ArtifactSecurity.nullable(),
   security_review_timestamp: z.string().nullable(),

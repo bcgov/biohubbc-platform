@@ -2,7 +2,13 @@ import Box from '@mui/material/Box';
 import type { Feature } from 'geojson';
 import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
 import { isEqual, omit } from 'lodash-es';
-import { Map as MapLibreMap, type MapGeoJSONFeature, type MapLibreEvent, type MapMouseEvent } from 'maplibre-gl';
+import {
+  type ErrorEvent as MapLibreErrorEvent,
+  Map as MapLibreMap,
+  type MapGeoJSONFeature,
+  type MapLibreEvent,
+  type MapMouseEvent
+} from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -14,6 +20,7 @@ import {
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import { SlippyMapDrawToolbar } from './components/SlippyMapDrawToolbar';
+import { configureMapLibreWorker } from './maplibre-worker';
 import type { ISlippyMapLayer, ISlippyMapProps, MapClickPosition, SlippyMapDrawMode } from './SlippyMap.interface';
 import {
   areFeatureSetsEqual,
@@ -304,6 +311,8 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
     const { initialCenter, initialZoom, mapStyle, mapOptions } = initialViewRef.current;
 
+    configureMapLibreWorker();
+
     const map = new MapLibreMap({
       ...mapOptions,
       container,
@@ -488,7 +497,7 @@ export const SlippyMap = (props: ISlippyMapProps) => {
      * A failure carrying no source is the style document's own: MapLibre reports those against the map rather than
      * against any source it never got as far as reading.
      */
-    const handleMapError = (event: ErrorEvent & { sourceId?: string }) => {
+    const handleMapError = (event: MapLibreErrorEvent & { sourceId?: string }) => {
       const sourceId = event.sourceId;
 
       if (!sourceId) {
@@ -684,7 +693,12 @@ export const SlippyMap = (props: ISlippyMapProps) => {
 
       for (const name of new Set([...Object.keys(previousPaint), ...Object.keys(nextPaint)])) {
         if (!isEqual(previousPaint[name], nextPaint[name])) {
-          map.setPaintProperty(layerId, name, nextPaint[name]);
+          // Every name is read from a layer specification's `paint`, so it is a paint property MapLibre knows.
+          map.setPaintProperty(
+            layerId,
+            name as Parameters<MapLibreMap['setPaintProperty']>[1],
+            nextPaint[name] as Parameters<MapLibreMap['setPaintProperty']>[2]
+          );
         }
       }
 

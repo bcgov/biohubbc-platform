@@ -2,18 +2,18 @@ import { z } from 'zod';
 import { TicketPriority, TicketWithTags } from './ticket';
 
 export const Board = z.object({
-  board_id: z.string().uuid(),
+  board_id: z.guid(),
   name: z.string(),
   description: z.string().nullable(),
   /** The lane tickets created on or added to the board go in. */
-  default_swimlane_id: z.string().uuid().nullable(),
+  default_swimlane_id: z.guid().nullable(),
   create_date: z.string()
 });
 export type Board = z.infer<typeof Board>;
 
 export const BoardSwimlane = z.object({
-  board_swimlane_id: z.string().uuid(),
-  board_id: z.string().uuid(),
+  board_swimlane_id: z.guid(),
+  board_id: z.guid(),
   name: z.string(),
   description: z.string().nullable(),
   color: z.string().nullable(),
@@ -23,7 +23,7 @@ export const BoardSwimlane = z.object({
 export type BoardSwimlane = z.infer<typeof BoardSwimlane>;
 
 export const BoardSwimlaneId = z.object({
-  board_swimlane_id: z.string().uuid()
+  board_swimlane_id: z.guid()
 });
 export type BoardSwimlaneId = z.infer<typeof BoardSwimlaneId>;
 
@@ -35,7 +35,7 @@ export interface BoardDetail extends Board {
  * A ticket on a board with the lane it is in.
  */
 export const BoardTicket = TicketWithTags.extend({
-  board_swimlane_id: z.string().uuid()
+  board_swimlane_id: z.guid()
 });
 export type BoardTicket = z.infer<typeof BoardTicket>;
 
