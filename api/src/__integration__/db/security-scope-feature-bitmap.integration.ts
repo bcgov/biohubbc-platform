@@ -6,7 +6,11 @@
 // the spec can hold shapes the recompute never produces together: a non-current feature that still
 // has closure rows, and a current feature with ancestry rows but no self-loop.
 //
-// Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
+// Each test's rows are written in a transaction that is ROLLED BACK, so no test data is persisted.
+// The "policy change publishes the scope jobs" block COMMITS pg-boss queue definitions: it creates
+// the scope anchor queue and, when no worker has, the bitmap queue. It deletes the bitmap queue it
+// created; the anchor queue definition stays. Job rows are sent through the test's connection and
+// roll back with it.
 //
 // Run: make test-db
 // Requires: make web (database must be running, migrations applied)
@@ -21,9 +25,6 @@ import { SecurityScopeService } from '../../services/access-policy/security-scop
 import { createTestUpload } from '../helpers/test-feature-property-helpers';
 import { computeAnchors, createPolicy, createPolicyStatement, secureFeature } from '../helpers/test-rbac-helpers';
 import { createTestSubmission } from '../helpers/test-submission-helpers';
-
-// The bitmap build queue. No JobQueues constant is assumed: the name is the contract.
-const COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE = 'compute-scope-feature-bitmap';
 
 describe('Security scope feature bitmap (integration)', function () {
   this.timeout(15000);
@@ -288,7 +289,7 @@ describe('Security scope feature bitmap (integration)', function () {
 
   // ── Tests ────────────────────────────────────────────────────────────
 
-  it('AC2: security_scope has a nullable feature_ids roaringbitmap column and the extension is installed', async () => {
+  it('security_scope has a nullable feature_ids roaringbitmap column and the extension is installed', async () => {
     const columns = await connection.sql(SQL`
       SELECT is_nullable, udt_name
       FROM information_schema.columns
@@ -310,7 +311,7 @@ describe('Security scope feature bitmap (integration)', function () {
     expect(extensions.rows, 'roaringbitmap extension').to.have.length(1);
   });
 
-  it('AC4: the bitmap holds exactly the anchor and its current, self-looped descendants, run-optimised, and is empty rather than NULL for a scope that matches no secured feature', async () => {
+  it('the bitmap holds exactly the anchor and its current, self-looped descendants, run-optimised, and is empty rather than NULL for a scope that matches no secured feature', async () => {
     const fixture = await seedSurveySubtree();
     const scopeId = await createResolvableScope(`urn:${fixture.submissionId}:survey:*`);
     // The dataset exists in the submission but is not secured, so this scope matches no secured feature.
@@ -342,7 +343,7 @@ describe('Security scope feature bitmap (integration)', function () {
     expect(emptyBitmap.isRunOptimised).to.be.true;
   });
 
-  it('AC6: building a scope bitmap twice on unchanged data stores the same bytes', async () => {
+  it('building a scope bitmap twice on unchanged data stores the same bytes', async () => {
     const fixture = await seedSurveySubtree();
     const scopeId = await createResolvableScope(`urn:${fixture.submissionId}:survey:*`);
 
@@ -357,7 +358,7 @@ describe('Security scope feature bitmap (integration)', function () {
     expect(second.bytes?.toString('hex')).to.equal(first.bytes?.toString('hex'));
   });
 
-  it('AC8: every resolvable scope bitmap equals the features its stored anchors grant', async function () {
+  it('every resolvable scope bitmap equals the features its stored anchors grant', async function () {
     this.timeout(120000);
 
     // Test-created scopes with anchors, so the comparison is never limited to whatever is seeded.
@@ -409,8 +410,8 @@ describe('Security scope feature bitmap (integration)', function () {
 
       // A queue must exist before a job can be sent to it. Create the bitmap queue only when no
       // worker has, and remove it again afterwards, so the spec leaves no queue definition behind.
-      if (!(await boss.getQueue(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE))) {
-        await boss.createQueue(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, { policy: 'short' });
+      if (!(await boss.getQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP))) {
+        await boss.createQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, { policy: 'short' });
         createdBitmapQueue = true;
       }
     });
@@ -418,7 +419,7 @@ describe('Security scope feature bitmap (integration)', function () {
     after(async () => {
       if (createdBitmapQueue) {
         const boss = await initPgBoss();
-        await boss.deleteQueue(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE);
+        await boss.deleteQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
       }
 
       await stopPgBoss();
@@ -457,7 +458,7 @@ describe('Security scope feature bitmap (integration)', function () {
       return result.rows.map((row) => row.security_scope_id);
     }
 
-    it('AC5 (a): an approved policy with an active ALLOW statement publishes one anchor job and one bitmap job for the statement scope', async () => {
+    it('an approved policy with an active ALLOW statement publishes one anchor job and one bitmap job for the statement scope', async () => {
       const { policyId, securityScopeId } = await createPolicyWithAllowStatement('approved');
 
       const materialized = await scopeService.materializePolicyStatementScopes(policyId);
@@ -468,22 +469,22 @@ describe('Security scope feature bitmap (integration)', function () {
         `${JobQueues.COMPUTE_SCOPE_ANCHORS} jobs for the scope`
       ).to.eql([securityScopeId]);
       expect(
-        await getQueuedScopeIds(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, securityScopeId),
-        `${COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE} jobs for the scope`
+        await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, securityScopeId),
+        `${JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP} jobs for the scope`
       ).to.eql([securityScopeId]);
     });
 
-    it('AC5 (b): an unapproved policy with an active ALLOW statement publishes neither job', async () => {
+    it('an unapproved policy with an active ALLOW statement publishes neither job', async () => {
       const { policyId, securityScopeId } = await createPolicyWithAllowStatement('requested');
 
       const materialized = await scopeService.materializePolicyStatementScopes(policyId);
 
       expect(materialized).to.be.false;
       expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_ANCHORS, securityScopeId)).to.eql([]);
-      expect(await getQueuedScopeIds(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, securityScopeId)).to.eql([]);
+      expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, securityScopeId)).to.eql([]);
     });
 
-    it('AC5 (c): an approved policy whose only ALLOW statement is ended publishes neither job', async () => {
+    it('an approved policy whose only ALLOW statement is ended publishes neither job', async () => {
       const { policyId, statementId, securityScopeId } = await createPolicyWithAllowStatement('approved');
       await connection.sql(SQL`
         UPDATE policy_statement
@@ -495,7 +496,7 @@ describe('Security scope feature bitmap (integration)', function () {
 
       expect(materialized).to.be.false;
       expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_ANCHORS, securityScopeId)).to.eql([]);
-      expect(await getQueuedScopeIds(COMPUTE_SCOPE_FEATURE_BITMAP_QUEUE, securityScopeId)).to.eql([]);
+      expect(await getQueuedScopeIds(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, securityScopeId)).to.eql([]);
     });
   });
 });

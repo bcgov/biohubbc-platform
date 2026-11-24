@@ -88,7 +88,7 @@ describe('computeScopeFeatureBitmapJobHandler', () => {
     expect(commitStub).not.to.have.been.called;
   });
 
-  it('should stop at the first failed job so pg-boss retries the batch', async () => {
+  it('should reject the batch when a job fails so pg-boss retries it, while the other jobs still run', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
@@ -104,11 +104,14 @@ describe('computeScopeFeatureBitmapJobHandler', () => {
       expect((error as Error).message).to.equal('URN resolve failed');
     }
 
-    expect(resolveUrnStub).to.have.been.calledOnceWith('scope-1');
+    // Jobs in a batch start together, so the second job is attempted even though the first fails.
+    expect(resolveUrnStub).to.have.been.calledTwice;
+    expect(resolveUrnStub).to.have.been.calledWith('scope-1');
+    expect(resolveUrnStub).to.have.been.calledWith('scope-2');
     expect(buildStub).not.to.have.been.called;
   });
 
-  it('should process multiple jobs in sequence, each in its own transaction', async () => {
+  it('should process every job in a batch, each in its own transaction', async () => {
     const mockDBConnection = getMockDBConnection();
     const openStub = sinon.stub().resolves();
     mockDBConnection.open = openStub;

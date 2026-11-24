@@ -21,7 +21,8 @@ export interface IComputeScopeFeatureBitmapJobData {
  * grants: its anchors and their available descendants. The bitmap is built once
  * per scope, not per team.
  *
- * The URN resolve and the build run in one transaction per job, so the scope's
+ * Jobs in a batch run concurrently, each on its own connection. The URN resolve
+ * and the build run in one transaction per job, so the scope's
  * active approved ALLOW statement is checked in the same snapshot that writes the
  * bitmap. The build is a single statement that replaces the stored value, which
  * makes it idempotent — safe to retry.
@@ -36,58 +37,60 @@ export interface IComputeScopeFeatureBitmapJobData {
 export const computeScopeFeatureBitmapJobHandler: PgBoss.WorkHandler<IComputeScopeFeatureBitmapJobData> = async (
   jobs
 ) => {
-  for (const job of jobs) {
-    const { securityScopeId } = job.data;
-
-    defaultLog.info({
-      label: 'computeScopeFeatureBitmapJobHandler',
-      message: 'Processing compute scope feature bitmap job',
-      jobId: job.id,
-      securityScopeId
-    });
-
-    try {
-      const isBuilt = await withConnection(async (conn) => {
-        const securityScopeService = new SecurityScopeService(conn);
-        const urn = await securityScopeService.resolveUrnForScope(securityScopeId);
-
-        if (!urn) {
-          return false;
-        }
-
-        await securityScopeService.buildScopeFeatureBitmap(securityScopeId, urn);
-
-        return true;
-      });
-
-      if (!isBuilt) {
-        defaultLog.info({
-          label: 'computeScopeFeatureBitmapJobHandler',
-          message: 'Scope has no active approved ALLOW statements, feature bitmap build skipped',
-          jobId: job.id,
-          securityScopeId
-        });
-        continue;
-      }
+  await Promise.all(
+    jobs.map(async (job) => {
+      const { securityScopeId } = job.data;
 
       defaultLog.info({
         label: 'computeScopeFeatureBitmapJobHandler',
-        message: 'Compute scope feature bitmap job completed successfully',
+        message: 'Processing compute scope feature bitmap job',
         jobId: job.id,
         securityScopeId
       });
-    } catch (error) {
-      defaultLog.error({
-        label: 'computeScopeFeatureBitmapJobHandler',
-        message: 'Compute scope feature bitmap job failed',
-        jobId: job.id,
-        securityScopeId,
-        error
-      });
 
-      throw error; // pg-boss will handle retry based on configuration
-    }
-  }
+      try {
+        const isBuilt = await withConnection(async (connection) => {
+          const securityScopeService = new SecurityScopeService(connection);
+          const urn = await securityScopeService.resolveUrnForScope(securityScopeId);
+
+          if (!urn) {
+            return false;
+          }
+
+          await securityScopeService.buildScopeFeatureBitmap(securityScopeId, urn);
+
+          return true;
+        });
+
+        if (!isBuilt) {
+          defaultLog.info({
+            label: 'computeScopeFeatureBitmapJobHandler',
+            message: 'Scope has no active approved ALLOW statements, feature bitmap build skipped',
+            jobId: job.id,
+            securityScopeId
+          });
+          return;
+        }
+
+        defaultLog.info({
+          label: 'computeScopeFeatureBitmapJobHandler',
+          message: 'Compute scope feature bitmap job completed successfully',
+          jobId: job.id,
+          securityScopeId
+        });
+      } catch (error) {
+        defaultLog.error({
+          label: 'computeScopeFeatureBitmapJobHandler',
+          message: 'Compute scope feature bitmap job failed',
+          jobId: job.id,
+          securityScopeId,
+          error
+        });
+
+        throw error; // pg-boss will handle retry based on configuration
+      }
+    })
+  );
 };
 
 /**
