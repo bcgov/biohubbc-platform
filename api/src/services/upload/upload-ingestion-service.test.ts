@@ -7,6 +7,7 @@ import { v4 } from 'uuid';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { HTTP401 } from '../../errors/http-error';
+import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
@@ -24,6 +25,23 @@ import { UploadIngestionService } from './upload-ingestion-service';
 import { UploadService } from './upload-service';
 
 chai.use(sinonChai);
+
+/**
+ * Builds the pending artifact row returned when an upload's archive artifact is inserted.
+ *
+ * @param {string} artifactId The inserted artifact's id.
+ * @return {*}  {Artifact} The artifact record.
+ */
+const pendingArtifact = (artifactId: string): Artifact => ({
+  artifact_id: artifactId,
+  artifact_status: ArtifactStatusEnum.PENDING,
+  bucket: 'test-bucket',
+  object_key: `uploads/${artifactId}/archive.zip`,
+  byte_size: null,
+  checksum_sha256: null,
+  uploaded_at: null,
+  format: 'zip'
+});
 
 describe('UploadIngestionService', () => {
   let mockConnection: IDBConnection;
@@ -120,7 +138,7 @@ describe('UploadIngestionService', () => {
         const insertSubmissionUploadStub = sinon
           .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
           .resolves({ submission_upload_id: 'submission-upload-id-1' });
-        sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
+        sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves(pendingArtifact(mockArtifactId));
         sinon
           .stub(UploadArchiveService.prototype, 'insertUploadArchive')
           .resolves({ upload_archive_id: mockUploadArchiveId });
@@ -278,7 +296,7 @@ describe('UploadIngestionService', () => {
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
-      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-789' });
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves(pendingArtifact('artifact-789'));
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
         .resolves({ upload_archive_id: 'upload-archive-999' });
@@ -336,7 +354,7 @@ describe('UploadIngestionService', () => {
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-append-1' });
-      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves(pendingArtifact(mockArtifactId));
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
         .resolves({ upload_archive_id: mockUploadArchiveId });

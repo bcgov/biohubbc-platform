@@ -45,6 +45,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:1:survey:1',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: null
       };
       const stub = sinon.stub(PolicyStatementRepository.prototype, 'insertPolicyStatement').resolves(mockStatement);
@@ -74,6 +75,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:1:survey:1',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
       const insertStub = sinon
@@ -114,6 +116,7 @@ describe('PolicyStatementService', () => {
           policy_id: '22222222-2222-2222-2222-222222222222',
           effect: PolicyEffect.DENY,
           submission_feature_urn: 'urn:1:survey:1',
+          security_scope_id: '55555555-5555-5555-5555-555555555555',
           policy_expression_id: null
         },
         {
@@ -121,6 +124,7 @@ describe('PolicyStatementService', () => {
           policy_id: '22222222-2222-2222-2222-222222222222',
           effect: PolicyEffect.ALLOW,
           submission_feature_urn: 'urn:1:survey:3',
+          security_scope_id: '55555555-5555-5555-5555-555555555555',
           policy_expression_id: null
         }
       ];
@@ -140,11 +144,13 @@ describe('PolicyStatementService', () => {
         {
           policy_statement_id: '11111111-1111-1111-1111-111111111111',
           urn_feature_type: 'survey',
+          effect: PolicyEffect.ALLOW,
           expression_id: null
         },
         {
           policy_statement_id: '22222222-2222-2222-2222-222222222222',
           urn_feature_type: 'observation',
+          effect: PolicyEffect.ALLOW,
           expression_id: '33333333-3333-3333-3333-333333333333'
         }
       ];
@@ -166,6 +172,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.DENY,
         submission_feature_urn: 'urn:1:survey:1',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: null
       };
       const stub = sinon.stub(PolicyStatementRepository.prototype, 'updatePolicyStatement').resolves(mockStatement);
@@ -284,6 +291,7 @@ describe('PolicyStatementService', () => {
         policy_id: '22222222-2222-2222-2222-222222222222',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:1:survey:1',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: '33333333-3333-3333-3333-333333333333'
       };
       sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatement').resolves(existingStatement);

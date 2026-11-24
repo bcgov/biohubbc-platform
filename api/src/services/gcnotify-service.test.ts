@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { mockAxiosResponse } from '../__mocks__/axios';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiError } from '../errors/api-error';
 import { IgcNotifyGenericMessage } from '../interfaces/gcnotify.interface';
@@ -31,7 +32,7 @@ describe('GCNotifyService', () => {
       const mockDBConnection = getMockDBConnection();
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
-      sinon.stub(GCNotifyService.dependencies, 'post').resolves({ data: null });
+      sinon.stub(GCNotifyService.dependencies, 'post').resolves(mockAxiosResponse(null));
 
       try {
         await gcNotifyServiece.sendEmailGCNotification('', message);
@@ -45,7 +46,7 @@ describe('GCNotifyService', () => {
       const mockDBConnection = getMockDBConnection();
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
-      sinon.stub(GCNotifyService.dependencies, 'post').resolves({ data: null });
+      sinon.stub(GCNotifyService.dependencies, 'post').resolves(mockAxiosResponse(null));
 
       try {
         await gcNotifyServiece.sendEmailGCNotification(emailAddress, message);
@@ -59,7 +60,7 @@ describe('GCNotifyService', () => {
       const mockDBConnection = getMockDBConnection();
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
-      sinon.stub(GCNotifyService.dependencies, 'post').resolves({ data: 201 });
+      sinon.stub(GCNotifyService.dependencies, 'post').resolves(mockAxiosResponse(201));
 
       const result = await gcNotifyServiece.sendEmailGCNotification(emailAddress, {} as IgcNotifyGenericMessage);
 
@@ -104,8 +105,8 @@ describe('GCNotifyService', () => {
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       const axiosStub = sinon.stub(GCNotifyService.dependencies, 'post');
-      axiosStub.onFirstCall().resolves({ data: null });
-      axiosStub.onSecondCall().resolves({ data: true });
+      axiosStub.onFirstCall().resolves(mockAxiosResponse(null));
+      axiosStub.onSecondCall().resolves(mockAxiosResponse(true));
 
       try {
         await gcNotifyServiece.sendNotificationForArtifactRequestAccess(mockRequestData);
@@ -120,8 +121,8 @@ describe('GCNotifyService', () => {
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       const axiosStub = sinon.stub(GCNotifyService.dependencies, 'post');
-      axiosStub.onFirstCall().resolves({ data: true });
-      axiosStub.onSecondCall().resolves({ data: null });
+      axiosStub.onFirstCall().resolves(mockAxiosResponse(true));
+      axiosStub.onSecondCall().resolves(mockAxiosResponse(null));
 
       try {
         await gcNotifyServiece.sendNotificationForArtifactRequestAccess(mockRequestData);
@@ -136,8 +137,8 @@ describe('GCNotifyService', () => {
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       const axiosStub = sinon.stub(GCNotifyService.dependencies, 'post');
-      axiosStub.onFirstCall().resolves({ data: false });
-      axiosStub.onSecondCall().resolves({ data: true });
+      axiosStub.onFirstCall().resolves(mockAxiosResponse(false));
+      axiosStub.onSecondCall().resolves(mockAxiosResponse(true));
 
       try {
         await gcNotifyServiece.sendNotificationForArtifactRequestAccess(mockRequestData);
@@ -152,8 +153,8 @@ describe('GCNotifyService', () => {
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       const axiosStub = sinon.stub(GCNotifyService.dependencies, 'post');
-      axiosStub.onFirstCall().resolves({ data: true });
-      axiosStub.onSecondCall().resolves({ data: false });
+      axiosStub.onFirstCall().resolves(mockAxiosResponse(true));
+      axiosStub.onSecondCall().resolves(mockAxiosResponse(false));
 
       try {
         await gcNotifyServiece.sendNotificationForArtifactRequestAccess(mockRequestData);
@@ -168,8 +169,8 @@ describe('GCNotifyService', () => {
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       const axiosStub = sinon.stub(GCNotifyService.dependencies, 'post');
-      axiosStub.onFirstCall().resolves({ data: true });
-      axiosStub.onSecondCall().resolves({ data: true });
+      axiosStub.onFirstCall().resolves(mockAxiosResponse(true));
+      axiosStub.onSecondCall().resolves(mockAxiosResponse(true));
 
       const result = await gcNotifyServiece.sendNotificationForArtifactRequestAccess(mockRequestData);
 
@@ -196,7 +197,7 @@ describe('GCNotifyService', () => {
       const mockDBConnection = getMockDBConnection();
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
-      sinon.stub(GCNotifyService.dependencies, 'post').resolves({ data: null });
+      sinon.stub(GCNotifyService.dependencies, 'post').resolves(mockAxiosResponse(null));
 
       try {
         await gcNotifyServiece.sendPhoneNumberGCNotification('', message);
@@ -210,7 +211,7 @@ describe('GCNotifyService', () => {
       const mockDBConnection = getMockDBConnection();
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
-      sinon.stub(GCNotifyService.dependencies, 'post').resolves({ data: null });
+      sinon.stub(GCNotifyService.dependencies, 'post').resolves(mockAxiosResponse(null));
 
       try {
         await gcNotifyServiece.sendPhoneNumberGCNotification(sms, message);
@@ -224,7 +225,7 @@ describe('GCNotifyService', () => {
       const mockDBConnection = getMockDBConnection();
       const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
-      sinon.stub(GCNotifyService.dependencies, 'post').resolves({ data: 201 });
+      sinon.stub(GCNotifyService.dependencies, 'post').resolves(mockAxiosResponse(201));
 
       const result = await gcNotifyServiece.sendPhoneNumberGCNotification(sms, {} as IgcNotifyGenericMessage);
 

@@ -4,6 +4,7 @@ import { getSubmissionUploadReviewSecurityAssignments, POST } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../../../../__mocks__/db';
 import * as db from '../../../../../../../../../../database/db';
 import { HTTP400 } from '../../../../../../../../../../errors/http-error';
+import { ExpressionTree } from '../../../../../../../../../../models/expression-tree';
 import { SubmissionUploadReviewSecurityService } from '../../../../../../../../../../services/upload/submission-upload-review-security-service';
 import { insertSubmissionUploadReviewSecurityRuleAssignments } from '../rules/{securityRuleId}/assignments';
 import { deleteSubmissionUploadReviewSecurityRuleAssignments } from '../rules/{securityRuleId}/assignments/remove';
@@ -11,7 +12,7 @@ import { deleteSubmissionUploadReviewSecurityAssignments } from './reset';
 
 describe('review assignment search and reset bodies', () => {
   afterEach(() => sinon.restore());
-  const expression = {
+  const expression: ExpressionTree = {
     type: 'expression',
     operator: 'AND',
     clauses: [
@@ -113,13 +114,12 @@ describe('assignment expression validation', () => {
     deleteSubmissionUploadReviewSecurityAssignments
   ]) {
     it(`${handler.name} rejects deeply nested empty expressions before accessing security data`, async () => {
-      const connection = getMockDBConnection({
-        sql: sinon.stub(),
-        knex: sinon.stub(),
-        commit: sinon.stub(),
-        rollback: sinon.stub(),
-        release: sinon.stub()
-      });
+      const sql = sinon.stub();
+      const knex = sinon.stub();
+      const commit = sinon.stub();
+      const rollback = sinon.stub();
+      const release = sinon.stub();
+      const connection = getMockDBConnection({ sql, knex, commit, rollback, release });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params = {
@@ -143,11 +143,11 @@ describe('assignment expression validation', () => {
       } catch (error) {
         expect(error).instanceOf(HTTP400);
       }
-      sinon.assert.notCalled(connection.sql as sinon.SinonStub);
-      sinon.assert.notCalled(connection.knex as sinon.SinonStub);
-      sinon.assert.notCalled(connection.commit as sinon.SinonStub);
-      sinon.assert.calledOnce(connection.rollback as sinon.SinonStub);
-      sinon.assert.calledOnce(connection.release as sinon.SinonStub);
+      sinon.assert.notCalled(sql);
+      sinon.assert.notCalled(knex);
+      sinon.assert.notCalled(commit);
+      sinon.assert.calledOnce(rollback);
+      sinon.assert.calledOnce(release);
     });
   }
 });

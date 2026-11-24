@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
-import { getMockDBConnection } from '../../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { TeamAuthorizationRepository } from './team-authorization-repository';
 
 describe('TeamAuthorizationRepository', () => {
@@ -39,7 +39,7 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('join "team" as "team" on "team"."team_id" = "dr"."team_id"');
           expect(sql).to.include('"team"."record_end_date" is null');
           expect(sql).to.include('"tm"."record_end_date" is null');
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 
@@ -77,7 +77,7 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('join "team" as "team" on "team"."team_id" = "t"."team_id"');
           expect(sql).to.include('"team"."record_end_date" is null');
           expect(sql).to.include('"tm"."record_end_date" is null');
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 
@@ -119,7 +119,7 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('"su"."record_end_date" is null');
           expect(sql).to.include('"team"."record_end_date" is null');
           expect(sql).to.include('"tm"."record_end_date" is null');
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 
@@ -159,7 +159,7 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('"s"."record_end_date" is null');
           expect(sql).to.include('"team"."record_end_date" is null');
           expect(sql).to.include('"tm"."record_end_date" is null');
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 
@@ -174,7 +174,7 @@ describe('TeamAuthorizationRepository', () => {
           const compiled = query.toSQL();
           expect(compiled.sql.toLowerCase()).to.include('"s"."uuid" = ?');
           expect(compiled.bindings).to.include(submissionUuid);
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 
@@ -230,7 +230,7 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('tm.record_end_date is null');
           expect(compiled.bindings).to.include.members([100, 200, 1]);
           expect(compiled.bindings.filter((binding: unknown) => binding === 1).length).to.be.at.least(2);
-          return { rowCount: 0, rows: [] } as QueryResult<any>;
+          return mockQueryResult([]);
         }
       });
 

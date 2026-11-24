@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { PATCH, updateSubmissionUploadDecision } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import * as db from '../../../../../../../database/db';
 import { HTTP409 } from '../../../../../../../errors/http-error';
@@ -25,7 +25,7 @@ describe('submission upload decision handler', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionId: String(SUBMISSION_ID), submissionUploadId: SUBMISSION_UPLOAD_ID };
 
-    await (PATCH[0] as RequestHandler)(mockReq, mockRes, mockNext);
+    await getOperationHandler(PATCH, 0)(mockReq, mockRes, mockNext);
 
     expect(mockReq.authorization_scheme).to.eql({
       and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]

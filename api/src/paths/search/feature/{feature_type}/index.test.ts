@@ -8,9 +8,26 @@ import * as db from '../../../../database/db';
 import { SearchFeatureService } from '../../../../services/search-feature-service';
 import { SearchFeatureResultWithRelevancy } from '../../../../services/search-feature-service.interface';
 import { UserService } from '../../../../services/user-service';
+import { DEFAULT_PAGINATION_LIMIT } from '../../../../utils/pagination';
+import { ApiCursorPaginationResults } from '../../../../zod-schema/pagination';
 import * as search from './index';
 
 chai.use(sinonChai);
+
+/**
+ * Builds the cursor pagination a search returns when the results fit on one page, sorted by the
+ * default relevancy ordering.
+ *
+ * @param {number} limit The page size the request asked for.
+ * @return {*}  {ApiCursorPaginationResults} Pagination with no next or previous cursor.
+ */
+const singlePagePagination = (limit: number): ApiCursorPaginationResults => ({
+  limit,
+  sort: 'relevancy_score',
+  order: 'desc',
+  next_cursor: null,
+  previous_cursor: null
+});
 
 describe('searchFeatures', () => {
   const expressionTree = {
@@ -46,6 +63,8 @@ describe('searchFeatures', () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 1,
+        parent_submission_feature_id: null,
+        provenance: null,
         submission_id: 10,
         uuid: '550e8400-e29b-41d4-a716-446655440001',
         feature_type_id: 1,
@@ -71,7 +90,7 @@ describe('searchFeatures', () => {
         features: mockResults,
         properties: [],
         has_inaccessible_secured_features: false,
-        pagination: { next_cursor: null, previous_cursor: null }
+        pagination: singlePagePagination(10)
       });
 
     const requestHandler = search.searchFeatures();
@@ -90,7 +109,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(10)
     });
   });
 
@@ -109,6 +128,8 @@ describe('searchFeatures', () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 2,
+        parent_submission_feature_id: null,
+        provenance: 'direct',
         submission_id: 11,
         uuid: '550e8400-e29b-41d4-a716-446655440002',
         feature_type_id: 1,
@@ -132,7 +153,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(10)
     });
 
     const requestHandler = search.searchFeatures();
@@ -144,7 +165,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(10)
     });
   });
 
@@ -168,7 +189,7 @@ describe('searchFeatures', () => {
       features: [],
       properties: [],
       has_inaccessible_secured_features: true,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(10)
     });
 
     const requestHandler = search.searchFeatures();
@@ -195,6 +216,8 @@ describe('searchFeatures', () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 3,
+        parent_submission_feature_id: null,
+        provenance: null,
         submission_id: 12,
         uuid: '550e8400-e29b-41d4-a716-446655440003',
         feature_type_id: 1,
@@ -220,7 +243,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(5)
     });
 
     const requestHandler = search.searchFeatures();
@@ -231,7 +254,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(5)
     });
   });
 
@@ -258,7 +281,7 @@ describe('searchFeatures', () => {
       features: [],
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(10)
     });
 
     const requestHandler = search.searchFeatures();
@@ -269,7 +292,7 @@ describe('searchFeatures', () => {
       features: [],
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(10)
     });
   });
 
@@ -354,6 +377,8 @@ describe('searchFeatures', () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 5,
+        parent_submission_feature_id: null,
+        provenance: null,
         submission_id: 14,
         uuid: '550e8400-e29b-41d4-a716-446655440005',
         feature_type_id: 3,
@@ -372,7 +397,7 @@ describe('searchFeatures', () => {
         features: mockResults,
         properties: [],
         has_inaccessible_secured_features: false,
-        pagination: { next_cursor: null, previous_cursor: null }
+        pagination: singlePagePagination(25)
       });
 
     const requestHandler = search.searchFeatures();
@@ -381,7 +406,7 @@ describe('searchFeatures', () => {
     expect(searchStub.firstCall.args[0]).to.equal('telemetry');
     expect(searchStub.firstCall.args[1]).to.be.null;
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue.pagination).to.eql({ next_cursor: null, previous_cursor: null });
+    expect(mockRes.jsonValue.pagination).to.eql(singlePagePagination(25));
   });
 
   it('should handle missing pagination gracefully', async () => {
@@ -399,6 +424,8 @@ describe('searchFeatures', () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 4,
+        parent_submission_feature_id: null,
+        provenance: null,
         submission_id: 13,
         uuid: '550e8400-e29b-41d4-a716-446655440004',
         feature_type_id: 1,
@@ -419,7 +446,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(DEFAULT_PAGINATION_LIMIT)
     });
 
     const requestHandler = search.searchFeatures();
@@ -430,7 +457,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       properties: [],
       has_inaccessible_secured_features: false,
-      pagination: { next_cursor: null, previous_cursor: null }
+      pagination: singlePagePagination(DEFAULT_PAGINATION_LIMIT)
     });
   });
 
@@ -457,7 +484,7 @@ describe('searchFeatures', () => {
         features: [],
         properties: [],
         has_inaccessible_secured_features: false,
-        pagination: { next_cursor: null, previous_cursor: null }
+        pagination: singlePagePagination(10)
       });
 
     const requestHandler = search.searchFeatures();
@@ -493,7 +520,7 @@ describe('searchFeatures', () => {
         features: [],
         properties: [],
         has_inaccessible_secured_features: false,
-        pagination: { next_cursor: null, previous_cursor: null }
+        pagination: singlePagePagination(10)
       });
 
     const requestHandler = search.searchFeatures();
@@ -529,7 +556,7 @@ describe('searchFeatures', () => {
         features: [],
         properties: [],
         has_inaccessible_secured_features: false,
-        pagination: { next_cursor: null, previous_cursor: null }
+        pagination: singlePagePagination(10)
       });
 
     const requestHandler = search.searchFeatures();

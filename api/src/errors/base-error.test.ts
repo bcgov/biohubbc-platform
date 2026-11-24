@@ -85,10 +85,9 @@ describe('BaseError', () => {
     });
 
     it('returns false for non-object values', () => {
-      expect(null instanceof BaseError).to.be.false;
-      expect(undefined instanceof BaseError).to.be.false;
-      expect('string' instanceof BaseError).to.be.false;
-      expect(42 instanceof BaseError).to.be.false;
+      const values: unknown[] = [null, undefined, 'string', 42];
+
+      expect(values.map((value) => value instanceof BaseError)).to.deep.equal([false, false, false, false]);
     });
   });
 });

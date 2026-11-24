@@ -76,11 +76,14 @@ describe('DataRequestService', () => {
     name: 'Data request policy - uuid',
     description: null,
     status: 'requested',
+    expressions: [],
     statements: statementIds.map((id, idx) => ({
       policy_statement_id: id,
       policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
       effect: PolicyEffect.ALLOW,
-      submission_feature_urn: `urn:*:f${idx}:*`
+      submission_feature_urn: `urn:*:f${idx}:*`,
+      security_scope_id: '55555555-5555-5555-5555-555555555555',
+      policy_expression_id: null
     }))
   });
 
@@ -637,8 +640,8 @@ describe('DataRequestService', () => {
 
     // Step 1: precheck returns both feature types as known.
     sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap').resolves([
-      { feature_type_id: 1, name: 'observation' },
-      { feature_type_id: 2, name: 'telemetry' }
+      { feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null },
+      { feature_type_id: 2, name: 'telemetry', display_name: 'Telemetry', description: null }
     ]);
     // Step 2: expression write returns a single tree id; we will verify per-statement linking in S12.
     sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-1' });
@@ -700,8 +703,8 @@ describe('DataRequestService', () => {
 
     // Step 1: precheck returns both feature types as known.
     sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap').resolves([
-      { feature_type_id: 1, name: 'observation' },
-      { feature_type_id: 2, name: 'telemetry' }
+      { feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null },
+      { feature_type_id: 2, name: 'telemetry', display_name: 'Telemetry', description: null }
     ]);
     const writeExpressionStub = sinon
       .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
@@ -752,8 +755,8 @@ describe('DataRequestService', () => {
 
     // Step 1: precheck + expression write.
     sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap').resolves([
-      { feature_type_id: 1, name: 'observation' },
-      { feature_type_id: 2, name: 'telemetry' }
+      { feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null },
+      { feature_type_id: 2, name: 'telemetry', display_name: 'Telemetry', description: null }
     ]);
     sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree').resolves({ expression_id: 'expr-1' });
     sinon
@@ -811,7 +814,7 @@ describe('DataRequestService', () => {
     // Step 1: precheck returns the known type.
     sinon
       .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
-      .resolves([{ feature_type_id: 1, name: 'observation' }]);
+      .resolves([{ feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null }]);
     const writeExpressionStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree');
     const updateStatementStub = sinon.stub(PolicyStatementService.prototype, 'updatePolicyStatement');
 
@@ -908,7 +911,7 @@ describe('DataRequestService', () => {
     // Step 1: catalog knows only 'observation'; 'weatherz' is the unknown.
     sinon
       .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
-      .resolves([{ feature_type_id: 1, name: 'observation' }]);
+      .resolves([{ feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null }]);
     const writeExpressionStub = sinon.stub(ExpressionTreeService.prototype, 'writeExpressionTree');
     const createPolicyStub = sinon.stub(PolicyService.prototype, 'createPolicyWithStatements');
     const createTeamPolicyStub = sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy');
@@ -958,7 +961,7 @@ describe('DataRequestService', () => {
     // Step 1: precheck + expression write.
     sinon
       .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
-      .resolves([{ feature_type_id: 1, name: 'observation' }]);
+      .resolves([{ feature_type_id: 1, name: 'observation', display_name: 'Observation', description: null }]);
     const writeExpressionStub = sinon
       .stub(ExpressionTreeService.prototype, 'writeExpressionTree')
       .resolves({ expression_id: 'expr-1' });

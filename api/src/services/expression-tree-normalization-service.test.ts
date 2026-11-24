@@ -4,7 +4,8 @@ import sinon from 'sinon';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiValidationError } from '../errors/api-error';
 import { PredicateOperator } from '../models/expression-predicate';
-import { ExpressionPredicatePropertyMetadata } from '../models/feature-type-property';
+import { ExpressionTree } from '../models/expression-tree';
+import { ExpressionPredicatePropertyMetadata, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { TaxonRecord } from '../models/taxon';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { ExpressionTreeNormalizationService } from './expression-tree-normalization-service';
@@ -40,7 +41,7 @@ describe('ExpressionTreeNormalizationService', () => {
   let getPropertyMetadata: sinon.SinonStub;
 
   beforeEach(() => {
-    currentMetadata = metadata('string');
+    currentMetadata = metadata(FEATURE_PROPERTY_TYPE.STRING);
     getPropertyMetadata = sinon
       .stub(FeaturePropertyRepository.prototype, 'getExpressionPredicatePropertyMetadata')
       .callsFake(async () => currentMetadata);
@@ -58,7 +59,7 @@ describe('ExpressionTreeNormalizationService', () => {
     currentMetadata = metadata(propertyType);
 
     const expressionTreeNormalizationService = new ExpressionTreeNormalizationService(getMockDBConnection());
-    const tree = {
+    const tree: ExpressionTree = {
       type: 'expression',
       operator: 'AND',
       clauses: [
@@ -70,7 +71,7 @@ describe('ExpressionTreeNormalizationService', () => {
           ...(value !== undefined ? { value } : {})
         }
       ]
-    } as const;
+    };
 
     return expressionTreeNormalizationService.normalize(tree);
   };
@@ -170,7 +171,7 @@ describe('ExpressionTreeNormalizationService', () => {
   it('normalizes a taxon DescendsFrom predicate', async () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
 
-    const result = await normalizeOne('taxon', 'DescendsFrom', 180703);
+    const result = await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'DescendsFrom', 180703);
     const predicate = result.clauses[0];
 
     expect(predicate).to.include({
@@ -188,7 +189,7 @@ describe('ExpressionTreeNormalizationService', () => {
   it('resolves a numeric taxon TSN to an internal taxon_id', async () => {
     const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
 
-    const result = await normalizeOne('taxon', 'Equals', 180703);
+    const result = await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'Equals', 180703);
     const predicate = result.clauses[0];
 
     // The client value is an ITIS TSN; findTaxon resolves it to the internal taxon_id.
@@ -203,7 +204,7 @@ describe('ExpressionTreeNormalizationService', () => {
   it('resolves a taxon scientific-name string to a taxon_id', async () => {
     const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7)]);
 
-    const result = await normalizeOne('taxon', 'DescendsFrom', 'Cervidae');
+    const result = await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'DescendsFrom', 'Cervidae');
     const predicate = result.clauses[0];
 
     expect(taxonStub).to.have.been.calledOnceWith({ itis_scientific_name: 'Cervidae' });
@@ -217,7 +218,7 @@ describe('ExpressionTreeNormalizationService', () => {
   it('resolves a numeric-string taxon TSN to an internal taxon_id', async () => {
     const taxonStub = sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(456)]);
 
-    const result = await normalizeOne('taxon', 'Equals', '180703');
+    const result = await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'Equals', '180703');
     const predicate = result.clauses[0];
 
     expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 180703 });
@@ -232,7 +233,7 @@ describe('ExpressionTreeNormalizationService', () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([]);
 
     try {
-      await normalizeOne('taxon', 'Equals', '2147483648');
+      await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'Equals', '2147483648');
       expect.fail();
     } catch (error) {
       expect(error).to.be.instanceOf(ApiValidationError);
@@ -244,7 +245,7 @@ describe('ExpressionTreeNormalizationService', () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7), taxonRecord(8)]);
 
     try {
-      await normalizeOne('taxon', 'DescendsFrom', 'Cervidae');
+      await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'DescendsFrom', 'Cervidae');
       expect.fail();
     } catch (error) {
       expect(error).to.be.instanceOf(ApiValidationError);
@@ -256,7 +257,7 @@ describe('ExpressionTreeNormalizationService', () => {
     sinon.stub(TaxonomyService.prototype, 'findTaxon').resolves([taxonRecord(7)]);
 
     for (const operator of ['Equals', 'ParentOf', 'ChildOf', 'DescendsFrom', 'AscendsFrom'] as const) {
-      const result = await normalizeOne('taxon', operator, 180703);
+      const result = await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, operator, 180703);
       const predicate = result.clauses[0];
 
       expect(predicate.type === 'predicate' && predicate.internal_predicate).to.eql({
@@ -272,7 +273,7 @@ describe('ExpressionTreeNormalizationService', () => {
     const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
 
     try {
-      await normalizeOne('taxon', 'Equals', 999999);
+      await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'Equals', 999999);
       expect.fail();
     } catch (error) {
       expect(taxonStub).to.have.been.calledOnceWith({ itis_tsn: 999999 });
@@ -287,7 +288,7 @@ describe('ExpressionTreeNormalizationService', () => {
     const ensureStub = sinon.stub(TaxonomyService.prototype, 'ensureTaxonHierarchyByTsnIds').resolves();
 
     try {
-      await normalizeOne('taxon', 'Equals', 'Notarealtaxon');
+      await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'Equals', 'Notarealtaxon');
       expect.fail();
     } catch (error) {
       expect(taxonStub).to.have.been.calledOnceWith({ itis_scientific_name: 'Notarealtaxon' });
@@ -299,7 +300,7 @@ describe('ExpressionTreeNormalizationService', () => {
 
   it('rejects an operator that is invalid for the property type', async () => {
     try {
-      await normalizeOne('taxon', 'After', 123);
+      await normalizeOne(FEATURE_PROPERTY_TYPE.TAXON, 'After', 123);
       expect.fail();
     } catch (error) {
       expect(error).to.be.instanceOf(ApiValidationError);
@@ -307,9 +308,9 @@ describe('ExpressionTreeNormalizationService', () => {
   });
 
   it('normalizes datetime date, time, and datetime scalar literals', async () => {
-    const date = await normalizeOne('datetime', 'After', '2020-01-01');
-    const time = await normalizeOne('datetime', 'After', '14:30:00-07:00');
-    const dateTime = await normalizeOne('datetime', 'After', '2020-01-01T14:30:00-07:00');
+    const date = await normalizeOne(FEATURE_PROPERTY_TYPE.DATETIME, 'After', '2020-01-01');
+    const time = await normalizeOne(FEATURE_PROPERTY_TYPE.DATETIME, 'After', '14:30:00-07:00');
+    const dateTime = await normalizeOne(FEATURE_PROPERTY_TYPE.DATETIME, 'After', '2020-01-01T14:30:00-07:00');
 
     expect(date.clauses[0].type === 'predicate' && date.clauses[0].internal_predicate).to.deep.include({
       type: 'timestamp',
@@ -329,15 +330,15 @@ describe('ExpressionTreeNormalizationService', () => {
   });
 
   it('enforces OnDate and OnTime literal kind rules', async () => {
-    await normalizeOne('datetime', 'OnDate', '2020-01-01');
-    await normalizeOne('datetime', 'OnTime', '14:30:00-07:00');
+    await normalizeOne(FEATURE_PROPERTY_TYPE.DATETIME, 'OnDate', '2020-01-01');
+    await normalizeOne(FEATURE_PROPERTY_TYPE.DATETIME, 'OnTime', '14:30:00-07:00');
 
     for (const [operator, value] of [
       ['OnDate', '2020-01-01T14:30:00-07:00'],
       ['OnTime', '2020-01-01']
-    ]) {
+    ] as const) {
       try {
-        await normalizeOne('datetime', operator, value);
+        await normalizeOne(FEATURE_PROPERTY_TYPE.DATETIME, operator, value);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiValidationError);
@@ -346,17 +347,17 @@ describe('ExpressionTreeNormalizationService', () => {
   });
 
   it('validates value shape and Exists semantics', async () => {
-    await normalizeOne('string', 'Contains', 'wolf');
-    await normalizeOne('boolean', 'Equals', true);
-    await normalizeOne('code', 'Equals', 42);
-    await normalizeOne('spatial', 'Within', { type: 'Point', coordinates: [0, 0] });
-    await normalizeOne('number', 'Exists');
+    await normalizeOne(FEATURE_PROPERTY_TYPE.STRING, 'Contains', 'wolf');
+    await normalizeOne(FEATURE_PROPERTY_TYPE.BOOLEAN, 'Equals', true);
+    await normalizeOne(FEATURE_PROPERTY_TYPE.CODE, 'Equals', 42);
+    await normalizeOne(FEATURE_PROPERTY_TYPE.SPATIAL, 'Within', { type: 'Point', coordinates: [0, 0] });
+    await normalizeOne(FEATURE_PROPERTY_TYPE.NUMBER, 'Exists');
 
     for (const [type, operator, value] of [
-      ['string', 'Contains', 42],
-      ['boolean', 'NotEquals', true],
-      ['datetime', 'Before', undefined],
-      ['number', 'Exists', 1]
+      [FEATURE_PROPERTY_TYPE.STRING, 'Contains', 42],
+      [FEATURE_PROPERTY_TYPE.BOOLEAN, 'NotEquals', true],
+      [FEATURE_PROPERTY_TYPE.DATETIME, 'Before', undefined],
+      [FEATURE_PROPERTY_TYPE.NUMBER, 'Exists', 1]
     ] as const) {
       try {
         await normalizeOne(type, operator, value);

@@ -51,6 +51,7 @@ const UPLOAD_DESCENDANT_COLUMNS = [
  * Each predicate is evaluated from its evidence: the upload features holding a matching value, then the features those
  * reach and the features that reach them. The cost is therefore proportional to the evidence and what it reaches rather
  * than to the upload's size, and a page request evaluates the complete match set before ordering and limiting it.
+ * Features whose type has since been retired are candidates like any other, as they are in published evaluation.
  *
  * @param {number} submissionId Submission boundary.
  * @param {string} submissionUploadId Reviewed upload boundary.
@@ -71,11 +72,6 @@ export function buildSubmissionUploadFeatureIdsSubquery(
     : knex('submission_feature as anchor_sf')
         .select('anchor_sf.submission_feature_id')
         .whereRaw(buildUploadScopeCondition('anchor_sf', scope, knex));
-
-  // Active feature types are collected once, so the filter applies to each anchor row rather than joining a type.
-  query.whereRaw('anchor_sf.feature_type_id = ANY(ARRAY(?))', [
-    knex('feature_type').select('feature_type_id').whereNull('record_end_date')
-  ]);
 
   applySearchQueryOptions(query, 'anchor_sf', options);
   return query;

@@ -192,10 +192,11 @@ describe('Martin tile cache keying (integration)', function () {
     expect(first.status).to.equal(200);
     expect(first.bytes.length).to.be.greaterThan(0);
 
-    // Mutate the COMMITTED data: end-date the feature, so any fresh render is now empty.
+    // Mutate the COMMITTED data: remove the feature's closure self-loop, which is how the tile function tells a current
+    // feature from a superseded one, so any fresh render is now empty.
     await connection.sql(SQL`
-      UPDATE submission_feature SET record_end_date = now() - make_interval(secs => 1)
-      WHERE submission_feature_id = ${featureId};
+      DELETE FROM submission_feature_closure
+      WHERE source_submission_feature_id = ${featureId} AND target_submission_feature_id = ${featureId};
     `);
     await connection.commit();
 

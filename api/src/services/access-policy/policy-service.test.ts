@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiConflictError, ApiNotFoundError } from '../../errors/api-error';
+import { ExpressionTree } from '../../models/expression-tree';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
@@ -142,8 +143,22 @@ describe('PolicyService', () => {
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
-        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
-        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+        {
+          team_policy_id: 'tp1',
+          team_id: 'team-1',
+          policy_id: '1',
+          team_name: 'A',
+          policy_name: 'P',
+          record_end_date: null
+        },
+        {
+          team_policy_id: 'tp2',
+          team_id: 'team-2',
+          policy_id: '1',
+          team_name: 'B',
+          policy_name: 'P',
+          record_end_date: null
+        }
       ]);
       const materializePolicyStub = sinon
         .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
@@ -171,9 +186,16 @@ describe('PolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
-      sinon
-        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
-        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        {
+          team_policy_id: 'tp1',
+          team_id: 'team-1',
+          policy_id: '1',
+          team_name: 'A',
+          policy_name: 'P',
+          record_end_date: null
+        }
+      ]);
       const materializePolicyStub = sinon
         .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
         .resolves(false);
@@ -193,8 +215,22 @@ describe('PolicyService', () => {
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
-        { team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' },
-        { team_policy_id: 'tp2', team_id: 'team-2', policy_id: '1', team_name: 'B', policy_name: 'P' }
+        {
+          team_policy_id: 'tp1',
+          team_id: 'team-1',
+          policy_id: '1',
+          team_name: 'A',
+          policy_name: 'P',
+          record_end_date: null
+        },
+        {
+          team_policy_id: 'tp2',
+          team_id: 'team-2',
+          policy_id: '1',
+          team_name: 'B',
+          policy_name: 'P',
+          record_end_date: null
+        }
       ]);
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
@@ -216,9 +252,16 @@ describe('PolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
-      sinon
-        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
-        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        {
+          team_policy_id: 'tp1',
+          team_id: 'team-1',
+          policy_id: '1',
+          team_name: 'A',
+          policy_name: 'P',
+          record_end_date: null
+        }
+      ]);
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
         .resolves();
@@ -237,9 +280,16 @@ describe('PolicyService', () => {
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
-      const getTeamPoliciesStub = sinon
-        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
-        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        {
+          team_policy_id: 'tp1',
+          team_id: 'team-1',
+          policy_id: '1',
+          team_name: 'A',
+          policy_name: 'P',
+          record_end_date: null
+        }
+      ]);
       const materializeStub = sinon
         .stub(SecurityScopeService.prototype, 'materializeStatementScopesAndTeamAccess')
         .resolves();
@@ -324,9 +374,16 @@ describe('PolicyService', () => {
       const updatedPolicy: Policy = { ...currentPolicy, status: 'approved' };
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(currentPolicy);
       const updateStub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
-      const getTeamPoliciesStub = sinon
-        .stub(TeamPolicyRepository.prototype, 'getTeamPolicies')
-        .resolves([{ team_policy_id: 'tp1', team_id: 'team-1', policy_id: '1', team_name: 'A', policy_name: 'P' }]);
+      const getTeamPoliciesStub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves([
+        {
+          team_policy_id: 'tp1',
+          team_id: 'team-1',
+          policy_id: '1',
+          team_name: 'A',
+          policy_name: 'P',
+          record_end_date: null
+        }
+      ]);
       const materializePolicyStub = sinon
         .stub(SecurityScopeService.prototype, 'materializePolicyStatementScopes')
         .resolves(true);
@@ -370,8 +427,22 @@ describe('PolicyService', () => {
   describe('applyCacheFanOutForTransition', () => {
     const policyId = 'policy-1';
     const linkedTeamPolicies = [
-      { team_policy_id: 'tp1', team_id: 'team-1', policy_id: policyId, team_name: 'A', policy_name: 'P' },
-      { team_policy_id: 'tp2', team_id: 'team-2', policy_id: policyId, team_name: 'B', policy_name: 'P' }
+      {
+        team_policy_id: 'tp1',
+        team_id: 'team-1',
+        policy_id: policyId,
+        team_name: 'A',
+        policy_name: 'P',
+        record_end_date: null
+      },
+      {
+        team_policy_id: 'tp2',
+        team_id: 'team-2',
+        policy_id: policyId,
+        team_name: 'B',
+        policy_name: 'P',
+        record_end_date: null
+      }
     ];
 
     // The helper is intentionally private; tests access it via an `any` cast to
@@ -488,7 +559,8 @@ describe('PolicyService', () => {
           team_id: 'team-1',
           policy_id: '1',
           team_name: 'Team 1',
-          policy_name: 'Policy 1'
+          policy_name: 'Policy 1',
+          record_end_date: null
         }
       ]);
       const deletePolicyStub = sinon.stub(PolicyRepository.prototype, 'deletePolicy').resolves();
@@ -524,6 +596,7 @@ describe('PolicyService', () => {
           policy_id: '1',
           effect: PolicyEffect.ALLOW,
           submission_feature_urn: 'urn:*:*:*',
+          security_scope_id: '55555555-5555-5555-5555-555555555555',
           policy_expression_id: null
         }
       ];
@@ -561,6 +634,7 @@ describe('PolicyService', () => {
           policy_id: '1',
           effect: PolicyEffect.ALLOW,
           submission_feature_urn: 'urn:*:telemetry:*',
+          security_scope_id: '55555555-5555-5555-5555-555555555555',
           policy_expression_id: null
         }
       ];
@@ -583,7 +657,7 @@ describe('PolicyService', () => {
 
   describe('createPolicyExpression', () => {
     it('creates a policy expression when the policy does not already use the resolved expression id', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -595,7 +669,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
       const policyExpression = {
         policy_expression_id: 'pe-new',
         policy_id: 'policy-1',
@@ -635,7 +709,7 @@ describe('PolicyService', () => {
     });
 
     it('throws conflict when the policy already has an active policy expression for the resolved expression id', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -647,7 +721,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
         policy_id: 'policy-1',
@@ -683,7 +757,7 @@ describe('PolicyService', () => {
 
   describe('updatePolicyExpression', () => {
     it('throws conflict when another active policy expression already uses the resolved expression id', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -695,7 +769,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
 
       sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves({
         policy_id: 'policy-1',
@@ -732,7 +806,7 @@ describe('PolicyService', () => {
     });
 
     it('allows updating metadata when the resolved expression id belongs to the same policy expression', async () => {
-      const expression = {
+      const expression: ExpressionTree = {
         type: 'expression',
         operator: 'AND',
         clauses: [
@@ -744,7 +818,7 @@ describe('PolicyService', () => {
             value: 'x'
           }
         ]
-      } as const;
+      };
       const policyExpression = {
         policy_expression_id: 'pe-current',
         policy_id: 'policy-1',
@@ -846,6 +920,7 @@ describe('PolicyService', () => {
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:*:telemetry:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: null
       };
       const mockStatement2: PolicyStatement = {
@@ -853,6 +928,7 @@ describe('PolicyService', () => {
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:10:*:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: null
       };
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
@@ -907,6 +983,7 @@ describe('PolicyService', () => {
         policy_id: '1',
         effect: PolicyEffect.ALLOW,
         submission_feature_urn: 'urn:*:sampling_site:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
         policy_expression_id: null
       };
       const linkedStatement: PolicyStatement = { ...mockStatement, policy_expression_id: 'pe-1' };

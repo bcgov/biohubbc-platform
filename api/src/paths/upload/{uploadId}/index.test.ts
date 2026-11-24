@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
-import { RequestHandler } from 'express';
 import { afterEach, describe, it } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { completeUpload, PUT } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { getOperationHandler } from '../../../__mocks__/operation';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import * as db from '../../../database/db';
 import { HTTP403 } from '../../../errors/http-error';
@@ -195,7 +195,7 @@ describe('Upload authorization middleware', () => {
           } as SystemUserExtended;
           let failure: unknown;
           try {
-            await (PUT[0] as RequestHandler)(mockReq, mockRes, mockNext);
+            await getOperationHandler(PUT, 0)(mockReq, mockRes, mockNext);
           } catch (error_) {
             failure = error_;
           }
@@ -222,7 +222,7 @@ describe('Upload authorization middleware', () => {
         role_names: administrator ? [SYSTEM_ROLE.SYSTEM_ADMIN] : []
       } as SystemUserExtended;
       try {
-        await (PUT[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(PUT, 0)(mockReq, mockRes, mockNext);
         expect.fail('Expected authorization rejection');
       } catch (error_) {
         expect(error_).to.be.instanceOf(HTTP403);
@@ -240,7 +240,7 @@ describe('Upload authorization middleware', () => {
       mockReq.keycloak_token = { sub: 'user' };
       mockReq.system_user = user as unknown as SystemUserExtended;
       try {
-        await (PUT[0] as RequestHandler)(mockReq, mockRes, mockNext);
+        await getOperationHandler(PUT, 0)(mockReq, mockRes, mockNext);
         expect.fail('Expected authorization rejection');
       } catch (error_) {
         expect(error_).to.be.instanceOf(HTTP403);

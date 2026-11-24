@@ -162,7 +162,6 @@ describe('SubmissionService', () => {
         security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
         system_user_id: 3,
-        team_id: '11111111-1111-1111-1111-111111111111',
         contributor_id: 1,
         name: 'name',
         description: 'description',
@@ -387,7 +386,6 @@ describe('SubmissionService', () => {
         contributor_id: 1,
         name: 'string',
         description: null,
-        comment: 'comment',
         publish_timestamp: '2023-12-12',
         record_end_date: 'string',
         create_date: 'string',
@@ -395,7 +393,10 @@ describe('SubmissionService', () => {
         update_date: null,
         update_user: null,
         revision_count: 1,
-        security: SECURITY_APPLIED_STATUS.SECURED
+        security: SECURITY_APPLIED_STATUS.SECURED,
+        contributor_name: 'contributor',
+        last_approved_upload_date: null,
+        feature_types: []
       };
 
       const repo = sinon
@@ -560,14 +561,13 @@ describe('SubmissionService', () => {
         feature_type_id: 1,
         source_id: 'source-id',
         data: {},
+        content_hash: null,
+        reconciliation: null,
+        successor_submission_feature_id: null,
         parent_submission_feature_id: 1,
         record_effective_date: '2024-01-01',
         record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 3,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
+        create_date: '2024-01-01'
       };
 
       const getSubmissionRootFeatureStub = sinon
