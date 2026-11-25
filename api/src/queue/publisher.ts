@@ -755,14 +755,44 @@ const COMPUTE_SCOPE_FEATURE_BITMAP_OPTIONS: IPublishOptions = {
 };
 
 /**
+ * Queue the refresh of one submission's part of a scope's bitmap, to start at once, unless one is already queued
+ * under the same singleton key. The insert runs in the caller's transaction.
+ *
+ * @param {IDBConnection} connection Caller's transaction.
+ * @param {IComputeScopeFeatureBitmapJobData} data Job payload, used only when no job is queued for the key.
+ * @param {IPublishOptions} options Job options.
+ * @param {string} singletonKey Key identifying the scope and submission.
+ * @returns {Promise<string | null>} New job id, or null when an already-queued job absorbed this request.
+ */
+async function sendSubmissionBitmapRefreshJob(
+  connection: IDBConnection,
+  data: IComputeScopeFeatureBitmapJobData,
+  options: IPublishOptions,
+  singletonKey: string
+): Promise<string | null> {
+  const boss = publisherDependencies.getPgBoss();
+
+  await boss.createQueue(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+
+  return boss.send(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP, data, {
+    ...options,
+    singletonKey,
+    db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+  });
+}
+
+/**
  * Publish a compute scope feature bitmap job to the queue.
  *
  * Queues the async rebuild of a security scope's `feature_ids` bitmap, or the
- * refresh of one submission's part of it. Each scope gets its own delayed
- * singleton job, and each (scope, submission) pair for refreshes limited to one
- * submission, so a burst of policy or security-rule edits coalesces into one
- * queued job without dropping rebuilds for other scopes or refreshes for other
- * submissions.
+ * refresh of one submission's part of it. Each scope gets its own singleton
+ * job, and each (scope, submission) pair for refreshes limited to one
+ * submission, so repeated requests coalesce into one queued job without
+ * dropping rebuilds for other scopes or refreshes for other submissions.
+ *
+ * A full build is delayed, so a burst of policy edits becomes one build. A
+ * refresh is not: it is cheap, and until it runs the submission's features can
+ * be missing from the bitmap.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
  * @param {IComputeScopeFeatureBitmapJobData} data Job data containing securityScopeId and submissionId
@@ -786,13 +816,16 @@ export const publishComputeScopeFeatureBitmapJob = async (
         ? `scope-feature-bitmap-${data.securityScopeId}`
         : `scope-feature-bitmap-${data.securityScopeId}-submission-${data.submissionId}`;
 
-    const jobId = await sendDelayedRecomputeJob(
-      connection,
-      JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP,
-      data,
-      mergedOptions,
-      singletonKey
-    );
+    const jobId =
+      data.submissionId === null
+        ? await sendDelayedRecomputeJob(
+            connection,
+            JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP,
+            data,
+            mergedOptions,
+            singletonKey
+          )
+        : await sendSubmissionBitmapRefreshJob(connection, data, mergedOptions, singletonKey);
 
     if (jobId) {
       defaultLog.info({

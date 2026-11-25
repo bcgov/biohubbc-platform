@@ -895,7 +895,7 @@ describe('publisher', () => {
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('bitmap-job-id');
     });
 
-    it('uses 30 minute timeout with retry backoff and a 10 second delay', async () => {
+    it('uses 30 minute timeout with retry backoff and a 10 second delay for a full build', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('bitmap-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -964,6 +964,31 @@ describe('publisher', () => {
 
       expect(sendStub.firstCall.args[1]).to.deep.equal(data);
       expect(sendStub.firstCall.args[2].singletonKey).to.equal('scope-feature-bitmap-scope-uuid-456-submission-42');
+    });
+
+    it('starts a submission-limited refresh at once, in the caller transaction, with the same retry options', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('bitmap-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss: MockPgBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as unknown as PgBoss);
+
+      await publishComputeScopeFeatureBitmapJob(mockConnection, {
+        securityScopeId: 'scope-uuid-456',
+        submissionId: 42
+      });
+
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+
+      const options = sendStub.firstCall.args[2];
+      expect(options).to.not.have.property('startAfter');
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 30);
+      expect(options.db.executeSql).to.be.a('function');
     });
 
     it('returns duplicate status when send returns null', async () => {
