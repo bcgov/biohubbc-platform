@@ -26,11 +26,11 @@ app:
   database:
     # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments (legacy dbHost secret).
     useCrunchy: true
-    host: "" # e.g. "biohub-platform-db-dev-primary" (use -primary not pgbouncer; also used for migrations unless migrationHost set)
+    host: "" # e.g. "biohub-platform-db-dev-pg18-primary" (use -primary not pgbouncer; also used for migrations unless migrationHost set)
     migrationHost: "" # optional; defaults to host when empty (set only if migration target differs from app host)
-    adminSecretName: "" # e.g. "biohub-platform-db-dev-pguser-postgres"
-    appSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-api"
-    dbNameSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
+    adminSecretName: "" # e.g. "biohub-platform-db-dev-pg18-pguser-postgres"
+    appSecretName: "" # e.g. "biohub-platform-db-dev-pg18-pguser-biohub-api"
+    dbNameSecretName: "" # e.g. "biohub-platform-db-dev-pg18-pguser-biohub-platform-db-dev-pg18"
     # Name of the least-privilege Martin tile server role. Crunchy environments only: the role and
     # its password are created by the Postgres Operator, so the migration only applies grants.
     # Must match the user declared in the PostgresCluster CR (infrastructure/crunchy-db).

@@ -1,18 +1,15 @@
 # PROD environment overrides for Crunchy Postgres cluster.
-# High-availability: 2 instances + 2 pgBouncer replicas, separate S3 backup path, higher retention.
+# High-availability: 2 instances + 2 pgBouncer replicas, separate S3 backup path.
 
-fullnameOverride: biohub-platform-db-prod
+fullnameOverride: biohub-platform-db-prod-pg18
 
 instances:
+  # Two 5Gi volumes (actual usage is under 1Gi) fit the namespace's 32Gi storage quota beside the
+  # Postgres 17 cluster this replaces once that cluster is down to one instance (PG18_MIGRATION.md, step A5).
+  # Volumes grow online but never shrink.
   replicas: 2
   dataVolumeClaimSpec:
-    # Sized to fit the namespace storage quota (32Gi total across all classes).
-    # Two instances at 20Gi requires 40Gi and can never be satisfied; that
-    # unsatisfiable request left the operator retry-looping on PVC expansion
-    # from 2026-03-20 onward. Actual usage is under 1Gi per instance, so 10Gi
-    # is ~15x headroom and matches dev/test. Note that PVCs cannot shrink in
-    # place: lowering this value requires recreating the instance's volume.
-    storage: 10Gi
+    storage: 5Gi
   requests:
     cpu: 100m
     memory: 512Mi
@@ -24,22 +21,22 @@ proxy:
 pgBackRest:
   repos:
     - name: repo1
-      path: "/biohub/prod/hourly"
+      path: "/biohub/prod-pg18/hourly"
       fullSchedule: "0 12 * * *"
       retention: "1"
       retentionFullType: count
     - name: repo2
-      path: "/biohub/prod/daily"
+      path: "/biohub/prod-pg18/daily"
       fullSchedule: "0 0 * * *"
       retention: "7"
       retentionFullType: count
     - name: repo3
-      path: "/biohub/prod/weekly"
+      path: "/biohub/prod-pg18/weekly"
       fullSchedule: "0 1 * * 0"
       retention: "4"
       retentionFullType: count
     - name: repo4
-      path: "/biohub/prod/monthly"
+      path: "/biohub/prod-pg18/monthly"
       fullSchedule: "0 3 1 * *"
       retention: "12"
       retentionFullType: count
@@ -56,17 +53,16 @@ dataSource:
   enabled: false
   repo:
     name: repo1
-    path: "/biohub/prod/daily"
-  options:
-    - "--set=20260320-000008F"
+    path: "/biohub/prod-pg18/daily"
+  options: []
 
-# To perform the one-time data migration from the old database, set:
-#   migration.enabled: true
-#   migration.oldDb.host: "biohub-platform-db-prod"
-#   migration.oldDb.secretName: "biohub-platform-db-postgresql-prod"
-# Then re-deploy with migration.enabled: false once complete.
+# One-time copy from the Postgres 17 cluster this one replaces (biohub-platform-db-prod). Leave it disabled here and
+# enable it only for the migration run with --set migration.enabled=true (PG18_MIGRATION.md, step B).
 migration:
   enabled: false
   oldDb:
-    host: "biohub-platform-db-prod"
-    secretName: "biohub-platform-db-postgresql-prod"
+    host: "biohub-platform-db-prod-primary"
+    secretName: "biohub-platform-db-prod-pguser-postgres"
+    adminKey: "user"
+    passwordKey: "password"
+    dbNameKey: "dbname"

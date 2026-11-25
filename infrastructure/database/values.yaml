@@ -24,7 +24,7 @@ app:
   postgresUserMartin: "" # Username for the least-privilege Martin tile server role (PR environments only).
   postgresUserMartinPassword: "" # Password for the Martin role. Use an alphanumeric value: it is embedded in a connection URL.
   postgresDb: "" # Name of the PostgreSQL database accessed.
-  pgData: /var/lib/postgresql/data/17 # Path to PostgreSQL data directory
+  pgData: /var/lib/postgresql/data/18 # Path to PostgreSQL data directory; named for the major version, so a PR environment on an older major starts an empty directory and is re-seeded
 
 # Openshift Resources
 replicas: 1

@@ -1,0 +1,84 @@
+# Builds the Crunchy Postgres image the DEV/TEST/PROD clusters run (infrastructure/crunchy-db/image).
+# A pull request that changes the image only builds and scans it, so a broken Dockerfile fails review.
+# Run the workflow by hand (workflow_dispatch) to build, scan and push the tag that
+# infrastructure/crunchy-db/values.yaml points at. Clusters pick up a new tag only when that chart is
+# upgraded, which is done by hand (see infrastructure/crunchy-db/PG18_MIGRATION.md).
+name: Build Postgres Image
+
+on:
+  pull_request:
+    paths:
+      - infrastructure/crunchy-db/image/**
+      - .github/workflows/buildPostgresImage.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: biohub-platform-crunchy-postgres
+  # The tag names what the image contains: Postgres, PostGIS and roaringbitmap versions. It must match the
+  # tag of `crunchyImage` in infrastructure/crunchy-db/values.yaml, and it must change whenever an ARG in
+  # the Dockerfile does, so a cluster never silently pulls different contents under a tag it already runs.
+  IMAGE_TAG: 18.1-3.6-rb1.3.0
+
+jobs:
+  buildPostgresImage:
+    name: Build Postgres Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Target Branch
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The Crunchy base image is published only in BC Gov Artifactory, which refuses anonymous pulls.
+      # The credentials are an Artifactory service account provisioned in the tools namespace.
+      - name: Authenticate Docker with Artifactory
+        env:
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+        run: |
+          echo "$ARTIFACTORY_PASSWORD" | docker login -u "$ARTIFACTORY_USERNAME" --password-stdin artifacts.developer.gov.bc.ca
+
+      - name: Build Postgres Image
+        working-directory: infrastructure/crunchy-db/image
+        run: |
+          docker build --platform linux/amd64 \
+            -t "${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:$IMAGE_TAG" .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'trivy-${{ env.APP_NAME }}-results.sarif'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          limit-severities-for-sarif: true
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-${{ env.APP_NAME }}-results
+          path: trivy-${{ env.APP_NAME }}-results.sarif
+
+      - name: Authenticate Docker with OpenShift registry
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.TOOLS_SA_TOKEN }}
+          OPENSHIFT_REGISTRY: ${{ vars.OPENSHIFT_REGISTRY }}
+        run: |
+          echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
+          echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
+
+      - name: Push Postgres Image
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          docker push "${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:$IMAGE_TAG"
