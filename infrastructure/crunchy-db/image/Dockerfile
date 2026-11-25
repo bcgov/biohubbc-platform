@@ -5,7 +5,9 @@
 #
 # The extension comes from the PGDG RHEL 9 build, whose files are copied into the Crunchy image's
 # /usr/pgsql-<major> tree. PG_MAJOR must match the major version of CRUNCHY_IMAGE, and
-# ROARINGBITMAP_RPM_VERSION must exist for that major on download.postgresql.org.
+# ROARINGBITMAP_RPM_VERSION must exist for that major on download.postgresql.org. Its release must equal
+# ROARINGBITMAP_VERSION in database/Dockerfile and database/.docker/db/Dockerfile, which build the same
+# extension for PR-preview and local databases.
 # ########################################################################################################
 
 ARG CRUNCHY_IMAGE=artifacts.developer.gov.bc.ca/bcgov-docker-local/crunchy-postgres-gis:ubi9-18.1-3.6-20260910

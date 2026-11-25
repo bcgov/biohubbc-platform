@@ -4,8 +4,8 @@
 fullnameOverride: biohub-platform-db-dev-pg18
 
 instances:
-  # One instance on a 5Gi volume (actual usage is under 1Gi), which fits the namespace's 32Gi storage quota
-  # beside the Postgres 17 cluster this replaces. Volumes grow online but never shrink.
+  # One instance on a 5Gi volume: actual usage is under 1Gi, and every volume in the namespace counts against
+  # its 32Gi storage quota. Volumes grow online but never shrink.
   replicas: 1
   dataVolumeClaimSpec:
     storage: 5Gi

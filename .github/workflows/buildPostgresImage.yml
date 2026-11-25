@@ -78,7 +78,12 @@ jobs:
           echo "Runner egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo UNKNOWN)"
           echo "$OPENSHIFT_TOKEN" | docker login -u unused --password-stdin "$OPENSHIFT_REGISTRY"
 
+      # A tag is never pushed twice, so a tag a cluster already runs always names the same contents.
       - name: Push Postgres Image
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
+          if docker manifest inspect "${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:$IMAGE_TAG" > /dev/null 2>&1; then
+            echo "::error::$APP_NAME:$IMAGE_TAG already exists. Change IMAGE_TAG (and crunchyImage in infrastructure/crunchy-db/values.yaml) to publish new contents."
+            exit 1
+          fi
           docker push "${{ vars.OPENSHIFT_REGISTRY }}/${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools/$APP_NAME:$IMAGE_TAG"
