@@ -22,6 +22,40 @@ const FIXTURE_DIR = path.join(__dirname, 'fixtures', 'seed-features');
 /** Rows-per-statement for the bulk inserts of the ~7,750-feature snapshot (CLAUDE.md scale carve-out). */
 const BATCH_SIZE = 1000;
 
+/** One statement that builds the feature bitmap of every granting scope that has none yet, from its anchors (see buildScopeFeatureBitmaps). */
+const BUILD_SCOPE_FEATURE_BITMAPS_SQL = `
+  UPDATE security_scope ss
+  SET feature_ids = rb_runoptimize(COALESCE((
+    SELECT rb_build_agg(member.submission_feature_id)
+    FROM security_scope_anchor scope_anchor
+    JOIN submission_feature_closure reach
+      ON reach.target_submission_feature_id = scope_anchor.anchor_submission_feature_id
+     AND reach.is_ancestor = true
+    JOIN submission_feature member
+      ON member.submission_feature_id = reach.source_submission_feature_id
+    WHERE scope_anchor.security_scope_id = ss.security_scope_id
+      AND member.record_effective_date <= now()
+      AND (member.record_end_date IS NULL OR now() < member.record_end_date)
+      AND member.successor_submission_feature_id IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM submission_feature_closure closure_ready
+        WHERE closure_ready.source_submission_feature_id = member.submission_feature_id
+          AND closure_ready.target_submission_feature_id = member.submission_feature_id
+      )
+  ), rb_build('{}'::integer[])))
+  WHERE ss.feature_ids IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM policy_statement ps
+      JOIN policy p ON p.policy_id = ps.policy_id
+      WHERE ps.security_scope_id = ss.security_scope_id
+        AND ps.record_end_date IS NULL
+        AND ps.effect = 'allow'
+        AND p.record_end_date IS NULL
+        AND p.status = 'approved'
+    )`;
+
 // The fixture types mirror `api/src/seed-data-generator/dump.ts`. They are re-declared here rather than
 // imported because the `database` seed package cannot import `api`; the committed JSON is the contract
 // between the two packages.
@@ -183,6 +217,7 @@ export async function seed(knex: Knex): Promise<void> {
       await insertArtifactLinks(trx, fixture, idMap, chain, context);
       await insertSecurity(trx, fixture, idMap, context);
       await insertAnchors(trx, fixture, idMap);
+      await buildScopeFeatureBitmaps(trx);
 
       await assertReplayedCounts(trx, fixture, chain.submissionId);
     });
@@ -753,6 +788,25 @@ async function insertAnchors(knex: Knex, fixture: SnapshotFixture, idMap: Map<st
   const rows = remapAnchorRows(fixture.anchors, idMap, scopeIdByHash);
 
   await knex.batchInsert('security_scope_anchor', rows, BATCH_SIZE);
+}
+
+/**
+ * Build `security_scope.feature_ids` for the seeded scopes from the anchors just inserted.
+ *
+ * Search, counts and single-feature checks grant a secured feature through its scope's bitmap. The
+ * migration that added the column backfilled it before any seed ran, when these scopes did not exist, and
+ * no job runs during seeding, so without this step a freshly seeded database has anchors but NULL
+ * bitmaps and the seeded team grants would return nothing.
+ *
+ * A bitmap holds each anchor of the scope and the anchor's closure descendants (`is_ancestor = true`,
+ * which includes the anchor's own self-loop), limited to features that are current and have a closure
+ * self-loop. It reads the seeded anchors rather than re-deriving them from the anchor rules. As in the
+ * migration, only a scope with an active allow statement of an active approved policy is written; one
+ * that grants nothing gets an empty bitmap and every other scope stays NULL. A scope that already holds a
+ * bitmap is left alone: the build job owns it from then on, and its stored anchors may be older than its bitmap.
+ */
+async function buildScopeFeatureBitmaps(knex: Knex): Promise<void> {
+  await knex.raw(BUILD_SCOPE_FEATURE_BITMAPS_SQL);
 }
 
 // ---------------------------------------------------------------------------
