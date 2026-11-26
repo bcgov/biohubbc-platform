@@ -13,7 +13,7 @@ import {
   isAndEqualityExpression
 } from './expression-predicate-sql';
 import { applySearchQueryOptions } from './search-feature-pagination-sql';
-import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureCurrent } from './sql-fragments';
+import { buildSecurityFilter, callerGrantedFeatureIds, isSubmissionFeatureCurrent } from './sql-fragments';
 
 /**
  * Pure SQL builders that compile an expression tree into Knex
@@ -535,8 +535,10 @@ function buildAndEqualityAnchorIdsQuery(
 /**
  * Builds the secured evidence IDs that the caller cannot access.
  *
- * Count estimates deliberately expand from the sparse active-security and user-scope sets rather
- * than applying the result-path security predicate to every evidence row. The result path remains
+ * Count estimates deliberately start from the sparse active-security set rather than applying the
+ * result-path security predicate to every evidence row. For a signed-in caller the secured set is
+ * filtered to the ids that are not in the caller's scope bitmap union (`callerGrantedFeatureIds`),
+ * which is built once for the statement; a NULL union denies every secured id. The result path remains
  * authoritative and fail-closed; this estimate omits closure self-loop eligibility so historical or
  * not-yet-closed evidence may make the displayed approximate total high.
  */
@@ -547,9 +549,12 @@ function buildDeniedEvidenceFeatureIdsQuery(knex: Knex, systemUserId: number | n
     return secured;
   }
 
-  const granted = buildGrantedFeatureIdsQuery(knex, systemUserId);
-
-  return secured.except(granted);
+  return knex
+    .from(secured.as('secured'))
+    .select('secured.submission_feature_id')
+    .whereRaw(`NOT COALESCE(rb_contains(${callerGrantedFeatureIds()}, secured.submission_feature_id), false)`, [
+      systemUserId
+    ]);
 }
 
 /** Builds feature IDs affected by currently enforcing security assignments. */
@@ -566,43 +571,6 @@ function buildSecuredFeatureIdsQuery(knex: Knex): Knex.QueryBuilder {
     .where((activeSecurity) => {
       activeSecurity.whereNull('sfs.record_end_date').orWhereRaw('now() < sfs.record_end_date');
     });
-}
-
-/**
- * Builds feature IDs granted through the caller's active teams and scope anchors.
- *
- * Starts from the selective user/team side, resolves the caller's reusable scopes and validated
- * anchors, then expands those anchors down through the ancestry closure. Anchor validation mirrors
- * the authoritative result-path checks so stale derived anchors cannot grant estimated access.
- */
-function buildGrantedFeatureIdsQuery(knex: Knex, systemUserId: number): Knex.QueryBuilder {
-  return knex('team_member as tm')
-    .distinct({ submission_feature_id: 'access_closure.source_submission_feature_id' })
-    .join('team as t', 't.team_id', 'tm.team_id')
-    .join('team_security_scope as tss', 'tss.team_id', 'tm.team_id')
-    .join('security_scope as ss', 'ss.security_scope_id', 'tss.security_scope_id')
-    .join('security_scope_anchor as ssa', 'ssa.security_scope_id', 'ss.security_scope_id')
-    .join('submission_feature as anchor_sf', 'anchor_sf.submission_feature_id', 'ssa.anchor_submission_feature_id')
-    .join('feature_type as anchor_ft', 'anchor_ft.feature_type_id', 'anchor_sf.feature_type_id')
-    .join('submission_feature_closure as access_closure', (join) => {
-      join
-        .on('access_closure.target_submission_feature_id', '=', 'ssa.anchor_submission_feature_id')
-        .andOn('access_closure.is_ancestor', '=', knex.raw('true'));
-    })
-    .where('tm.system_user_id', systemUserId)
-    .whereNull('tm.record_end_date')
-    .whereNull('t.record_end_date')
-    .whereRaw(isSubmissionFeatureCurrent('anchor_sf'))
-    .whereExists(
-      knex('submission_feature_closure as anchor_self')
-        .select(knex.raw('1'))
-        .whereRaw('anchor_self.source_submission_feature_id = anchor_sf.submission_feature_id')
-        .whereRaw('anchor_self.target_submission_feature_id = anchor_sf.submission_feature_id')
-    )
-    .whereRaw(isEffectivelySecured('anchor_sf.submission_feature_id'))
-    .whereRaw(`(ss.urn_submission_id = anchor_sf.submission_id::text OR ss.urn_submission_id = '*')`)
-    .whereRaw(`(ss.urn_feature_type = anchor_ft.name OR ss.urn_feature_type = '*')`)
-    .whereRaw(`(ss.urn_feature_id = anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')`);
 }
 
 /**

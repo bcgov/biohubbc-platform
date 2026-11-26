@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import {
   buildSubmissionFeatureTerminalSubquery,
+  callerGrantedFeatureIds,
   codePropertyValueJson,
   featureReferencePropertyValueJson,
   isAccessibleToUser,
@@ -90,53 +91,71 @@ describe('sql-fragments', () => {
     });
   });
 
+  describe('callerGrantedFeatureIds', () => {
+    it('unions the bitmaps of the scopes held by the caller through active team records', () => {
+      const sql = callerGrantedFeatureIds().toLowerCase();
+
+      expect(sql).to.include('select rb_or_agg(caller_scope.feature_ids)');
+      expect(sql).to.include('from security_scope caller_scope');
+      expect(sql).to.include('join team_security_scope caller_tss on caller_tss.team_id = caller_tm.team_id');
+      expect(sql).to.include('caller_team.record_end_date is null');
+      expect(sql).to.include('caller_tm.record_end_date is null');
+    });
+
+    it('reads each scope once however many of the caller teams hold it', () => {
+      const sql = callerGrantedFeatureIds().toLowerCase();
+
+      expect(sql).to.match(/where caller_scope\.security_scope_id in \(\s*select caller_tss\.security_scope_id/);
+    });
+
+    it('references no outer row, so the union is not rebuilt per candidate', () => {
+      const sql = callerGrantedFeatureIds();
+      const qualifiers = new Set(sql.match(/\b[a-z_]+(?=\.)/g));
+
+      expect([...qualifiers].sort()).to.eql(['caller_scope', 'caller_team', 'caller_tm', 'caller_tss']);
+    });
+
+    it('contains exactly one bound placeholder for systemUserId', () => {
+      const sql = callerGrantedFeatureIds();
+
+      expect(sql.match(/\?/g) || []).to.have.lengthOf(1);
+      expect(sql).to.include('caller_tm.system_user_id = ?');
+    });
+  });
+
   describe('isAccessibleToUser', () => {
-    it('requires active team records for scope grants', () => {
+    it('requires active team and membership records for scope grants', () => {
       const sql = isAccessibleToUser('wf.submission_feature_id').toLowerCase();
 
-      expect(sql).to.include('join team t on t.team_id = tss.team_id');
-      expect(sql).to.include('and t.record_end_date is null');
+      expect(sql).to.include('join team caller_team');
+      expect(sql).to.include('caller_team.record_end_date is null');
+      expect(sql).to.include('caller_tm.record_end_date is null');
     });
 
-    it('revalidates cached anchors before treating them as grants', () => {
+    it('grants a secured feature by testing its id against the caller bitmap union', () => {
       const sql = isAccessibleToUser('wf.submission_feature_id').toLowerCase();
 
-      expect(sql).to.include('closure_ready');
-      expect(sql).to.include('submission_feature_security');
-      expect(sql).to.include('urn_submission_id');
-      expect(sql).to.include('urn_feature_type');
-      expect(sql).to.include('urn_feature_id');
-      expect(sql).to.include('scope_anchor_sf.record_effective_date <= now()');
-    });
-
-    it('probes the closure ancestry for a scope anchor instead of a recursive parent walk', () => {
-      // Verifies: the rewritten access check resolves ancestry via the precomputed closure
-      // (is_ancestor = true) and joins security_scope_anchor on the closure target id — no
-      // recursive CTE.
-
-      // Step 1: Build the fragment and lowercase for token matching
-      const sql = isAccessibleToUser('wf.submission_feature_id').toLowerCase();
-
-      // Step 2: Verify it reads the closure ancestry
-      expect(sql).to.include('submission_feature_closure');
-      expect(sql).to.include('is_ancestor');
-
-      // Step 3: Verify the scope anchor is joined on the closure target id
-      expect(sql).to.include(
-        'security_scope_anchor ssa on ssa.anchor_submission_feature_id = c.target_submission_feature_id'
-      );
-
-      // Step 4: Verify it does NOT use the recursive parent walk
+      expect(sql).to.include('rb_or_agg(caller_scope.feature_ids)');
+      expect(sql).to.match(/coalesce\(rb_contains\(\([\s\S]*\), wf\.submission_feature_id\), false\)/);
+      expect(sql).to.not.include('security_scope_anchor');
+      expect(sql).to.not.include('urn_submission_id');
       expect(sql).to.not.include('with recursive');
-      expect(sql).to.not.include('ancestor_chain');
     });
 
-    it('keeps the candidate feature expression bound to the caller when the caller aliases its row anchor_sf', () => {
-      const sql = isAccessibleToUser('anchor_sf.submission_feature_id');
+    it('requires the candidate closure self-loop for a bitmap grant', () => {
+      const sql = isAccessibleToUser('wf.submission_feature_id').toLowerCase();
 
-      expect(sql).to.include('WHERE c.source_submission_feature_id = anchor_sf.submission_feature_id');
-      expect(sql).to.not.match(/JOIN submission_feature anchor_sf\b/);
-      expect(sql).to.not.match(/JOIN feature_type anchor_ft\b/);
+      expect(sql).to.include('granted_ready.source_submission_feature_id = wf.submission_feature_id');
+      expect(sql).to.include('granted_ready.target_submission_feature_id = wf.submission_feature_id');
+    });
+
+    it('keeps the candidate feature expression bound to the caller when the caller aliases its row caller_scope', () => {
+      const sql = isAccessibleToUser('caller_scope.submission_feature_id');
+
+      // The candidate is tested outside the union subquery, where the fragment's own caller_scope is not visible.
+      expect(sql).to.match(/\)\s*\), caller_scope\.submission_feature_id\), false\)/);
+      expect(sql).to.include('granted_ready.source_submission_feature_id = caller_scope.submission_feature_id');
+      expect(callerGrantedFeatureIds()).to.not.include('submission_feature_id');
     });
 
     it('contains exactly one bound placeholder for systemUserId', () => {

@@ -519,7 +519,7 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('limit 1');
     });
 
-    it('should check effectively-secured and not-accessible (anchor-only) for authenticated users', async () => {
+    it('should check effectively-secured and not-accessible (bitmap-only) for authenticated users', async () => {
       const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ '?column?': 1 }] });
       const mockDBConnection = getMockDBConnection({ knex: knexSpy });
       const repository = new SearchFeatureRepository(mockDBConnection);
@@ -537,12 +537,11 @@ describe('SearchFeatureRepository', () => {
       expect(sql).to.include('submission_feature_closure');
       expect(sql).to.include('submission_feature_security');
       // authenticated accessibility probe, negated (isAccessibleToUser → team_member bound to the caller)
-      expect(sql).to.include('NOT EXISTS');
+      expect(sql).to.match(/NOT \(\s*-- Branch 1/);
       expect(sql).to.include('team_member');
-      expect(sql).to.include('security_scope_anchor');
-      // Cached anchors are revalidated against their immutable scope components before granting.
-      expect(sql).to.include('urn_submission_id');
-      expect(sql).to.include('anchor_sf');
+      expect(sql).to.include('rb_contains');
+      expect(sql).to.include('rb_or_agg');
+      expect(sql).to.not.include('security_scope_anchor');
       // "unfiltered" drops only the access/security filter, never search-result eligibility.
       expect(sql).to.include('sfc.source_submission_feature_id = sf.submission_feature_id');
       expect(sql).to.include('sfc.target_submission_feature_id = sf.submission_feature_id');

@@ -283,10 +283,10 @@ export class SearchFeatureRepository extends BaseRepository {
    *
    * Implemented as an `EXISTS`/`LIMIT 1` probe over the unhydrated candidate set:
    * - For authenticated users: true when any matched feature is effectively secured and NOT accessible
-   *   to the caller via the anchor-based read path (`isAccessibleToUser`). A caller holding a blanket
-   *   grant (e.g. `urn:*:*:*`) over a feature secured before anchor recomputation ran may see a
-   *   transient false-positive banner until anchors catch up (a short window, ~10s); this is accepted
-   *   so the probe stays consistent with the visible-results access filter (also anchor-only).
+   *   to the caller via the bitmap-based read path (`isAccessibleToUser`). A caller holding a blanket
+   *   grant (e.g. `urn:*:*:*`) over a feature secured before the scope's bitmap was refreshed may see a
+   *   transient false-positive banner until the bitmap refresh runs; this is accepted so the probe stays
+   *   consistent with the visible-results access filter (also bitmap-only).
    * - For anonymous users: true when any matched feature is effectively secured (none are accessible).
    *
    * No feature data is selected — only the boolean is returned, so no hidden secured rows are exposed.
@@ -347,9 +347,9 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     // Authenticated: a secured match is hidden when the caller cannot access it. Reuses the shared
-    // isAccessibleToUser check (anchor-based, identical to the visible-results access filter) so the
+    // isAccessibleToUser check (bitmap-based, identical to the visible-results access filter) so the
     // banner stays consistent with which rows are actually shown. The candidate is already effectively
-    // secured here, so isAccessibleToUser short-circuits to its team-scope-anchor branch.
+    // secured here, so isAccessibleToUser falls through to its scope-bitmap branch.
     // Anonymous context: every secured match is hidden.
     if (securityContext.type === 'user') {
       existsQuery.whereRaw(`NOT ${isAccessibleToUser('sf.submission_feature_id')}`, [securityContext.systemUserId]);

@@ -244,7 +244,8 @@ describe('expression-evaluation', () => {
       const sql = buildExpressionTreeFeatureIdsSubquery('survey', expressionTree, 42).toString();
 
       expect(sql).to.include('p.submission_feature_id');
-      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('rb_contains');
+      expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');
       expect(sql).to.include('42');
     });
@@ -267,7 +268,8 @@ describe('expression-evaluation', () => {
 
       expect(sql).to.include('"anchor_sf"."submission_feature_id"');
       expect(sql).to.include('anchor_sf.submission_feature_id');
-      expect(sql.match(/security_scope_anchor/g)).to.have.length.greaterThan(1);
+      expect(sql.match(/rb_contains/g)).to.have.length.greaterThan(1);
+      expect(sql).to.not.include('security_scope_anchor');
     });
 
     it('should narrow predicate evidence by blueprint_feature_type_property_id when provided', () => {
@@ -593,7 +595,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('sfc.target_submission_feature_id = sf.submission_feature_id');
       expect(sql).to.include('LIMIT 1');
       expect(sql).to.include('IS TRUE');
-      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('rb_contains');
+      expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');
       expect(sql).to.include('42');
     });
@@ -631,7 +634,8 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('from "submission_feature" as "sf"');
       expect(sql).to.include('sf.successor_submission_feature_id IS NULL');
       expect(sql).to.include('denied.submission_feature_id = sf.submission_feature_id');
-      expect(sql).to.include(' except ');
+      expect(sql).to.include('rb_contains');
+      expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.not.include('self_closure');
     });
   });
@@ -786,14 +790,14 @@ describe('expression-evaluation', () => {
       expect(sql).to.include('union');
       expect(sql).to.include('submission_feature_security');
       expect(sql).to.include('security_closure');
-      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('rb_contains');
+      expect(sql).to.include('rb_or_agg(caller_scope.feature_ids)');
+      expect(sql).to.not.include('security_scope_anchor');
       expect(sql).to.include('team_security_scope');
-      expect(sql).to.include('access_closure');
-      expect(sql).to.include('"access_closure"."target_submission_feature_id" = "ssa"."anchor_submission_feature_id"');
-      expect(sql).to.include('from "team_member" as "tm"');
-      expect(sql).to.include(' except ');
-      expect(sql).to.include('anchor_self');
-      expect(sql).to.include('c.source_submission_feature_id = anchor_sf.submission_feature_id');
+      expect(sql).to.include('FROM team_member caller_tm');
+      expect(sql).to.include('caller_tm.system_user_id = 42');
+      expect(sql).to.include('secured.submission_feature_id), false)');
+      expect(sql).to.not.include(' except ');
       expect(sql).to.not.include('security_closure.source_submission_feature_id = p.submission_feature_id');
     });
 

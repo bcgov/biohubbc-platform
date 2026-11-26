@@ -196,94 +196,105 @@ export function isEffectivelySecured(featureIdExpr: string): string {
 }
 
 /**
+ * The union of the feature-id bitmaps of every scope the caller's active teams hold.
+ *
+ * The caller's scopes are reached through `team_member` -> `team` -> `team_security_scope`, with the end-date checks
+ * on the membership and the team. A scope is read once however many of the caller's teams hold it.
+ *
+ * The subquery references no outer row, so PostgreSQL builds the union once per place the fragment appears in a
+ * statement (an InitPlan), never once per candidate feature.
+ *
+ * `rb_or_agg` skips NULL bitmaps. The result is NULL when the caller holds no scope, or only scopes whose bitmap has
+ * never been built.
+ *
+ * The fragment's aliases carry the `caller_` prefix so they cannot capture an alias of the query it is placed in.
+ *
+ * @returns Scalar subquery SQL (a `roaringbitmap`, or NULL) with a single `?` placeholder for `systemUserId`.
+ */
+export function callerGrantedFeatureIds(): string {
+  return `(
+    SELECT rb_or_agg(caller_scope.feature_ids)
+    FROM security_scope caller_scope
+    WHERE caller_scope.security_scope_id IN (
+      SELECT caller_tss.security_scope_id
+      FROM team_member caller_tm
+      JOIN team caller_team
+        ON caller_team.team_id = caller_tm.team_id
+        AND caller_team.record_end_date IS NULL
+      JOIN team_security_scope caller_tss ON caller_tss.team_id = caller_tm.team_id
+      WHERE caller_tm.system_user_id = ?  -- bound by caller
+        AND caller_tm.record_end_date IS NULL
+    )
+  )`;
+}
+
+/**
  * Combined security + scope-grant check for authenticated users on the read paths.
  * A feature is accessible when either:
  *
- * 1. The feature is NOT effectively secured (no active approved security rule in its
- *    ancestry), OR
- * 2. The caller's team holds a scope anchored on this feature or one of its ancestors
- *    (`security_scope_anchor` reachable via the caller's `team_member`).
+ * 1. The feature is NOT effectively secured (no enforcing security assignment in its closure ancestry), OR
+ * 2. The feature's id is in the caller's bitmap union ({@link callerGrantedFeatureIds}) AND the feature has its
+ *    closure self-loop.
  *
- * Returns an `EXISTS (...)` SQL expression with a single `?` placeholder for `systemUserId`.
+ * Returns a parenthesised boolean SQL expression with a single `?` placeholder for `systemUserId`.
  *
- * This reads the precomputed `submission_feature_closure` ancestry subset
- * (`is_ancestor = true`, which includes the feature's own self-loop) instead of doing a
- * recursive parent walk. Branch 1 reuses `isEffectivelySecured`; Branch 2 probes the closure
- * for an ancestor that is a scope anchor the user's team can reach. Both are cheap PK-served
- * closure probes (`source_submission_feature_id`), so the old concern of walking the ancestor
- * chain twice no longer applies — there is no recursive walk at all.
+ * - The union is built once per place this fragment appears in a statement, not once per candidate.
+ * - A NULL union (no scopes, or only scopes whose bitmap was never built) grants nothing.
+ * - The self-loop probe keeps a granted feature whose closure is not built hidden. Not every reader probes the
+ *   candidate's self-loop itself, so the check lives here. It is a primary-key probe.
+ * - Callers remain responsible for limiting the candidate to current features (`isSubmissionFeatureCurrent`).
+ *
+ * A scope's bitmap (`security_scope.feature_ids`) is a computed cache, and this check trusts it: a bitmap hit is not
+ * revalidated against anchors, rule assignments or scope URNs. An id that is stale in a bitmap therefore keeps granting
+ * a current, self-looped feature until the bitmap is refreshed. The known case is a reload: an upload approval that
+ * re-points a child to its parent's successor leaves the child's id in the bitmap until
+ * `SecurityScopeService.refreshScopeFeatureBitmapForSubmission` runs. Losing a team membership, a team or a
+ * team's scope takes effect on the next query, because those are read live to build the union.
  *
  * Note: a caller that has already established the feature is effectively secured (e.g. the
  * hidden-secured probe) still passes the whole expression here — Branch 1 then re-evaluates
- * `isEffectivelySecured` (a couple of indexed PK probes) and short-circuits to Branch 2. The cost
+ * `isEffectivelySecured` (a couple of indexed PK probes) and falls through to Branch 2. The cost
  * is small, and using the canonical check keeps the probe consistent with the visible-results filter.
  *
- * The fragment's own table aliases are prefixed (`scope_anchor_sf`, `scope_anchor_ft`) so they cannot
- * capture a caller's alias. `featureIdExpr` is interpolated inside the inner subquery, so an inner alias
- * with the same name as the caller's would silently rebind the expression to the anchor row and turn the
- * grant check into "the user holds any anchor".
- *
- * @param featureIdExpr SQL expression for the starting submission_feature_id
+ * @param featureIdExpr SQL expression for the candidate submission_feature_id
  *   (e.g. 'wf.submission_feature_id', 'aggregated_results.submission_feature_id')
  */
 export function isAccessibleToUser(featureIdExpr: string): string {
-  return `EXISTS (
-    SELECT 1
-    WHERE
-      -- Branch 1: feature is NOT effectively secured
-      NOT ${isEffectivelySecured(featureIdExpr)}
-      -- Branch 2: the caller's team holds a scope anchored on this feature or one of its ancestors
-      OR EXISTS (
+  return `(
+    -- Branch 1: feature is NOT effectively secured
+    NOT ${isEffectivelySecured(featureIdExpr)}
+    -- Branch 2: the feature's id is in the caller's bitmap union, and the feature has its closure self-loop
+    OR (
+      COALESCE(rb_contains(${callerGrantedFeatureIds()}, ${featureIdExpr}), false)
+      AND EXISTS (
         SELECT 1
-        FROM submission_feature_closure c
-        JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = c.target_submission_feature_id
-        JOIN security_scope ss ON ss.security_scope_id = ssa.security_scope_id
-        JOIN submission_feature scope_anchor_sf
-          ON scope_anchor_sf.submission_feature_id = ssa.anchor_submission_feature_id
-          AND ${isSubmissionFeatureCurrent('scope_anchor_sf')}
-        JOIN feature_type scope_anchor_ft ON scope_anchor_ft.feature_type_id = scope_anchor_sf.feature_type_id
-        JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-        JOIN team t ON t.team_id = tss.team_id
-          AND t.record_end_date IS NULL
-        JOIN team_member tm ON tm.team_id = tss.team_id
-          AND tm.system_user_id = ?  -- bound by caller
-          AND tm.record_end_date IS NULL
-        WHERE c.source_submission_feature_id = ${featureIdExpr}
-          AND c.is_ancestor = true
-          -- Anchors are an asynchronous cache. Revalidate the security- and scope-sensitive facts
-          -- whose revocation must take effect immediately instead of trusting a stale cache row.
-          AND EXISTS (
-            SELECT 1
-            FROM submission_feature_closure closure_ready
-            WHERE closure_ready.source_submission_feature_id = scope_anchor_sf.submission_feature_id
-              AND closure_ready.target_submission_feature_id = scope_anchor_sf.submission_feature_id
-          )
-          AND ${isEffectivelySecured('scope_anchor_sf.submission_feature_id')}
-          AND (ss.urn_submission_id = scope_anchor_sf.submission_id::text OR ss.urn_submission_id = '*')
-          AND (ss.urn_feature_type = scope_anchor_ft.name OR ss.urn_feature_type = '*')
-          AND (ss.urn_feature_id = scope_anchor_sf.submission_feature_id::text OR ss.urn_feature_id = '*')
+        FROM submission_feature_closure granted_ready
+        WHERE granted_ready.source_submission_feature_id = ${featureIdExpr}
+          AND granted_ready.target_submission_feature_id = ${featureIdExpr}
       )
+    )
   )`;
 }
 
 /**
  * Builds a single security filter, applied per candidate feature, that checks:
  *   1. Unsecured — no ancestor has an active submission_feature_security row → visible
- *   2. Secured + granted — any ancestor is a scope anchor the user's team can reach → visible
- *   3. Secured + denied — secured but no matching scope anchor → filtered out
+ *   2. Secured + granted — the feature's id is in the bitmap union of the scopes the user's active teams hold,
+ *      and the feature has its closure self-loop → visible
+ *   3. Secured + denied — secured and not in the union (or the union is NULL) → filtered out
  *
  * For anonymous users (systemUserId is null), only unsecured features pass.
  *
- * Composes the closure-based read-path fragments above:
+ * Composes the read-path fragments above:
  * - `isEffectivelySecured` — a feature is "effectively secured" when it or an ancestor in the
  *   closure snapshot has a currently enforcing security assignment.
- * - `isAccessibleToUser` — probes the same closure ancestry for a scope anchor the user's team
- *   can reach.
+ * - `isAccessibleToUser` — tests the candidate's id against the caller's bitmap union.
  *
- * Both fragments are indexed closure lookups (PK-served on `source_submission_feature_id`), not
- * per-row recursive parent walks. Callers have already narrowed features to a small candidate
- * set, so the filter applies a couple of cheap probes per candidate — cost is O(candidates),
- * not O(features in scope).
+ * The union is built once per place the filter appears in a statement; each candidate then costs a couple of
+ * primary-key closure probes and one in-memory bitmap test — cost is O(candidates), not O(features in scope)
+ * and not O(scopes the caller holds).
+ *
+ * A bitmap is a computed cache the filter trusts; see `isAccessibleToUser` for what a stale id grants and until when.
  *
  * Shared by the filter-based search wrapper and the expression-tree evaluator so both
  * read paths apply identical security semantics.
@@ -308,7 +319,7 @@ export function buildSecurityFilter(
     return knex.raw(`NOT ${isEffectivelySecured(submissionFeatureIdColumn)}`);
   }
 
-  // Authenticated: feature is unsecured OR user has team scope grant (indexed closure lookups)
+  // Authenticated: feature is unsecured OR its id is in the caller's scope bitmap union
   return knex.raw(`${isAccessibleToUser(submissionFeatureIdColumn)}`, [systemUserId]);
 }
 
