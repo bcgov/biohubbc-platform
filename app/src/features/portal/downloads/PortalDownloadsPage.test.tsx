@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { makeDownload } from 'test-helpers/download-helpers';
 import { render } from 'test-helpers/test-utils';
 import { getFormattedDate } from 'utils/Utils';
-import { PortalDownloadPage } from './PortalDownloadPage';
+import { PortalDownloadsPage } from './PortalDownloadsPage';
 
 const mockGetDownloads = vi.fn();
 
@@ -31,13 +31,13 @@ const renderPage = (): ReturnType<typeof render> =>
   render(
     <MemoryRouter initialEntries={['/portal/download']}>
       <Routes>
-        <Route path="/portal/download" element={<PortalDownloadPage />} />
-        <Route path="/download/:downloadId" element={<div>Download detail destination</div>} />
+        <Route path="/portal/download" element={<PortalDownloadsPage />} />
+        <Route path="/portal/download/:downloadId" element={<div>Download detail destination</div>} />
       </Routes>
     </MemoryRouter>
   );
 
-describe('PortalDownloadPage', () => {
+describe('PortalDownloadsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDownloads.mockResolvedValue({
@@ -61,7 +61,7 @@ describe('PortalDownloadPage', () => {
     );
   });
 
-  it('navigates to the selected download', async () => {
+  it('navigates to the selected download within the Portal', async () => {
     const { findByText } = renderPage();
 
     const name = await findByText('Wetland observations');

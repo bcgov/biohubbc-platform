@@ -284,6 +284,79 @@ describe('DataRequestRepository', () => {
       const repo = new DataRequestRepository(mockDBConnection);
       await repo.findDataRequestsByTeamMembership([1]);
     });
+
+    it('limits the query to the requested page and sort', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const { sql, bindings } = query.toSQL();
+          expect(sql.toLowerCase()).to.include('order by "create_date" desc');
+          expect(sql.toLowerCase()).to.include('limit ?');
+          expect(sql.toLowerCase()).to.include('offset ?');
+          expect(bindings).to.include.members([10, 10]);
+          return mockQueryResult([mockDataRequest]);
+        }
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+      const result = await repo.findDataRequestsByTeamMembership([1], undefined, {
+        page: 2,
+        limit: 10,
+        sort: 'create_date',
+        order: 'desc'
+      });
+
+      expect(result).to.eql([mockDataRequest]);
+    });
+  });
+
+  describe('findDataRequestsByTeamMembershipCount', () => {
+    it('counts the active team data requests matching the filters', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const sql = query.toSQL().sql.toLowerCase();
+          expect(sql).to.include('count(*)::integer as count');
+          expect(sql).to.include('"tm"."system_user_id" in (?)');
+          expect(sql).to.include('"t"."record_end_date" is null');
+          expect(sql).to.include('"tm"."record_end_date" is null');
+          expect(sql).to.include('"p"."status" = ?');
+          expect(sql).not.to.include('limit');
+          return mockQueryResult([{ count: 3 }]);
+        }
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+      const result = await repo.findDataRequestsByTeamMembershipCount([1], { status: 'requested' });
+
+      expect(result).to.equal(3);
+    });
+
+    it('returns 0 without querying when no system user ids are provided', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => {
+          throw new Error('query should not execute');
+        }
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+      const result = await repo.findDataRequestsByTeamMembershipCount([]);
+
+      expect(result).to.equal(0);
+    });
+
+    it('throws when the count query returns no row', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResult([])
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+
+      try {
+        await repo.findDataRequestsByTeamMembershipCount([1]);
+        expect.fail('Expected count to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Failed to get team membership data requests count');
+      }
+    });
   });
 
   describe('getDataRequestById', () => {

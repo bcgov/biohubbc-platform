@@ -1,8 +1,16 @@
+import { PORTAL_DOWNLOAD_BASE_PATH } from 'constants/download';
 import { UserTicketContextProvider } from 'contexts/ticketContext';
-import PortalPage from 'features/portal/PortalPage';
-import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
-import { PortalSubmissionDetailPage } from 'features/portal/page/submission/PortalSubmissionDetailPage';
-import { PortalSubmissionFeaturePage } from 'features/portal/page/submission/PortalSubmissionFeaturePage';
+import { DownloadPage } from 'features/download/DownloadPage';
+import { DownloadVersionPage } from 'features/download/DownloadVersionPage';
+import { PortalApiKeysPage } from 'features/portal/api-keys/PortalApiKeysPage';
+import { PortalDataRequestsPage } from 'features/portal/data-requests/PortalDataRequestsPage';
+import { PortalDownloadsPage } from 'features/portal/downloads/PortalDownloadsPage';
+import { PortalPage } from 'features/portal/PortalPage';
+import { PortalSubmissionsPage } from 'features/portal/submissions/PortalSubmissionsPage';
+import { PortalSubmissionDetailPage } from 'features/portal/submissions/detail/PortalSubmissionDetailPage';
+import { PortalSubmissionFeaturePage } from 'features/portal/submissions/detail/feature/PortalSubmissionFeaturePage';
+import { PortalTicketsPage } from 'features/portal/tickets/PortalTicketsPage';
+import { PortalTicketDetailPage } from 'features/portal/tickets/detail/PortalTicketDetailPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 
@@ -18,7 +26,7 @@ export const PortalRouter = () => {
         path="/"
         element={
           <>
-            <PageTitle title="My Portal" description="View portal activity" />
+            <PageTitle title="Portal" description="Browse portal sections" />
             <PortalPage />
           </>
         }
@@ -29,7 +37,7 @@ export const PortalRouter = () => {
         element={
           <>
             <PageTitle title="My Tickets" description="View tickets assigned to you" />
-            <PortalPage initialTab="tickets" />
+            <PortalTicketsPage />
           </>
         }
       />
@@ -39,7 +47,7 @@ export const PortalRouter = () => {
         element={
           <>
             <PageTitle title="My Submissions" description="View submissions assigned to you" />
-            <PortalPage initialTab="submissions" />
+            <PortalSubmissionsPage />
           </>
         }
       />
@@ -49,7 +57,37 @@ export const PortalRouter = () => {
         element={
           <>
             <PageTitle title="My Downloads" description="View downloads available to you" />
-            <PortalPage initialTab="downloads" />
+            <PortalDownloadsPage />
+          </>
+        }
+      />
+
+      <Route
+        path="/download/:downloadId"
+        element={
+          <>
+            <PageTitle title="Download" description="Download status and details" />
+            <DownloadPage basePath={PORTAL_DOWNLOAD_BASE_PATH} />
+          </>
+        }
+      />
+
+      <Route
+        path="/download/:downloadId/version/:downloadVersionId"
+        element={
+          <>
+            <PageTitle title="Download" description="Download version details" />
+            <DownloadVersionPage basePath={PORTAL_DOWNLOAD_BASE_PATH} />
+          </>
+        }
+      />
+
+      <Route
+        path="/data-request"
+        element={
+          <>
+            <PageTitle title="My Data Requests" description="View data requests made for your teams" />
+            <PortalDataRequestsPage />
           </>
         }
       />
@@ -59,7 +97,7 @@ export const PortalRouter = () => {
         element={
           <>
             <PageTitle title="API Keys" description="Manage your API keys" />
-            <PortalPage initialTab="apikeys" />
+            <PortalApiKeysPage />
           </>
         }
       />

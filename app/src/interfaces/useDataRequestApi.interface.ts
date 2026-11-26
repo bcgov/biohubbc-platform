@@ -67,3 +67,9 @@ export interface DataRequestResponse {
   status: PolicyStatus;
   create_date: string;
 }
+
+/** One page of the data requests made for the current user's teams. */
+export interface UserDataRequestListResponse {
+  data_requests: DataRequestResponse[];
+  pagination: ApiPaginationResponseParams;
+}

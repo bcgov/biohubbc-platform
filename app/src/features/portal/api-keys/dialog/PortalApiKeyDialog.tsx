@@ -9,8 +9,8 @@ import { EditDialog } from 'components/dialog/EditDialog';
 import { OkDialog } from 'components/dialog/OkDialog';
 import { ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
 import { useEffect, useState } from 'react';
-import { ApiKeyForm, IApiKeyFormValues } from './ApiKeyForm';
-import { ApiKeyYupSchema } from './ApiKeyYupSchema';
+import { ApiKeyForm, IApiKeyFormValues } from '../form/ApiKeyForm';
+import { ApiKeyYupSchema } from '../form/ApiKeyYupSchema';
 
 const createFormInitialValues: IApiKeyFormValues = {
   name: ''

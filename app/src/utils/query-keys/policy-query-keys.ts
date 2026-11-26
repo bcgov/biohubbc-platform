@@ -30,6 +30,16 @@ const dataRequests = (search: ApiSearchParams, pagination: ApiPaginationRequestO
   [...lists(), 'data-requests', { search, pagination }] as const;
 
 /**
+ * Key of one page of the data requests made for the current user's teams. It sits under the policies lists for the
+ * same reason as the administrative data requests list.
+ *
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The current user's data requests key.
+ */
+const userDataRequests = (pagination: ApiPaginationRequestOptions) =>
+  [...lists(), 'user-data-requests', { pagination }] as const;
+
+/**
  * Key of one data request as the administrative pages show it. It sits under the policies lists for the same reason
  * as the data requests list.
  *
@@ -108,6 +118,7 @@ export const policyQueryKeys = {
   lists,
   list,
   dataRequests,
+  userDataRequests,
   dataRequest,
   dataRequestFeatureTypes,
   dataRequestRecipients,

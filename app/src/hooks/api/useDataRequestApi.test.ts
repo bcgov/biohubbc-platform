@@ -1,6 +1,10 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { CreateDataRequestPayload, DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
+import {
+  CreateDataRequestPayload,
+  DataRequestResponse,
+  UserDataRequestListResponse
+} from 'interfaces/useDataRequestApi.interface';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useDataRequestApi } from './useDataRequestApi';
 
@@ -13,6 +17,35 @@ describe('useDataRequestApi', () => {
 
   afterEach(() => {
     mock.restore();
+  });
+
+  describe('getDataRequestsForUser', () => {
+    it("should GET one page of the data requests of the current user's teams", async () => {
+      const mockResponse: UserDataRequestListResponse = {
+        data_requests: [
+          {
+            data_request_id: 'request-1',
+            reason: 'Need this data',
+            team_id: 'team-1',
+            requested_by: 42,
+            ticket_id: 'ticket-1',
+            policy_id: 'policy-1',
+            status: PolicyStatus.REQUESTED,
+            create_date: '2026-01-02'
+          }
+        ],
+        pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
+      };
+
+      mock.onGet('/api/data-request').reply(200, mockResponse);
+
+      const pagination = { page: 2, limit: 10, sort: 'create_date', order: 'desc' as const };
+
+      const result = await useDataRequestApi(axios).getDataRequestsForUser(pagination);
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].params).toEqual(pagination);
+    });
   });
 
   describe('getDataRequests', () => {

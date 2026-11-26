@@ -4,6 +4,7 @@ import { createTestQueryClient } from 'test-helpers/query-client';
 import { downloadQueryKeys } from 'utils/query-keys/download-query-keys';
 import { act, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import { DOWNLOAD_BASE_PATH, PORTAL_DOWNLOAD_BASE_PATH } from 'constants/download';
 import dayjs from 'dayjs';
 import { DownloadDetail, DownloadVersion, DownloadVersionListResponse } from 'interfaces/useDownloadApi.interface';
 import { Link, MemoryRouter, Route, Routes } from 'react-router';
@@ -73,10 +74,15 @@ const renderAt = (path: string, queryClient?: QueryClient) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/download/:downloadId" element={<DownloadPage />} />
+        <Route path="/download/:downloadId" element={<DownloadPage basePath={DOWNLOAD_BASE_PATH} />} />
         <Route
           path="/download/:downloadId/version/:downloadVersionId"
           element={<div>Version detail destination</div>}
+        />
+        <Route path="/portal/download/:downloadId" element={<DownloadPage basePath={PORTAL_DOWNLOAD_BASE_PATH} />} />
+        <Route
+          path="/portal/download/:downloadId/version/:downloadVersionId"
+          element={<div>Portal version detail destination</div>}
         />
       </Routes>
     </MemoryRouter>,
@@ -110,7 +116,7 @@ describe('DownloadPage', () => {
       <MemoryRouter initialEntries={[`/download/${DOWNLOAD_ID}`]}>
         <Link to={`/download/${otherDownloadId}`}>Open other download</Link>
         <Routes>
-          <Route path="/download/:downloadId" element={<DownloadPage />} />
+          <Route path="/download/:downloadId" element={<DownloadPage basePath={DOWNLOAD_BASE_PATH} />} />
         </Routes>
       </MemoryRouter>,
       { queryClient, wrapper: DialogContextProvider }
@@ -157,13 +163,38 @@ describe('DownloadPage', () => {
     expect(await findByRole('heading', { name: 'Bears in BC' })).toBeVisible();
     expect(getAllByText('Bears in BC')[0]).toBeVisible();
     expect(getByText('All bear observations within BC')).toBeVisible();
-    expect(getByRole('link', { name: 'Downloads' })).toHaveAttribute('href', '/portal/downloads');
     const breadcrumb = getByRole('navigation', { name: 'download breadcrumb' });
+    // The open route serves anonymous links, so the trail does not lead into the Portal.
+    expect(within(breadcrumb).queryByRole('link', { name: 'Portal' })).not.toBeInTheDocument();
+    expect(within(breadcrumb).queryByRole('link', { name: 'Downloads' })).not.toBeInTheDocument();
     expect(within(breadcrumb).queryByText('Search')).not.toBeInTheDocument();
     expect(within(breadcrumb).getByText('Bears in BC')).not.toHaveAttribute('href');
     expect(within(breadcrumb).queryByRole('link', { name: 'Bears in BC' })).not.toBeInTheDocument();
     expect(await findByRole('tab', { name: 'Versions' })).toBeVisible();
     expect(queryByRole('tab', { name: 'Exports' })).not.toBeInTheDocument();
+  });
+
+  it('roots the breadcrumb at the Portal under the Portal route', async () => {
+    const { findByRole, getByRole } = renderAt(`/portal/download/${DOWNLOAD_ID}`);
+
+    expect(await findByRole('heading', { name: 'Bears in BC' })).toBeVisible();
+    const breadcrumb = getByRole('navigation', { name: 'download breadcrumb' });
+    const links = within(breadcrumb).getAllByRole('link');
+
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Portal', '/portal'],
+      ['Downloads', '/portal/download']
+    ]);
+    expect(within(breadcrumb).getByText('Bears in BC')).toBeVisible();
+  });
+
+  it('navigates to the selected version within the Portal under the Portal route', async () => {
+    const { findByText } = renderAt(`/portal/download/${DOWNLOAD_ID}`);
+
+    const versionId = await findByText(VERSION_ID);
+    fireEvent.click(versionId.closest('.MuiDataGrid-row')!);
+
+    expect(await findByText('Portal version detail destination')).toBeVisible();
   });
 
   it('renders the paginated versions table', async () => {

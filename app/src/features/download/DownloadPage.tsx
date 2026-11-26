@@ -11,12 +11,18 @@ import { DownloadDeadEndCard } from './components/DownloadDeadEndCard';
 import { DownloadPageHeader } from './components/header/DownloadPageHeader';
 import { DownloadVersionsTable } from './components/table/DownloadVersionsTable';
 
+interface DownloadPageProps {
+  /** Base route the page is served under, either the open or the Portal download route. */
+  basePath: string;
+}
+
 /**
  * Download page with the download's version table.
  *
+ * @param {DownloadPageProps} props - Base route used for the page's links and breadcrumbs.
  * @return {JSX.Element} The download page, loading state, or unavailable state.
  */
-export const DownloadPage = () => {
+export const DownloadPage = ({ basePath }: DownloadPageProps) => {
   const { downloadId } = useParams<{ downloadId: string }>();
   const api = useApi();
   const downloadQuery = useQuery({
@@ -37,9 +43,9 @@ export const DownloadPage = () => {
       <LoadingGuard isLoading={downloadQuery.isFetching && !download} isLoadingFallback={<SkeletonPage />}>
         {download ? (
           <>
-            <DownloadPageHeader download={download} />
+            <DownloadPageHeader download={download} basePath={basePath} />
             <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
-              <DownloadVersionsTable downloadId={download.download_id} />
+              <DownloadVersionsTable downloadId={download.download_id} basePath={basePath} />
             </Container>
           </>
         ) : null}

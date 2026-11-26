@@ -51,7 +51,7 @@ const statusColor = (status: KeyStatus): 'success' | 'error' | 'warning' => {
   }
 };
 
-interface IPortalApiKeysContainerProps {
+interface IPortalApiKeysContentProps {
   rows: IApiKeyView[];
   rowCount: number;
   isLoading: boolean;
@@ -68,9 +68,12 @@ interface IPortalApiKeysContainerProps {
 }
 
 /**
- * Portal API keys container using the shared page section and data grid pattern.
+ * API keys table of the portal, with search, creation, and per-key revoke and delete actions.
+ *
+ * @param {IPortalApiKeysContentProps} props - Key rows, loading state, search, and action callbacks.
+ * @return {JSX.Element} The API keys section and table.
  */
-export const PortalApiKeysContainer = (props: IPortalApiKeysContainerProps) => {
+export const PortalApiKeysContent = (props: IPortalApiKeysContentProps) => {
   const { rows, rowCount, isLoading, searchTerm, onSearch, onAdd, onRevoke, onDelete } = props;
 
   const columns: GridColDef<IApiKeyView>[] = [

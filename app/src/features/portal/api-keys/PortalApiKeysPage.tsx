@@ -6,16 +6,18 @@ import { useDialogContext } from 'hooks/useContext';
 import { IApiKeyView } from 'interfaces/useApiKeysApi.interface';
 import { useMemo, useState } from 'react';
 import { apiKeyQueryKeys } from 'utils/query-keys/api-key-query-keys';
-import { IApiKeyFormValues } from './components/dialog/ApiKeyForm';
-import { PortalApiKeyDialog } from './components/dialog/PortalApiKeyDialog';
-import { PortalListPageLayout } from './components/PortalListPageLayout';
-import { PortalApiKeysContainer } from './list/PortalApiKeysContainer';
+import { IApiKeyFormValues } from './form/ApiKeyForm';
+import { PortalApiKeyDialog } from './dialog/PortalApiKeyDialog';
+import { PortalPageLayout } from 'layouts/PortalPageLayout';
+import { PortalApiKeysContent } from './content/PortalApiKeysContent';
 
 /**
  * Portal page for managing user API keys.
  *
  * Handles data loading, client-side search filtering, and create/revoke/delete dialog state.
- * Delegates all layout and table rendering to PortalApiKeysContainer.
+ * Delegates table rendering to PortalApiKeysContent.
+ *
+ * @return {JSX.Element} The API keys header, table, and dialogs.
  */
 export const PortalApiKeysPage = () => {
   const api = useApi();
@@ -135,9 +137,9 @@ export const PortalApiKeysPage = () => {
   };
 
   return (
-    <PortalListPageLayout>
+    <PortalPageLayout title="API Keys">
       <QueryErrorDialog error={keysQuery.error} label="API keys" />
-      <PortalApiKeysContainer
+      <PortalApiKeysContent
         rows={filteredKeys}
         rowCount={filteredKeys.length}
         isLoading={keysQuery.isFetching}
@@ -187,6 +189,6 @@ export const PortalApiKeysPage = () => {
         onNo={() => setDeleteTarget(null)}
         onYes={handleDeleteConfirm}
       />
-    </PortalListPageLayout>
+    </PortalPageLayout>
   );
 };

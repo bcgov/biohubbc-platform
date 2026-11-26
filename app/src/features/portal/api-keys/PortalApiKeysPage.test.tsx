@@ -2,11 +2,12 @@ import { DialogContextProvider } from 'contexts/dialogContext';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { IApiKeyView, ICreateApiKeyResponse } from 'interfaces/useApiKeysApi.interface';
+import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PortalApiKeysPage } from './PortalApiKeysPage';
 
-vi.mock('../../hooks/useApi');
+vi.mock('hooks/useApi');
 
 const mockUseApi = useApi as Mock;
 
@@ -32,7 +33,13 @@ const mockCreateApiKey = vi.fn();
 const mockRevokeApiKey = vi.fn();
 const mockDeleteApiKey = vi.fn();
 
-const renderPage = () => render(<PortalApiKeysPage />, { wrapper: DialogContextProvider });
+const renderPage = () =>
+  render(
+    <MemoryRouter>
+      <PortalApiKeysPage />
+    </MemoryRouter>,
+    { wrapper: DialogContextProvider }
+  );
 
 const clickMenuButton = async () => {
   await waitFor(() => screen.getByTestId('custom-menu-icon-Actions'));

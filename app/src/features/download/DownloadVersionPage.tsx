@@ -16,12 +16,18 @@ import { DownloadVersionExportTable } from './components/table/DownloadVersionEx
 
 type DownloadVersionTab = 'features' | 'exports';
 
+interface DownloadVersionPageProps {
+  /** Base route the page is served under, either the open or the Portal download route. */
+  basePath: string;
+}
+
 /**
  * Detail page for one materialized version of a download.
  *
+ * @param {DownloadVersionPageProps} props - Base route used for the page's links and breadcrumbs.
  * @return {JSX.Element} The version detail page, loading state, or unavailable state.
  */
-export const DownloadVersionPage = () => {
+export const DownloadVersionPage = ({ basePath }: DownloadVersionPageProps) => {
   const { downloadId, downloadVersionId } = useParams<{ downloadId: string; downloadVersionId: string }>();
   const api = useApi();
   const [activeTab, setActiveTab] = useState<DownloadVersionTab>('features');
@@ -58,6 +64,7 @@ export const DownloadVersionPage = () => {
             <DownloadVersionPageHeader
               download={download}
               version={version}
+              basePath={basePath}
               activeTab={activeTab}
               onTabChange={setActiveTab}
             />

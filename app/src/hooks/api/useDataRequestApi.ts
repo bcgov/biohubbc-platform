@@ -6,7 +6,8 @@ import {
   DataRequestListItem,
   DataRequestListResponse,
   DataRequestRecipientsResponse,
-  DataRequestResponse
+  DataRequestResponse,
+  UserDataRequestListResponse
 } from 'interfaces/useDataRequestApi.interface';
 import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
@@ -39,6 +40,25 @@ export const useDataRequestApi = (axios: AxiosInstance) => {
    */
   const createDataRequest = async (payload: CreateDataRequestPayload): Promise<DataRequestResponse> => {
     const { data } = await axios.post<DataRequestResponse>('/api/data-request', payload);
+    return data;
+  };
+
+  /**
+   * Gets one page of the data requests made for the teams the current user belongs to.
+   *
+   * @param {ApiPaginationRequestOptions} pagination The page and sort.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {Promise<UserDataRequestListResponse>}
+   */
+  const getDataRequestsForUser = async (
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<UserDataRequestListResponse> => {
+    const { data } = await axios.get<UserDataRequestListResponse>('/api/data-request', {
+      params: pagination,
+      ...options
+    });
+
     return data;
   };
 
@@ -136,6 +156,7 @@ export const useDataRequestApi = (axios: AxiosInstance) => {
   return {
     createTicketDataRequest,
     createDataRequest,
+    getDataRequestsForUser,
     getDataRequests,
     getDataRequest,
     getDataRequestFeatureTypes,

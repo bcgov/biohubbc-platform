@@ -2,6 +2,12 @@ import { ChipProps } from '@mui/material';
 import { type DownloadRecord, type DownloadStatus } from 'interfaces/useDownloadApi.interface';
 import { type DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
 
+/** Base route of the open download pages, where an anonymous download's UUID is the credential. */
+export const DOWNLOAD_BASE_PATH = '/download';
+
+/** Base route of the Portal download pages, for downloads shared with the user's teams. */
+export const PORTAL_DOWNLOAD_BASE_PATH = '/portal/download';
+
 type DownloadStatusChipProps = { color: ChipProps['color']; label: string };
 
 export const DOWNLOAD_STATUS_CHIP_PROPS: Record<DownloadRecord['download_status'], DownloadStatusChipProps> = {

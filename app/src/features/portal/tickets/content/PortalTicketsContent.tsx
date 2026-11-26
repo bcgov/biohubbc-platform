@@ -2,7 +2,7 @@ import { TicketsListSection } from 'components/tickets/list/TicketsListSection';
 import { ITicket } from 'interfaces/useTicketsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 
-interface IPortalTicketsContainerProps extends IServerPaginationProps {
+interface IPortalTicketsContentProps extends IServerPaginationProps {
   rows: ITicket[];
   searchTerm: string;
   onSearch: (term: string) => void;
@@ -10,11 +10,11 @@ interface IPortalTicketsContainerProps extends IServerPaginationProps {
 }
 
 /**
- * Portal tickets container with read-only ticket table.
+ * Read-only tickets table of the portal.
  *
- * @param {IPortalTicketsContainerProps} props
- * @return {*}
+ * @param {IPortalTicketsContentProps} props - Ticket rows, pagination state, search, and navigation callback.
+ * @return {JSX.Element} The tickets section and table.
  */
-export const PortalTicketsContainer = (props: IPortalTicketsContainerProps) => {
+export const PortalTicketsContent = (props: IPortalTicketsContentProps) => {
   return <TicketsListSection {...props} sectionId="portal-tickets" dataTestId="portal-tickets-table" />;
 };

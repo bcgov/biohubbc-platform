@@ -25,8 +25,11 @@ export const PortalTicketHeader = (props: IPortalTicketHeaderProps) => {
       maxWidth="xl"
       breadcrumbs={
         <Breadcrumbs aria-label="breadcrumb">
-          <Link component={RouterLink} to="/portal/ticket" underline="hover" color="inherit">
+          <Link component={RouterLink} to="/portal" underline="hover" color="inherit">
             Portal
+          </Link>
+          <Link component={RouterLink} to="/portal/ticket" underline="hover" color="inherit">
+            Tickets
           </Link>
           <Typography color="text.primary">{ticket.subject}</Typography>
         </Breadcrumbs>

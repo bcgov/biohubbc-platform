@@ -2,6 +2,7 @@ import { DownloadVersionExportTable } from './components/table/DownloadVersionEx
 import { cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { DownloadDetail, DownloadVersion } from 'interfaces/useDownloadApi.interface';
 import { DownloadExportDetail, DownloadExportListResponse } from 'interfaces/useDownloadExportApi.interface';
+import { DOWNLOAD_BASE_PATH, PORTAL_DOWNLOAD_BASE_PATH } from 'constants/download';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { describe, expect, it, vi } from 'vitest';
@@ -61,15 +62,23 @@ const version: DownloadVersion = {
 };
 
 /**
- * Render the download-version page at its canonical route.
+ * Render the download-version page at the open route, or at the Portal route when requested.
  *
+ * @param {string} [path] - Initial route.
  * @return {ReturnType<typeof render>} Testing Library render utilities for the page.
  */
-const renderPage = (): ReturnType<typeof render> =>
+const renderPage = (path = `/download/${DOWNLOAD_ID}/version/${VERSION_ID}`): ReturnType<typeof render> =>
   render(
-    <MemoryRouter initialEntries={[`/download/${DOWNLOAD_ID}/version/${VERSION_ID}`]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/download/:downloadId/version/:downloadVersionId" element={<DownloadVersionPage />} />
+        <Route
+          path="/download/:downloadId/version/:downloadVersionId"
+          element={<DownloadVersionPage basePath={DOWNLOAD_BASE_PATH} />}
+        />
+        <Route
+          path="/portal/download/:downloadId/version/:downloadVersionId"
+          element={<DownloadVersionPage basePath={PORTAL_DOWNLOAD_BASE_PATH} />}
+        />
       </Routes>
     </MemoryRouter>
   );
@@ -121,13 +130,30 @@ describe('DownloadVersionPage', () => {
     expect(queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
   });
 
+  it('roots the breadcrumb at the Portal under the Portal route', async () => {
+    const { findByRole, getByRole } = renderPage(`/portal/download/${DOWNLOAD_ID}/version/${VERSION_ID}`);
+
+    expect(await findByRole('heading', { name: 'Bears in BC' })).toBeVisible();
+    const breadcrumb = getByRole('navigation', { name: 'download version breadcrumb' });
+    const links = within(breadcrumb).getAllByRole('link');
+
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Portal', '/portal'],
+      ['Downloads', '/portal/download'],
+      ['Bears in BC', `/portal/download/${DOWNLOAD_ID}`]
+    ]);
+    expect(breadcrumb).toHaveTextContent('March 1, 2026');
+  });
+
   it('renders the download header with Features and Exports tabs', async () => {
     const { findByRole, getByRole, getByText } = renderPage();
 
     expect(await findByRole('heading', { name: 'Bears in BC' })).toBeVisible();
     expect(getByRole('link', { name: 'Bears in BC' })).toHaveAttribute('href', `/download/${DOWNLOAD_ID}`);
     const breadcrumb = getByRole('navigation', { name: 'download version breadcrumb' });
-    expect(within(breadcrumb).getByRole('link', { name: 'Downloads' })).toHaveAttribute('href', '/portal/downloads');
+    // The open route serves anonymous links, so the trail does not lead into the Portal.
+    expect(within(breadcrumb).queryByRole('link', { name: 'Portal' })).not.toBeInTheDocument();
+    expect(within(breadcrumb).queryByRole('link', { name: 'Downloads' })).not.toBeInTheDocument();
     expect(within(breadcrumb).queryByText('Search')).not.toBeInTheDocument();
     expect(breadcrumb).toHaveTextContent('March 1, 2026');
     expect(within(breadcrumb).queryByRole('link', { name: 'March 1, 2026' })).not.toBeInTheDocument();

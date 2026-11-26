@@ -3,7 +3,7 @@ import { useTicketQuery } from 'features/admin/tickets/hooks/useTicketQuery';
 import { TicketSkeleton } from 'features/admin/tickets/detail/skeleton/TicketSkeleton';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
-import { PortalTicketDetailPageContent } from './detail/content/PortalTicketDetailPageContent';
+import { PortalTicketDetailPageContent } from './content/PortalTicketDetailPageContent';
 
 /**
  * Portal ticket detail page for viewing timeline activity.

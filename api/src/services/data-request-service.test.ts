@@ -384,20 +384,23 @@ describe('DataRequestService', () => {
     expect(result).to.deep.equal(mockDataRequest);
   });
 
-  it('findDataRequestsByTeamMembership delegates to repository with system user ids', async () => {
+  it('getDataRequestListByTeamMembership returns the page of team data requests with the total for the same filters', async () => {
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
     const userIds = [1, 2];
     const filters = { status: 'requested' as const };
+    const pagination = { page: 2, limit: 10 };
 
-    const stub = sinon
+    const listStub = sinon
       .stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership')
       .resolves([mockDataRequest]);
+    const countStub = sinon.stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembershipCount').resolves(11);
 
-    const result = await service.findDataRequestsByTeamMembership(userIds, filters);
+    const result = await service.getDataRequestListByTeamMembership(userIds, filters, pagination);
 
-    expect(stub).to.have.been.calledOnceWith(userIds, filters);
-    expect(result).to.deep.equal([mockDataRequest]);
+    expect(listStub).to.have.been.calledOnceWith(userIds, filters, pagination);
+    expect(countStub).to.have.been.calledOnceWith(userIds, filters);
+    expect(result).to.eql({ data_requests: [mockDataRequest], total: 11 });
   });
 
   it('createDataRequest derives subject from featureTypes + reason and delegates to createDataRequestForTicket', async () => {

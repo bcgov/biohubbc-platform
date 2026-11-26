@@ -69,8 +69,11 @@ export const PortalSubmissionDetailPage = () => {
         submission={submission}
         breadcrumbs={
           <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to="/portal/submission" underline="hover" color="inherit">
+            <Link component={RouterLink} to="/portal" underline="hover" color="inherit">
               Portal
+            </Link>
+            <Link component={RouterLink} to="/portal/submission" underline="hover" color="inherit">
+              Submissions
             </Link>
             <Typography color="text.primary">{submission?.name}</Typography>
           </Breadcrumbs>

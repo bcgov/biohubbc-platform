@@ -86,7 +86,7 @@ describe('data-request', () => {
       }
     });
 
-    it('calls DataRequestService.findDataRequestsByTeamMembership for non-admin with no filters and returns 200', async () => {
+    it('returns the first page of the current user team data requests with no filters', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => mockNonAdminUser.system_user_id,
         commit: sinon.stub(),
@@ -97,25 +97,61 @@ describe('data-request', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
 
       const stub = sinon
-        .stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership')
-        .resolves([mockDataRequest]);
+        .stub(DataRequestService.prototype, 'getDataRequestListByTeamMembership')
+        .resolves({ data_requests: [mockDataRequest], total: 1 });
 
       const requestHandler = findDataRequests();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith([mockNonAdminUser.system_user_id], {
-        date_from: undefined,
-        date_to: undefined,
-        requested_by: undefined,
-        team_id: undefined,
-        status: undefined
-      });
+      expect(stub).to.have.been.calledOnceWith(
+        [mockNonAdminUser.system_user_id],
+        {
+          date_from: undefined,
+          date_to: undefined,
+          requested_by: undefined,
+          team_id: undefined,
+          status: undefined
+        },
+        sinon.match.object
+      );
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql([mockDataRequest]);
+      expect(mockRes.jsonValue.data_requests).to.eql([mockDataRequest]);
+      expect(mockRes.jsonValue.pagination.total).to.equal(1);
+    });
+
+    it('passes the requested page to the service and reports it with the total', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
+
+      const stub = sinon
+        .stub(DataRequestService.prototype, 'getDataRequestListByTeamMembership')
+        .resolves({ data_requests: [mockDataRequest], total: 23 });
+
+      const requestHandler = findDataRequests();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = { page: '2', limit: '10', sort: 'create_date', order: 'desc' } as any;
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(stub).to.have.been.calledOnceWith(
+        [mockNonAdminUser.system_user_id],
+        sinon.match.object,
+        sinon.match({ page: 2, limit: 10, sort: 'create_date', order: 'desc' })
+      );
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue.data_requests).to.eql([mockDataRequest]);
+      expect(mockRes.jsonValue.pagination).to.include({ total: 23, current_page: 2, last_page: 3 });
     });
 
     it('parses query params and passes filters to service for non-admin', async () => {
@@ -129,8 +165,8 @@ describe('data-request', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
 
       const stub = sinon
-        .stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership')
-        .resolves([mockDataRequest]);
+        .stub(DataRequestService.prototype, 'getDataRequestListByTeamMembership')
+        .resolves({ data_requests: [mockDataRequest], total: 1 });
 
       const requestHandler = findDataRequests();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -145,13 +181,17 @@ describe('data-request', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith([mockNonAdminUser.system_user_id], {
-        date_from: '2025-01-01',
-        date_to: '2025-01-31',
-        requested_by: 1,
-        team_id: mockDataRequest.team_id,
-        status: 'requested'
-      });
+      expect(stub).to.have.been.calledOnceWith(
+        [mockNonAdminUser.system_user_id],
+        {
+          date_from: '2025-01-01',
+          date_to: '2025-01-31',
+          requested_by: 1,
+          team_id: mockDataRequest.team_id,
+          status: 'requested'
+        },
+        sinon.match.object
+      );
       expect(mockRes.statusValue).to.equal(200);
     });
 
@@ -164,7 +204,9 @@ describe('data-request', () => {
       });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
-      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership').rejects(new Error('Service error'));
+      sinon
+        .stub(DataRequestService.prototype, 'getDataRequestListByTeamMembership')
+        .rejects(new Error('Service error'));
 
       const requestHandler = findDataRequests();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
