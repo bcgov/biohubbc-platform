@@ -15,6 +15,12 @@ import {
 chai.use(sinonChai);
 
 describe('computeScopeFeatureBitmapJobHandler', () => {
+  let lockStub: sinon.SinonStub;
+
+  beforeEach(() => {
+    lockStub = sinon.stub(SecurityScopeService.prototype, 'lockScopeFeatureBitmap').resolves();
+  });
+
   afterEach(() => {
     sinon.restore();
   });
@@ -50,6 +56,11 @@ describe('computeScopeFeatureBitmapJobHandler', () => {
     expect(buildStub).to.have.been.calledOnceWith('scope-uuid-1', urn);
     expect(resolveUrnStub).to.have.been.calledBefore(buildStub);
     expect(refreshStub).not.to.have.been.called;
+
+    // The scope's row is locked before the URN is resolved, so the resolve waits for a request that is
+    // giving the scope to a team and reads what it committed.
+    expect(lockStub).to.have.been.calledOnceWith('scope-uuid-1');
+    expect(lockStub).to.have.been.calledBefore(resolveUrnStub);
 
     // The active-statement check and the write share one transaction: the build has no gate of its own.
     expect(openStub).to.have.been.calledOnce;

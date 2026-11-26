@@ -368,6 +368,21 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
+   * Lock a security scope's row for a write to its feature bitmap, until the transaction ends.
+   *
+   * The bitmap job takes this lock before it resolves the scope's URN. A request that gives the
+   * scope to a team holds the same lock from the moment it clears the bitmap until it commits, so
+   * the job waits for that commit and then resolves the URN from committed data. Resolved the other
+   * way round, a job that started inside a policy's approval would see the policy as not yet
+   * approved and skip the build, leaving the cleared bitmap NULL with no build queued.
+   *
+   * @param securityScopeId UUID of the security scope
+   */
+  async lockScopeFeatureBitmap(securityScopeId: string): Promise<void> {
+    await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
+  }
+
+  /**
    * Rebuild the feature bitmap of a security scope from the features its anchors grant.
    *
    * A scope URN naming one submission limits the build to that submission; a wildcard scope spans

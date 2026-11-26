@@ -31,10 +31,11 @@ export interface IComputeScopeFeatureBitmapJobData {
  * carrying a submission (its feature graph or rule assignments changed) refreshes
  * only that submission's part of the bitmap and leaves the rest as it is.
  *
- * Jobs in a batch run concurrently, each on its own connection. The URN resolve
- * and the write run in one transaction per job, so the scope's
- * active approved ALLOW statement is checked in the same snapshot that writes the
- * bitmap. Both the build and the refresh write a value computed from the current
+ * Jobs in a batch run concurrently, each on its own connection. The scope's row
+ * is locked first, then the URN resolve and the write run, all in one transaction
+ * per job. The lock makes the job wait for a request that is giving the scope to
+ * a team, which holds the row until it commits, so the scope's active approved
+ * ALLOW statement is read after that commit. Both the build and the refresh write a value computed from the current
  * data, which makes them idempotent — safe to retry.
  *
  * If the scope currently has no active approved ALLOW statement, the job exits
@@ -63,6 +64,9 @@ export const computeScopeFeatureBitmapJobHandler: PgBoss.WorkHandler<IComputeSco
       try {
         const isBuilt = await withConnection(async (connection) => {
           const securityScopeService = new SecurityScopeService(connection);
+
+          // Lock before resolving: a request that is giving this scope to a team holds the row until it commits.
+          await securityScopeService.lockScopeFeatureBitmap(securityScopeId);
           const urn = await securityScopeService.resolveUrnForScope(securityScopeId);
 
           if (!urn) {
