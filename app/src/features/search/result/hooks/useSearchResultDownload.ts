@@ -8,7 +8,7 @@ import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
+import { ICreateDownloadFormValues } from '../dialog/CreateDownloadForm';
 
 interface UseSearchResultDownloadProps {
   /** Raw feature-type route segment; used to close route-scoped dialogs when it changes. */
@@ -22,14 +22,13 @@ interface UseSearchResultDownloadProps {
 }
 
 /**
- * Owns download sidebar state and create-download lifecycle for search results.
+ * Owns the create-download lifecycle for search results.
  *
- * Keeps download-specific behavior out of the route component: active sidebar
- * tab, create-download dialog state, checkout, and expression-backed download
- * creation. Guards against empty searches and stale in-flight result state.
+ * Keeps download-specific behavior out of the route component: create-download dialog state and expression-backed
+ * download creation. Guards against empty searches and stale in-flight result state.
  *
  * @param {UseSearchResultDownloadProps} props - Route, expression, loading, and count state needed by download actions.
- * @returns Download sidebar state, create-download dialog state, and handlers for opening, saving, canceling, and checkout.
+ * @returns Create-download dialog state, and handlers for opening, saving, and canceling it.
  */
 export const useSearchResultDownload = ({
   featureType,
@@ -120,7 +119,6 @@ export const useSearchResultDownload = ({
   }, []);
 
   return {
-    downloadView: 'Downloads',
     isCreateDownloadDialogOpen,
     isSubmittingDownload: createDownloadMutation.isPending,
     handleOpenCreateDownload,

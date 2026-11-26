@@ -1,15 +1,4 @@
-import { isExportReady, triggerIframeDownload } from './download';
-
-describe('isExportReady', () => {
-  it.each([
-    { status: 'pending', expected: false },
-    { status: 'processing', expected: false },
-    { status: 'ready', expected: true },
-    { status: 'failed', expected: false }
-  ] as const)('returns $expected for status "$status"', ({ status, expected }) => {
-    expect(isExportReady(status)).toBe(expected);
-  });
-});
+import { triggerIframeDownload } from './download';
 
 describe('triggerIframeDownload', () => {
   afterEach(() => {

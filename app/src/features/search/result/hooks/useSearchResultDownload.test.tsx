@@ -5,7 +5,7 @@ import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { Mock, vi } from 'vitest';
-import { ICreateDownloadFormValues } from '../sidebar/download/CreateDownloadForm';
+import { ICreateDownloadFormValues } from '../dialog/CreateDownloadForm';
 import { useSearchResultDownload } from './useSearchResultDownload';
 
 vi.mock('hooks/useApi');
@@ -79,7 +79,6 @@ describe('useSearchResultDownload', () => {
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
-    expect(result.current.downloadView).toBe('Downloads');
     expect(mockSetSnackbar).not.toHaveBeenCalled();
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
     expect(mockSetOkDialog).not.toHaveBeenCalled();
@@ -125,7 +124,6 @@ describe('useSearchResultDownload', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/download/download-uuid');
     expect(mockSetOkDialog).not.toHaveBeenCalled();
     expect(mockSetSnackbar).not.toHaveBeenCalled();
-    expect(result.current.downloadView).toBe('Downloads');
     expect(result.current.isCreateDownloadDialogOpen).toBe(false);
   });
 

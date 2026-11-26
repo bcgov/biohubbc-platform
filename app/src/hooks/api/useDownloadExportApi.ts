@@ -78,22 +78,6 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Lists the download's materialized feature types and their exportable columns,
-   * which drive the export config picker.
-   *
-   * @param {string} downloadId
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @return {Promise<DownloadFeatureType[]>}
-   */
-  const getDownloadFeatureTypes = async (
-    downloadId: string,
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<DownloadFeatureType[]> => {
-    const { data } = await axios.get<DownloadFeatureType[]>(`/api/download/${downloadId}/feature-types`, options);
-    return data;
-  };
-
-  /**
    * Lists the feature types and exportable columns materialized by one download version.
    *
    * @param {string} downloadId - The parent download ID.
@@ -114,7 +98,6 @@ export const useDownloadExportApi = (axios: AxiosInstance) => {
     createExport,
     getExport,
     listDownloadVersionExports,
-    getDownloadFeatureTypes,
     getDownloadVersionFeatureTypes
   };
 };

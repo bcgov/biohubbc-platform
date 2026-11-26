@@ -32,16 +32,6 @@ export const DOWNLOAD_STATUS_BODY_COPY: Record<DownloadRecord['download_status']
   failed: 'This download failed. Please try again from search.'
 };
 
-/**
- * Chip variants for `download_export.status`.
- */
-export const EXPORT_STATUS_CHIP_PROPS: Record<DownloadExportStatus, DownloadStatusChipProps> = {
-  pending: { color: 'default', label: 'Pending' },
-  processing: { color: 'info', label: 'Processing' },
-  ready: { color: 'success', label: 'Ready' },
-  failed: { color: 'error', label: 'Failed' }
-};
-
 export const DOWNLOAD_TABLE_STATUS_CHIP_COLORS: Record<
   DownloadStatus | DownloadExportStatus,
   DownloadStatusChipProps['color']
@@ -52,6 +42,3 @@ export const DOWNLOAD_TABLE_STATUS_CHIP_COLORS: Record<
   downloaded: 'default',
   failed: 'error'
 };
-
-/** Downloads per page in the search results' Downloads sidebar. */
-export const DOWNLOAD_SIDEBAR_PAGE_SIZE = 10;

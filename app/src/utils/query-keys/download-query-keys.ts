@@ -33,14 +33,6 @@ const download = (downloadId: string) => [QUERY_KEY_ROOT.DOWNLOAD, downloadId] a
 const detail = (downloadId: string) => [...download(downloadId), 'detail'] as const;
 
 /**
- * Key of the feature types, and their exportable columns, a download materialized.
- *
- * @param {string} downloadId The download.
- * @returns The download feature types key.
- */
-const featureTypes = (downloadId: string) => [...download(downloadId), 'feature-types'] as const;
-
-/**
  * Key of one page of a download's versions.
  *
  * @param {string} downloadId The download.
@@ -90,7 +82,6 @@ export const downloadQueryKeys = {
   list,
   download,
   detail,
-  featureTypes,
   versions,
   version,
   versionExportsAll,
