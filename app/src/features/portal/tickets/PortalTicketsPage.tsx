@@ -5,15 +5,15 @@ import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { useNavigate } from 'react-router-dom';
 import { ticketQueryKeys } from 'utils/query-keys/ticket-query-keys';
-import { PortalListPageLayout } from './components/PortalListPageLayout';
-import { PortalTicketsContainer } from './list/PortalTicketsContainer';
+import { PortalPageLayout } from 'layouts/PortalPageLayout';
+import { PortalTicketsContent } from './content/PortalTicketsContent';
 
 /**
- * Portal tickets page content for the current user.
+ * Portal tickets page: the tickets of the current user, each opening its own page.
  *
- * @return {*}
+ * @return {JSX.Element} The tickets header and table.
  */
-export const PortalTicketPage = () => {
+export const PortalTicketsPage = () => {
   const api = useApi();
   const navigate = useNavigate();
   const grid = useServerPaginatedGridState({ defaultSort: TICKETS_LIST_DEFAULT_SORT });
@@ -25,9 +25,9 @@ export const PortalTicketPage = () => {
   });
 
   return (
-    <PortalListPageLayout>
+    <PortalPageLayout title="Tickets">
       <QueryErrorDialog error={ticketsQuery.error} label="tickets" />
-      <PortalTicketsContainer
+      <PortalTicketsContent
         rows={ticketsQuery.data?.tickets ?? []}
         rowCount={ticketsQuery.data?.pagination.total ?? 0}
         paginationModel={grid.paginationModel}
@@ -38,6 +38,6 @@ export const PortalTicketPage = () => {
         onSearch={grid.handleSearch}
         onRowClick={(ticketId) => navigate(`/portal/ticket/${ticketId}`)}
       />
-    </PortalListPageLayout>
+    </PortalPageLayout>
   );
 };

@@ -1,11 +1,11 @@
 import { useApi } from 'hooks/useApi';
-import { waitFor } from '@testing-library/react';
+import { waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PortalSubmissionFeaturePage } from './PortalSubmissionFeaturePage';
 
-vi.mock('../../../../hooks/useApi');
+vi.mock('hooks/useApi');
 
 const mockUseApi = useApi as Mock;
 
@@ -111,9 +111,17 @@ describe('PortalSubmissionFeaturePage', () => {
   });
 
   it('renders portal as the breadcrumb root', async () => {
-    const { findByRole } = renderPage();
+    const { findByRole } = renderPage('/portal/submission/1/feature/10?tab=features');
 
-    expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal/submission');
+    const breadcrumb = await findByRole('navigation', { name: 'breadcrumb' });
+    const links = within(breadcrumb).getAllByRole('link');
+
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Portal', '/portal'],
+      ['Submissions', '/portal/submission'],
+      ['Test Submission', '/portal/submission/1?tab=features']
+    ]);
+    expect(within(breadcrumb).getByText('Observation')).toBeVisible();
   });
 
   it('places Map and About after Properties', async () => {

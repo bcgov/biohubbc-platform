@@ -9,7 +9,7 @@ import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { getFormattedDate } from 'utils/Utils';
 
-interface IPortalDownloadsContainerProps extends IServerPaginationProps {
+interface IPortalDownloadsContentProps extends IServerPaginationProps {
   rows: DownloadRecord[];
   rowCount: number;
   onRowClick: (downloadId: string) => void;
@@ -61,10 +61,10 @@ const columns: GridColDef<DownloadRecord>[] = [
 /**
  * Renders the Portal's server-paginated downloads table.
  *
- * @param {IPortalDownloadsContainerProps} props - Download rows, pagination state, and navigation callback.
+ * @param {IPortalDownloadsContentProps} props - Download rows, pagination state, and navigation callback.
  * @return {JSX.Element} The downloads section and table.
  */
-export const PortalDownloadsContainer = (props: IPortalDownloadsContainerProps) => {
+export const PortalDownloadsContent = (props: IPortalDownloadsContentProps) => {
   const { rows, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel, onRowClick } = props;
 
   return (

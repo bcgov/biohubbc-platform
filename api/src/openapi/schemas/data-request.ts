@@ -49,8 +49,16 @@ export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 export const DataRequestListResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'array',
-  items: DataRequestResponseSchema
+  type: 'object',
+  required: ['data_requests', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    data_requests: {
+      type: 'array',
+      items: DataRequestResponseSchema
+    },
+    pagination: paginationResponseSchema
+  }
 };
 
 export const DataRequestListItemSchema: OpenAPIV3.SchemaObject = {

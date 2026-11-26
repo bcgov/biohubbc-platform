@@ -1,3 +1,6 @@
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
 import { SubmissionFeatureLayout } from 'features/submissions/page/features/components/SubmissionFeatureLayout';
@@ -5,7 +8,8 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { useMemo } from 'react';
-import { Navigate, useLocation, useParams } from 'react-router-dom';
+import { Link as RouterLink, Navigate, useLocation, useParams } from 'react-router-dom';
+import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { keepPreviousDataWithin } from 'utils/query-client';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
@@ -62,10 +66,30 @@ export const PortalSubmissionFeaturePage = () => {
     <SubmissionFeatureLayout
       isLoading={featureQuery.isLoading}
       feature={feature}
-      rootBreadcrumbLabel="Portal"
+      rootBreadcrumbLabel="Submissions"
       rootBreadcrumbTo="/portal/submission"
       submissionDetailBasePath="/portal/submission"
-      queryString={location.search}>
+      queryString={location.search}
+      breadcrumbs={
+        feature && (
+          <Breadcrumbs aria-label="breadcrumb">
+            <Link component={RouterLink} to="/portal" underline="hover" color="inherit">
+              Portal
+            </Link>
+            <Link component={RouterLink} to="/portal/submission" underline="hover" color="inherit">
+              Submissions
+            </Link>
+            <Link
+              component={RouterLink}
+              to={`/portal/submission/${feature.submission_id}${location.search}`}
+              underline="hover"
+              color="inherit">
+              {feature.submission_name}
+            </Link>
+            <Typography color="text.primary">{getFeatureTypeDisplayLabel(feature.feature_type_name)}</Typography>
+          </Breadcrumbs>
+        )
+      }>
       <SubmissionFeaturePropertiesSection
         submissionId={submissionId}
         pathResolvers={pathResolvers}

@@ -8,7 +8,7 @@ import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { PortalSubmissionDetailPage } from './PortalSubmissionDetailPage';
 
-vi.mock('../../../../hooks/useApi');
+vi.mock('hooks/useApi');
 
 const mockUseApi = useApi as Mock;
 const mockNavigate = vi.fn();
@@ -115,7 +115,8 @@ describe('PortalSubmissionDetailPage', () => {
     const { findByRole } = renderPage();
     const breadcrumbNav = await findByRole('navigation', { name: 'breadcrumb' });
 
-    expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal/submission');
+    expect(await findByRole('link', { name: 'Submissions' })).toHaveAttribute('href', '/portal/submission');
+    expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal');
     expect(within(breadcrumbNav).getByText('Test Submission')).toBeVisible();
   });
 

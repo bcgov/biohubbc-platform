@@ -169,12 +169,14 @@ export class DataRequestRepository extends BaseRepository {
    *
    * @param {number[]} systemUserIds - System user identifiers.
    * @param {DataRequestFilters} [filters] - Optional query filters.
+   * @param {ApiPaginationOptions} [pagination] - Optional page, page size and sort.
    * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestRepository
    */
   async findDataRequestsByTeamMembership(
     systemUserIds: number[],
-    filters?: DataRequestFilters
+    filters?: DataRequestFilters,
+    pagination?: ApiPaginationOptions
   ): Promise<DataRequest[]> {
     if (systemUserIds.length === 0) {
       return [];
@@ -202,8 +204,48 @@ export class DataRequestRepository extends BaseRepository {
       .whereNull('tm.record_end_date');
 
     this.applyFilters(queryBuilder, filters);
+    this.applyPagination(queryBuilder, pagination);
     const response = await this.connection.knex(queryBuilder, DataRequest);
     return response.rows;
+  }
+
+  /**
+   * Count the data requests scoped to teams that include any of the specified system users.
+   *
+   * Counts the same rows {@link findDataRequestsByTeamMembership} returns without pagination.
+   *
+   * @param {number[]} systemUserIds - System user identifiers.
+   * @param {DataRequestFilters} [filters] - Optional query filters.
+   * @return {Promise<number>} The number of matching data requests.
+   * @throws {ApiExecuteSQLError} If the count query returns an unexpected row count.
+   * @memberof DataRequestRepository
+   */
+  async findDataRequestsByTeamMembershipCount(systemUserIds: number[], filters?: DataRequestFilters): Promise<number> {
+    if (systemUserIds.length === 0) {
+      return 0;
+    }
+
+    const knex = getKnex();
+    const queryBuilder = knex('data_request as dr')
+      .select(knex.raw('count(*)::integer as count'))
+      .join('policy as p', 'p.policy_id', 'dr.policy_id')
+      .join('team as t', 't.team_id', 'dr.team_id')
+      .join('team_member as tm', 'tm.team_id', 'dr.team_id')
+      .whereIn('tm.system_user_id', systemUserIds)
+      .whereNull('dr.record_end_date')
+      .whereNull('p.record_end_date')
+      .whereNull('t.record_end_date')
+      .whereNull('tm.record_end_date');
+
+    this.applyFilters(queryBuilder, filters);
+
+    const response = await this.connection.knex(queryBuilder, CountResult);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get team membership data requests count');
+    }
+
+    return response.rows[0].count;
   }
 
   /**

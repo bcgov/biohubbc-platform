@@ -5,15 +5,15 @@ import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { useNavigate } from 'react-router-dom';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
-import { PortalListPageLayout } from './components/PortalListPageLayout';
-import { PortalSubmissionsContainer } from './list/PortalSubmissionsContainer';
+import { PortalPageLayout } from 'layouts/PortalPageLayout';
+import { PortalSubmissionsContent } from './content/PortalSubmissionsContent';
 
 /**
- * Portal submissions page content for the current user.
+ * Portal submissions page: the submissions of the current user, each opening its own page.
  *
- * @return {*}
+ * @return {JSX.Element} The submissions header and table.
  */
-export const PortalSubmissionPage = () => {
+export const PortalSubmissionsPage = () => {
   const biohubApi = useApi();
   const navigate = useNavigate();
   const grid = useServerPaginatedGridState({ defaultSort: SUBMISSIONS_LIST_DEFAULT_SORT });
@@ -25,9 +25,9 @@ export const PortalSubmissionPage = () => {
   });
 
   return (
-    <PortalListPageLayout>
+    <PortalPageLayout title="Submissions">
       <QueryErrorDialog error={submissionsQuery.error} label="submissions" />
-      <PortalSubmissionsContainer
+      <PortalSubmissionsContent
         rows={submissionsQuery.data?.submissions ?? []}
         rowCount={submissionsQuery.data?.pagination.total ?? 0}
         paginationModel={grid.paginationModel}
@@ -38,6 +38,6 @@ export const PortalSubmissionPage = () => {
         searchTerm={grid.searchTerm}
         onSearch={grid.handleSearch}
       />
-    </PortalListPageLayout>
+    </PortalPageLayout>
   );
 };

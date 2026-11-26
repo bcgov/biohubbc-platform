@@ -9,9 +9,11 @@ import {
   DataRequestResponseSchema
 } from '../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
 const defaultLog = getLogger('paths/data-request');
 
@@ -43,7 +45,7 @@ export const POST: Operation = [
 
 GET.apiDoc = {
   description:
-    'Find data request records for teams the current user belongs to, optionally filtered by date range, requested_by, team_id, or status',
+    'Get one page of the data request records for teams the current user belongs to, optionally filtered by date range, requested_by, team_id, or status',
   tags: ['data-request'],
   security: [
     {
@@ -51,6 +53,7 @@ GET.apiDoc = {
     }
   ],
   parameters: [
+    ...paginationRequestQueryParamSchema,
     {
       in: 'query',
       name: 'date_from',
@@ -88,7 +91,7 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Data requests retrieved successfully',
+      description: 'Paginated list of data requests.',
       content: {
         'application/json': {
           schema: DataRequestListResponseSchema
@@ -128,7 +131,7 @@ POST.apiDoc = {
 };
 
 /**
- * Find data request records for teams the current user belongs to, optionally filtered by query params.
+ * Get one page of the data request records for teams the current user belongs to, optionally filtered by query params.
  *
  * @returns {RequestHandler}
  */
@@ -140,14 +143,22 @@ export function findDataRequests(): RequestHandler {
       await connection.open();
 
       const filters = parseQueryParams(req);
+      const pagination = makePaginationOptionsFromRequest(req);
       const systemUserId = connection.systemUserId();
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequestsByTeamMembership([systemUserId], filters);
+      const dataRequestList = await dataRequestService.getDataRequestListByTeamMembership(
+        [systemUserId],
+        filters,
+        pagination
+      );
 
       await connection.commit();
 
-      return res.status(200).json(dataRequests);
+      return res.status(200).json({
+        data_requests: dataRequestList.data_requests,
+        pagination: makePaginationResponse(dataRequestList.total, pagination)
+      });
     } catch (error) {
       defaultLog.error({ label: 'findDataRequests', message: 'error', error });
       await connection.rollback();

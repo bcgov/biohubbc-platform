@@ -45,6 +45,12 @@ export interface DataRequestList {
   total: number;
 }
 
+/** One page of the data requests made for users' teams, with the total number matching the filters. */
+export interface TeamMembershipDataRequestList {
+  data_requests: DataRequest[];
+  total: number;
+}
+
 /** One recipient of a data request: a member of a team its policy is assigned to. */
 export interface DataRequestRecipient {
   system_user_id: number;

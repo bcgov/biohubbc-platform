@@ -1,6 +1,6 @@
 import { DialogContextProvider } from 'contexts/dialogContext';
 import { fireEvent, screen } from '@testing-library/react';
-import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
+import { PortalTicketDetailPage } from 'features/portal/tickets/detail/PortalTicketDetailPage';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicketTagEvent } from 'interfaces/useTagsApi.interface';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
@@ -93,7 +93,7 @@ vi.mock('./detail/skeleton/TicketSkeleton', () => ({
   TicketSkeleton: () => <div data-testid="ticket-skeleton" />
 }));
 
-vi.mock('features/portal/detail/content/PortalTicketDetailPageContent', () => ({
+vi.mock('features/portal/tickets/detail/content/PortalTicketDetailPageContent', () => ({
   PortalTicketDetailPageContent: ({ ticket }: { ticket: ITicketExtended }) => (
     <div data-testid="portal-ticket-content">{ticket.subject}</div>
   )

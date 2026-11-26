@@ -4,24 +4,42 @@ import { render } from 'test-helpers/test-utils';
 import { PortalRouter } from './PortalRouter';
 
 vi.mock('features/portal/PortalPage', () => ({
-  default: ({ initialTab }: { initialTab?: string }) => (
-    <div data-testid="portal-page">Portal Page ({initialTab ?? 'downloads'})</div>
-  )
+  PortalPage: () => <div data-testid="portal-page">Portal Page</div>
+}));
+
+vi.mock('features/portal/submissions/PortalSubmissionsPage', () => ({
+  PortalSubmissionsPage: () => <div data-testid="portal-submissions-page">Portal Submissions</div>
+}));
+
+vi.mock('features/portal/downloads/PortalDownloadsPage', () => ({
+  PortalDownloadsPage: () => <div data-testid="portal-downloads-page">Portal Downloads</div>
+}));
+
+vi.mock('features/portal/data-requests/PortalDataRequestsPage', () => ({
+  PortalDataRequestsPage: () => <div data-testid="portal-data-requests-page">Portal Data Requests</div>
+}));
+
+vi.mock('features/portal/tickets/PortalTicketsPage', () => ({
+  PortalTicketsPage: () => <div data-testid="portal-tickets-page">Portal Tickets</div>
+}));
+
+vi.mock('features/portal/api-keys/PortalApiKeysPage', () => ({
+  PortalApiKeysPage: () => <div data-testid="portal-api-keys-page">Portal API Keys</div>
 }));
 
 vi.mock('contexts/ticketContext', () => ({
   UserTicketContextProvider: ({ children }: { children: unknown }) => <>{children}</>
 }));
 
-vi.mock('features/portal/PortalTicketDetailPage', () => ({
+vi.mock('features/portal/tickets/detail/PortalTicketDetailPage', () => ({
   PortalTicketDetailPage: () => <div data-testid="portal-ticket-detail-page">Portal Ticket Detail</div>
 }));
 
-vi.mock('features/portal/page/submission/PortalSubmissionDetailPage', () => ({
+vi.mock('features/portal/submissions/detail/PortalSubmissionDetailPage', () => ({
   PortalSubmissionDetailPage: () => <div data-testid="portal-submission-detail-page">Portal Submission Detail</div>
 }));
 
-vi.mock('features/portal/page/submission/PortalSubmissionFeaturePage', () => ({
+vi.mock('features/portal/submissions/detail/feature/PortalSubmissionFeaturePage', () => ({
   PortalSubmissionFeaturePage: () => <div data-testid="portal-submission-feature-page">Portal Submission Feature</div>
 }));
 
@@ -40,39 +58,18 @@ describe('PortalRouter routes', () => {
       </MemoryRouter>
     );
 
-  it('renders portal list route', async () => {
-    const { getByTestId } = renderPortalRouter('/portal');
+  it.each([
+    ['/portal', 'portal-page'],
+    ['/portal/submission', 'portal-submissions-page'],
+    ['/portal/download', 'portal-downloads-page'],
+    ['/portal/data-request', 'portal-data-requests-page'],
+    ['/portal/ticket', 'portal-tickets-page'],
+    ['/portal/api-key', 'portal-api-keys-page']
+  ])('renders %s', async (path, testId) => {
+    const { getByTestId } = renderPortalRouter(path);
 
     await waitFor(() => {
-      expect(getByTestId('portal-page')).toBeVisible();
-      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (downloads)');
-    });
-  });
-
-  it('renders tickets tab route', async () => {
-    const { getByTestId } = renderPortalRouter('/portal/ticket');
-
-    await waitFor(() => {
-      expect(getByTestId('portal-page')).toBeVisible();
-      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (tickets)');
-    });
-  });
-
-  it('renders submissions tab route', async () => {
-    const { getByTestId } = renderPortalRouter('/portal/submission');
-
-    await waitFor(() => {
-      expect(getByTestId('portal-page')).toBeVisible();
-      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (submissions)');
-    });
-  });
-
-  it('renders downloads tab route', async () => {
-    const { getByTestId } = renderPortalRouter('/portal/download');
-
-    await waitFor(() => {
-      expect(getByTestId('portal-page')).toBeVisible();
-      expect(getByTestId('portal-page')).toHaveTextContent('Portal Page (downloads)');
+      expect(getByTestId(testId)).toBeVisible();
     });
   });
 

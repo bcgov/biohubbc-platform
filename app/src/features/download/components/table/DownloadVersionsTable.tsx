@@ -19,15 +19,17 @@ import { DownloadVersionExportButton } from '../DownloadVersionExportButton';
 
 interface DownloadVersionsTableProps {
   downloadId: string;
+  /** Base route of the download pages, used to link each version. */
+  basePath: string;
 }
 
 /**
  * Renders the paginated version collection and its per-version export actions.
  *
- * @param {DownloadVersionsTableProps} props - Parent download used to load and navigate versions.
+ * @param {DownloadVersionsTableProps} props - Parent download and base route used to load and navigate versions.
  * @return {JSX.Element} The paginated download versions table.
  */
-export const DownloadVersionsTable = ({ downloadId }: DownloadVersionsTableProps) => {
+export const DownloadVersionsTable = ({ downloadId, basePath }: DownloadVersionsTableProps) => {
   const api = useApi();
   const navigate = useNavigate();
   const versionsGrid = useServerPaginatedGridState({ defaultSort: { field: 'create_date', sort: 'desc' } });
@@ -116,7 +118,7 @@ export const DownloadVersionsTable = ({ downloadId }: DownloadVersionsTableProps
         setPaginationModel={versionsGrid.handlePaginationChange}
         sortModel={versionsGrid.sortModel}
         setSortModel={versionsGrid.handleSortChange}
-        onRowClick={(version) => navigate(`/download/${downloadId}/version/${version.download_version_id}`)}
+        onRowClick={(version) => navigate(`${basePath}/${downloadId}/version/${version.download_version_id}`)}
       />
     </PageSection>
   );

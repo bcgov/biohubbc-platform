@@ -3,6 +3,7 @@ import NotFoundPage from 'features/404/NotFoundPage';
 import { DownloadPage } from 'features/download/DownloadPage';
 import { DownloadVersionPage } from 'features/download/DownloadVersionPage';
 import { SearchPage } from 'features/search/SearchPage';
+import { DOWNLOAD_BASE_PATH } from 'constants/download';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router';
@@ -110,7 +111,7 @@ export const AppRouter = () => {
         element={
           <BaseLayout>
             <PageTitle title="Download" description="Download version details" />
-            <DownloadVersionPage />
+            <DownloadVersionPage basePath={DOWNLOAD_BASE_PATH} />
           </BaseLayout>
         }
       />
@@ -120,7 +121,7 @@ export const AppRouter = () => {
         element={
           <BaseLayout>
             <PageTitle title="Download" description="Download status and details" />
-            <DownloadPage />
+            <DownloadPage basePath={DOWNLOAD_BASE_PATH} />
           </BaseLayout>
         }
       />

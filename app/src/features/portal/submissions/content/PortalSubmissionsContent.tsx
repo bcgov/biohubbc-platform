@@ -14,7 +14,7 @@ import { SubmissionSummary } from 'interfaces/useSubmissionsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { getFormattedDate } from 'utils/Utils';
 
-interface IPortalSubmissionsContainerProps extends IServerPaginationProps {
+interface IPortalSubmissionsContentProps extends IServerPaginationProps {
   rows: SubmissionSummary[];
   rowCount: number;
   onRowClick: (submissionId: number) => void;
@@ -61,12 +61,12 @@ const columns: GridColDef<SubmissionSummary>[] = [
 ];
 
 /**
- * Portal submissions container using a shared page section wrapper.
+ * Submissions table of the portal, with search, status and submission date.
  *
- * @param {IPortalSubmissionsContainerProps} props
- * @return {*}
+ * @param {IPortalSubmissionsContentProps} props - Submission rows, pagination state, search, and navigation callback.
+ * @return {JSX.Element} The submissions section and table.
  */
-export const PortalSubmissionsContainer = (props: IPortalSubmissionsContainerProps) => {
+export const PortalSubmissionsContent = (props: IPortalSubmissionsContentProps) => {
   const {
     rows,
     rowCount,

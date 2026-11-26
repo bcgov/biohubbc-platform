@@ -9,6 +9,7 @@ import {
   DataRequestListFilters,
   DataRequestListItem,
   DataRequestRecipient,
+  TeamMembershipDataRequestList,
   UpdateDataRequest
 } from '../models/data-request';
 import { CreatePolicyStatementPayload, PolicyEffect } from '../models/policy-statement';
@@ -256,18 +257,26 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find data requests visible to one or more system users via team membership.
+   * Get one page of the data requests visible to one or more system users via team membership, with the total number
+   * matching the filters.
    *
    * @param {number[]} systemUserIds - System user identifiers.
-   * @param {DataRequestFilters} [filters] - Optional query filters.
-   * @return {Promise<DataRequest[]>} Matching data requests.
+   * @param {DataRequestFilters} filters - Query filters.
+   * @param {ApiPaginationOptions} pagination - Page, page size and sort.
+   * @return {Promise<TeamMembershipDataRequestList>} The page of data requests and the total matching the filters.
    * @memberof DataRequestService
    */
-  async findDataRequestsByTeamMembership(
+  async getDataRequestListByTeamMembership(
     systemUserIds: number[],
-    filters?: DataRequestFilters
-  ): Promise<DataRequest[]> {
-    return this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserIds, filters);
+    filters: DataRequestFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<TeamMembershipDataRequestList> {
+    const [dataRequests, total] = await Promise.all([
+      this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserIds, filters, pagination),
+      this.dataRequestRepository.findDataRequestsByTeamMembershipCount(systemUserIds, filters)
+    ]);
+
+    return { data_requests: dataRequests, total };
   }
 
   /**
