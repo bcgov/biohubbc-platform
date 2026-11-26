@@ -779,6 +779,48 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
+   * Set the feature bitmap (`security_scope.feature_ids`) to NULL for each of the given security scopes
+   * that no team holds: a scope with no `team_security_scope` row.
+   *
+   * Run before a team is given a scope, in the transaction that gives it. A bitmap is refreshed only
+   * while its scope is held, so the bitmap of a scope that had no holder may be out of date. A NULL
+   * bitmap grants nothing, so the scope's new holders get no access through it until the full build
+   * queued with the grant has run. A scope a team already holds is left as it is.
+   *
+   * Rows are locked in `security_scope_id` order before the write, as
+   * {@link lockSecurityScopesForSubmissionFeatureIdsUpdate} does, so the two cannot deadlock. The
+   * lock also makes the write wait for a build in flight and then clear what it wrote.
+   *
+   * Updating no row is a normal result and does not throw: every given scope is held.
+   *
+   * @param {string[]} securityScopeIds Security scope identifiers to check.
+   * @returns {Promise<void>}
+   * @memberof SecurityScopeRepository
+   */
+  async updateUnheldSecurityScopeFeatureIdsToNull(securityScopeIds: string[]): Promise<void> {
+    const sqlStatement = SQL`
+      WITH unheld AS (
+        SELECT ss.security_scope_id
+        FROM security_scope ss
+        WHERE ss.security_scope_id = ANY(${securityScopeIds}::uuid[])
+          AND NOT EXISTS (
+            SELECT 1
+            FROM team_security_scope tss
+            WHERE tss.security_scope_id = ss.security_scope_id
+          )
+        ORDER BY ss.security_scope_id
+        FOR NO KEY UPDATE OF ss
+      )
+      UPDATE security_scope ss
+      SET feature_ids = NULL
+      FROM unheld
+      WHERE ss.security_scope_id = unheld.security_scope_id;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Filter a list of scope IDs to those with no remaining active approved ALLOW
    * statement references.
    *
