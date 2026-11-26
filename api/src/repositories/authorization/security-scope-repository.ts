@@ -779,6 +779,42 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
+   * Lock the row of each of the given security scopes that no team holds (a scope with no
+   * `team_security_scope` row) for a write to its feature bitmap, until the transaction ends.
+   *
+   * Taken as its own statement before {@link updateUnheldSecurityScopeFeatureIdsToNull}, so that
+   * statement starts after any in-flight writer of these rows has committed and sees its data: a
+   * bitmap build, or another request giving the same scope to a team. A scope a team already holds
+   * is not locked.
+   *
+   * Rows are locked in `security_scope_id` order within one call. A caller that locks for several
+   * policies in one transaction takes locks across calls in the order it makes them, so it can
+   * still deadlock with another writer of the same rows; PostgreSQL then aborts one of the two.
+   *
+   * @param {string[]} securityScopeIds Security scope identifiers to check.
+   * @returns {Promise<SecurityScopeId[]>} The locked scopes: those no team held when the statement ran.
+   * @memberof SecurityScopeRepository
+   */
+  async lockUnheldSecurityScopesForFeatureIdsUpdate(securityScopeIds: string[]): Promise<SecurityScopeId[]> {
+    const sqlStatement = SQL`
+      SELECT ss.security_scope_id
+      FROM security_scope ss
+      WHERE ss.security_scope_id = ANY(${securityScopeIds}::uuid[])
+        AND NOT EXISTS (
+          SELECT 1
+          FROM team_security_scope tss
+          WHERE tss.security_scope_id = ss.security_scope_id
+        )
+      ORDER BY ss.security_scope_id
+      FOR NO KEY UPDATE OF ss;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SecurityScopeId);
+
+    return response.rows;
+  }
+
+  /**
    * Set the feature bitmap (`security_scope.feature_ids`) to NULL for each of the given security scopes
    * that no team holds: a scope with no `team_security_scope` row.
    *
@@ -787,34 +823,26 @@ export class SecurityScopeRepository extends BaseRepository {
    * bitmap grants nothing, so the scope's new holders get no access through it until the full build
    * queued with the grant has run. A scope a team already holds is left as it is.
    *
-   * Rows are locked in `security_scope_id` order before the write, as
-   * {@link lockSecurityScopesForSubmissionFeatureIdsUpdate} does, so the two cannot deadlock. The
-   * lock also makes the write wait for a build in flight and then clear what it wrote.
+   * The caller locks the rows first ({@link lockUnheldSecurityScopesForFeatureIdsUpdate}) and passes
+   * the locked scopes. Holders are checked again here, in a statement that starts after the lock is
+   * held: a scope another request gave to a team while the lock was waited for is left as it is.
    *
    * Updating no row is a normal result and does not throw: every given scope is held.
    *
-   * @param {string[]} securityScopeIds Security scope identifiers to check.
+   * @param {string[]} securityScopeIds Security scope identifiers to check, already locked.
    * @returns {Promise<void>}
    * @memberof SecurityScopeRepository
    */
   async updateUnheldSecurityScopeFeatureIdsToNull(securityScopeIds: string[]): Promise<void> {
     const sqlStatement = SQL`
-      WITH unheld AS (
-        SELECT ss.security_scope_id
-        FROM security_scope ss
-        WHERE ss.security_scope_id = ANY(${securityScopeIds}::uuid[])
-          AND NOT EXISTS (
-            SELECT 1
-            FROM team_security_scope tss
-            WHERE tss.security_scope_id = ss.security_scope_id
-          )
-        ORDER BY ss.security_scope_id
-        FOR NO KEY UPDATE OF ss
-      )
       UPDATE security_scope ss
       SET feature_ids = NULL
-      FROM unheld
-      WHERE ss.security_scope_id = unheld.security_scope_id;
+      WHERE ss.security_scope_id = ANY(${securityScopeIds}::uuid[])
+        AND NOT EXISTS (
+          SELECT 1
+          FROM team_security_scope tss
+          WHERE tss.security_scope_id = ss.security_scope_id
+        );
     `;
 
     await this.connection.sql(sqlStatement);

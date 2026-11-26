@@ -149,9 +149,16 @@ export class SecurityScopeService extends DBService {
 
     // A scope no team holds has had no bitmap refresh while it was unheld. Clear its bitmap before the
     // caller grants it, so it grants nothing until the build queued below has run.
-    await this.securityScopeRepository.updateUnheldSecurityScopeFeatureIdsToNull(
+    // The lock and the clear are two statements: the clear re-checks for holders after the lock is held.
+    const unheldScopes = await this.securityScopeRepository.lockUnheldSecurityScopesForFeatureIdsUpdate(
       statements.map((statement) => statement.security_scope_id)
     );
+
+    if (unheldScopes.length > 0) {
+      await this.securityScopeRepository.updateUnheldSecurityScopeFeatureIdsToNull(
+        unheldScopes.map((scope) => scope.security_scope_id)
+      );
+    }
 
     for (const statement of statements) {
       await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
