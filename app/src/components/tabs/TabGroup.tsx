@@ -1,5 +1,5 @@
 import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
+import Tabs, { TabsProps } from '@mui/material/Tabs';
 import { SxProps, Theme } from '@mui/material/styles';
 
 export interface ITabGroupItem<T extends string = string> {
@@ -15,6 +15,8 @@ interface ITabGroupProps<T extends string = string> {
   tabs: ITabGroupItem<T>[];
   onChange: (value: T) => void;
   ariaLabel: string;
+  /** Tabs layout; `scrollable` lets tabs that do not fit scroll horizontally. Defaults to `standard`. */
+  variant?: TabsProps['variant'];
   sx?: SxProps<Theme>;
 }
 
@@ -25,10 +27,15 @@ interface ITabGroupProps<T extends string = string> {
  * @return {*}
  */
 export const TabGroup = <T extends string>(props: ITabGroupProps<T>) => {
-  const { value, tabs, onChange, ariaLabel, sx } = props;
+  const { value, tabs, onChange, ariaLabel, variant, sx } = props;
 
   return (
-    <Tabs value={value} onChange={(_, nextValue: T) => onChange(nextValue)} aria-label={ariaLabel} sx={sx}>
+    <Tabs
+      value={value}
+      onChange={(_, nextValue: T) => onChange(nextValue)}
+      aria-label={ariaLabel}
+      variant={variant}
+      sx={sx}>
       {tabs.map((tab) => (
         <Tab
           key={tab.value}
