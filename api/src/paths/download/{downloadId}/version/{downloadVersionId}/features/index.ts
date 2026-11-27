@@ -84,7 +84,7 @@ export function listDownloadVersionFeatures(): RequestHandler {
       await connection.rollback();
       throw error;
     } finally {
-      connection.release();
+      await connection.release();
     }
   };
 }
