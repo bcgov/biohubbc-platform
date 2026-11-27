@@ -58,22 +58,24 @@ describe('process-download-job', () => {
   });
 
   /**
-   * Stubs the step that stores the version's feature set and the repository read of the feature
-   * types present in it. Defaults to an empty set. The service method that unions those types
-   * with the statements' types runs for real, and is spied on.
+   * The bitmap the stubbed repository returns for a feature type in the stored set.
+   */
+  const featureIdsOf = (featureTypeName: string) => Buffer.from(`${featureTypeName}-bitmap`);
+
+  /**
+   * Stubs the step that stores the version's feature set and the repository read that splits it
+   * by feature type. Defaults to an empty set. The service method that unions those types with
+   * the statements' types runs for real, and is spied on.
    */
   const stubFeatureSet = (featureCount = 0, storedFeatureTypeNames: string[] = []) => {
     const storeStub = sinon
       .stub(DownloadPipelineService.prototype, 'storeDownloadVersionFeatureSet')
       .resolves(featureCount);
-    sinon
-      .stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureTypeNames')
-      .resolves(storedFeatureTypeNames.map((name) => ({ name })));
-    const listFileFeatureTypeNamesSpy = sinon.spy(
-      DownloadPipelineService.prototype,
-      'listDownloadVersionFileFeatureTypeNames'
-    );
-    return { storeStub, listFileFeatureTypeNamesSpy };
+    const listFeatureIdsByTypeStub = sinon
+      .stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureIdsByType')
+      .resolves(storedFeatureTypeNames.map((name) => ({ name, feature_ids: featureIdsOf(name) })));
+    const listFileFeatureSetsSpy = sinon.spy(DownloadPipelineService.prototype, 'listDownloadVersionFileFeatureSets');
+    return { storeStub, listFeatureIdsByTypeStub, listFileFeatureSetsSpy };
   };
 
   describe('processDownloadJobHandler', () => {
@@ -153,7 +155,7 @@ describe('process-download-job', () => {
       sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
 
       const statements = [createMockStatement('a'), createMockStatement('b', 'expr-b'), createMockStatement('c')];
-      const { storeStub, listFileFeatureTypeNamesSpy } = stubFeatureSet(3, ['a', 'b']);
+      const { storeStub, listFileFeatureSetsSpy } = stubFeatureSet(3, ['a', 'b']);
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: ['a', 'b', 'c'],
@@ -171,9 +173,9 @@ describe('process-download-job', () => {
         statements
       });
 
-      // Step 4: The file types are asked for once, after the store, with the statements' feature types
-      expect(listFileFeatureTypeNamesSpy).to.have.been.calledOnceWithExactly(DOWNLOAD_VERSION_ID, ['a', 'b', 'c']);
-      expect(listFileFeatureTypeNamesSpy).to.have.been.calledAfter(storeStub);
+      // Step 4: The files are asked for once, after the store, with the statements' feature types
+      expect(listFileFeatureSetsSpy).to.have.been.calledOnceWithExactly(DOWNLOAD_VERSION_ID, ['a', 'b', 'c']);
+      expect(listFileFeatureSetsSpy).to.have.been.calledAfter(storeStub);
 
       // Step 5: The store ran before the first file, and no write payload carries the statement or source
       expect(storeStub).to.have.been.calledBefore(writeStub);
@@ -182,7 +184,8 @@ describe('process-download-job', () => {
         'downloadId',
         'downloadVersionId',
         'properties',
-        'featureTypeName'
+        'featureTypeName',
+        'featureIds'
       );
     });
 
@@ -206,7 +209,7 @@ describe('process-download-job', () => {
       schemaLookup.set('b', bProps);
       schemaLookup.set('c', []);
 
-      stubFeatureSet(4, ['a', 'b']);
+      const { listFeatureIdsByTypeStub } = stubFeatureSet(4, ['a', 'b']);
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
         featureTypes: ['c', 'a'],
@@ -223,6 +226,16 @@ describe('process-download-job', () => {
 
       // Step 4: The type with no statement is written with its own schema properties
       expect(writeStub.secondCall.args[0].properties).to.deep.equal(bProps);
+
+      // Step 5: The stored set is split by feature type once for the whole build, and each file is
+      // written from its own part: no write walks the whole set. The type with no feature in the
+      // set gets null ids (an empty file)
+      expect(listFeatureIdsByTypeStub).to.have.been.calledOnceWithExactly(DOWNLOAD_VERSION_ID);
+      expect(writeStub.getCalls().map((call) => call.args[0].featureIds)).to.deep.equal([
+        featureIdsOf('a'),
+        featureIdsOf('b'),
+        null
+      ]);
     });
 
     it('propagates an error from storeDownloadVersionFeatureSet without writing a file or transitioning to READY', async () => {

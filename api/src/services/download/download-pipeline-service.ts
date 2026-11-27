@@ -36,16 +36,28 @@ import { ArtifactService } from '../upload/artifact-service';
  * Payload for `DownloadPipelineService.writeFeatureTypeParquet`.
  *
  * `downloadId` keys the deterministic S3 object key; `downloadVersionId` names the
- * version whose stored feature set the file is written from, and is the temporal axis
- * the produced artifact is linked to in `download_version_artifact`, so the export
- * pipeline can rediscover the version's Parquet files without re-running the original
- * search.
+ * version the file belongs to, and is the temporal axis the produced artifact is linked
+ * to in `download_version_artifact`, so the export pipeline can rediscover the version's
+ * Parquet files without re-running the original search. `featureIds` is the feature
+ * type's part of the version's stored feature set, from
+ * `listDownloadVersionFileFeatureSets`; null writes an empty file.
  */
 export interface WriteFeatureTypeParquetPayload {
   downloadId: string;
   downloadVersionId: string;
   properties: CsvPropertyDefinition[];
   featureTypeName: string;
+  featureIds: Buffer | null;
+}
+
+/**
+ * One Parquet file a download version gets: its feature type and that type's part of the
+ * version's stored feature set (a serialized bitmap), or null when the version has no feature of
+ * the type.
+ */
+export interface DownloadVersionFileFeatureSet {
+  featureTypeName: string;
+  featureIds: Buffer | null;
 }
 
 /**
@@ -333,30 +345,39 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * List the feature types a download version gets a Parquet file for.
+   * List the Parquet files a download version gets, each with the features it holds.
    *
-   * The sorted, de-duplicated union of `featureTypeNames` (the feature types of the statements
-   * resolved on this attempt) and the feature types present in the version's stored set.
-   * Statements are re-read on every attempt, so a retry can resolve fewer of them than the
-   * attempt that stored the set; every feature in the set must still land in a file. A type with
-   * a statement and no features still gets its (empty) file.
+   * One entry per feature type, ordered by name: the de-duplicated union of `featureTypeNames`
+   * (the feature types of the statements resolved on this attempt) and the feature types present
+   * in the version's stored set. Statements are re-read on every attempt, so a retry can resolve
+   * fewer of them than the attempt that stored the set; every feature in the set must still land
+   * in a file. A type with a statement and no features still gets its (empty) file, with null
+   * `featureIds`.
+   *
+   * The stored set is split by feature type here, in one pass, so no file's write has to walk the
+   * whole set to find its own features.
    *
    * @param {string} downloadVersionId - The download version whose stored feature set is read.
    * @param {string[]} featureTypeNames - The feature types of the resolved statements.
-   * @return {Promise<string[]>} Feature type names, each once, ordered by name.
+   * @return {Promise<DownloadVersionFileFeatureSet[]>} One entry per feature type, ordered by name.
    * @memberof DownloadPipelineService
    */
-  async listDownloadVersionFileFeatureTypeNames(
+  async listDownloadVersionFileFeatureSets(
     downloadVersionId: string,
     featureTypeNames: string[]
-  ): Promise<string[]> {
-    const storedFeatureTypes = await this.downloadVersionRepository.listDownloadVersionFeatureTypeNames(
+  ): Promise<DownloadVersionFileFeatureSet[]> {
+    const storedFeatureTypeSets = await this.downloadVersionRepository.listDownloadVersionFeatureIdsByType(
       downloadVersionId
     );
 
-    return Array.from(new Set([...featureTypeNames, ...storedFeatureTypes.map((row) => row.name)])).sort((a, b) =>
-      a.localeCompare(b)
-    );
+    const featureIdsByFeatureTypeName = new Map(storedFeatureTypeSets.map((row) => [row.name, row.feature_ids]));
+
+    return Array.from(new Set([...featureTypeNames, ...featureIdsByFeatureTypeName.keys()]))
+      .sort((a, b) => a.localeCompare(b))
+      .map((featureTypeName) => ({
+        featureTypeName,
+        featureIds: featureIdsByFeatureTypeName.get(featureTypeName) ?? null
+      }));
   }
 
   /**
@@ -387,22 +408,25 @@ export class DownloadPipelineService extends DBService {
    * Zero disk usage: streams through PassThrough → hash → S3 multipart upload.
    *
    * The rows come from the version's stored feature set (`download_version.feature_ids`),
-   * which `storeDownloadVersionFeatureSet` resolved once for the whole version. Nothing is
-   * evaluated here: the policy expression, the current and closure rules and the security
-   * filter for `requested_by` were all applied when the set was stored, so every file of
-   * the version is cut from the same set.
+   * which `storeDownloadVersionFeatureSet` resolved once for the whole version and
+   * `listDownloadVersionFileFeatureSets` split by feature type. Nothing is evaluated here:
+   * the policy expression, the current and closure rules and the security filter for
+   * `requested_by` were all applied when the set was stored, so every file of the version
+   * is cut from the same set.
    *
    * @param {WriteFeatureTypeParquetPayload} payload
    * @param {string} payload.downloadId - The download ID.
-   * @param {string} payload.downloadVersionId - The download's materialized version; its stored feature set
-   *   is the source of the rows, and the produced artifact is linked to it.
+   * @param {string} payload.downloadVersionId - The download's materialized version; the produced
+   *   artifact is linked to it.
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
+   * @param {(Buffer | null)} payload.featureIds - The feature type's part of the version's stored feature
+   *   set, the source of the rows; null writes an empty file.
    * @return {Promise<number>} The number of hydrated feature rows written to the Parquet file.
    * @memberof DownloadPipelineService
    */
   async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<number> {
-    const { downloadId, downloadVersionId, properties, featureTypeName } = payload;
+    const { downloadId, downloadVersionId, properties, featureTypeName, featureIds } = payload;
 
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
@@ -412,11 +436,7 @@ export class DownloadPipelineService extends DBService {
 
     // Set up the cursor BEFORE starting the S3 multipart upload. Building the cursor
     // descriptor is cheap and side-effect-free until the stream is iterated.
-    const cursor = this.downloadRepository.streamDownloadVersionFeatureBaseByType(
-      downloadId,
-      downloadVersionId,
-      featureTypeName
-    );
+    const cursor = this.downloadRepository.streamFeatureBaseByFeatureIds(downloadId, featureTypeName, featureIds);
 
     // Pipeline: Parquet writer → passThrough → hash+count transform → S3 multipart upload.
     //

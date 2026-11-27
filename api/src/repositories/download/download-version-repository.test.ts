@@ -357,26 +357,33 @@ describe('DownloadVersionRepository', () => {
     });
   });
 
-  describe('listDownloadVersionFeatureTypeNames', () => {
-    it('iterates the active version stored set for its distinct feature type names and returns the raw rows', async () => {
-      // Verifies: the query iterates the version's own bitmap (no array is built), skips an ended
-      // version, and the rows are returned as they came from the query
+  describe('listDownloadVersionFeatureIdsByType', () => {
+    it('splits the active version stored set into one bitmap per feature type and returns the raw rows', async () => {
+      // Verifies: the query iterates the version's own bitmap once (no array is built), skips an
+      // ended version, aggregates each feature type's ids back into a bitmap, and the rows are
+      // returned as they came from the query
 
-      // Step 1: Setup mock DB to return two name rows
-      const rows: { name: string }[] = [{ name: 'capture' }, { name: 'survey' }];
+      // Step 1: Setup mock DB to return two feature type rows
+      const rows = [
+        { name: 'capture', feature_ids: Buffer.from('capture-bitmap') },
+        { name: 'survey', feature_ids: Buffer.from('survey-bitmap') }
+      ];
       const sqlStub = sinon.stub().resolves(mockQueryResult(rows, 2));
       const repo = new DownloadVersionRepository(getMockDBConnection({ sql: sqlStub }));
 
       // Step 2: Call the list method
-      const result = await repo.listDownloadVersionFeatureTypeNames(VERSION_ID);
+      const result = await repo.listDownloadVersionFeatureIdsByType(VERSION_ID);
 
       // Step 3: Verify the raw rows, the SQL shape and the bound version id
       expect(result).to.equal(rows);
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('SELECT DISTINCT');
+      expect(sqlText).to.include(
+        'rb_runoptimize(rb_build_agg(version_feature.submission_feature_id))::bytea AS feature_ids'
+      );
       expect(sqlText).to.include('FROM rb_iterate((');
       expect(sqlText).to.not.include('rb_to_array');
       expect(sqlText).to.include('AND dv.record_end_date IS NULL');
+      expect(sqlText).to.include('GROUP BY ft.name');
       expect(sqlText).to.include('ORDER BY ft.name');
       expect(sqlStub.firstCall.args[0].values).to.deep.equal([VERSION_ID]);
     });

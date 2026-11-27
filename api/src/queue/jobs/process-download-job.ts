@@ -119,39 +119,42 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       // version has none: a mid-job retry (or a second worker on the same version) stores nothing
       // and reads back the set of the first attempt, so `featureCount` is the same on every attempt.
       //
-      // The feature types that get a file are read in the same transaction: the statements'
-      // feature types plus every feature type present in the stored set. Statements are re-read on
-      // each attempt, so a retry can resolve fewer of them than the attempt that stored the set,
-      // and every feature in the set must still land in a file. A type with a statement and no
-      // features gets its empty file.
-      const { featureCount, featureTypeNames } = await withConnection(async (connection) => {
+      // The files the version gets are read in the same transaction: one per feature type, for the
+      // statements' feature types plus every feature type present in the stored set, each with its
+      // own part of the set. The set is split by feature type once, here, so no file's write walks
+      // the whole set; the parts are compressed bitmaps, together about the size of the stored set.
+      // Statements are re-read on each attempt, so a retry can resolve fewer of them than the
+      // attempt that stored the set, and every feature in the set must still land in a file. A type
+      // with a statement and no features gets its empty file.
+      const { featureCount, fileFeatureSets } = await withConnection(async (connection) => {
         const pipelineService = new DownloadPipelineService(connection);
         const featureCount = await pipelineService.storeDownloadVersionFeatureSet({
           downloadVersionId,
           source,
           statements
         });
-        const featureTypeNames = await pipelineService.listDownloadVersionFileFeatureTypeNames(
+        const fileFeatureSets = await pipelineService.listDownloadVersionFileFeatureSets(
           downloadVersionId,
           featureTypes
         );
 
-        return { featureCount, featureTypeNames };
+        return { featureCount, fileFeatureSets };
       });
 
-      // Write one Parquet file per feature type, each from the stored set. Each write runs in its
-      // own transaction so completed types survive retries — S3 overwrites are idempotent, and the
-      // artifact + download_artifact inserts use ON CONFLICT DO NOTHING. A mid-job retry re-runs
-      // the whole loop and rewrites every file at the same key from the same stored set, so the
-      // re-writes converge to the same state.
-      for (const featureTypeName of featureTypeNames) {
+      // Write one Parquet file per feature type, each from its part of the stored set. Each write
+      // runs in its own transaction so completed types survive retries — S3 overwrites are
+      // idempotent, and the artifact + download_artifact inserts use ON CONFLICT DO NOTHING. A
+      // mid-job retry re-runs the whole loop and rewrites every file at the same key from the same
+      // stored set, so the re-writes converge to the same state.
+      for (const { featureTypeName, featureIds } of fileFeatureSets) {
         await withConnection(async (connection) => {
           const properties = schemaLookup.get(featureTypeName) ?? [];
           await new DownloadPipelineService(connection).writeFeatureTypeParquet({
             downloadId,
             downloadVersionId,
             properties,
-            featureTypeName
+            featureTypeName,
+            featureIds
           });
         });
       }

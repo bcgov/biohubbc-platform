@@ -7,6 +7,7 @@ import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import {
   DownloadVersionFeature,
+  DownloadVersionFeatureTypeSet,
   DownloadVersionRecord,
   DownloadVersionStatusRecord
 } from '../../models/download-version';
@@ -176,20 +177,25 @@ export class DownloadVersionRepository extends BaseRepository {
   }
 
   /**
-   * List the feature types of the features in a download version's stored feature set.
+   * Split a download version's stored feature set by feature type.
    *
    * The set is read once, iterated with the set-returning `rb_iterate` (never built as one
-   * `integer[]` value) and joined to `submission_feature` by primary key, as the per-type cursor
-   * does. A version with no stored set, or an empty one, has no feature types.
+   * `integer[]` value) and joined to `submission_feature` by primary key; the ids of each feature
+   * type are aggregated back into a bitmap of their own. This is the one pass over the set that
+   * tells the build which feature each file holds: every Parquet file is then written from its
+   * own row, so the build's read cost follows the size of the set, not the size of the set times
+   * the number of feature types. A version with no stored set, or an empty one, has no rows.
    *
    * @param {string} downloadVersionId - The download version ID.
-   * @return {Promise<{ name: string }[]>} One row per distinct feature type name, ordered by name.
+   * @return {Promise<DownloadVersionFeatureTypeSet[]>} One row per feature type present in the
+   *   set, ordered by name, each with the serialized bitmap of that type's feature ids.
    * @memberof DownloadVersionRepository
    */
-  async listDownloadVersionFeatureTypeNames(downloadVersionId: string): Promise<{ name: string }[]> {
+  async listDownloadVersionFeatureIdsByType(downloadVersionId: string): Promise<DownloadVersionFeatureTypeSet[]> {
     const sql = SQL`
-      SELECT DISTINCT
-        ft.name
+      SELECT
+        ft.name,
+        rb_runoptimize(rb_build_agg(version_feature.submission_feature_id))::bytea AS feature_ids
       FROM rb_iterate((
         SELECT dv.feature_ids
         FROM download_version dv
@@ -198,10 +204,11 @@ export class DownloadVersionRepository extends BaseRepository {
       )) AS version_feature(submission_feature_id)
       INNER JOIN submission_feature sf ON sf.submission_feature_id = version_feature.submission_feature_id
       INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      GROUP BY ft.name
       ORDER BY ft.name;
     `;
 
-    const response = await this.connection.sql(sql, z.object({ name: z.string() }));
+    const response = await this.connection.sql(sql, DownloadVersionFeatureTypeSet);
 
     return response.rows;
   }

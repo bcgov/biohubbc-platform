@@ -4,7 +4,7 @@
 //
 // Tests the stored-feature-set cursor + hydration helper that powers
 // `DownloadPipelineService.writeFeatureTypeParquet`:
-//   streamDownloadVersionFeatureBaseByType  →  fetchTypedPropertyRows
+//   streamFeatureBaseByFeatureIds  →  fetchTypedPropertyRows
 //
 // Also covers: status transitions and the writeFeatureTypeParquet artifact contract
 // (one artifact + one download_version_artifact row per feature type, idempotent on retry).
@@ -458,9 +458,26 @@ describe('Download Parquet pipeline (integration)', function () {
     await downloadVersionRepo.updateDownloadVersionFeatureIds(downloadVersionId, featureIdsSql, [submissionId]);
 
     return hydrateFromStream(
-      downloadRepo.streamDownloadVersionFeatureBaseByType(cursorScopeId, downloadVersionId, featureTypeName, 100),
+      downloadRepo.streamFeatureBaseByFeatureIds(
+        cursorScopeId,
+        featureTypeName,
+        await featureIdsOfType(downloadVersionId, featureTypeName),
+        100
+      ),
       properties
     );
+  }
+
+  /**
+   * Helper: the part of a download version's stored feature set that holds one feature type, as
+   * the job reads it before writing that type's file. Null when the version has no such feature.
+   */
+  async function featureIdsOfType(downloadVersionId: string, featureTypeName: string): Promise<Buffer | null> {
+    const fileFeatureSets = await pipelineService.listDownloadVersionFileFeatureSets(downloadVersionId, [
+      featureTypeName
+    ]);
+
+    return fileFeatureSets.find((set) => set.featureTypeName === featureTypeName)?.featureIds ?? null;
   }
 
   /**
@@ -1020,7 +1037,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         downloadVersionId,
         properties: emptyProperties,
-        featureTypeName: 'survey'
+        featureTypeName: 'survey',
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
 
       const artifactRows = await connection.sql(SQL`
@@ -1081,7 +1099,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         downloadVersionId,
         properties: emptyProperties,
-        featureTypeName: 'survey'
+        featureTypeName: 'survey',
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
 
       const afterFirst = await connection.sql(SQL`
@@ -1101,7 +1120,8 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         downloadVersionId,
         properties: emptyProperties,
-        featureTypeName: 'survey'
+        featureTypeName: 'survey',
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
 
       const afterSecond = await connection.sql(SQL`
@@ -1138,13 +1158,15 @@ describe('Download Parquet pipeline (integration)', function () {
         downloadId,
         downloadVersionId,
         properties: emptyProperties,
-        featureTypeName: 'survey'
+        featureTypeName: 'survey',
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         downloadVersionId,
         properties: emptyProperties,
-        featureTypeName: 'capture'
+        featureTypeName: 'capture',
+        featureIds: await featureIdsOfType(downloadVersionId, 'capture')
       });
 
       const artifactRows = await connection.sql(SQL`

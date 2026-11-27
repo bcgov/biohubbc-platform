@@ -439,12 +439,13 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('streamDownloadVersionFeatureBaseByType', () => {
+  describe('streamFeatureBaseByFeatureIds', () => {
     const DOWNLOAD_ID = 'dddd0000-0000-0000-0000-000000000001';
-    const DOWNLOAD_VERSION_ID = 'eeee0000-0000-0000-0000-000000000002';
+    const FEATURE_IDS = Buffer.from('feature-type-bitmap');
 
-    it('declares a cursor over the version stored feature set, bound to the version and feature type', async () => {
-      // Verifies: the cursor reads the version's bitmap (not the download id) and filters by feature type
+    it('declares a cursor over the given feature-id bitmap alone, with no feature type or version predicate', async () => {
+      // Verifies: the cursor iterates the feature type's own part of the set, so it never walks the
+      // version's whole set to filter it by type
 
       // Step 1: Setup the DECLARE, one FETCH with data, an empty FETCH and the CLOSE
       const queryStub = sinon.stub();
@@ -466,28 +467,22 @@ describe('DownloadRepository', () => {
 
       // Step 3: Consume the stream
       const batches: BaseFeatureRow[][] = [];
-      for await (const batch of repo.streamDownloadVersionFeatureBaseByType(
-        DOWNLOAD_ID,
-        DOWNLOAD_VERSION_ID,
-        'observation',
-        50
-      )) {
+      for await (const batch of repo.streamFeatureBaseByFeatureIds(DOWNLOAD_ID, 'observation', FEATURE_IDS, 50)) {
         batches.push(batch);
       }
 
-      // Step 4: The cursor iterates the active version's stored set (no array is built) and joins
-      // submission_feature by primary key
+      // Step 4: The cursor iterates the bound bitmap (no array is built) and joins submission_feature
+      // by primary key; it reads no version row and filters by no feature type
       const [declareSql, declareBindings] = queryStub.getCall(0).args;
       expect(declareSql).to.include('DECLARE dl_pq_version_cursor_dddd0000_0000_0000_0000_000000000001_observation');
-      expect(declareSql).to.include('FROM rb_iterate((');
+      expect(declareSql).to.include('FROM rb_iterate($1::bytea::roaringbitmap)');
       expect(declareSql).to.not.include('rb_to_array');
-      expect(declareSql).to.include('WHERE dv.download_version_id = $1');
-      expect(declareSql).to.include('AND dv.record_end_date IS NULL');
+      expect(declareSql).to.not.include('download_version');
+      expect(declareSql).to.not.include('ft.name =');
       expect(declareSql).to.include('sf.submission_feature_id = version_feature.submission_feature_id');
-      expect(declareSql).to.include('WHERE ft.name = $2');
 
-      // Step 5: Bindings are the version id (not the download id) then the feature type
-      expect(declareBindings).to.deep.equal([DOWNLOAD_VERSION_ID, 'observation']);
+      // Step 5: The only binding is the feature type's bitmap
+      expect(declareBindings).to.deep.equal([FEATURE_IDS]);
 
       // Step 6: The batch size drives FETCH, and the cursor is closed
       expect(queryStub.getCall(1).args[0]).to.include('FETCH 50 FROM');
@@ -511,7 +506,7 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       // Step 2: Pull the first batch and capture the error
-      const stream = repo.streamDownloadVersionFeatureBaseByType(DOWNLOAD_ID, DOWNLOAD_VERSION_ID, 'observation');
+      const stream = repo.streamFeatureBaseByFeatureIds(DOWNLOAD_ID, 'observation', FEATURE_IDS);
       try {
         await stream.next();
         expect.fail('Expected error');

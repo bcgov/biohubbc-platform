@@ -202,13 +202,18 @@ describe('Ingest → Download → Export (system integration)', function () {
     const { schemaLookup, statements } = await pipelineService.resolveParquetSchema(source);
     // Store the version's feature set first, as the job does: every file is written from it.
     await pipelineService.storeDownloadVersionFeatureSet({ downloadVersionId, source, statements });
-    for (const statement of statements) {
-      const featureTypeName = statement.urn_feature_type;
+    // Split the stored set by feature type once, as the job does: each file is written from its part.
+    const fileFeatureSets = await pipelineService.listDownloadVersionFileFeatureSets(
+      downloadVersionId,
+      statements.map((statement) => statement.urn_feature_type)
+    );
+    for (const { featureTypeName, featureIds } of fileFeatureSets) {
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         downloadVersionId,
         properties: schemaLookup.get(featureTypeName) ?? [],
-        featureTypeName
+        featureTypeName,
+        featureIds
       });
     }
     await pipelineService.transitionDownloadVersionStatus(downloadVersionId, DownloadStatusEnum.READY, [

@@ -44,3 +44,15 @@ export const DownloadVersionFeature = z.object({
   feature_type_name: z.string()
 });
 export type DownloadVersionFeature = z.infer<typeof DownloadVersionFeature>;
+
+/**
+ * The features of one feature type in a download version's stored feature set: the feature type's
+ * name and the serialized bitmap of its `submission_feature_id` values (`roaringbitmap` cast to
+ * `bytea`). The download build reads one row per feature type, then writes each Parquet file from
+ * its own row.
+ */
+export const DownloadVersionFeatureTypeSet = z.object({
+  name: z.string(),
+  feature_ids: z.instanceof(Buffer)
+});
+export type DownloadVersionFeatureTypeSet = z.infer<typeof DownloadVersionFeatureTypeSet>;

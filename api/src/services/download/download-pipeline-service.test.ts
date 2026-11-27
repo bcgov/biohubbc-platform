@@ -266,6 +266,7 @@ describe('DownloadPipelineService', () => {
   // Shared test data for Parquet tests
   const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
   const TEST_DOWNLOAD_VERSION_ID = 'dddd0000-0000-0000-0000-000000000001';
+  const TEST_FEATURE_IDS = Buffer.from('feature-type-bitmap');
   const TEST_POLICY_ID = '11111111-1111-1111-1111-111111111111';
   const TEST_SOURCE: DownloadSource = { policy_id: TEST_POLICY_ID, requested_by: 7 };
 
@@ -664,36 +665,44 @@ describe('DownloadPipelineService', () => {
     });
   });
 
-  describe('listDownloadVersionFileFeatureTypeNames', () => {
-    it('returns the sorted union of the given feature types and the stored set types, each once', async () => {
-      // Verifies: a type only in the stored set is added, a type in both appears once, and the
-      // result is ordered by name whatever order the inputs came in
+  describe('listDownloadVersionFileFeatureSets', () => {
+    it('returns one entry per feature type of the given types and the stored set, sorted, each with its ids', async () => {
+      // Verifies: a type only in the stored set is added, a type in both appears once with its
+      // bitmap, a type with a statement and no stored feature gets null ids, and the result is
+      // ordered by name whatever order the inputs came in
 
       // Step 1: The stored set holds 'survey' and 'capture' features
       const service = new DownloadPipelineService(getMockDBConnection());
-      const listStub = sinon
-        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureTypeNames')
-        .resolves([{ name: 'capture' }, { name: 'survey' }]);
+      const captureIds = Buffer.from('capture-bitmap');
+      const surveyIds = Buffer.from('survey-bitmap');
+      const listStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureIdsByType').resolves([
+        { name: 'survey', feature_ids: surveyIds },
+        { name: 'capture', feature_ids: captureIds }
+      ]);
 
       // Step 2: The resolved statements cover 'survey' and 'observation'
-      const result = await service.listDownloadVersionFileFeatureTypeNames(TEST_DOWNLOAD_VERSION_ID, [
+      const result = await service.listDownloadVersionFileFeatureSets(TEST_DOWNLOAD_VERSION_ID, [
         'survey',
         'observation'
       ]);
 
-      // Step 3: The stored set is read for the version, and the union is sorted and de-duplicated
+      // Step 3: The stored set is read once for the version, and the union is sorted and de-duplicated
       expect(listStub).to.have.been.calledOnceWithExactly(TEST_DOWNLOAD_VERSION_ID);
-      expect(result).to.deep.equal(['capture', 'observation', 'survey']);
+      expect(result).to.deep.equal([
+        { featureTypeName: 'capture', featureIds: captureIds },
+        { featureTypeName: 'observation', featureIds: null },
+        { featureTypeName: 'survey', featureIds: surveyIds }
+      ]);
     });
 
     it('keeps a feature type that has a statement but no feature in the stored set', async () => {
       // Verifies: an empty stored set does not drop the statements' types (they get an empty file)
       const service = new DownloadPipelineService(getMockDBConnection());
-      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureTypeNames').resolves([]);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureIdsByType').resolves([]);
 
-      const result = await service.listDownloadVersionFileFeatureTypeNames(TEST_DOWNLOAD_VERSION_ID, ['survey']);
+      const result = await service.listDownloadVersionFileFeatureSets(TEST_DOWNLOAD_VERSION_ID, ['survey']);
 
-      expect(result).to.deep.equal(['survey']);
+      expect(result).to.deep.equal([{ featureTypeName: 'survey', featureIds: null }]);
     });
   });
 
@@ -801,14 +810,15 @@ describe('DownloadPipelineService', () => {
       return { mockWriter, openStreamStub, uploadStub, insertArtifactStub, linkStub };
     };
 
-    it('opens the cursor on the version stored feature set for the feature type, without evaluating the policy', async () => {
-      // Verifies: the rows come from the version's stored set; the writer builds no feature-id subquery
+    it('opens the cursor on the feature type part of the stored feature set, without evaluating the policy', async () => {
+      // Verifies: the rows come from the ids the caller passes for this feature type; the writer builds no
+      // feature-id subquery
 
       // Step 1: Stub the pipeline, the cursor and the subquery builders
       const service = new DownloadPipelineService(getMockDBConnection());
       stubParquetPipeline();
       const streamStub = sinon
-        .stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType')
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds')
         .returns(mockBaseCursor([]));
       const readTreeStub = sinon.stub(ExpressionTreeService.prototype, 'readExpressionTree');
       const buildExprSubqueryStub = sinon.stub(expressionEvaluation, 'buildExpressionTreeFeatureIdsSubquery');
@@ -819,11 +829,12 @@ describe('DownloadPipelineService', () => {
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
-      // Step 3: The cursor is keyed by the download (cursor name), the version (set) and the type
-      expect(streamStub).to.have.been.calledOnceWithExactly(TEST_DOWNLOAD_ID, TEST_DOWNLOAD_VERSION_ID, 'observation');
+      // Step 3: The cursor is named by the download and the type, and reads the type's ids
+      expect(streamStub).to.have.been.calledOnceWithExactly(TEST_DOWNLOAD_ID, 'observation', TEST_FEATURE_IDS);
 
       // Step 4: Nothing was evaluated
       expect(readTreeStub).to.not.have.been.called;
@@ -845,9 +856,7 @@ describe('DownloadPipelineService', () => {
           parent_uuid: null
         }
       ];
-      sinon
-        .stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType')
-        .returns(mockBaseCursor([baseBatch]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([baseBatch]));
       sinon
         .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
         .resolves([{ submission_feature_id: 1, name: 'species', value: 'moose' }]);
@@ -856,7 +865,8 @@ describe('DownloadPipelineService', () => {
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(mockWriter.appendRow).to.have.been.calledOnce;
@@ -872,13 +882,14 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType').returns(mockBaseCursor([]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockSpatialProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(mockWriter.setMetadata).to.have.been.calledTwice;
@@ -892,13 +903,14 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType').returns(mockBaseCursor([]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(mockWriter.setMetadata).to.have.been.calledOnce;
@@ -911,13 +923,14 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType').returns(mockBaseCursor([]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(insertArtifactStub).to.have.been.calledOnce;
@@ -954,7 +967,7 @@ describe('DownloadPipelineService', () => {
         .rejects(new Error('S3 upload aborted by caller'));
 
       sinon
-        .stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType')
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds')
         .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
       const hydrateError = new Error('hydration blew up');
       sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch').rejects(hydrateError);
@@ -965,7 +978,8 @@ describe('DownloadPipelineService', () => {
           downloadId: TEST_DOWNLOAD_ID,
           downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           properties: mockProperties,
-          featureTypeName: 'observation'
+          featureTypeName: 'observation',
+          featureIds: TEST_FEATURE_IDS
         });
       } catch (e) {
         caught = e;
@@ -1000,7 +1014,7 @@ describe('DownloadPipelineService', () => {
         .returns(new Promise<void>(() => undefined));
 
       sinon
-        .stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType')
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds')
         .returns(mockBaseCursor([[{ submission_feature_id: 1 }]]));
       const hydrateError = new Error('hydration blew up');
       sinon.stub(DownloadPipelineService.prototype, 'hydrateFeatureBatch').rejects(hydrateError);
@@ -1015,7 +1029,8 @@ describe('DownloadPipelineService', () => {
           downloadId: TEST_DOWNLOAD_ID,
           downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           properties: mockProperties,
-          featureTypeName: 'observation'
+          featureTypeName: 'observation',
+          featureIds: TEST_FEATURE_IDS
         });
       } catch (e) {
         caught = e;
@@ -1043,7 +1058,7 @@ describe('DownloadPipelineService', () => {
         .stub(ObjectStorageService.prototype, 'uploadStream')
         .rejects(new Error('S3 upload aborted by caller'));
 
-      sinon.stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType').returns(mockBaseCursor([]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([]));
 
       let caught: unknown;
       try {
@@ -1051,7 +1066,8 @@ describe('DownloadPipelineService', () => {
           downloadId: TEST_DOWNLOAD_ID,
           downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
           properties: mockProperties,
-          featureTypeName: 'observation'
+          featureTypeName: 'observation',
+          featureIds: TEST_FEATURE_IDS
         });
       } catch (e) {
         caught = e;
@@ -1070,13 +1086,14 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { insertArtifactStub, linkStub } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType').returns(mockBaseCursor([]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([]));
 
       await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(insertArtifactStub).to.have.been.calledOnce;
@@ -1107,7 +1124,7 @@ describe('DownloadPipelineService', () => {
       const { mockWriter } = stubParquetPipeline();
 
       sinon
-        .stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType')
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds')
         .returns(
           mockBaseCursor([[{ submission_feature_id: 1 }, { submission_feature_id: 2 }], [{ submission_feature_id: 3 }]])
         );
@@ -1120,7 +1137,8 @@ describe('DownloadPipelineService', () => {
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(result).to.equal(3);
@@ -1136,7 +1154,7 @@ describe('DownloadPipelineService', () => {
 
       // Base batch has 3 rows...
       sinon
-        .stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType')
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds')
         .returns(
           mockBaseCursor([[{ submission_feature_id: 1 }, { submission_feature_id: 2 }, { submission_feature_id: 3 }]])
         );
@@ -1149,7 +1167,8 @@ describe('DownloadPipelineService', () => {
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(result).to.equal(2);
@@ -1163,13 +1182,14 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(mockDBConnection);
       const { mockWriter } = stubParquetPipeline();
 
-      sinon.stub(DownloadRepository.prototype, 'streamDownloadVersionFeatureBaseByType').returns(mockBaseCursor([]));
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByFeatureIds').returns(mockBaseCursor([]));
 
       const result = await service.writeFeatureTypeParquet({
         downloadId: TEST_DOWNLOAD_ID,
         downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
         properties: mockProperties,
-        featureTypeName: 'observation'
+        featureTypeName: 'observation',
+        featureIds: TEST_FEATURE_IDS
       });
 
       expect(result).to.equal(0);

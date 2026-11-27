@@ -469,6 +469,11 @@ describe('Download version feature set (integration)', function () {
       sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
       const featureIdsByType = new Map<string, number[]>();
+      // Split the stored set by feature type once, as the job does: each file is written from its part.
+      const fileFeatureSets = await pipelineService.listDownloadVersionFileFeatureSets(
+        fixture.downloadVersionId,
+        fixture.statements.map((statement) => statement.urn_feature_type)
+      );
       for (const statement of fixture.statements) {
         currentRows = [];
         const featureTypeName = statement.urn_feature_type;
@@ -476,7 +481,8 @@ describe('Download version feature set (integration)', function () {
           downloadId: fixture.downloadId,
           downloadVersionId: fixture.downloadVersionId,
           properties: fixture.schemaLookup.get(featureTypeName) ?? [],
-          featureTypeName
+          featureTypeName,
+          featureIds: fileFeatureSets.find((set) => set.featureTypeName === featureTypeName)?.featureIds ?? null
         });
 
         const uuids = currentRows.map((row) => String(row.uuid));
