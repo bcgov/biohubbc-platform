@@ -69,10 +69,10 @@ biohub-platform-db-setup:
 
     # Database
     database:
-      host: "biohub-platform-db-prod-primary"
-      adminSecretName: "biohub-platform-db-prod-pguser-postgres"
-      appSecretName: "biohub-platform-db-prod-pguser-biohub-api"
-      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+      host: "biohub-platform-db-prod-pg18-primary"
+      adminSecretName: "biohub-platform-db-prod-pg18-pguser-postgres"
+      appSecretName: "biohub-platform-db-prod-pg18-pguser-biohub-api"
+      dbNameSecretName: "biohub-platform-db-prod-pg18-pguser-biohub-platform-db-prod-pg18"
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -102,10 +102,10 @@ biohub-platform-api:
 
     # Database
     database:
-      host: "biohub-platform-db-prod-primary"
-      adminSecretName: "biohub-platform-db-prod-pguser-postgres"
-      appSecretName: "biohub-platform-db-prod-pguser-biohub-api"
-      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+      host: "biohub-platform-db-prod-pg18-primary"
+      adminSecretName: "biohub-platform-db-prod-pg18-pguser-postgres"
+      appSecretName: "biohub-platform-db-prod-pg18-pguser-biohub-api"
+      dbNameSecretName: "biohub-platform-db-prod-pg18-pguser-biohub-platform-db-prod-pg18"
 
     # Object Store (S3)
     objectStore:
@@ -152,10 +152,10 @@ biohub-platform-queue:
 
     # Database
     database:
-      host: "biohub-platform-db-prod-primary"
-      adminSecretName: "biohub-platform-db-prod-pguser-postgres"
-      appSecretName: "biohub-platform-db-prod-pguser-biohub-api"
-      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+      host: "biohub-platform-db-prod-pg18-primary"
+      adminSecretName: "biohub-platform-db-prod-pg18-pguser-postgres"
+      appSecretName: "biohub-platform-db-prod-pg18-pguser-biohub-api"
+      dbNameSecretName: "biohub-platform-db-prod-pg18-pguser-biohub-platform-db-prod-pg18"
 
     # Clamav
     clamav:
@@ -203,9 +203,9 @@ biohub-platform-martin:
   app:
     database:
       useCrunchy: true
-      host: biohub-platform-db-prod-primary
-      martinSecretName: biohub-platform-db-prod-pguser-martin
-      dbNameSecretName: biohub-platform-db-prod-pguser-biohub-platform-db-prod
+      host: biohub-platform-db-prod-pg18-primary
+      martinSecretName: biohub-platform-db-prod-pg18-pguser-martin
+      dbNameSecretName: biohub-platform-db-prod-pg18-pguser-biohub-platform-db-prod-pg18
   # Openshift Resources
   replicas: 1
   resources:

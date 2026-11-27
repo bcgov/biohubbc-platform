@@ -25,7 +25,7 @@ spec:
       initContainers:
         # Wait for the old database to be reachable
         - name: wait-for-old-db
-          image: postgres:17-alpine
+          image: postgres:18-alpine
           command: ['sh', '-c']
           args:
             - |
@@ -44,7 +44,7 @@ spec:
         # Wait for the new Crunchy DB to be ready (host from postgres secret = primary)
         # Secret name uses cluster name (fullnameOverride), not Helm release name.
         - name: wait-for-new-db
-          image: postgres:17-alpine
+          image: postgres:18-alpine
           command: ['sh', '-c']
           args:
             - |
@@ -58,16 +58,16 @@ spec:
             - name: NEW_DB_HOST
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "crunchy-postgres").fullnameOverride }}-pguser-postgres
+                  name: {{ include "crunchy-postgres.fullname" . }}-pguser-postgres
                   key: host
             - name: NEW_DB_ADMIN
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "crunchy-postgres").fullnameOverride }}-pguser-postgres
+                  name: {{ include "crunchy-postgres.fullname" . }}-pguser-postgres
                   key: {{ .Values.migration.newDb.adminUserKey }}
       containers:
         - name: migrate
-          image: postgres:17-alpine
+          image: postgres:18-alpine
           command: ['sh', '-c']
           args:
             - |
@@ -78,9 +78,9 @@ spec:
               echo "Target: $NEW_DB_HOST / $NEW_DB_NAME"
 
               # biohub_api password comes from a secret you create manually (see values migration.newDb.appUserSecretName).
-              # Example: kubectl create secret generic biohub-platform-db-dev-pguser-biohub-api --from-literal=user=biohub_api --from-literal=password='YOUR_PASSWORD' -n <namespace>
+              # Example: kubectl create secret generic biohub-platform-db-dev-pg18-pguser-biohub-api --from-literal=user=biohub_api --from-literal=password='YOUR_PASSWORD' -n <namespace>
               if [ -z "$NEW_DB_APP_PASS" ]; then
-                echo "ERROR: NEW_DB_APP_PASS is not set. Create the app user secret before running migration (e.g. biohub-platform-db-dev-pguser-biohub-api with key password)."
+                echo "ERROR: NEW_DB_APP_PASS is not set. Create the app user secret before running migration (e.g. biohub-platform-db-dev-pg18-pguser-biohub-api with key password)."
                 exit 1
               fi
 
@@ -172,6 +172,20 @@ spec:
               " || true
               echo "biohub_api search_path and ACLs set."
 
+              echo "--- Re-establish default privileges for biohub_api (dump used --no-acl, which drops them) ---"
+              # Tables, functions, types and sequences that later migrations create are owned by postgres, and
+              # reach biohub_api only through these defaults; they match the grants the release migration made.
+              psql -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN -d $NEW_DB_NAME -v ON_ERROR_STOP=1 -c "
+                ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA biohub, public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO biohub_api;
+                ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA biohub, public GRANT EXECUTE ON FUNCTIONS TO biohub_api;
+                ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA biohub, public GRANT USAGE ON TYPES TO biohub_api;
+                ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA biohub, public GRANT USAGE, SELECT ON SEQUENCES TO biohub_api;
+              "
+              psql -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN -d $NEW_DB_NAME -v ON_ERROR_STOP=0 -c "
+                ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA biohub_dapi_v1 GRANT ALL ON TABLES TO biohub_api;
+              " || true
+              echo "biohub_api default privileges set."
+
               echo "--- Re-grant pgboss schema to biohub_api (pg_restore --no-owner leaves schema owned by postgres) ---"
               psql -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN -d $NEW_DB_NAME -v ON_ERROR_STOP=0 -c "
                 GRANT USAGE ON SCHEMA pgboss TO biohub_api;
@@ -252,28 +266,28 @@ spec:
             - name: NEW_DB_HOST
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "crunchy-postgres").fullnameOverride }}-pguser-postgres
+                  name: {{ include "crunchy-postgres.fullname" . }}-pguser-postgres
                   key: host
             - name: NEW_DB_ADMIN
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "crunchy-postgres").fullnameOverride }}-pguser-postgres
+                  name: {{ include "crunchy-postgres.fullname" . }}-pguser-postgres
                   key: {{ .Values.migration.newDb.adminUserKey }}
             - name: NEW_DB_ADMIN_PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "crunchy-postgres").fullnameOverride }}-pguser-postgres
+                  name: {{ include "crunchy-postgres.fullname" . }}-pguser-postgres
                   key: {{ .Values.migration.newDb.adminPasswordKey }}
             - name: NEW_DB_NAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "crunchy-postgres").fullnameOverride }}-pguser-{{ (index .Values "crunchy-postgres").fullnameOverride }}
+                  name: {{ include "crunchy-postgres.fullname" . }}-pguser-{{ include "crunchy-postgres.fullname" . }}
                   key: dbname
             # Password for biohub_api role; create this secret manually before running migration (valid name: no underscore, e.g. pguser-biohub-api).
             - name: NEW_DB_APP_PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ (.Values.migration.newDb.appUserSecretName | default (printf "%s-pguser-biohub-api" (index .Values "crunchy-postgres").fullnameOverride)) }}
+                  name: {{ (.Values.migration.newDb.appUserSecretName | default (printf "%s-pguser-biohub-api" (include "crunchy-postgres.fullname" .))) }}
                   key: {{ .Values.migration.newDb.appPasswordKey | default "password" }}
           resources:
             requests:
