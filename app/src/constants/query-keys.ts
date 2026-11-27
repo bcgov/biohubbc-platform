@@ -9,6 +9,7 @@ export const QUERY_KEY_ROOT = {
   BOARD: 'board',
   CODE: 'code',
   DOWNLOAD: 'download',
+  FORM: 'form',
   GALLERY: 'gallery',
   POLICY: 'policy',
   SECURITY: 'security',

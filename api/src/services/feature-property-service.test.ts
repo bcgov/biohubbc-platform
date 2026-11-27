@@ -83,4 +83,15 @@ describe('FeaturePropertyService', () => {
       });
     });
   });
+
+  describe('getActiveFeaturePropertyTypes', () => {
+    it('delegates to the repository', async () => {
+      const service = new FeaturePropertyService(getMockDBConnection());
+      const rows = [{ feature_property_id: 1, type_name: 'code' }];
+      const repoStub = sinon.stub(service.featurePropertyRepository, 'getActiveFeaturePropertyTypes').resolves(rows);
+
+      expect(await service.getActiveFeaturePropertyTypes([1])).to.eql(rows);
+      expect(repoStub).to.have.been.calledOnceWith([1]);
+    });
+  });
 });

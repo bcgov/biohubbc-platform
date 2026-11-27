@@ -8,6 +8,7 @@ import {
   CreateFeatureProperty,
   ExpressionPredicatePropertyMetadata,
   FeatureProperty,
+  FeaturePropertyWithTypeName,
   UpdateFeatureProperty
 } from '../models/feature-property';
 import { FeaturePropertyFilters } from '../services/feature-property-service.interface';
@@ -514,5 +515,25 @@ export class FeaturePropertyRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Get the type names, among the supplied feature properties, of those that are not retired.
+   *
+   * @param {number[]} featurePropertyIds - Feature property identifiers to check.
+   * @return {Promise<FeaturePropertyWithTypeName[]>} Active feature property identifiers and their type names.
+   * @memberof FeaturePropertyRepository
+   */
+  async getActiveFeaturePropertyTypes(featurePropertyIds: number[]): Promise<FeaturePropertyWithTypeName[]> {
+    const knex = getKnex();
+    const query = knex('feature_property as fp')
+      .join('feature_property_type as pt', 'pt.feature_property_type_id', 'fp.feature_property_type_id')
+      .select('fp.feature_property_id', 'pt.name as type_name')
+      .whereIn('fp.feature_property_id', featurePropertyIds)
+      .whereNull('fp.record_end_date');
+
+    const response = await this.connection.knex(query, FeaturePropertyWithTypeName);
+
+    return response.rows;
   }
 }

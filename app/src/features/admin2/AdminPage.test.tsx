@@ -33,6 +33,7 @@ describe('AdminPage', () => {
     expect(getByRole('link', { name: 'Submissions' })).toHaveAttribute('href', '/admin/submissions');
     expect(getByRole('link', { name: 'Security' })).toHaveAttribute('href', '/admin/security');
     expect(getByRole('link', { name: 'Data Requests' })).toHaveAttribute('href', '/admin/data-requests');
+    expect(getByRole('link', { name: 'Forms' })).toHaveAttribute('href', '/admin/forms');
     expect(getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration');
     expect(queryByRole('link', { name: 'Tag Rules' })).not.toBeInTheDocument();
   });

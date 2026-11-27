@@ -1,7 +1,12 @@
 import { BLUEPRINT_FEATURE_TYPE_SORT_FIELDS } from '../constants/blueprint';
 import { IDBConnection } from '../database/db';
 import { ApiConflictError, ApiValidationError } from '../errors/api-error';
-import { BlueprintCompositionFilters, CreateBlueprintFeatureTypeAssignment } from '../models/blueprint-composition';
+import {
+  BlueprintCompositionFilters,
+  BlueprintFeatureTypeKey,
+  CreateBlueprintFeatureTypeAssignment,
+  EnsureBlueprintFeatureType
+} from '../models/blueprint-composition';
 import { BlueprintFeatureTypeRepository } from '../repositories/blueprint-feature-type-repository';
 import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -98,5 +103,33 @@ export class BlueprintFeatureTypeService extends DBService {
    */
   async copyBlueprintFeatureTypes(sourceBlueprintId: number, blueprintId: number): Promise<void> {
     await this.blueprintFeatureTypeRepository.copyBlueprintFeatureTypes(sourceBlueprintId, blueprintId);
+  }
+
+  /**
+   * Ensure each feature type has an active membership in the blueprint with the given sort. The caller must hold the
+   * blueprint administration lock and have validated that the blueprint is editable.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param featureTypes Feature types and their sort order.
+   * @returns Active membership identifiers of the supplied feature types.
+   */
+  async ensureBlueprintFeatureTypes(
+    blueprintId: number,
+    featureTypes: EnsureBlueprintFeatureType[]
+  ): Promise<BlueprintFeatureTypeKey[]> {
+    return this.blueprintFeatureTypeRepository.ensureBlueprintFeatureTypes(blueprintId, featureTypes);
+  }
+
+  /**
+   * End the active memberships of an editable blueprint whose feature type is not retained. Property memberships must
+   * be ended first.
+   *
+   * @param blueprintId Owning blueprint.
+   * @param featureTypeIds Feature types to retain.
+   * @param date Database lifecycle date shared with child deletion.
+   * @returns Resolves after persistence.
+   */
+  async deleteBlueprintFeatureTypesNotIn(blueprintId: number, featureTypeIds: number[], date: string): Promise<void> {
+    await this.blueprintFeatureTypeRepository.deleteBlueprintFeatureTypesNotIn(blueprintId, featureTypeIds, date);
   }
 }

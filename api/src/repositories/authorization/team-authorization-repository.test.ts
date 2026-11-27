@@ -262,4 +262,31 @@ describe('TeamAuthorizationRepository', () => {
       expect(result).to.be.true;
     });
   });
+
+  describe('form memberships', () => {
+    it("finds an active membership in an active form's administration team by slug", async () => {
+      const knexStub = sinon.stub().resolves({ rowCount: 1, rows: [{ form_id: 1, record_end_date: null }] });
+      const repository = new TeamAuthorizationRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.findTeamMembershipByForm(9, 'caribou');
+
+      const { sql, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
+      expect(result).to.eql({ form_id: 1, record_end_date: null });
+      expect(sql).to.include('"team"."team_id" = "f"."team_id"');
+      expect(sql).to.include('"f"."record_end_date" is null');
+      expect(sql).to.include('"tm"."record_end_date" is null');
+      expect(bindings).to.include.members(['caribou', 9]);
+    });
+
+    it("finds an active membership in an active form submission's team", async () => {
+      const knexStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const repository = new TeamAuthorizationRepository(getMockDBConnection({ knex: knexStub }));
+
+      const result = await repository.findTeamMembershipByFormSubmission(9, '55555555-5555-5555-5555-555555555555');
+
+      const { sql } = knexStub.firstCall.args[0].toSQL().toNative();
+      expect(result).to.be.null;
+      expect(sql).to.include('"fs"."record_end_date" is null');
+    });
+  });
 });

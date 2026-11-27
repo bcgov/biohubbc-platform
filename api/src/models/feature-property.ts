@@ -190,3 +190,13 @@ export const ExpressionPredicatePropertyMetadata = z.object({
 });
 
 export type ExpressionPredicatePropertyMetadata = z.infer<typeof ExpressionPredicatePropertyMetadata>;
+
+/**
+ * A feature property and the name of its type.
+ */
+export const FeaturePropertyWithTypeName = z.object({
+  feature_property_id: z.number(),
+  type_name: z.string()
+});
+
+export type FeaturePropertyWithTypeName = z.infer<typeof FeaturePropertyWithTypeName>;

@@ -213,4 +213,54 @@ describe('TeamAuthorizationService', () => {
       expect(repoStub).to.have.been.calledOnceWith(null, 2, 3);
     });
   });
+
+  describe('form entities', () => {
+    it('authorizes an active member of the form administration team', async () => {
+      const repoStub = sinon
+        .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByForm')
+        .resolves({ form_id: 1, record_end_date: null });
+      const service = new TeamAuthorizationService(getMockDBConnection());
+
+      const result = await service.isUserAuthorizedForTeamEntity(9, { entity: 'form', formSlug: 'caribou' });
+
+      expect(result).to.be.true;
+      expect(repoStub).to.have.been.calledOnceWith(9, 'caribou');
+    });
+
+    it('denies a user outside the form administration team', async () => {
+      sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByForm').resolves(null);
+      const service = new TeamAuthorizationService(getMockDBConnection());
+
+      expect(await service.isUserAuthorizedForTeamEntity(9, { entity: 'form', formSlug: 'caribou' })).to.be.false;
+    });
+
+    it("authorizes an active member of the form submission's team", async () => {
+      const repoStub = sinon
+        .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByFormSubmission')
+        .resolves({ form_submission_id: 7, record_end_date: null });
+      const service = new TeamAuthorizationService(getMockDBConnection());
+
+      const result = await service.isUserAuthorizedForTeamEntity(9, {
+        entity: 'form_submission',
+        formSubmissionUuid: '55555555-5555-5555-5555-555555555555'
+      });
+
+      expect(result).to.be.true;
+      expect(repoStub).to.have.been.calledOnceWith(9, '55555555-5555-5555-5555-555555555555');
+    });
+
+    it('denies an expired form submission team membership', async () => {
+      sinon
+        .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByFormSubmission')
+        .resolves({ form_submission_id: 7, record_end_date: '2000-01-01T00:00:00.000Z' });
+      const service = new TeamAuthorizationService(getMockDBConnection());
+
+      const result = await service.isUserAuthorizedForTeamEntity(9, {
+        entity: 'form_submission',
+        formSubmissionUuid: '55555555-5555-5555-5555-555555555555'
+      });
+
+      expect(result).to.be.false;
+    });
+  });
 });

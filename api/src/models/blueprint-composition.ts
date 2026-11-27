@@ -93,3 +93,49 @@ export interface UpdateBlueprintFeaturePropertyAssignment {
 export interface BlueprintFeaturePropertyFilters extends BlueprintCompositionFilters {
   blueprintFeatureTypeId?: number;
 }
+
+/**
+ * A Blueprint feature type assignment identifier paired with its global feature type.
+ */
+export const BlueprintFeatureTypeKey = z.object({
+  blueprint_feature_type_id: z.number(),
+  feature_type_id: z.number()
+});
+
+export type BlueprintFeatureTypeKey = z.infer<typeof BlueprintFeatureTypeKey>;
+
+/**
+ * A Blueprint property assignment identifier paired with its feature type assignment and global property.
+ */
+export const BlueprintFeatureTypePropertyKey = z.object({
+  blueprint_feature_type_property_id: z.number(),
+  blueprint_feature_type_id: z.number(),
+  feature_property_id: z.number()
+});
+
+export type BlueprintFeatureTypePropertyKey = z.infer<typeof BlueprintFeatureTypePropertyKey>;
+
+/**
+ * Feature type membership to ensure within a Blueprint.
+ */
+export interface EnsureBlueprintFeatureType {
+  featureTypeId: number;
+  sort: number;
+}
+
+/**
+ * Property membership to ensure within a Blueprint feature type.
+ */
+export interface EnsureBlueprintFeatureTypeProperty {
+  blueprintFeatureTypeId: number;
+  featurePropertyId: number;
+  sort: number;
+}
+
+/**
+ * Property membership retained within a Blueprint feature type.
+ */
+export interface BlueprintFeatureTypePropertyPair {
+  blueprintFeatureTypeId: number;
+  featurePropertyId: number;
+}

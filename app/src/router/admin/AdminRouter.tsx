@@ -6,6 +6,8 @@ import { AdminConfigurationPage } from 'features/admin2/configuration/AdminConfi
 import { AdminDataRequestsPage } from 'features/admin2/data-requests/AdminDataRequestsPage';
 import { AdminDataRequestPage } from 'features/admin2/data-requests/detail/AdminDataRequestPage';
 import { AdminDataRequestFeatureTypePage } from 'features/admin2/data-requests/detail/feature-type/AdminDataRequestFeatureTypePage';
+import { AdminFormsPage } from 'features/admin2/forms/AdminFormsPage';
+import { AdminFormLayoutPage } from 'features/admin2/forms/layout/AdminFormLayoutPage';
 import { AdminSecurityPage } from 'features/admin2/security/AdminSecurityPage';
 import { AdminSecurityCategoryPage } from 'features/admin2/security/category/AdminSecurityCategoryPage';
 import { AdminUsersPage } from 'features/admin2/users/AdminUsersPage';
@@ -236,6 +238,53 @@ export const AdminRouter = () => {
       />
 
       {/* Data requests route */}
+      {/* Forms routes */}
+      <Route
+        path="forms"
+        element={
+          <BaseLayout>
+            <PageTitle title="Forms" description="Manage the forms submitters fill in" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminFormsPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="forms/create"
+        element={
+          <BaseLayout>
+            <PageTitle title="Create Form" description="Build a new form" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminFormLayoutPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+      <Route
+        path="forms/:formId/versions/:formVersionId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Form" description="Build a form version" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <AdminFormLayoutPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
       <Route
         path="data-requests"
         element={
