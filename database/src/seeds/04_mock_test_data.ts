@@ -405,9 +405,6 @@ export const insertObservationRecord = async (
   const submission_feature_id = response.rows[0].submission_feature_id;
 
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
   //   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
