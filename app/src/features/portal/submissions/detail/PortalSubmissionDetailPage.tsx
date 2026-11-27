@@ -1,20 +1,15 @@
 import { QueryErrorDialog } from 'components/dialog/QueryErrorDialog';
-import { keepPreviousDataWithin } from 'utils/query-client';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { GridRowParams, MuiEvent } from '@mui/x-data-grid';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { SECURITY_LABEL } from 'constants/security';
 import dayjs from 'dayjs';
 import { SubmissionDetailContent } from 'features/submissions/components/SubmissionDetailContent';
-import { SubmissionFeatureRow } from 'features/submissions/components/SubmissionFeatureTable.interface';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
-import { useMemo } from 'react';
-import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { getDaysSinceDate } from 'utils/Utils';
 
@@ -24,8 +19,6 @@ import { getDaysSinceDate } from 'utils/Utils';
  * @returns {JSX.Element}
  */
 export const PortalSubmissionDetailPage = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
   const { submissionId } = useParams<{ submissionId: string }>();
   const numericSubmissionId = submissionId ? Number(submissionId) : undefined;
   const api = useApi();
@@ -37,33 +30,11 @@ export const PortalSubmissionDetailPage = () => {
       : skipToken
   });
 
-  const featureGrid = useServerPaginatedGridState({ defaultSort: { field: 'submission_feature_id', sort: 'asc' } });
-  const featuresQuery = useQuery({
-    queryKey: submissionQueryKeys.features(numericSubmissionId ?? 0, featureGrid.apiPagination),
-    queryFn: ({ signal }) =>
-      api.submissions.getSubmissionFeatures(numericSubmissionId ?? 0, featureGrid.apiPagination, { signal }),
-    placeholderData: keepPreviousDataWithin(submissionQueryKeys.submission(numericSubmissionId ?? 0))
-  });
-  const featureRows = useMemo(
-    () =>
-      featuresQuery.data?.features.map((feature) => ({
-        submission_feature_id: feature.submission_feature_id,
-        feature_type_name: feature.feature_type_name
-      })) ?? [],
-    [featuresQuery.data]
-  );
-
   const submission = submissionQuery.data;
-  const hasSecuredFeatures = featuresQuery.data?.features.some((feature) => feature.secured) ?? false;
-
-  const handleRowClick = (params: GridRowParams<SubmissionFeatureRow>, _event: MuiEvent<React.MouseEvent>) => {
-    navigate(`/portal/submission/${submissionId}/feature/${params.row.submission_feature_id}${location.search}`);
-  };
 
   return (
     <>
       <QueryErrorDialog error={submissionQuery.error} label="submission" />
-      <QueryErrorDialog error={featuresQuery.error} label="submission features" />
       <SubmissionDetailContent
         isSubmissionLoading={submissionQuery.isPending}
         submission={submission}
@@ -92,15 +63,7 @@ export const PortalSubmissionDetailPage = () => {
             </Stack>
           </Stack>
         }
-        hasSecuredFeatures={hasSecuredFeatures}
-        rows={featureRows}
-        rowCount={featuresQuery.data?.pagination.total ?? 0}
-        isLoading={featuresQuery.isFetching && !featuresQuery.data}
-        onRowClick={handleRowClick}
-        paginationModel={featureGrid.paginationModel}
-        onPaginationModelChange={featureGrid.handlePaginationChange}
-        sortModel={featureGrid.sortModel}
-        onSortModelChange={featureGrid.handleSortChange}
+        basePath="/portal/submission"
       />
     </>
   );

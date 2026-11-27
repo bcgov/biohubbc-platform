@@ -82,16 +82,6 @@ const adminUploads = (submissionId: number, pagination: ApiPaginationRequestOpti
   [...adminUploadLists(submissionId), { pagination }] as const;
 
 /**
- * Key of one page of a submission's features as its submitter or the public sees them.
- *
- * @param {number} submissionId The submission.
- * @param {ApiPaginationRequestOptions} pagination The page and sort.
- * @returns The submission features key.
- */
-const features = (submissionId: number, pagination: ApiPaginationRequestOptions) =>
-  [...submission(submissionId), 'features', { pagination }] as const;
-
-/**
  * Key prefix of everything cached for one submission feature.
  *
  * @param {number} submissionId The submission.
@@ -139,7 +129,6 @@ export const submissionQueryKeys = {
   defaultBlueprint,
   adminUploadLists,
   adminUploads,
-  features,
   feature,
   featureDetail,
   featureProperties

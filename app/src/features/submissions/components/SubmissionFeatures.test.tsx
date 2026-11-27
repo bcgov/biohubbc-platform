@@ -53,16 +53,16 @@ const FeaturePage = () => {
   return <button onClick={() => navigate(-1)}>Back to submission</button>;
 };
 
-const renderFeatures = (search = '', featureTypes = ['survey', 'animal']) =>
+const renderFeatures = (search = '', featureTypes = ['survey', 'animal'], basePath = '/submission') =>
   render(
-    <MemoryRouter initialEntries={[`/submission/1${search}`]}>
+    <MemoryRouter initialEntries={[`${basePath}/1${search}`]}>
       <Location />
       <Routes>
         <Route
-          path="/submission/:submissionId"
-          element={<SubmissionFeatures submissionId={1} featureTypes={featureTypes} />}
+          path={`${basePath}/:submissionId`}
+          element={<SubmissionFeatures submissionId={1} basePath={basePath} featureTypes={featureTypes} />}
         />
-        <Route path="/submission/:submissionId/feature/:featureId" element={<FeaturePage />} />
+        <Route path={`${basePath}/:submissionId/feature/:featureId`} element={<FeaturePage />} />
       </Routes>
     </MemoryRouter>
   );
@@ -136,13 +136,13 @@ describe('SubmissionFeatures URL state', () => {
       expect.objectContaining({ cursor: 'SavedCursor' }),
       expect.objectContaining({ submissionIds: [1] })
     );
-    expect(screen.getByRole('button', { name: 'Animal' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('tab', { name: 'Animal' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('resets the page when switching types and restores selection and pagination after visiting a feature', async () => {
     renderFeatures('?feature_type=survey&cursor=SavedCursor');
     await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Animal' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Animal' }));
     await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(2));
     expect(mocks.searchFeatures).toHaveBeenLastCalledWith(
       'animal',
@@ -158,7 +158,7 @@ describe('SubmissionFeatures URL state', () => {
       '/submission/1/feature/10?feature_type=animal&cursor=NextCursor'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Back to submission' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Animal' })).toHaveAttribute('aria-pressed', 'true'));
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Animal' })).toHaveAttribute('aria-selected', 'true'));
     // The page loaded moments ago is still fresh, so it is shown from the cache rather than requested again.
     expect(mocks.searchFeatures).toHaveBeenCalledTimes(3);
     expect(mocks.searchFeatures).toHaveBeenLastCalledWith(
@@ -167,13 +167,32 @@ describe('SubmissionFeatures URL state', () => {
       expect.objectContaining({ cursor: 'NextCursor' }),
       expect.objectContaining({ submissionIds: [1] })
     );
-    expect(screen.getByRole('button', { name: 'Animal' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('tab', { name: 'Animal' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('shows a tab for each feature type in the submission, in the order given', async () => {
+    renderFeatures('?feature_type=survey');
+    await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(1));
+
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+
+    expect(tabs).toEqual(['Survey', 'Animal']);
+    expect(screen.getByRole('tab', { name: 'Survey' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens a result under the route base it is given', async () => {
+    renderFeatures('?feature_type=survey', ['survey', 'animal'], '/portal/submission');
+    await waitFor(() => expect(mocks.searchFeatures).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open feature' }));
+
+    expect(screen.getByTestId('location').textContent).toBe('/portal/submission/1/feature/10?feature_type=survey');
   });
 
   it('shows an empty feature section without querying when no feature types are available', () => {
     renderFeatures('?page=5', []);
     expect(screen.getByText('No searchable features available.')).toBeVisible();
     expect(mocks.searchFeatures).not.toHaveBeenCalled();
-    expect(screen.queryByRole('group', { name: 'Submission feature types' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'Submission feature types' })).not.toBeInTheDocument();
   });
 });
