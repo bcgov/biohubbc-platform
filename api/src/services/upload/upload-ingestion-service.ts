@@ -148,7 +148,6 @@ export class UploadIngestionService extends DBService {
       bytes,
       submissionId: submission_id,
       submissionUuid: submissionUuidFromTable,
-      systemUserIds: [submission.system_user_id],
       submitterSystemUserIds,
       comment: submission.comment,
       requestedBlueprintId,
@@ -188,7 +187,6 @@ export class UploadIngestionService extends DBService {
       bytes,
       submissionId: byUuid.submission_id,
       submissionUuid: submissionRecord.uuid,
-      systemUserIds: [authenticatedSystemUserId],
       submitterSystemUserIds,
       comment: submissionRecord.comment ?? null,
       requestedBlueprintId: blueprintId,
@@ -197,10 +195,11 @@ export class UploadIngestionService extends DBService {
   }
 
   /**
-   * Internal helper: creates a new upload session, submission_upload record, review status,
-   * artifact, upload_archive, and presigned URLs for the given submissionId.
+   * Internal helper: creates a new upload session, draft submission_upload record, artifact,
+   * upload_archive, and presigned URLs for the given submissionId. The upload's ticket is opened
+   * when the upload is completed, so an abandoned upload never creates one.
    *
-   * @param {StartSubmissionArchiveUploadInput} input - Submission identity, archive metadata, ticket users,
+   * @param {StartSubmissionArchiveUploadInput} input - Submission identity, archive metadata,
    * upload access-team members, and comment. The Blueprint resolves from the requested value,
    * the submission's default, or system default. Archive encoding defaults to uncompressed TAR.
    * @returns {Promise<PresignedUploadUrlResponse>} The archive upload session and presigned part URLs.
@@ -212,7 +211,6 @@ export class UploadIngestionService extends DBService {
       bytes,
       submissionId,
       submissionUuid,
-      systemUserIds,
       submitterSystemUserIds,
       comment,
       requestedBlueprintId,
@@ -232,21 +230,13 @@ export class UploadIngestionService extends DBService {
       s3_upload_id: null
     });
 
-    // 2. Create ticket for admin visibility into this upload
-    const ticket = await this.ticketService.createTicket({
-      subject: 'New Submission',
-      description: `Submission ID: ${submissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${upload_id}`,
-      priority: 'medium',
-      systemUserIds
-    });
-
-    // 3. Bind submission → upload. The service creates its dedicated access team.
+    // 2. Bind submission → upload as a draft until the upload is completed. The service creates its dedicated access team.
     const { submission_upload_id } = await this.submissionUploadService.insertSubmissionUpload(
       {
         submission_id: submissionId,
         upload_id,
-        ticket_id: ticket.ticket_id,
-        status: 'uploaded',
+        ticket_id: null,
+        status: 'draft',
         blueprint_id,
         comment: comment ?? null
       },
@@ -254,7 +244,7 @@ export class UploadIngestionService extends DBService {
       submitterSystemUserIds
     );
 
-    // 4. Create placeholder artifact for archive
+    // 3. Create placeholder artifact for archive
     const key = `submissions/${submissionId}/uploads/${upload_id}.${archiveFormat}`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
@@ -266,14 +256,14 @@ export class UploadIngestionService extends DBService {
       format: archiveFormat
     });
 
-    // 5. Create upload_archive metadata
+    // 4. Create upload_archive metadata
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,
       archive_status: ProcessStatusStatusEnum.DRAFT
     });
 
-    // 8. Initialize multipart upload
+    // 5. Initialize multipart upload
     const {
       uploadId: s3UploadId,
       presignedUrls,
@@ -284,10 +274,10 @@ export class UploadIngestionService extends DBService {
       bytes
     });
 
-    // 9. Persist S3 upload ID
+    // 6. Persist S3 upload ID
     await this.uploadService.updateUpload(upload_id, { s3_upload_id: s3UploadId });
 
-    // 10. Return the submission UUID for client use.
+    // 7. Return the submission UUID for client use.
     return {
       submissionUuid,
       submissionUploadId: submission_upload_id,
@@ -303,9 +293,10 @@ export class UploadIngestionService extends DBService {
   /**
    * Finalize a multipart archive upload after all parts have been uploaded.
    *
-   * This completes the upload in the security bucket and enqueues the
-   * archive artifact(s) for malware scanning. The endpoint must first authorize the upload
-   * creator and owning contributor through the Upload discriminator.
+   * This submits the draft submission upload by opening its ticket, completes the upload in the
+   * security bucket and enqueues the archive artifact(s) for malware scanning. The endpoint must
+   * first authorize the upload creator and owning contributor through the Upload discriminator,
+   * so the authenticated user is the upload's creator and the ticket's only initial member.
    *
    * @param {CompleteMultipartUploadParams} params
    * @returns {Promise<void>}
@@ -316,28 +307,44 @@ export class UploadIngestionService extends DBService {
     // 1. Validate multipart identity and upload state after middleware authorization
     await this.uploadService.validateUploadCompletion(uploadId, s3UploadId);
 
+    // 2. Submit the draft submission upload with a ticket for admin visibility into this upload
+    const submissionUpload = await this.submissionUploadService.getSubmissionUploadByUploadId(uploadId);
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(
+      submissionUpload.submission_id
+    );
+    const ticket = await this.ticketService.createTicket({
+      subject: 'New Submission',
+      description: `Submission ID: ${submissionUpload.submission_id}. Submission UUID: ${submissionRecord.uuid}. Upload UUID: ${uploadId}`,
+      priority: 'medium',
+      systemUserIds: [this.connection.systemUserId()]
+    });
+    await this.submissionUploadService.submitDraftSubmissionUpload(
+      submissionUpload.submission_upload_id,
+      ticket.ticket_id
+    );
+
     // Update upload status, artifact statuses, and create security records
     const [, , securityRecords] = await Promise.all([
-      // 2. Update upload status to completed
+      // 3. Update upload status to completed
       this.uploadService.updateUpload(uploadId, {
         upload_status: UploadStatusEnum.COMPLETED
       }),
-      // 3. Mark all artifacts as uploaded
+      // 4. Mark all artifacts as uploaded
       this.artifactService.updateArtifactsByUploadId(uploadId, {
         artifact_status: ArtifactStatusEnum.UPLOADED,
         uploaded_at: dayjs().toISOString()
       }),
-      // 4. Create artifact_security records for malware scanning
+      // 5. Create artifact_security records for malware scanning
       this.artifactSecurityService.insertArtifactSecurityByUploadId(uploadId, {
         security: SecurityStatusEnum.PENDING
       }),
-      // 5. Block archives for extraction until malware scan completes
+      // 6. Block archives for extraction until malware scan completes
       this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, {
         archive_status: ProcessStatusStatusEnum.BLOCKED
       })
     ]);
 
-    // 6. Complete the multipart upload in the security bucket
+    // 7. Complete the multipart upload in the security bucket
     const s3Client = UploadIngestionService.dependencies.getSecurityS3Client();
     await s3Client.send(
       new CompleteMultipartUploadCommand({
@@ -348,7 +355,7 @@ export class UploadIngestionService extends DBService {
       })
     );
 
-    // 7. Publish malware scan jobs for each artifact_security record
+    // 8. Publish malware scan jobs for each artifact_security record
     await Promise.all(
       securityRecords.map((record) =>
         UploadIngestionService.dependencies.publishMalwareScanJob(this.connection, {

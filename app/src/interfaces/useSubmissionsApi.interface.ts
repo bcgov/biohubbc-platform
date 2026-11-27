@@ -8,7 +8,8 @@ export interface AdminSubmissionUpload {
   upload_id: string;
   status: SubmissionUploadJobStatus;
   decision: SubmissionUploadDecision;
-  ticket_id: string;
+  /** Null while the upload is a draft. */
+  ticket_id: string | null;
   comment: string | null;
   create_date: string;
   create_user: number;
@@ -28,7 +29,8 @@ export interface AdminSubmissionUploadListItem {
   upload_id: string;
   status: SubmissionUploadJobStatus;
   decision: SubmissionUploadDecision;
-  ticket_id: string;
+  /** Null while the upload is a draft. */
+  ticket_id: string | null;
   comment: string | null;
   create_date: string;
   create_user: number;

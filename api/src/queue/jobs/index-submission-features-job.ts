@@ -1,6 +1,7 @@
 import PgBoss from 'pg-boss';
 import { INDEX_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
 import { IDBConnection } from '../../database/db';
+import { ApiGeneralError } from '../../errors/api-error';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
@@ -205,16 +206,18 @@ async function runIndexSubmissionFeaturesStage(submissionUploadId: string, jobId
       return;
     }
 
+    // Only draft uploads lack a ticket, and indexing never starts from draft.
+    const ticketId = upload.ticket_id;
+    if (ticketId === null) {
+      throw new ApiGeneralError('Submission upload has no ticket', [
+        'runIndexSubmissionFeaturesStage',
+        { submissionUploadId, status: upload.status }
+      ]);
+    }
+
     const submissionId = upload.submission_id;
     const outcome = await executeIndexSubmissionFeaturesIngestion(connection, submissionId, submissionUploadId);
-    await finalizeIndexSubmissionFeaturesStage(
-      connection,
-      submissionId,
-      submissionUploadId,
-      upload.ticket_id,
-      jobId,
-      outcome
-    );
+    await finalizeIndexSubmissionFeaturesStage(connection, submissionId, submissionUploadId, ticketId, jobId, outcome);
   });
 }
 

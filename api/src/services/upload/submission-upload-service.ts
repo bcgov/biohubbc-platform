@@ -488,6 +488,27 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Submit a draft upload: attach its ticket and make it ready for ingestion.
+   * - draft -> uploaded
+   * - all other statuses -> conflict
+   *
+   * The ticket is attached before the status changes, because only a draft upload may lack a ticket.
+   *
+   * @param {string} submissionUploadId Submission upload identifier.
+   * @param {string} ticketId Ticket opened for the submitted upload.
+   * @returns {Promise<void>} Resolves after the ticket is attached and the upload is `uploaded`.
+   * @throws {ApiConflictError} If the upload is not a draft.
+   * @memberof SubmissionUploadService
+   */
+  async submitDraftSubmissionUpload(submissionUploadId: string, ticketId: string): Promise<void> {
+    const current = await this.getSubmissionUploadWithLock(submissionUploadId);
+    this.assertStatusCanChange(submissionUploadId, current.status, ['draft']);
+
+    await this.submissionUploadRepository.updateSubmissionUpload(submissionUploadId, { ticket_id: ticketId });
+    await this.transitionSubmissionUploadStatus(submissionUploadId, 'uploaded', ['draft']);
+  }
+
+  /**
    * Transition to ingesting when the process stage starts.
    * - uploaded -> ingesting
    * - ingesting -> ingesting (no-op, idempotent retry)

@@ -6,6 +6,7 @@ export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 export type TicketSystemUserStatus = 'requested' | 'started' | 'blocked' | 'resolved';
 export type SubmissionUploadJobStatus =
+  | 'draft'
   | 'uploaded'
   | 'ingesting'
   | 'ingested'
