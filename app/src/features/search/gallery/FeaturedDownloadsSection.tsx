@@ -12,7 +12,7 @@ import { FeaturedDownloadTile } from './FeaturedDownloadTile';
  */
 const HOME_GALLERY_SLUG = 'home';
 
-const TILES_PER_PAGE = 9;
+const TILES_PER_PAGE = 4;
 
 /**
  * "Featured Downloads" grid rendered on the landing (search) page: a paged grid of tiles for
@@ -44,7 +44,7 @@ export const FeaturedDownloadsSection = () => {
         <Typography variant="h3">Featured Downloads</Typography>
         <Grid container spacing={3}>
           {downloads.map((download) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={download.download_id}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={download.download_id}>
               <FeaturedDownloadTile download={download} />
             </Grid>
           ))}

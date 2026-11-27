@@ -301,6 +301,9 @@ test: ## Runs `npm test` for api, and app projects
 	@echo "==============================================="
 	@cd martin-gateway && npm test && cd ..
 
+compute-submission-metrics: ## Calculates and stores a metrics snapshot locally (requires queue and db)
+	@docker compose exec -T queue npm run compute-submission-metrics
+
 test-db: ## Runs DB integration tests (transaction/rollback, only needs database)
 	@echo "==============================================="
 	@echo "Running DB integration tests"

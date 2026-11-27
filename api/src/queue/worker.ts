@@ -17,6 +17,10 @@ import {
   IComputeSubmissionFeatureClosureJobData
 } from './jobs/compute-submission-feature-closure-job';
 import {
+  computeSubmissionMetricsFailedHandler,
+  computeSubmissionMetricsJobHandler
+} from './jobs/compute-submission-metrics-job';
+import {
   deleteExpiredMartinContextsFailedHandler,
   deleteExpiredMartinContextsJobHandler,
   IDeleteExpiredMartinContextsJobData
@@ -72,6 +76,8 @@ const defaultLog = getLogger('queue/worker');
  * stubbing imported job modules directly.
  */
 export interface WorkerDependencies {
+  computeSubmissionMetricsJobHandler: typeof computeSubmissionMetricsJobHandler;
+  computeSubmissionMetricsFailedHandler: typeof computeSubmissionMetricsFailedHandler;
   getPgBoss: typeof getPgBoss;
   processSubmissionFeaturesJobHandler: typeof processSubmissionFeaturesJobHandler;
   processSubmissionFeaturesFailedHandler: typeof processSubmissionFeaturesFailedHandler;
@@ -102,6 +108,8 @@ export interface WorkerDependencies {
 }
 
 export const workerDependencies: WorkerDependencies = {
+  computeSubmissionMetricsJobHandler,
+  computeSubmissionMetricsFailedHandler,
   getPgBoss,
   processSubmissionFeaturesJobHandler,
   processSubmissionFeaturesFailedHandler,
@@ -459,6 +467,21 @@ export const registerWorkers = async (): Promise<void> => {
     JobQueues.APPROVE_SUBMISSION_UPLOAD_FAILED,
     workerDependencies.approveSubmissionUploadFailedHandler
   );
+
+  await boss.createQueue(JobQueues.COMPUTE_SUBMISSION_METRICS_FAILED);
+  await boss.createQueue(JobQueues.COMPUTE_SUBMISSION_METRICS, {
+    deadLetter: JobQueues.COMPUTE_SUBMISSION_METRICS_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+  await boss.work(JobQueues.COMPUTE_SUBMISSION_METRICS, workerDependencies.computeSubmissionMetricsJobHandler);
+  await boss.work(
+    JobQueues.COMPUTE_SUBMISSION_METRICS_FAILED,
+    workerDependencies.computeSubmissionMetricsFailedHandler
+  );
+  // Keep the nightly calculation at 11 PM local time through daylight saving changes.
+  await boss.schedule(JobQueues.COMPUTE_SUBMISSION_METRICS, '0 23 * * *', {}, { tz: 'America/Vancouver' });
 
   defaultLog.info({
     label: 'registerWorkers',

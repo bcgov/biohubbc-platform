@@ -16,6 +16,7 @@ export const QUERY_KEY_ROOT = {
   SUBMISSION: 'submission',
   SUBMISSION_UPLOAD: 'submission-upload',
   SUBMISSION_UPLOAD_REVIEW: 'submission-upload-review',
+  SUMMARY_METRIC: 'summary-metric',
   TAG: 'tag',
   TEAM: 'team',
   TEAM_POLICY: 'team-policy',

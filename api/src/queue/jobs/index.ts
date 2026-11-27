@@ -126,7 +126,11 @@ export const JobQueues = {
    * Dead letter queue for failed approve-submission-upload jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  APPROVE_SUBMISSION_UPLOAD_FAILED: 'approve-submission-upload-failed'
+  APPROVE_SUBMISSION_UPLOAD_FAILED: 'approve-submission-upload-failed',
+  /** Nightly platform-wide submission metrics snapshot. */
+  COMPUTE_SUBMISSION_METRICS: 'compute-submission-metrics',
+  /** Exhausted metric calculation retries. */
+  COMPUTE_SUBMISSION_METRICS_FAILED: 'compute-submission-metrics-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

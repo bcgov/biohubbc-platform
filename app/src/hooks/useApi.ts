@@ -24,6 +24,7 @@ import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
+import { useSummaryMetricsApi } from './api/useSummaryMetricsApi';
 import { useTagRulesApi } from './api/useTagRulesApi';
 import { useTagsApi } from './api/useTagsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
@@ -76,6 +77,8 @@ export const useApi = () => {
 
   const gallery = useGalleryApi(apiAxios);
 
+  const summaryMetrics = useSummaryMetricsApi(apiAxios);
+
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
   const tickets = useTicketsApi(apiAxios);
@@ -125,6 +128,7 @@ export const useApi = () => {
     download,
     downloadExport,
     gallery,
+    summaryMetrics,
     teamPolicies,
     tickets,
     tags,

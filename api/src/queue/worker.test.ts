@@ -31,7 +31,18 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(26);
+      expect(createQueueStub.callCount).to.equal(28);
+      expect(
+        createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_METRICS, {
+          deadLetter: JobQueues.COMPUTE_SUBMISSION_METRICS_FAILED,
+          retryLimit: 3,
+          retryDelay: 60,
+          retryBackoff: true
+        })
+      ).to.be.true;
+      expect(
+        scheduleStub.calledWith(JobQueues.COMPUTE_SUBMISSION_METRICS, '0 23 * * *', {}, { tz: 'America/Vancouver' })
+      ).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.RECONCILE_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
@@ -173,7 +184,7 @@ describe('worker', () => {
       // POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED,
       // DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED, EVALUATE_TICKET_TAG_RULES + FAILED,
       // APPROVE_SUBMISSION_UPLOAD + FAILED.
-      expect(createQueueStub.callCount).to.equal(26);
+      expect(createQueueStub.callCount).to.equal(28);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -480,7 +491,7 @@ describe('worker', () => {
       await registerWorkers();
 
       // Two recurring infrastructure ticks: the download poll and the tile context sweep.
-      expect(scheduleStub.callCount).to.equal(2);
+      expect(scheduleStub.callCount).to.equal(3);
       expect(scheduleStub.firstCall.args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
       expect(scheduleStub.firstCall.args[1]).to.equal('0 * * * *');
       expect(scheduleStub.firstCall.args[3]).to.deep.equal({ tz: 'UTC' });
