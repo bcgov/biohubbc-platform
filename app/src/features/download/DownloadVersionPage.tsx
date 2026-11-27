@@ -58,7 +58,7 @@ export const DownloadVersionPage = ({ basePath }: DownloadVersionPageProps) => {
       <QueryErrorDialog error={versionQuery.error} label="download version" />
       <LoadingGuard
         isLoading={(downloadQuery.isFetching || versionQuery.isFetching) && (!download || !version)}
-        isLoadingFallback={<SkeletonPage />}>
+        isLoadingFallback={<SkeletonPage maxWidth="lg" />}>
         {download && version ? (
           <>
             <DownloadVersionPageHeader
@@ -68,7 +68,7 @@ export const DownloadVersionPage = ({ basePath }: DownloadVersionPageProps) => {
               activeTab={activeTab}
               onTabChange={setActiveTab}
             />
-            <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+            <Container maxWidth="lg" sx={{ py: 4, px: 3 }}>
               <ComponentSwitch<DownloadVersionTab>
                 switch={activeTab}
                 components={{

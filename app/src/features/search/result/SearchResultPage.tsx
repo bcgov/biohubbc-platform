@@ -112,7 +112,6 @@ export const SearchResultPage = () => {
             activeSort={activeSort}
             view={view}
             viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-            isCreateDownloadDisabled={isSubmittingDownload || isLoading || totalCount === undefined}
             onCreateDownloadClick={handleOpenCreateDownload}
             onSortChange={handleSortChange}
             onViewChange={setView}

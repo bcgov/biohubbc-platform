@@ -20,7 +20,7 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
     <>
       <PortalTicketHeader ticket={ticket} />
 
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <PageSection id="ticket-detail-content" label="Ticket Details">
           <Stack
             sx={{

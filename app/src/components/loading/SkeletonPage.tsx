@@ -1,11 +1,14 @@
 import Container from '@mui/material/Container';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
+import { Breakpoint } from '@mui/material/styles';
 import { PageHeader } from 'components/header/PageHeader';
 import { SkeletonTable } from './SkeletonLoaders';
 
 interface SkeletonPageProps {
   numberOfLines?: number;
+  /** Width of the header and body, matching the page being loaded. Defaults to `xl`. */
+  maxWidth?: Breakpoint;
 }
 
 /**
@@ -14,10 +17,11 @@ interface SkeletonPageProps {
  * @param {SkeletonPageProps} props - Component props.
  * @returns {JSX.Element}
  */
-export const SkeletonPage = ({ numberOfLines = 6 }: SkeletonPageProps) => {
+export const SkeletonPage = ({ numberOfLines = 6, maxWidth = 'xl' }: SkeletonPageProps) => {
   return (
     <>
       <PageHeader
+        maxWidth={maxWidth}
         breadcrumbs={<Skeleton variant="text" width={220} height={20} />}
         label={<Skeleton variant="text" width={320} height={44} />}
         subheader={
@@ -27,7 +31,7 @@ export const SkeletonPage = ({ numberOfLines = 6 }: SkeletonPageProps) => {
           </Stack>
         }
       />
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth={maxWidth} sx={{ py: 4 }}>
         <SkeletonTable numberOfLines={numberOfLines} />
       </Container>
     </>

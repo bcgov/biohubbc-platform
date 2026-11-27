@@ -15,11 +15,11 @@ const renderDialog = (overrides: Partial<React.ComponentProps<typeof CreateDownl
   );
 
 describe('CreateDownloadDialog', () => {
-  it('renders the dialog title and Create save button', () => {
-    const { getByText, getByTestId } = renderDialog();
+  it('renders the Save Download title and a Save button', () => {
+    const { getByRole, getByTestId } = renderDialog();
 
-    expect(getByText('Create Download')).toBeVisible();
-    expect(getByTestId('edit-dialog-save-button')).toHaveTextContent('Create');
+    expect(getByRole('dialog', { name: 'Save Download' })).toBeVisible();
+    expect(getByTestId('edit-dialog-save-button')).toHaveTextContent('Save');
   });
 
   it('pre-fills the Name input with the supplied defaultName', () => {

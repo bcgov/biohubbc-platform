@@ -40,11 +40,13 @@ export const DownloadPage = ({ basePath }: DownloadPageProps) => {
   return (
     <>
       <QueryErrorDialog error={downloadQuery.error} label="download" />
-      <LoadingGuard isLoading={downloadQuery.isFetching && !download} isLoadingFallback={<SkeletonPage />}>
+      <LoadingGuard
+        isLoading={downloadQuery.isFetching && !download}
+        isLoadingFallback={<SkeletonPage maxWidth="lg" />}>
         {download ? (
           <>
             <DownloadPageHeader download={download} basePath={basePath} />
-            <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+            <Container maxWidth="lg" sx={{ py: 4, px: 3 }}>
               <DownloadVersionsTable downloadId={download.download_id} basePath={basePath} />
             </Container>
           </>

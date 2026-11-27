@@ -21,7 +21,7 @@ export const PortalTicketDetailPage = () => {
       <QueryErrorDialog error={ticketQuery.error} label="ticket" />
       <LoadingGuard
         isLoading={ticketQuery.isFetching && !ticket}
-        isLoadingFallback={<TicketSkeleton />}
+        isLoadingFallback={<TicketSkeleton maxWidth="lg" />}
         isLoadingFallbackDelay={300}>
         {ticket ? (
           <PortalTicketDetailPageContent

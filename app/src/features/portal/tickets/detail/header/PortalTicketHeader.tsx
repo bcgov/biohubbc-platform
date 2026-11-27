@@ -22,7 +22,7 @@ export const PortalTicketHeader = (props: IPortalTicketHeaderProps) => {
 
   return (
     <PageHeader
-      maxWidth="xl"
+      maxWidth="lg"
       breadcrumbs={
         <Breadcrumbs aria-label="breadcrumb">
           <Link component={RouterLink} to="/portal" underline="hover" color="inherit">

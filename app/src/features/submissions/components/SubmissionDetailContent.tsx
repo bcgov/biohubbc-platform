@@ -38,16 +38,16 @@ export const SubmissionDetailContent = ({
   return (
     <LoadingGuard
       isLoading={isSubmissionLoading}
-      isLoadingFallback={<SkeletonPage />}
+      isLoadingFallback={<SkeletonPage maxWidth="lg" />}
       hasNoData={!submission}
       hasNoDataFallback={
         <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
           <Typography color="text.secondary">No submission found</Typography>
         </Box>
       }>
-      <PageHeader breadcrumbs={breadcrumbs} label={submission?.name ?? ''} subheader={subheader} />
+      <PageHeader maxWidth="lg" breadcrumbs={breadcrumbs} label={submission?.name ?? ''} subheader={subheader} />
 
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         {hasSecuredFeatures && (
           <AlertBanner icon={<Icon path={mdiLock} size={0.9} />} sx={{ my: 3 }}>
             This submission contains secured features.

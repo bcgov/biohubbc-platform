@@ -24,6 +24,7 @@ interface DownloadPageHeaderProps {
  */
 export const DownloadPageHeader = ({ download, basePath }: DownloadPageHeaderProps) => (
   <PageHeader
+    maxWidth="lg"
     breadcrumbs={
       <Breadcrumbs aria-label="download breadcrumb">
         {basePath === PORTAL_DOWNLOAD_BASE_PATH && (

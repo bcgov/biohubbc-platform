@@ -1,4 +1,4 @@
-import { mdiDownload } from '@mdi/js';
+import { mdiFileExportOutline } from '@mdi/js';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
 import Icon from '@mdi/react';
@@ -70,8 +70,8 @@ export const DownloadVersionExportButton = ({
 
   return (
     <PrimaryButton
-      variant="text"
-      startIcon={<Icon path={mdiDownload} size={0.8} />}
+      size="small"
+      startIcon={<Icon path={mdiFileExportOutline} size={0.8} />}
       loading={isExporting}
       disabled={status !== 'ready'}
       onClick={handleExport}>

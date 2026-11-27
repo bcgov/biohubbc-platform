@@ -3,17 +3,24 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
+import { Breakpoint } from '@mui/material/styles';
+
+interface TicketSkeletonProps {
+  /** Width of the header and body, matching the page being loaded. Defaults to `xl`. */
+  maxWidth?: Breakpoint;
+}
 
 /**
  * Loading skeleton that mirrors the ticket detail page layout.
  *
- * @return {*}
+ * @param {TicketSkeletonProps} props - Component props.
+ * @return {JSX.Element}
  */
-export const TicketSkeleton = () => {
+export const TicketSkeleton = ({ maxWidth = 'xl' }: TicketSkeletonProps) => {
   return (
     <>
       <Paper square elevation={0} sx={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)', borderColor: 'divider' }}>
-        <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Container maxWidth={maxWidth} sx={{ py: 4 }}>
           <Stack spacing={1.5}>
             <Skeleton variant="text" width={220} height={24} />
             <Skeleton variant="text" width={320} height={44} />
@@ -26,7 +33,7 @@ export const TicketSkeleton = () => {
         </Container>
       </Paper>
 
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth={maxWidth} sx={{ py: 4 }}>
         <Paper elevation={1} sx={{ p: { xs: 2, md: 3 } }}>
           <Stack
             sx={{
