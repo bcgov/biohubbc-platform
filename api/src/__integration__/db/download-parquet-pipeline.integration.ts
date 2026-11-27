@@ -453,7 +453,7 @@ describe('Download Parquet pipeline (integration)', function () {
     properties: CsvPropertyDefinition[],
     cursorScopeId: string
   ): Promise<ParquetFeatureData[]> {
-    const featureIdsSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = $1';
+    const featureIdsSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = ?';
     const downloadVersionId = await createDownloadVersionFor(await createPolicyDownload());
     await downloadVersionRepo.updateDownloadVersionFeatureIds(downloadVersionId, featureIdsSql, [submissionId]);
 

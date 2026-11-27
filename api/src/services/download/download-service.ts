@@ -8,7 +8,12 @@ import {
   DownloadListRecord,
   DownloadParquetPart
 } from '../../models/download';
-import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
+import { DownloadStatusEnum } from '../../models/download-status';
+import {
+  DownloadVersionFeature,
+  DownloadVersionRecord,
+  DownloadVersionStatusRecord
+} from '../../models/download-version';
 import { DownloadVersionExportListRow } from '../../models/download-version-export';
 import { ExpressionTree } from '../../models/expression-tree';
 import { publishProcessDownloadJob } from '../../queue/publisher';
@@ -22,6 +27,7 @@ import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { DownloadPipelineService } from './download-pipeline-service';
 import { DownloadPolicyService } from './download-policy-service';
 
 const defaultLog = getLogger('services/download/download-service');
@@ -61,6 +67,7 @@ export class DownloadService extends DBService {
   teamService: TeamService;
   expressionTreeService: ExpressionTreeService;
   downloadPolicyService: DownloadPolicyService;
+  downloadPipelineService: DownloadPipelineService;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -83,6 +90,7 @@ export class DownloadService extends DBService {
     this.teamService = new TeamService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.downloadPolicyService = new DownloadPolicyService(connection);
+    this.downloadPipelineService = new DownloadPipelineService(connection);
   }
 
   /**
@@ -287,6 +295,65 @@ export class DownloadService extends DBService {
     }
 
     return version;
+  }
+
+  /**
+   * List one page of the features of a download version.
+   *
+   * A version built with a stored feature set lists that set: the page is cut from it, the count is
+   * its size, and `is_snapshot` is true. The list is fixed at build time and does not move when
+   * features are later superseded or secured.
+   *
+   * A version with no stored set (built before the set was recorded) lists what the download's
+   * policy selects now for the requesting user, under the build's rules (current, closure
+   * self-loop, security filter), and says so with `is_snapshot` false.
+   *
+   * Does not enforce authorization — the route's `Download` authorization does. The order is always
+   * ascending `submission_feature_id`; `sort` and `order` in `pagination` are ignored.
+   *
+   * @param {string} downloadId - The parent download ID.
+   * @param {string} downloadVersionId - The download version ID.
+   * @param {ApiPaginationOptions} pagination - The page and page size.
+   * @return {Promise<{ features: DownloadVersionFeature[]; count: number; is_snapshot: boolean }>}
+   * @throws {ApiNotFoundError} When the download version does not exist.
+   * @throws {HTTP404} When the download version does not belong to the parent download.
+   * @throws {HTTP409} When the download version is not ready.
+   * @memberof DownloadService
+   */
+  async listDownloadVersionFeatures(
+    downloadId: string,
+    downloadVersionId: string,
+    pagination: ApiPaginationOptions
+  ): Promise<{ features: DownloadVersionFeature[]; count: number; is_snapshot: boolean }> {
+    const version = await this.getDownloadVersion(downloadId, downloadVersionId);
+
+    if (version.status !== DownloadStatusEnum.READY) {
+      throw new HTTP409('Download version is not ready — cannot list features');
+    }
+
+    const featureSetSize = await this.downloadVersionRepository.findDownloadVersionFeatureSetSize(downloadVersionId);
+
+    if (featureSetSize !== null) {
+      const features = await this.downloadVersionRepository.listDownloadVersionFeatures(downloadVersionId, pagination);
+
+      return { features, count: featureSetSize, is_snapshot: true };
+    }
+
+    // No stored set: evaluate the download's policy now, as the build would.
+    const source = await this.downloadRepository.getDownloadSource(downloadId);
+    const { statements } = await this.downloadPipelineService.resolveParquetSchema(source);
+    const featureIdsQuery = await this.downloadPipelineService.buildDownloadFeatureIdsQuery(source, statements);
+
+    if (featureIdsQuery === null) {
+      return { features: [], count: 0, is_snapshot: false };
+    }
+
+    const [features, count] = await Promise.all([
+      this.downloadRepository.listFeaturesByFeatureIdsQuery(featureIdsQuery.sql, featureIdsQuery.bindings, pagination),
+      this.downloadRepository.getFeaturesByFeatureIdsQueryCount(featureIdsQuery.sql, featureIdsQuery.bindings)
+    ]);
+
+    return { features, count, is_snapshot: false };
   }
 
   /**

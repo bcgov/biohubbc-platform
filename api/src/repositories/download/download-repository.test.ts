@@ -5,7 +5,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadVersionFeature } from '../../models/download-version';
 import { BaseFeatureRow, DownloadRepository } from './download-repository';
 
 chai.use(sinonChai);
@@ -521,6 +523,63 @@ describe('DownloadRepository', () => {
 
       const closeCall = queryStub.getCalls().find((c) => String(c.args[0]).includes('CLOSE'));
       expect(closeCall).to.not.be.undefined;
+    });
+  });
+
+  describe('listFeaturesByFeatureIdsQuery', () => {
+    it('embeds the feature-id subquery and binds LIMIT and OFFSET after its bindings', async () => {
+      // Verifies: the page's parameters come after the subquery's own, the offset is that of the
+      // requested page, and the rows are validated against the feature model
+
+      // Step 1: Setup mock DB
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repo = new DownloadRepository(getMockDBConnection({ knex: knexStub }));
+
+      // Step 2: Ask for page 3 at 10 per page of a subquery that has two bindings of its own
+      const featureIdsSql = 'SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = ? AND b = ?';
+      await repo.listFeaturesByFeatureIdsQuery(featureIdsSql, ['observation', 7], {
+        page: 3,
+        limit: 10,
+        sort: 'uuid',
+        order: 'desc'
+      });
+
+      // Step 3: The subquery is the id source, and LIMIT / OFFSET take the next two positions
+      const { sql: sqlText, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
+      expect(sqlText).to.include(
+        'WHERE sf.submission_feature_id IN (SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = $1 AND b = $2)'
+      );
+      expect(sqlText).to.match(/ORDER BY sf\.submission_feature_id\s+LIMIT \$3\s+OFFSET \$4$/);
+
+      // Step 4: Bindings are the subquery's, then the limit, then the offset of page 3
+      expect(bindings).to.deep.equal(['observation', 7, 10, 20]);
+
+      // Step 5: The rows are validated against the feature model
+      expect(knexStub.firstCall.args[1]).to.equal(DownloadVersionFeature);
+    });
+  });
+
+  describe('getFeaturesByFeatureIdsQueryCount', () => {
+    it('counts the rows of the feature-id subquery with its own bindings, unpaged', async () => {
+      // Verifies: the count wraps the same subquery, adds no parameters of its own, and is validated
+
+      // Step 1: Setup mock DB to return a count row
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 6 }], 1));
+      const repo = new DownloadRepository(getMockDBConnection({ knex: knexStub }));
+
+      // Step 2: Count a subquery that has two bindings
+      const featureIdsSql = 'SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = ? AND b = ?';
+      const result = await repo.getFeaturesByFeatureIdsQueryCount(featureIdsSql, ['observation', 7]);
+
+      // Step 3: The subquery is counted as a derived table, with exactly its bindings
+      expect(knexStub.firstCall.args[0].toSQL().toNative()).to.deep.equal({
+        sql: 'SELECT count(*)::integer AS count FROM (SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = $1 AND b = $2) ids',
+        bindings: ['observation', 7]
+      });
+
+      // Step 4: The row is validated as a count, and its number (not the row) is returned
+      expect(knexStub.firstCall.args[1]).to.equal(CountResult);
+      expect(result).to.equal(6);
     });
   });
 

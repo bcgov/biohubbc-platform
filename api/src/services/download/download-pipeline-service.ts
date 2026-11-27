@@ -234,19 +234,21 @@ export class DownloadPipelineService extends DBService {
    * There is one effective statement per feature type and a feature has one type, so the
    * per-statement subqueries are disjoint and are combined with UNION ALL.
    *
-   * Returns the compiled SQL and bindings, never the knex builder: a builder is thenable,
-   * so returning one from an async method would execute it.
+   * Returns the SQL and bindings, never the knex builder: a builder is thenable, so
+   * returning one from an async method would execute it. The SQL is in knex's placeholder
+   * form (`?`, with a literal question mark escaped as `\?`), so a repository can embed it
+   * in a `knex.raw` statement and run it through the connection's validated `knex` path.
    *
    * @param {DownloadSource} source - The download source (policy_id + requested_by).
    * @param {EffectiveDownloadStatement[]} statements - The effective statements, one per feature type.
-   * @return {Promise<{ sql: string; bindings: unknown[] } | null>} The compiled feature-id query, or
-   *   null when there are no statements.
+   * @return {Promise<{ sql: string; bindings: readonly Knex.Value[] } | null>} The feature-id query
+   *   with `?` placeholders, or null when there are no statements.
    * @memberof DownloadPipelineService
    */
   async buildDownloadFeatureIdsQuery(
     source: DownloadSource,
     statements: EffectiveDownloadStatement[]
-  ): Promise<{ sql: string; bindings: unknown[] } | null> {
+  ): Promise<{ sql: string; bindings: readonly Knex.Value[] } | null> {
     if (statements.length === 0) {
       return null;
     }
@@ -286,9 +288,9 @@ export class DownloadPipelineService extends DBService {
 
     const query =
       statementSubqueries.length === 1 ? statementSubqueries[0] : getKnex().unionAll(statementSubqueries, true);
-    const { sql, bindings } = query.toSQL().toNative();
+    const { sql, bindings } = query.toSQL();
 
-    return { sql, bindings: [...bindings] };
+    return { sql, bindings };
   }
 
   /**

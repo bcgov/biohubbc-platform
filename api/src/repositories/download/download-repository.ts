@@ -1,8 +1,10 @@
+import { Knex } from 'knex';
 import { QueryResultRow } from 'pg';
 import SQL from 'sql-template-strings';
 import { DOWNLOAD_FEATURE_BATCH_SIZE } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import {
   CreateDownload,
@@ -13,6 +15,7 @@ import {
   HasTeams,
   IsAuthorized
 } from '../../models/download';
+import { DownloadVersionFeature } from '../../models/download-version';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 import { isSubmissionFeatureCurrent } from '../sql-fragments';
@@ -420,6 +423,68 @@ export class DownloadRepository extends BaseRepository {
       bindings: [downloadVersionId, featureTypeName],
       batchSize
     });
+  }
+
+  /**
+   * List one page of the features a compiled feature-id subquery selects.
+   *
+   * Used for a download version that has no stored feature set: `featureIdsSql` is the download's
+   * feature-id query (current, closure self-loop, security filter for the requesting user), in
+   * knex's placeholder form (`?`, as `toSQL().sql` gives it), with its `bindings` in order. The page
+   * is cut with LIMIT / OFFSET, so nothing is loaded unbounded.
+   *
+   * The order is always ascending `submission_feature_id`; `sort` and `order` in `pagination` are
+   * ignored.
+   *
+   * @param {string} featureIdsSql - Subquery returning `submission_feature_id` rows, with `?` placeholders.
+   * @param {readonly Knex.Value[]} bindings - Bindings of `featureIdsSql`, in placeholder order.
+   * @param {ApiPaginationOptions} pagination - The page and page size.
+   * @return {Promise<DownloadVersionFeature[]>}
+   * @memberof DownloadRepository
+   */
+  async listFeaturesByFeatureIdsQuery(
+    featureIdsSql: string,
+    bindings: readonly Knex.Value[],
+    pagination: ApiPaginationOptions
+  ): Promise<DownloadVersionFeature[]> {
+    // LIMIT and OFFSET are the last two bindings, after the subquery's own.
+    const query = getKnex().raw(
+      `SELECT
+         sf.submission_feature_id,
+         sf.uuid,
+         sf.submission_id,
+         sf.feature_type_id,
+         ft.name AS feature_type_name
+       FROM submission_feature sf
+       INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+       WHERE sf.submission_feature_id IN (${featureIdsSql})
+       ORDER BY sf.submission_feature_id
+       LIMIT ?
+       OFFSET ?`,
+      [...bindings, pagination.limit, (pagination.page - 1) * pagination.limit]
+    );
+
+    const response = await this.connection.knex(query, DownloadVersionFeature);
+
+    return response.rows;
+  }
+
+  /**
+   * Count the features a compiled feature-id subquery selects.
+   *
+   * The count method of `listFeaturesByFeatureIdsQuery`.
+   *
+   * @param {string} featureIdsSql - Subquery returning `submission_feature_id` rows, with `?` placeholders.
+   * @param {readonly Knex.Value[]} bindings - Bindings of `featureIdsSql`, in placeholder order.
+   * @return {Promise<number>}
+   * @memberof DownloadRepository
+   */
+  async getFeaturesByFeatureIdsQueryCount(featureIdsSql: string, bindings: readonly Knex.Value[]): Promise<number> {
+    const query = getKnex().raw(`SELECT count(*)::integer AS count FROM (${featureIdsSql}) ids`, [...bindings]);
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
   }
 
   /**

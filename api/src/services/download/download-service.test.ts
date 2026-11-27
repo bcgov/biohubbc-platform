@@ -10,14 +10,18 @@ import {
   createMockDownloadVersionStatusRecord
 } from '../../__mocks__/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
-import { CreateDownload } from '../../models/download';
+import { CreateDownload, DownloadSource } from '../../models/download';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadVersionFeature } from '../../models/download-version';
 import { ExpressionTree } from '../../models/expression-tree';
+import { PolicyEffect } from '../../models/policy-statement';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionExportRepository } from '../../repositories/download/download-version-export-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { TeamService } from '../access-policy/team-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { DownloadPipelineService, EffectiveDownloadStatement } from './download-pipeline-service';
 import { DownloadPolicyService } from './download-policy-service';
 import { DownloadService, groupExportsByDownloadId } from './download-service';
 
@@ -98,6 +102,161 @@ describe('DownloadService', () => {
       } catch (error) {
         expect(error).to.be.instanceOf(HTTP404);
       }
+    });
+  });
+
+  describe('listDownloadVersionFeatures', () => {
+    const downloadId = 'aaaa0000-0000-0000-0000-000000000001';
+    const versionId = 'dddd0000-0000-0000-0000-000000000001';
+    const pagination = { page: 2, limit: 5 };
+    const source: DownloadSource = { policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 7 };
+    const statements: EffectiveDownloadStatement[] = [
+      {
+        policy_statement_id: '22222222-2222-2222-2222-222222222222',
+        effect: PolicyEffect.ALLOW,
+        urn_feature_type: 'observation',
+        expression_id: null
+      }
+    ];
+    const feature: DownloadVersionFeature = {
+      submission_feature_id: 7,
+      uuid: 'ffff0000-0000-0000-0000-000000000007',
+      submission_id: 3,
+      feature_type_id: 2,
+      feature_type_name: 'observation'
+    };
+
+    const stubVersion = (status: DownloadStatusEnum) =>
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
+        .resolves(
+          createMockDownloadVersionStatusRecord({ download_id: downloadId, download_version_id: versionId, status })
+        );
+
+    it('refuses a version that is not ready with HTTP409 before reading its feature set', async () => {
+      // Verifies: only a ready version is listed; a processing version may hold a set that has no files yet
+
+      // Step 1: Stub a processing version and the set-size read
+      stubVersion(DownloadStatusEnum.PROCESSING);
+      const sizeStub = sinon.stub(DownloadVersionRepository.prototype, 'findDownloadVersionFeatureSetSize').resolves(3);
+      const service = new DownloadService(getMockDBConnection());
+
+      // Step 2: Call the list and capture the error
+      let caught: unknown;
+      try {
+        await service.listDownloadVersionFeatures(downloadId, versionId, pagination);
+      } catch (error) {
+        caught = error;
+      }
+
+      // Step 3: HTTP409, and the set was never read
+      expect(caught).to.be.instanceOf(HTTP409);
+      expect(sizeStub).not.to.have.been.called;
+    });
+
+    it('lists a page of the stored set with its size as count and is_snapshot true, without evaluating the policy', async () => {
+      // Verifies: a stored set is the only source of the list; the download's policy is not read
+
+      // Step 1: Stub a ready version with a stored set of 11 features
+      stubVersion(DownloadStatusEnum.READY);
+      sinon.stub(DownloadVersionRepository.prototype, 'findDownloadVersionFeatureSetSize').resolves(11);
+      const listStub = sinon
+        .stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatures')
+        .resolves([feature]);
+      const sourceStub = sinon.stub(DownloadRepository.prototype, 'getDownloadSource');
+      const liveListStub = sinon.stub(DownloadRepository.prototype, 'listFeaturesByFeatureIdsQuery');
+      const service = new DownloadService(getMockDBConnection());
+
+      // Step 2: Call the list
+      const result = await service.listDownloadVersionFeatures(downloadId, versionId, pagination);
+
+      // Step 3: The page was read by version id with the caller's pagination
+      expect(listStub).to.have.been.calledOnceWith(versionId, pagination);
+
+      // Step 4: The count is the set's size, not the page's length, and the live path was not taken
+      expect(result).to.eql({ features: [feature], count: 11, is_snapshot: true });
+      expect(sourceStub).not.to.have.been.called;
+      expect(liveListStub).not.to.have.been.called;
+    });
+
+    it('treats an empty stored set as a snapshot, not as a version with no set', async () => {
+      // Verifies: a size of 0 takes the stored-set path (only null means "no stored set")
+
+      // Step 1: Stub a ready version whose stored set is empty
+      stubVersion(DownloadStatusEnum.READY);
+      sinon.stub(DownloadVersionRepository.prototype, 'findDownloadVersionFeatureSetSize').resolves(0);
+      sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatures').resolves([]);
+      const sourceStub = sinon.stub(DownloadRepository.prototype, 'getDownloadSource');
+      const service = new DownloadService(getMockDBConnection());
+
+      // Step 2: Call the list
+      const result = await service.listDownloadVersionFeatures(downloadId, versionId, pagination);
+
+      // Step 3: An empty snapshot, and the policy was not evaluated
+      expect(result).to.eql({ features: [], count: 0, is_snapshot: true });
+      expect(sourceStub).not.to.have.been.called;
+    });
+
+    it('evaluates the download policy for a version with no stored set and reports is_snapshot false', async () => {
+      // Verifies: with no stored set, the list and the count both run the feature-id query built
+      // from the download's own source and effective statements
+
+      // Step 1: Stub a ready version with no stored set, and the policy evaluation chain
+      stubVersion(DownloadStatusEnum.READY);
+      sinon.stub(DownloadVersionRepository.prototype, 'findDownloadVersionFeatureSetSize').resolves(null);
+      const storedListStub = sinon.stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatures');
+      const sourceStub = sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      const schemaStub = sinon
+        .stub(DownloadPipelineService.prototype, 'resolveParquetSchema')
+        .resolves({ schemaLookup: new Map(), featureTypes: ['observation'], statements });
+      const buildStub = sinon
+        .stub(DownloadPipelineService.prototype, 'buildDownloadFeatureIdsQuery')
+        .resolves({ sql: 'SELECT ids WHERE requested_by = ?', bindings: [7] });
+      const liveListStub = sinon
+        .stub(DownloadRepository.prototype, 'listFeaturesByFeatureIdsQuery')
+        .resolves([feature]);
+      const liveCountStub = sinon.stub(DownloadRepository.prototype, 'getFeaturesByFeatureIdsQueryCount').resolves(6);
+      const service = new DownloadService(getMockDBConnection());
+
+      // Step 2: Call the list
+      const result = await service.listDownloadVersionFeatures(downloadId, versionId, pagination);
+
+      // Step 3: The query was built from this download's source and its effective statements
+      expect(sourceStub).to.have.been.calledOnceWith(downloadId);
+      expect(schemaStub).to.have.been.calledOnceWith(source);
+      expect(buildStub).to.have.been.calledOnceWith(source, statements);
+
+      // Step 4: The list and the count ran the same compiled query; only the list is paged
+      expect(liveListStub).to.have.been.calledOnceWith('SELECT ids WHERE requested_by = ?', [7], pagination);
+      expect(liveCountStub).to.have.been.calledOnceWith('SELECT ids WHERE requested_by = ?', [7]);
+
+      // Step 5: The live count is returned, flagged as not a snapshot; the stored-set read was skipped
+      expect(result).to.eql({ features: [feature], count: 6, is_snapshot: false });
+      expect(storedListStub).not.to.have.been.called;
+    });
+
+    it('returns an empty live list without querying when the policy has no statements', async () => {
+      // Verifies: a null feature-id query (no effective statements) short-circuits to an empty page
+
+      // Step 1: Stub a ready version with no stored set, whose policy builds no query
+      stubVersion(DownloadStatusEnum.READY);
+      sinon.stub(DownloadVersionRepository.prototype, 'findDownloadVersionFeatureSetSize').resolves(null);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      sinon
+        .stub(DownloadPipelineService.prototype, 'resolveParquetSchema')
+        .resolves({ schemaLookup: new Map(), featureTypes: [], statements: [] });
+      sinon.stub(DownloadPipelineService.prototype, 'buildDownloadFeatureIdsQuery').resolves(null);
+      const liveListStub = sinon.stub(DownloadRepository.prototype, 'listFeaturesByFeatureIdsQuery');
+      const liveCountStub = sinon.stub(DownloadRepository.prototype, 'getFeaturesByFeatureIdsQueryCount');
+      const service = new DownloadService(getMockDBConnection());
+
+      // Step 2: Call the list
+      const result = await service.listDownloadVersionFeatures(downloadId, versionId, pagination);
+
+      // Step 3: Empty, not a snapshot, and neither live query ran
+      expect(result).to.eql({ features: [], count: 0, is_snapshot: false });
+      expect(liveListStub).not.to.have.been.called;
+      expect(liveCountStub).not.to.have.been.called;
     });
   });
 

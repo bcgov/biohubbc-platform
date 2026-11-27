@@ -444,11 +444,11 @@ describe('DownloadPipelineService', () => {
     });
   });
 
-  // A subquery stub that exposes toSQL().toNative() — the only surface the
-  // service uses on the returned Knex.QueryBuilder.
+  // A subquery stub that exposes toSQL() — the only surface the service uses on
+  // the returned Knex.QueryBuilder.
   const subqueryStub = (sql = 'SELECT 1', bindings: unknown[] = []) =>
     ({
-      toSQL: () => ({ toNative: () => ({ sql, bindings }) })
+      toSQL: () => ({ sql, bindings })
     } as unknown as Knex.QueryBuilder);
 
   describe('buildDownloadFeatureIdsQuery', () => {
@@ -628,12 +628,39 @@ describe('DownloadPipelineService', () => {
 
       // Step 4: The expression UNION is one parenthesised operand of the UNION ALL
       expect(result?.sql).to.equal(
-        '(select $1::int as broad_id) union all ' +
-          '((select $2::int as first_expression_id) union (select $3::int as second_expression_id))'
+        '(select ?::int as broad_id) union all ' +
+          '((select ?::int as first_expression_id) union (select ?::int as second_expression_id))'
       );
 
       // Step 5: The bindings follow the SQL: the broad statement's, then each expression's
       expect(result?.bindings).to.deep.equal([10, 20, 30]);
+    });
+
+    it('returns knex placeholder SQL that keeps a literal question mark escaped', async () => {
+      // Verifies: the SQL is handed on uncompiled (`?` placeholders, `\\?` for a literal question
+      // mark such as a jsonb operator), so embedding it in knex.raw binds the right values
+
+      // Step 1: Return a real subquery whose SQL holds a literal `?` operator and one binding
+      const service = new DownloadPipelineService(getMockDBConnection());
+      const knex = getKnex();
+      sinon
+        .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
+        .returns(knex.select('submission_feature_id').from('submission_feature').whereRaw('data \\? ?', ['key']));
+
+      // Step 2: Build the query
+      const result = await service.buildDownloadFeatureIdsQuery(TEST_SOURCE, [stmt('observation', null)]);
+
+      // Step 3: The placeholder stays `?` and the operator stays escaped
+      expect(result?.sql).to.equal('select "submission_feature_id" from "submission_feature" where data \\? ?');
+      expect(result?.bindings).to.deep.equal(['key']);
+
+      // Step 4: Embedded in a raw statement with one more binding, the operator comes out as a plain
+      // `?` and the two bindings take positions 1 and 2
+      const compiled = knex.raw(`SELECT 1 FROM (${result?.sql}) ids LIMIT ?`, [...(result?.bindings ?? []), 5]);
+      expect(compiled.toSQL().toNative()).to.deep.equal({
+        sql: 'SELECT 1 FROM (select "submission_feature_id" from "submission_feature" where data ? $1) ids LIMIT $2',
+        bindings: ['key', 5]
+      });
     });
   });
 
@@ -679,7 +706,7 @@ describe('DownloadPipelineService', () => {
       const service = new DownloadPipelineService(getMockDBConnection());
       sinon
         .stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery')
-        .returns(subqueryStub('SELECT broad WHERE type = $1', ['observation']));
+        .returns(subqueryStub('SELECT broad WHERE type = ?', ['observation']));
       const updateStub = sinon.stub(DownloadVersionRepository.prototype, 'updateDownloadVersionFeatureIds').resolves();
       const sizeStub = sinon
         .stub(DownloadVersionRepository.prototype, 'findDownloadVersionFeatureSetSize')
@@ -693,7 +720,7 @@ describe('DownloadPipelineService', () => {
       });
 
       // Step 3: The store received the version, the compiled SQL and its bindings
-      expect(updateStub).to.have.been.calledOnceWithExactly(TEST_DOWNLOAD_VERSION_ID, 'SELECT broad WHERE type = $1', [
+      expect(updateStub).to.have.been.calledOnceWithExactly(TEST_DOWNLOAD_VERSION_ID, 'SELECT broad WHERE type = ?', [
         'observation'
       ]);
 

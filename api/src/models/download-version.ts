@@ -30,3 +30,17 @@ export const DownloadVersionStatusRecord = z.object({
   create_date: z.string()
 });
 export type DownloadVersionStatusRecord = z.infer<typeof DownloadVersionStatusRecord>;
+
+/**
+ * One feature of a download version, as the version's feature list returns it. The list reads the
+ * version's stored feature set in SQL; the set itself (`download_version.feature_ids`) is never
+ * selected into a row.
+ */
+export const DownloadVersionFeature = z.object({
+  submission_feature_id: z.number().int(),
+  uuid: z.guid(),
+  submission_id: z.number().int(),
+  feature_type_id: z.number().int(),
+  feature_type_name: z.string()
+});
+export type DownloadVersionFeature = z.infer<typeof DownloadVersionFeature>;
