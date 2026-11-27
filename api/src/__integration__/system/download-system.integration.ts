@@ -823,4 +823,169 @@ describe('Download Worker', function () {
       expect(hash).to.equal(row.checksum_sha256);
     }
   });
+
+  // The version's stored feature set (download_version.feature_ids) against the files the job wrote.
+  describe('download version feature set', () => {
+    interface VersionFile {
+      featureTypeName: string;
+      featureIds: number[];
+    }
+
+    let createdFeatureIds: number[];
+    let storedFeatureIds: number[] | null;
+    let storedCardinality: number | null;
+    let featureCount: number | null;
+    let files: VersionFile[];
+    let featureTypeNameByFeatureId: Map<number, string>;
+
+    /**
+     * Read every row of a Parquet file and return the feature each row is for. A row names its
+     * feature by `submission_feature_id` when the file carries that column, and otherwise by `uuid`,
+     * which is mapped through submission_feature.
+     */
+    async function readFeatureIdsFromParquet(s3Key: string): Promise<number[]> {
+      const buffer = await downloadParquetFromS3(storageService, s3Key);
+      const reader = await ParquetReader.openBuffer(buffer);
+      const rows: Record<string, unknown>[] = [];
+      try {
+        const cursor = reader.getCursor();
+        let next = (await cursor.next()) as Record<string, unknown> | null;
+        while (next) {
+          rows.push(next);
+          next = (await cursor.next()) as Record<string, unknown> | null;
+        }
+      } finally {
+        await reader.close();
+      }
+
+      if (rows.every((row) => row.submission_feature_id !== undefined && row.submission_feature_id !== null)) {
+        return rows.map((row) => Number(row.submission_feature_id));
+      }
+
+      const uuids = rows.map((row) => (Buffer.isBuffer(row.uuid) ? row.uuid.toString('utf-8') : String(row.uuid)));
+      const features: { submission_feature_id: number; uuid: string }[] = await db('biohub.submission_feature')
+        .whereIn('uuid', uuids)
+        .select('submission_feature_id', 'uuid');
+      expect(features, `one feature per uuid in ${s3Key}`).to.have.lengthOf(uuids.length);
+
+      return features.map((feature) => feature.submission_feature_id);
+    }
+
+    before(async () => {
+      // A policy over two feature types, with features of both in one submission.
+      const submissionId = await createTestSubmission();
+      const surveyFeatureId = await createTestFeature(submissionId, 'survey', {
+        name: 'Feature Set Test Survey',
+        start_date: '2024-01-01T00:00:00.000Z',
+        end_date: '2024-12-31T00:00:00.000Z'
+      });
+      const firstSampleSiteFeatureId = await createTestFeature(
+        submissionId,
+        'sample_site',
+        { name: 'Feature Set Test Site 1', geometry: { type: 'Point', coordinates: [-124.856, 54.321] } },
+        surveyFeatureId
+      );
+      const secondSampleSiteFeatureId = await createTestFeature(
+        submissionId,
+        'sample_site',
+        { name: 'Feature Set Test Site 2', geometry: { type: 'Point', coordinates: [-130.849, 56.207] } },
+        surveyFeatureId
+      );
+      createdFeatureIds = [surveyFeatureId, firstSampleSiteFeatureId, secondSampleSiteFeatureId];
+
+      const { downloadVersionId } = await createDownloadAndProcess(['survey', 'sample_site'], { format: 'parquet' });
+
+      const stored = await db.raw(
+        `SELECT
+           rb_to_array(feature_ids) AS ids,
+           rb_cardinality(feature_ids)::integer AS cardinality,
+           feature_count
+         FROM biohub.download_version
+         WHERE download_version_id = ?`,
+        [downloadVersionId]
+      );
+      expect(stored.rows, 'download_version row').to.have.lengthOf(1);
+      storedFeatureIds = stored.rows[0].ids;
+      storedCardinality = stored.rows[0].cardinality;
+      featureCount = stored.rows[0].feature_count;
+
+      const artifacts: { feature_type_name: string; object_key: string }[] = await db(
+        'biohub.download_version_artifact as dva'
+      )
+        .join('biohub.artifact as a', 'a.artifact_id', 'dva.artifact_id')
+        .where('dva.download_version_id', downloadVersionId)
+        .whereNull('dva.record_end_date')
+        .select('dva.feature_type_name', 'a.object_key')
+        .orderBy('dva.feature_type_name');
+      createdS3Keys.push(...artifacts.map((artifact) => artifact.object_key));
+
+      files = [];
+      for (const artifact of artifacts) {
+        files.push({
+          featureTypeName: artifact.feature_type_name,
+          featureIds: await readFeatureIdsFromParquet(artifact.object_key)
+        });
+      }
+
+      const featureTypes: { submission_feature_id: number; name: string }[] = await db(
+        'biohub.submission_feature as sf'
+      )
+        .join('biohub.feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+        .whereIn(
+          'sf.submission_feature_id',
+          files.flatMap((file) => file.featureIds)
+        )
+        .select('sf.submission_feature_id', 'ft.name');
+      featureTypeNameByFeatureId = new Map(featureTypes.map((row) => [row.submission_feature_id, row.name]));
+
+      // Fixture checks: one file per feature type of the policy, holding the features created above.
+      expect(files.map((file) => file.featureTypeName)).to.deep.equal(['sample_site', 'survey']);
+      expect(files[0].featureIds, 'sample_site file').to.include.members([
+        firstSampleSiteFeatureId,
+        secondSampleSiteFeatureId
+      ]);
+      expect(files[1].featureIds, 'survey file').to.include(surveyFeatureId);
+    });
+
+    const sortedAscending = (ids: number[]): number[] => [...ids].sort((a, b) => a - b);
+
+    it('AC1 the union of the features in the version files equals the stored feature set', async () => {
+      const featureIdsInFiles = files.flatMap((file) => file.featureIds);
+
+      expect(storedFeatureIds, 'rb_to_array(download_version.feature_ids)').to.not.equal(null);
+      expect(sortedAscending(storedFeatureIds ?? []), 'stored set against the files').to.deep.equal(
+        sortedAscending(featureIdsInFiles)
+      );
+      // No feature is in two files, so the union is as large as the sum of the files' rows.
+      expect(new Set(featureIdsInFiles).size, 'distinct features in the files').to.equal(featureIdsInFiles.length);
+      expect(storedFeatureIds, 'stored set').to.include.members(createdFeatureIds);
+    });
+
+    it('AC1 every file holds only features of its own feature type, and none outside the stored set', async () => {
+      expect(storedFeatureIds, 'rb_to_array(download_version.feature_ids)').to.not.equal(null);
+      const storedSet = new Set(storedFeatureIds ?? []);
+
+      for (const file of files) {
+        expect(file.featureIds, `rows of the ${file.featureTypeName} file`).to.have.length.greaterThan(0);
+
+        const outsideStoredSet = file.featureIds.filter((featureId) => !storedSet.has(featureId));
+        expect(outsideStoredSet, `features of the ${file.featureTypeName} file outside the stored set`).to.deep.equal(
+          []
+        );
+
+        const ofAnotherType = file.featureIds.filter(
+          (featureId) => featureTypeNameByFeatureId.get(featureId) !== file.featureTypeName
+        );
+        expect(ofAnotherType, `features of the ${file.featureTypeName} file of another type`).to.deep.equal([]);
+      }
+    });
+
+    it('AC3 feature_count equals rb_cardinality(feature_ids) and the number of features in the files', async () => {
+      const featuresInFiles = files.reduce((total, file) => total + file.featureIds.length, 0);
+
+      expect(storedCardinality, 'rb_cardinality(download_version.feature_ids)').to.not.equal(null);
+      expect(featureCount, 'download_version.feature_count').to.equal(storedCardinality);
+      expect(featureCount, 'download_version.feature_count').to.equal(featuresInFiles);
+    });
+  });
 });
