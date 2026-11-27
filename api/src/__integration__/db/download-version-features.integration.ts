@@ -23,7 +23,8 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadVersionRepository } from '../../repositories/download/download-version-repository';
 import { buildBroadFeatureTypeSubquery } from '../../repositories/expression-evaluation';
-import { DownloadPipelineService, EffectiveDownloadStatement } from '../../services/download/download-pipeline-service';
+import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { EffectiveDownloadStatement } from '../../services/download/download-pipeline-service.interface';
 import { DownloadPolicyService } from '../../services/download/download-policy-service';
 import { DownloadService } from '../../services/download/download-service';
 import { ObjectStorageService } from '../../services/object-storage/object-storage-service';

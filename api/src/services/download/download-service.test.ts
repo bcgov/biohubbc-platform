@@ -21,7 +21,8 @@ import { DownloadVersionRepository } from '../../repositories/download/download-
 import { TeamService } from '../access-policy/team-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
-import { DownloadPipelineService, EffectiveDownloadStatement } from './download-pipeline-service';
+import { DownloadPipelineService } from './download-pipeline-service';
+import { EffectiveDownloadStatement } from './download-pipeline-service.interface';
 import { DownloadPolicyService } from './download-policy-service';
 import { DownloadService, groupExportsByDownloadId } from './download-service';
 
