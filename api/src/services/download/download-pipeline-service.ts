@@ -2,7 +2,7 @@ import { ParquetWriter } from '@dsnp/parquetjs';
 import { Knex } from 'knex';
 import { PassThrough } from 'node:stream';
 import { getKnex, IDBConnection } from '../../database/db';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { DownloadSource, ParquetFeatureData } from '../../models/download';
@@ -35,18 +35,26 @@ import { ArtifactService } from '../upload/artifact-service';
 /**
  * Payload for `DownloadPipelineService.writeFeatureTypeParquet`.
  *
- * `downloadId` keys the deterministic S3 object key; `downloadVersionId` is the
- * temporal axis the produced artifact is linked to in `download_version_artifact`,
- * so the export pipeline can rediscover the version's Parquet files without
- * re-running the original search.
+ * `downloadId` keys the deterministic S3 object key; `downloadVersionId` names the
+ * version whose stored feature set the file is written from, and is the temporal axis
+ * the produced artifact is linked to in `download_version_artifact`, so the export
+ * pipeline can rediscover the version's Parquet files without re-running the original
+ * search.
  */
 export interface WriteFeatureTypeParquetPayload {
   downloadId: string;
   downloadVersionId: string;
-  source: DownloadSource;
   properties: CsvPropertyDefinition[];
   featureTypeName: string;
-  statement: EffectiveDownloadStatement;
+}
+
+/**
+ * Payload for `DownloadPipelineService.storeDownloadVersionFeatureSet`.
+ */
+export interface StoreDownloadVersionFeatureSetPayload {
+  downloadVersionId: string;
+  source: DownloadSource;
+  statements: EffectiveDownloadStatement[];
 }
 
 /**
@@ -189,9 +197,9 @@ export class DownloadPipelineService extends DBService {
    * The download's policy is the single source of truth for both the list of feature
    * types to export and (per type) whether to filter by an expression tree or to
    * project the broad feature-type set. Returning the full statements list alongside
-   * the schema lookup keeps the caller's per-type loop to a single fetch — the
-   * matching statement is threaded into `writeFeatureTypeParquet` instead of being
-   * re-queried per type.
+   * the schema lookup keeps the caller to a single fetch — the statements are handed to
+   * `storeDownloadVersionFeatureSet`, which resolves the version's feature set from them
+   * once.
    *
    * Feature types come back in `urn_feature_type` ASC order so the downstream loop
    * produces a stable, alphabetic sequence of Parquet files.
@@ -210,6 +218,143 @@ export class DownloadPipelineService extends DBService {
     const expandedStatements = resolveEffectiveDownloadStatements(statements, Array.from(schemaLookup.keys()));
     const featureTypes = expandedStatements.map((statement) => statement.urn_feature_type);
     return { schemaLookup, featureTypes, statements: expandedStatements };
+  }
+
+  /**
+   * Build the query that selects every feature a download contains, across all of its
+   * effective statements.
+   *
+   * Per statement: when `expression_id` is set, the expression tree drives the feature-id
+   * subquery (several expressions for one feature type are UNIONed); when null, a broad
+   * subquery over the whole feature type is used. In both branches a feature is kept only
+   * when it is current, has a closure self-loop, and passes the security filter for
+   * `source.requested_by` — visibility is judged against the requesting user's
+   * authorization scope, not the audit `create_user` or the worker's own connection grants.
+   *
+   * There is one effective statement per feature type and a feature has one type, so the
+   * per-statement subqueries are disjoint and are combined with UNION ALL.
+   *
+   * Returns the compiled SQL and bindings, never the knex builder: a builder is thenable,
+   * so returning one from an async method would execute it.
+   *
+   * @param {DownloadSource} source - The download source (policy_id + requested_by).
+   * @param {EffectiveDownloadStatement[]} statements - The effective statements, one per feature type.
+   * @return {Promise<{ sql: string; bindings: unknown[] } | null>} The compiled feature-id query, or
+   *   null when there are no statements.
+   * @memberof DownloadPipelineService
+   */
+  async buildDownloadFeatureIdsQuery(
+    source: DownloadSource,
+    statements: EffectiveDownloadStatement[]
+  ): Promise<{ sql: string; bindings: unknown[] } | null> {
+    if (statements.length === 0) {
+      return null;
+    }
+
+    const statementSubqueries: Knex.QueryBuilder[] = [];
+    for (const statement of statements) {
+      const featureTypeName = statement.urn_feature_type;
+
+      if (statement.expression_id === null) {
+        statementSubqueries.push(
+          expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by)
+        );
+        continue;
+      }
+
+      // The expression evaluator consumes the optimized internal tree shape.
+      // `readExpressionTree` returns the public API tree, so validate and optimize
+      // through the same stages used by search before generating SQL.
+      const expressionIds = statement.expression_ids ?? [statement.expression_id];
+      const expressionSubqueries = [];
+      for (const expressionId of expressionIds) {
+        const expressionTree = await this.expressionTreeService.readExpressionTree(expressionId);
+        const normalizedExpression = await this.expressionTreeNormalizationService.normalize(expressionTree);
+        const optimizedExpression = optimizeExpression(normalizedExpression);
+        expressionSubqueries.push(
+          expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
+            featureTypeName,
+            optimizedExpression,
+            source.requested_by
+          )
+        );
+      }
+      statementSubqueries.push(
+        expressionSubqueries.length === 1 ? expressionSubqueries[0] : getKnex().union(expressionSubqueries, true)
+      );
+    }
+
+    const query =
+      statementSubqueries.length === 1 ? statementSubqueries[0] : getKnex().unionAll(statementSubqueries, true);
+    const { sql, bindings } = query.toSQL().toNative();
+
+    return { sql, bindings: [...bindings] };
+  }
+
+  /**
+   * Resolve a download version's feature set and store it on the version, once.
+   *
+   * The set is built and stored in one SQL statement, so no feature id crosses into
+   * Node. It is written only while the version has no stored set: on a retry (or a second
+   * worker on the same version) nothing is written and the size of the set stored by the
+   * first attempt is returned, so every attempt writes its files from the same set.
+   *
+   * @param {StoreDownloadVersionFeatureSetPayload} payload
+   * @param {string} payload.downloadVersionId - The download version to store the set on.
+   * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
+   * @param {EffectiveDownloadStatement[]} payload.statements - The effective statements, one per feature type.
+   * @return {Promise<number>} The number of features in the version's stored set.
+   * @throws {ApiGeneralError} if the version has no stored set after the store.
+   * @memberof DownloadPipelineService
+   */
+  async storeDownloadVersionFeatureSet(payload: StoreDownloadVersionFeatureSetPayload): Promise<number> {
+    const { downloadVersionId, source, statements } = payload;
+
+    const featureIdsQuery = await this.buildDownloadFeatureIdsQuery(source, statements);
+
+    await this.downloadVersionRepository.updateDownloadVersionFeatureIds(
+      downloadVersionId,
+      featureIdsQuery?.sql ?? null,
+      featureIdsQuery?.bindings ?? []
+    );
+
+    const featureSetSize = await this.downloadVersionRepository.findDownloadVersionFeatureSetSize(downloadVersionId);
+
+    if (featureSetSize === null) {
+      throw new ApiGeneralError('Download version has no stored feature set', [
+        'DownloadPipelineService->storeDownloadVersionFeatureSet',
+        { downloadVersionId }
+      ]);
+    }
+
+    return featureSetSize;
+  }
+
+  /**
+   * List the feature types a download version gets a Parquet file for.
+   *
+   * The sorted, de-duplicated union of `featureTypeNames` (the feature types of the statements
+   * resolved on this attempt) and the feature types present in the version's stored set.
+   * Statements are re-read on every attempt, so a retry can resolve fewer of them than the
+   * attempt that stored the set; every feature in the set must still land in a file. A type with
+   * a statement and no features still gets its (empty) file.
+   *
+   * @param {string} downloadVersionId - The download version whose stored feature set is read.
+   * @param {string[]} featureTypeNames - The feature types of the resolved statements.
+   * @return {Promise<string[]>} Feature type names, each once, ordered by name.
+   * @memberof DownloadPipelineService
+   */
+  async listDownloadVersionFileFeatureTypeNames(
+    downloadVersionId: string,
+    featureTypeNames: string[]
+  ): Promise<string[]> {
+    const storedFeatureTypes = await this.downloadVersionRepository.listDownloadVersionFeatureTypeNames(
+      downloadVersionId
+    );
+
+    return Array.from(new Set([...featureTypeNames, ...storedFeatureTypes.map((row) => row.name)])).sort((a, b) =>
+      a.localeCompare(b)
+    );
   }
 
   /**
@@ -239,29 +384,23 @@ export class DownloadPipelineService extends DBService {
    *
    * Zero disk usage: streams through PassThrough → hash → S3 multipart upload.
    *
-   * Per-statement evaluation: `payload.statement` is the resolved policy statement
-   * for this feature type. When `expression_id` is set, the expression tree drives
-   * the feature-id subquery; when null, a broad subquery over the whole feature
-   * type is used. In both branches the security filter is applied for
-   * `source.requested_by` so visibility is judged at export time against the
-   * requesting user's authorization scope — not the audit `create_user` or the
-   * worker's own connection grants.
+   * The rows come from the version's stored feature set (`download_version.feature_ids`),
+   * which `storeDownloadVersionFeatureSet` resolved once for the whole version. Nothing is
+   * evaluated here: the policy expression, the current and closure rules and the security
+   * filter for `requested_by` were all applied when the set was stored, so every file of
+   * the version is cut from the same set.
    *
    * @param {WriteFeatureTypeParquetPayload} payload
    * @param {string} payload.downloadId - The download ID.
-   * @param {string} payload.downloadVersionId - The download's materialized version; the produced artifact is linked to it.
-   * @param {DownloadSource} payload.source - The download source (policy_id + requested_by).
+   * @param {string} payload.downloadVersionId - The download's materialized version; its stored feature set
+   *   is the source of the rows, and the produced artifact is linked to it.
    * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
    * @param {string} payload.featureTypeName - The feature type to stream.
-   * @param {EffectiveDownloadStatement} payload.statement - The effective policy statement for this feature type.
-   * @return {Promise<number>} The number of hydrated feature rows written to the Parquet file. Counted
-   *   during the streaming write so the caller can store the version's total feature count at
-   *   materialization time — computing it live per landing view would put a large COUNT over the policy
-   *   scope on a public request path.
+   * @return {Promise<number>} The number of hydrated feature rows written to the Parquet file.
    * @memberof DownloadPipelineService
    */
   async writeFeatureTypeParquet(payload: WriteFeatureTypeParquetPayload): Promise<number> {
-    const { downloadId, downloadVersionId, source, properties, featureTypeName, statement } = payload;
+    const { downloadId, downloadVersionId, properties, featureTypeName } = payload;
 
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
@@ -269,44 +408,11 @@ export class DownloadPipelineService extends DBService {
     const schema = buildParquetSchema(properties);
     const s3Key = buildParquetKey(downloadId, downloadVersionId, featureTypeName);
 
-    // Resolve every precondition (expression read, semantic validation, subquery
-    // build, cursor setup) BEFORE starting the S3 multipart upload. The upload
-    // holds an open multipart context; if any of these throw after upload startup,
-    // the abort path can't run and the upload either hangs or leaks. Building the
-    // cursor descriptor is cheap and side-effect-free until the stream is iterated.
-    //
-    // The expression evaluator consumes the optimized internal tree shape.
-    // `readExpressionTree` returns the public API tree, so validate and optimize
-    // through the same stages used by search before generating SQL.
-    const expressionIds =
-      statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
-
-    let subquery: Knex.QueryBuilder;
-    if (statement.expression_id === null) {
-      subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by);
-    } else {
-      const expressionSubqueries = [];
-      for (const expressionId of expressionIds) {
-        const expressionTree = await this.expressionTreeService.readExpressionTree(expressionId);
-        const normalizedExpression = await this.expressionTreeNormalizationService.normalize(expressionTree);
-        const optimizedExpression = optimizeExpression(normalizedExpression);
-        expressionSubqueries.push(
-          expressionEvaluation.buildExpressionTreeFeatureIdsSubquery(
-            featureTypeName,
-            optimizedExpression,
-            source.requested_by
-          )
-        );
-      }
-      subquery =
-        expressionSubqueries.length === 1 ? expressionSubqueries[0] : getKnex().union(expressionSubqueries, true);
-    }
-
-    const { sql, bindings } = subquery.toSQL().toNative();
-    const cursor = this.downloadRepository.streamFeatureBaseBySearchQueryAndType(
+    // Set up the cursor BEFORE starting the S3 multipart upload. Building the cursor
+    // descriptor is cheap and side-effect-free until the stream is iterated.
+    const cursor = this.downloadRepository.streamDownloadVersionFeatureBaseByType(
       downloadId,
-      sql,
-      bindings as any[],
+      downloadVersionId,
       featureTypeName
     );
 
@@ -595,7 +701,7 @@ export function resolveEffectiveDownloadStatements(
  *
  * A broad concrete ALLOW (`expression_id === null`) covers every row for that
  * feature type, so narrower filtered statements do not add anything. Otherwise,
- * all expression ids are retained so `writeFeatureTypeParquet` can UNION them.
+ * all expression ids are retained so `buildDownloadFeatureIdsQuery` can UNION them.
  *
  * @param {ActivePolicyStatementWithExpression[]} featureStatements - ALLOW statements for a single concrete feature type.
  * @return {EffectiveDownloadStatement} One effective statement for the feature type.

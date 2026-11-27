@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadArtifactInfo } from '../../models/download';
@@ -101,6 +102,101 @@ export class DownloadVersionRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Store a download version's feature set, once.
+   *
+   * `featureIdsSql` is a compiled subquery that returns `submission_feature_id` rows, with its
+   * positional `bindings`. The set is aggregated and run-optimised inside the database in one
+   * statement; no feature id is returned to the caller. A `null` subquery stores the empty set.
+   *
+   * The set is written only while `feature_ids` is NULL: the first writer wins, and a retry or a
+   * concurrent worker waits on the row lock and then updates nothing. A row count of 0 is therefore
+   * not an error — the set was already stored.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @param {(string | null)} featureIdsSql - Compiled feature-id subquery, or null for the empty set.
+   * @param {unknown[]} bindings - Positional bindings of `featureIdsSql`.
+   * @return {Promise<void>}
+   * @memberof DownloadVersionRepository
+   */
+  async updateDownloadVersionFeatureIds(
+    downloadVersionId: string,
+    featureIdsSql: string | null,
+    bindings: unknown[]
+  ): Promise<void> {
+    const featureIds =
+      featureIdsSql === null
+        ? `rb_build('{}'::integer[])`
+        : `COALESCE((
+             SELECT rb_build_agg(ids.submission_feature_id) FROM (${featureIdsSql}) ids
+           ), rb_build('{}'::integer[]))`;
+
+    // The version id is the last positional parameter, after the subquery's bindings.
+    const values = [...bindings, downloadVersionId];
+
+    await this.connection.query(
+      `UPDATE download_version
+       SET feature_ids = rb_runoptimize(${featureIds})
+       WHERE download_version_id = $${values.length}
+         AND record_end_date IS NULL
+         AND feature_ids IS NULL`,
+      values
+    );
+  }
+
+  /**
+   * Find the size of a download version's stored feature set.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<number | null>} The number of features in the set, or null when the version
+   *   has no stored set (or does not exist).
+   * @memberof DownloadVersionRepository
+   */
+  async findDownloadVersionFeatureSetSize(downloadVersionId: string): Promise<number | null> {
+    const sql = SQL`
+      SELECT
+        rb_cardinality(feature_ids)::integer AS feature_set_size
+      FROM download_version
+      WHERE download_version_id = ${downloadVersionId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, z.object({ feature_set_size: z.number().int().nullable() }));
+
+    return response.rows[0]?.feature_set_size ?? null;
+  }
+
+  /**
+   * List the feature types of the features in a download version's stored feature set.
+   *
+   * The set is read once, iterated with the set-returning `rb_iterate` (never built as one
+   * `integer[]` value) and joined to `submission_feature` by primary key, as the per-type cursor
+   * does. A version with no stored set, or an empty one, has no feature types.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<{ name: string }[]>} One row per distinct feature type name, ordered by name.
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersionFeatureTypeNames(downloadVersionId: string): Promise<{ name: string }[]> {
+    const sql = SQL`
+      SELECT DISTINCT
+        ft.name
+      FROM rb_iterate((
+        SELECT dv.feature_ids
+        FROM download_version dv
+        WHERE dv.download_version_id = ${downloadVersionId}
+          AND dv.record_end_date IS NULL
+      )) AS version_feature(submission_feature_id)
+      INNER JOIN submission_feature sf ON sf.submission_feature_id = version_feature.submission_feature_id
+      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      ORDER BY ft.name;
+    `;
+
+    const response = await this.connection.sql(sql, z.object({ name: z.string() }));
+
+    return response.rows;
   }
 
   /**

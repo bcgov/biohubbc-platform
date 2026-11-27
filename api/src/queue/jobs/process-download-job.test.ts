@@ -57,6 +57,25 @@ describe('process-download-job', () => {
     expression_id
   });
 
+  /**
+   * Stubs the step that stores the version's feature set and the repository read of the feature
+   * types present in it. Defaults to an empty set. The service method that unions those types
+   * with the statements' types runs for real, and is spied on.
+   */
+  const stubFeatureSet = (featureCount = 0, storedFeatureTypeNames: string[] = []) => {
+    const storeStub = sinon
+      .stub(DownloadPipelineService.prototype, 'storeDownloadVersionFeatureSet')
+      .resolves(featureCount);
+    sinon
+      .stub(DownloadVersionRepository.prototype, 'listDownloadVersionFeatureTypeNames')
+      .resolves(storedFeatureTypeNames.map((name) => ({ name })));
+    const listFileFeatureTypeNamesSpy = sinon.spy(
+      DownloadPipelineService.prototype,
+      'listDownloadVersionFileFeatureTypeNames'
+    );
+    return { storeStub, listFileFeatureTypeNamesSpy };
+  };
+
   describe('processDownloadJobHandler', () => {
     it('transitions pending → processing → ready for a version with 3 feature types', async () => {
       setupMockConnection();
@@ -77,6 +96,7 @@ describe('process-download-job', () => {
       schemaLookup.set('c', [{ feature_property_name: 'three', feature_property_type_name: 'string' }]);
 
       const statements = [createMockStatement('a'), createMockStatement('b'), createMockStatement('c')];
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
         featureTypes: ['a', 'b', 'c'],
@@ -106,24 +126,142 @@ describe('process-download-job', () => {
       expect(writeStub.firstCall.args[0]).to.deep.include({
         downloadId: DOWNLOAD_ID,
         downloadVersionId: DOWNLOAD_VERSION_ID,
-        source,
-        featureTypeName: 'a',
-        statement: statements[0]
+        featureTypeName: 'a'
       });
       expect(writeStub.secondCall.args[0]).to.deep.include({
         downloadId: DOWNLOAD_ID,
         downloadVersionId: DOWNLOAD_VERSION_ID,
-        source,
-        featureTypeName: 'b',
-        statement: statements[1]
+        featureTypeName: 'b'
       });
       expect(writeStub.thirdCall.args[0]).to.deep.include({
         downloadId: DOWNLOAD_ID,
         downloadVersionId: DOWNLOAD_VERSION_ID,
-        source,
-        featureTypeName: 'c',
-        statement: statements[2]
+        featureTypeName: 'c'
       });
+    });
+
+    it('stores the feature set once from the source and statements, before any file is written', async () => {
+      // Verifies: the handler resolves the version's set in one store call, ahead of the file loop
+
+      // Step 1: Stub the version, the source and three statements
+      setupMockConnection();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
+        .resolves(createMockDownloadVersionStatusRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
+      const source = { policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+
+      const statements = [createMockStatement('a'), createMockStatement('b', 'expr-b'), createMockStatement('c')];
+      const { storeStub, listFileFeatureTypeNamesSpy } = stubFeatureSet(3, ['a', 'b']);
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: ['a', 'b', 'c'],
+        statements
+      });
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves(0);
+
+      // Step 2: Run the handler
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      // Step 3: One store call, carrying the version, the source and every statement
+      expect(storeStub).to.have.been.calledOnceWithExactly({
+        downloadVersionId: DOWNLOAD_VERSION_ID,
+        source,
+        statements
+      });
+
+      // Step 4: The file types are asked for once, after the store, with the statements' feature types
+      expect(listFileFeatureTypeNamesSpy).to.have.been.calledOnceWithExactly(DOWNLOAD_VERSION_ID, ['a', 'b', 'c']);
+      expect(listFileFeatureTypeNamesSpy).to.have.been.calledAfter(storeStub);
+
+      // Step 5: The store ran before the first file, and no write payload carries the statement or source
+      expect(storeStub).to.have.been.calledBefore(writeStub);
+      expect(writeStub).to.have.been.calledThrice;
+      expect(writeStub.firstCall.args[0]).to.have.all.keys(
+        'downloadId',
+        'downloadVersionId',
+        'properties',
+        'featureTypeName'
+      );
+    });
+
+    it('writes a file for every feature type in the stored set, even one no statement covers', async () => {
+      // Verifies: the file loop follows the types the service returns — the sorted union of the
+      // statements' types and the stored set's types — not the statements alone
+
+      // Step 1: A retry resolves statements for 'c' and 'a' only; the stored set also holds 'b' features
+      setupMockConnection();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
+        .resolves(createMockDownloadVersionStatusRecord({ status: DownloadStatusEnum.PROCESSING }));
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+
+      const bProps: CsvPropertyDefinition[] = [{ feature_property_name: 'two', feature_property_type_name: 'string' }];
+      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+      schemaLookup.set('a', []);
+      schemaLookup.set('b', bProps);
+      schemaLookup.set('c', []);
+
+      stubFeatureSet(4, ['a', 'b']);
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup,
+        featureTypes: ['c', 'a'],
+        statements: [createMockStatement('c'), createMockStatement('a')]
+      });
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves(0);
+
+      // Step 2: Run the handler
+      await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+
+      // Step 3: One file per type, each once, in name order — 'a' is not written twice and
+      // 'c' (a statement with no features in the set) still gets its file
+      expect(writeStub.getCalls().map((call) => call.args[0].featureTypeName)).to.deep.equal(['a', 'b', 'c']);
+
+      // Step 4: The type with no statement is written with its own schema properties
+      expect(writeStub.secondCall.args[0].properties).to.deep.equal(bProps);
+    });
+
+    it('propagates an error from storeDownloadVersionFeatureSet without writing a file or transitioning to READY', async () => {
+      // Verifies: a failed store stops the build before the file loop
+
+      // Step 1: Stub the store to reject
+      setupMockConnection();
+      sinon
+        .stub(DownloadVersionRepository.prototype, 'getDownloadVersion')
+        .resolves(createMockDownloadVersionStatusRecord());
+      const transitionStub = sinon
+        .stub(DownloadPipelineService.prototype, 'transitionDownloadVersionStatus')
+        .resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+
+      const { storeStub } = stubFeatureSet();
+      const testError = new Error('feature set store failed');
+      storeStub.rejects(testError);
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: ['a'],
+        statements: [createMockStatement('a')]
+      });
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves(0);
+
+      // Step 2: Run the handler and capture the error
+      try {
+        await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect(error).to.equal(testError);
+      }
+
+      // Step 3: No file was written and only the PROCESSING transition ran
+      expect(writeStub).to.not.have.been.called;
+      expect(transitionStub).to.have.been.calledOnce;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
     });
 
     it('derives downloadId for the parquet write from the version row download_id', async () => {
@@ -143,6 +281,7 @@ describe('process-download-job', () => {
 
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
       schemaLookup.set('a', []);
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
         featureTypes: ['a'],
@@ -180,6 +319,7 @@ describe('process-download-job', () => {
       schemaLookup.set('observation', obsProps);
       schemaLookup.set('survey', surveyProps);
 
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
         featureTypes: ['observation', 'survey'],
@@ -209,6 +349,7 @@ describe('process-download-job', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],
@@ -227,7 +368,7 @@ describe('process-download-job', () => {
       expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
     });
 
-    it('sums per-feature-type row counts and passes featureCount on the READY transition only', async () => {
+    it('passes the stored set size, not the rows the writes report, as featureCount on the READY transition only', async () => {
       setupMockConnection();
 
       sinon
@@ -245,21 +386,24 @@ describe('process-download-job', () => {
       schemaLookup.set('a', []);
       schemaLookup.set('b', []);
       schemaLookup.set('c', []);
+      // The stored set holds 10 features.
+      stubFeatureSet(10, ['a', 'b', 'c']);
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
         featureTypes: ['a', 'b', 'c'],
         statements: [createMockStatement('a'), createMockStatement('b'), createMockStatement('c')]
       });
 
-      // Each per-type write reports the rows it materialized; the handler sums them.
+      // The per-type writes report rows that do not add up to the set size: the handler must
+      // take the count from the stored set, not from the writes.
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet');
       writeStub.onCall(0).resolves(2);
       writeStub.onCall(1).resolves(3);
-      writeStub.onCall(2).resolves(5);
+      writeStub.onCall(2).resolves(4);
 
       await processDownloadJobHandler([createMockJob(DOWNLOAD_VERSION_ID)]);
 
-      // The PROCESSING transition carries no metadata; the READY transition carries the sum.
+      // The PROCESSING transition carries no metadata; the READY transition carries the set size.
       expect(transitionStub).to.have.been.calledTwice;
       expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
       expect(transitionStub.firstCall.args[3]).to.be.undefined;
@@ -279,6 +423,7 @@ describe('process-download-job', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],
@@ -309,6 +454,7 @@ describe('process-download-job', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 1 });
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],
@@ -383,6 +529,7 @@ describe('process-download-job', () => {
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
       schemaLookup.set('a', []);
 
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
         featureTypes: ['a'],
@@ -422,6 +569,7 @@ describe('process-download-job', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: null });
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],
@@ -444,6 +592,7 @@ describe('process-download-job', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadSource')
         .resolves({ policy_id: '11111111-1111-1111-1111-111111111111', requested_by: 42 });
+      stubFeatureSet();
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
         featureTypes: [],

@@ -6,7 +6,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadRepository } from './download-repository';
+import { BaseFeatureRow, DownloadRepository } from './download-repository';
 
 chai.use(sinonChai);
 
@@ -437,59 +437,70 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('streamFeatureBaseBySearchQueryAndType', () => {
-    it('yields batches via cursor with search subquery bindings', async () => {
-      const queryStub = sinon.stub();
+  describe('streamDownloadVersionFeatureBaseByType', () => {
+    const DOWNLOAD_ID = 'dddd0000-0000-0000-0000-000000000001';
+    const DOWNLOAD_VERSION_ID = 'eeee0000-0000-0000-0000-000000000002';
 
-      // DECLARE
+    it('declares a cursor over the version stored feature set, bound to the version and feature type', async () => {
+      // Verifies: the cursor reads the version's bitmap (not the download id) and filters by feature type
+
+      // Step 1: Setup the DECLARE, one FETCH with data, an empty FETCH and the CLOSE
+      const queryStub = sinon.stub();
       queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
-      // FETCH with data
-      queryStub.onCall(1).resolves({
-        rows: [
-          {
-            submission_feature_id: 5,
-            uuid: 'uuid-5',
-            feature_type_name: 'observation',
-            data: { properties: {} },
-            parent_uuid: 'parent-uuid-5'
-          }
-        ],
-        rowCount: 1
-      });
-      // FETCH empty
+      const row: BaseFeatureRow = {
+        submission_feature_id: 5,
+        uuid: 'uuid-5',
+        feature_type_name: 'observation',
+        data: {},
+        parent_uuid: 'parent-uuid-5'
+      };
+      queryStub.onCall(1).resolves({ rows: [row], rowCount: 1 });
       queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
-      // CLOSE
       queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
 
+      // Step 2: Create repository with mocked connection
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const batches: any[][] = [];
-      for await (const batch of repo.streamFeatureBaseBySearchQueryAndType(
-        'dddd0000-0000-0000-0000-000000000001',
-        'SELECT submission_feature_id FROM search_results WHERE x = $1',
-        ['search-val'],
-        'observation'
+      // Step 3: Consume the stream
+      const batches: BaseFeatureRow[][] = [];
+      for await (const batch of repo.streamDownloadVersionFeatureBaseByType(
+        DOWNLOAD_ID,
+        DOWNLOAD_VERSION_ID,
+        'observation',
+        50
       )) {
         batches.push(batch);
       }
 
+      // Step 4: The cursor iterates the active version's stored set (no array is built) and joins
+      // submission_feature by primary key
+      const [declareSql, declareBindings] = queryStub.getCall(0).args;
+      expect(declareSql).to.include('DECLARE dl_pq_version_cursor_dddd0000_0000_0000_0000_000000000001_observation');
+      expect(declareSql).to.include('FROM rb_iterate((');
+      expect(declareSql).to.not.include('rb_to_array');
+      expect(declareSql).to.include('WHERE dv.download_version_id = $1');
+      expect(declareSql).to.include('AND dv.record_end_date IS NULL');
+      expect(declareSql).to.include('sf.submission_feature_id = version_feature.submission_feature_id');
+      expect(declareSql).to.include('WHERE ft.name = $2');
+
+      // Step 5: Bindings are the version id (not the download id) then the feature type
+      expect(declareBindings).to.deep.equal([DOWNLOAD_VERSION_ID, 'observation']);
+
+      // Step 6: The batch size drives FETCH, and the cursor is closed
+      expect(queryStub.getCall(1).args[0]).to.include('FETCH 50 FROM');
+      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
+
+      // Step 7: The fetched batch is yielded as it came from the cursor
       expect(batches).to.have.length(1);
       expect(batches[0][0]).to.have.property('submission_feature_id', 5);
-
-      // Verify DECLARE includes search SQL and feature type binding
-      const declareArgs = queryStub.getCall(0).args;
-      expect(declareArgs[0]).to.include('DECLARE');
-      expect(declareArgs[0]).to.include('submission_feature');
-      // Bindings include search value + feature type name
-      expect(declareArgs[1]).to.deep.equal(['search-val', 'observation']);
-
-      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
     });
 
     it('calls CLOSE even when FETCH throws', async () => {
-      const queryStub = sinon.stub();
+      // Verifies: a failed FETCH still closes the cursor before the error surfaces
 
+      // Step 1: DECLARE succeeds, the first FETCH rejects, CLOSE succeeds
+      const queryStub = sinon.stub();
       queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
       queryStub.onCall(1).rejects(new Error('Search cursor failure'));
       queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
@@ -497,20 +508,16 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
+      // Step 2: Pull the first batch and capture the error
+      const stream = repo.streamDownloadVersionFeatureBaseByType(DOWNLOAD_ID, DOWNLOAD_VERSION_ID, 'observation');
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for await (const _batch of repo.streamFeatureBaseBySearchQueryAndType(
-          'dddd0000-0000-0000-0000-000000000001',
-          'SELECT sf_id FROM search WHERE x = $1',
-          ['val'],
-          'observation'
-        )) {
-          // should not reach here
-        }
+        await stream.next();
         expect.fail('Expected error');
       } catch (err: any) {
         expect(err.message).to.equal('Search cursor failure');
       }
+
+      // Step 3: The cursor was closed
 
       const closeCall = queryStub.getCalls().find((c) => String(c.args[0]).includes('CLOSE'));
       expect(closeCall).to.not.be.undefined;

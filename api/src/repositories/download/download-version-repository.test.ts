@@ -262,6 +262,119 @@ describe('DownloadVersionRepository', () => {
     });
   });
 
+  describe('updateDownloadVersionFeatureIds', () => {
+    it('aggregates the feature-id subquery into a run-optimised bitmap and binds the version id after its bindings', async () => {
+      // Verifies: the subquery is embedded, its bindings keep their positions, and the version id comes last
+
+      // Step 1: Setup mock DB
+      const queryStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      // Step 2: Create repository with mocked connection
+      const repo = new DownloadVersionRepository(mockDBConnection);
+
+      // Step 3: Store a set from a compiled subquery with two bindings
+      const featureIdsSql = 'SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = $1 AND b = $2';
+      await repo.updateDownloadVersionFeatureIds(VERSION_ID, featureIdsSql, ['survey', 7]);
+
+      // Step 4: The set is built in the database, run-optimised, with an empty-set fallback
+      const [sqlText, values] = queryStub.firstCall.args;
+      expect(sqlText).to.include('UPDATE download_version');
+      expect(sqlText).to.include('SET feature_ids = rb_runoptimize(COALESCE((');
+      expect(sqlText).to.include(`SELECT rb_build_agg(ids.submission_feature_id) FROM (${featureIdsSql}) ids`);
+      expect(sqlText).to.include(`rb_build('{}'::integer[])`);
+
+      // Step 5: The version id is the parameter after the subquery's own, and the set is written once
+      expect(sqlText).to.include('WHERE download_version_id = $3');
+      expect(sqlText).to.include('AND record_end_date IS NULL');
+      expect(sqlText).to.include('AND feature_ids IS NULL');
+      expect(values).to.deep.equal(['survey', 7, VERSION_ID]);
+    });
+
+    it('stores the empty bitmap with no subquery when featureIdsSql is null', async () => {
+      // Verifies: the null branch writes an empty set and binds only the version id
+
+      // Step 1: Setup mock DB and repository
+      const queryStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const repo = new DownloadVersionRepository(getMockDBConnection({ query: queryStub }));
+
+      // Step 2: Store with no subquery
+      await repo.updateDownloadVersionFeatureIds(VERSION_ID, null, []);
+
+      // Step 3: No aggregate is run; the version id is the first parameter
+      const [sqlText, values] = queryStub.firstCall.args;
+      expect(sqlText).to.include(`SET feature_ids = rb_runoptimize(rb_build('{}'::integer[]))`);
+      expect(sqlText).to.not.include('rb_build_agg');
+      expect(sqlText).to.include('WHERE download_version_id = $1');
+      expect(values).to.deep.equal([VERSION_ID]);
+    });
+
+    it('does not throw when no row is updated (the set was already stored)', async () => {
+      // Verifies: rowCount 0 is the retry path, not an error
+      const queryStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repo = new DownloadVersionRepository(getMockDBConnection({ query: queryStub }));
+
+      await repo.updateDownloadVersionFeatureIds(VERSION_ID, 'SELECT 1 AS submission_feature_id', []);
+
+      expect(queryStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('findDownloadVersionFeatureSetSize', () => {
+    it('returns null when the version row has no stored set', async () => {
+      // Verifies: a NULL cardinality (feature_ids IS NULL) maps to null, not 0
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ feature_set_size: null }], 1));
+      const repo = new DownloadVersionRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repo.findDownloadVersionFeatureSetSize(VERSION_ID);
+
+      expect(result).to.equal(null);
+      expect(sqlStub.firstCall.args[0].text).to.include('rb_cardinality(feature_ids)::integer AS feature_set_size');
+      expect(sqlStub.firstCall.args[0].values).to.deep.equal([VERSION_ID]);
+    });
+
+    it('returns null when no version matches', async () => {
+      // Verifies: find* maps an empty result to null
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repo = new DownloadVersionRepository(getMockDBConnection({ sql: sqlStub }));
+
+      expect(await repo.findDownloadVersionFeatureSetSize(VERSION_ID)).to.equal(null);
+    });
+
+    it('returns 0 for an empty stored set (distinct from no set)', async () => {
+      // Verifies: an explicit 0 survives the null-coalescing
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ feature_set_size: 0 }], 1));
+      const repo = new DownloadVersionRepository(getMockDBConnection({ sql: sqlStub }));
+
+      expect(await repo.findDownloadVersionFeatureSetSize(VERSION_ID)).to.equal(0);
+    });
+  });
+
+  describe('listDownloadVersionFeatureTypeNames', () => {
+    it('iterates the active version stored set for its distinct feature type names and returns the raw rows', async () => {
+      // Verifies: the query iterates the version's own bitmap (no array is built), skips an ended
+      // version, and the rows are returned as they came from the query
+
+      // Step 1: Setup mock DB to return two name rows
+      const rows: { name: string }[] = [{ name: 'capture' }, { name: 'survey' }];
+      const sqlStub = sinon.stub().resolves(mockQueryResult(rows, 2));
+      const repo = new DownloadVersionRepository(getMockDBConnection({ sql: sqlStub }));
+
+      // Step 2: Call the list method
+      const result = await repo.listDownloadVersionFeatureTypeNames(VERSION_ID);
+
+      // Step 3: Verify the raw rows, the SQL shape and the bound version id
+      expect(result).to.equal(rows);
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('SELECT DISTINCT');
+      expect(sqlText).to.include('FROM rb_iterate((');
+      expect(sqlText).to.not.include('rb_to_array');
+      expect(sqlText).to.include('AND dv.record_end_date IS NULL');
+      expect(sqlText).to.include('ORDER BY ft.name');
+      expect(sqlStub.firstCall.args[0].values).to.deep.equal([VERSION_ID]);
+    });
+  });
+
   describe('listDownloadVersionArtifacts', () => {
     it('JOINs artifact, filters record_end_date IS NULL, and binds versionId', async () => {
       // Verifies: the active-artifact lookup joins artifact for object_key and excludes ended links

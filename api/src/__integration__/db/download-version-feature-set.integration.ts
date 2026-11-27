@@ -475,10 +475,8 @@ describe('Download version feature set (integration)', function () {
         await pipelineService.writeFeatureTypeParquet({
           downloadId: fixture.downloadId,
           downloadVersionId: fixture.downloadVersionId,
-          source: fixture.source,
           properties: fixture.schemaLookup.get(featureTypeName) ?? [],
-          featureTypeName,
-          statement
+          featureTypeName
         });
 
         const uuids = currentRows.map((row) => String(row.uuid));

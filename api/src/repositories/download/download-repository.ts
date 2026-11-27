@@ -371,31 +371,31 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Stream base feature rows for a filter-based download, filtered by feature type.
+   * Stream the base feature rows of one feature type from a download version's stored feature set.
+   *
+   * The version's set (`download_version.feature_ids`) is read once and iterated with the
+   * set-returning `rb_iterate`, so it is never built as one `integer[]` value in the backend. Its
+   * ids are joined to `submission_feature` by primary key, so the cost follows the size of the
+   * version, not the size of the table. Membership in the set is the only rule: no current, closure or security
+   * predicate is applied here, because the set was resolved under those rules when it was stored.
    *
    * Must be called within an open transaction (cursors require tx context).
    *
    * @param {string} downloadId - The download ID (used for cursor naming).
-   * @param {string} searchSql - Raw SQL for the search subquery.
-   * @param {any[]} searchBindings - Parameterized bindings for the search SQL.
+   * @param {string} downloadVersionId - The download version whose stored feature set is read.
    * @param {string} featureTypeName - The feature type to stream.
    * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
    * @yields {BaseFeatureRow[]} Batches of base feature rows.
    * @memberof DownloadRepository
    */
-  async *streamFeatureBaseBySearchQueryAndType(
+  async *streamDownloadVersionFeatureBaseByType(
     downloadId: string,
-    searchSql: string,
-    searchBindings: any[],
+    downloadVersionId: string,
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    // featureTypeName is the last positional parameter after all search bindings
-    const allBindings = [...searchBindings, featureTypeName];
-    const typeParamIndex = allBindings.length;
-
     yield* this.streamWithCursor<BaseFeatureRow>({
-      cursorName: `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
+      cursorName: `dl_pq_version_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
         /[^a-z0-9_]/gi,
         '_'
       )}`,
@@ -406,12 +406,18 @@ export class DownloadRepository extends BaseRepository {
           '{}'::jsonb AS data,
           ft.name AS feature_type_name,
           parent_sf.uuid AS parent_uuid
-        FROM submission_feature sf
+        FROM rb_iterate((
+          SELECT dv.feature_ids
+          FROM download_version dv
+          WHERE dv.download_version_id = $1
+            AND dv.record_end_date IS NULL
+        )) AS version_feature(submission_feature_id)
+        INNER JOIN submission_feature sf ON sf.submission_feature_id = version_feature.submission_feature_id
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
-        WHERE sf.submission_feature_id IN (${searchSql}) AND ft.name = $${typeParamIndex}
+        WHERE ft.name = $2
         ORDER BY sf.submission_feature_id`,
-      bindings: allBindings,
+      bindings: [downloadVersionId, featureTypeName],
       batchSize
     });
   }
