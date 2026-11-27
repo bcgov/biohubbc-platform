@@ -3,6 +3,7 @@ import { IFlattenedBlock, SubmissionFeatureIngestionRecord } from '../../models/
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { computeSubmissionFeatureContentHash } from '../../utils/feature-content-hash';
 import { getLogger } from '../../utils/logger';
+import { normalizeCase } from '../../utils/normalize';
 import { DBService } from '../db-service';
 
 /**
@@ -55,7 +56,8 @@ export class SubmissionFeatureIngestionService extends DBService {
     let droppedUnknownTypeCount = 0;
 
     const records = features.flatMap((feature): SubmissionFeatureIngestionRecord[] => {
-      const featureTypeId = knownFeatureTypeMap.get(feature.type);
+      const featureTypeName = normalizeCase(feature.type);
+      const featureTypeId = knownFeatureTypeMap.get(featureTypeName);
       if (!featureTypeId) {
         droppedUnknownTypeCount += 1;
         return [];
@@ -70,7 +72,7 @@ export class SubmissionFeatureIngestionService extends DBService {
           submissionUploadId,
           sourceId: feature.id,
           featureTypeId,
-          featureTypeName: feature.type,
+          featureTypeName,
           dataJson,
           dataByteSize: Buffer.byteLength(dataJson),
           contentHash: computeSubmissionFeatureContentHash(feature),

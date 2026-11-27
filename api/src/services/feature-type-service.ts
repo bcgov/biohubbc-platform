@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { CreateFeatureType, FeatureType, UpdateFeatureType } from '../models/feature-type';
 import { FeatureTypeRepository } from '../repositories/feature-type-repository';
+import { normalizeCase } from '../utils/normalize';
 import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
@@ -30,13 +31,17 @@ export class FeatureTypeService extends DBService {
   /**
    * Create a feature type record.
    *
+   * The name is stored normalized, since feature types are looked up by their lowercase name.
+   *
    * @param {CreateFeatureType} data - Feature type fields required to create the record.
    * @return {Promise<FeatureType>} The created feature type.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof FeatureTypeService
    */
   async createFeatureType(data: CreateFeatureType): Promise<FeatureType> {
-    return this.featureTypeRepository.insertFeatureType(data);
+    const name = normalizeCase(data.name);
+
+    return this.featureTypeRepository.insertFeatureType({ ...data, name });
   }
 
   /**

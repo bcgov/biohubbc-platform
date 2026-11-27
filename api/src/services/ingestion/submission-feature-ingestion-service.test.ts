@@ -133,6 +133,26 @@ describe('SubmissionFeatureIngestionService', () => {
       expect(insertedRows).to.have.length(1);
       expect(insertedRows[0]).to.include({ sourceId: 'feature-1', featureTypeId: 1 });
     });
+
+    it('matches a feature type whatever its case or padding in the tarball', async () => {
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatures').resolves(1);
+      const feature: IFlattenedBlock = {
+        id: 'feature-1',
+        type: ' Linework ',
+        properties: { name: 'Fence line' },
+        content: [],
+        parent: null
+      };
+
+      await service.ingestFeatureBatch(42, 'submission-upload-1', [feature], new Map([['linework', 30]]));
+
+      expect(insertStub.calledOnce).to.be.true;
+      const insertedRows = insertStub.firstCall.args[0];
+      expect(insertedRows).to.have.length(1);
+      expect(insertedRows[0]).to.include({ featureTypeId: 30, featureTypeName: 'linework' });
+      expect(JSON.parse(insertedRows[0].dataJson)).to.deep.equal(feature);
+    });
   });
   describe('deleteSubmissionFeaturesBySubmissionUploadId', () => {
     it('soft-deletes features scoped to one submission upload attempt', async () => {

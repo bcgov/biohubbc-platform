@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { CreateFeatureProperty, FeatureProperty, UpdateFeatureProperty } from '../models/feature-property';
 import { FeaturePropertyRepository } from '../repositories/feature-property-repository';
 import { FeaturePropertyTypeRepository } from '../repositories/feature-property-type-repository';
+import { normalizeCase } from '../utils/normalize';
 import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
@@ -33,6 +34,8 @@ export class FeaturePropertyService extends DBService {
   /**
    * Create a feature property record.
    *
+   * The name is stored normalized, since tarball property keys are matched against the lowercase name.
+   *
    * @param {CreateFeatureProperty} data - Feature property fields required to create the record.
    * @return {Promise<FeatureProperty>} The created feature property (with resolved type_name).
    * @throws {ApiNotFoundError} If the referenced feature_property_type_id does not exist.
@@ -41,7 +44,8 @@ export class FeaturePropertyService extends DBService {
    */
   async createFeatureProperty(data: CreateFeatureProperty): Promise<FeatureProperty> {
     await this.featurePropertyRepository.getFeaturePropertyTypeById(data.feature_property_type_id);
-    const featurePropertyId = await this.featurePropertyRepository.insertFeatureProperty(data);
+    const name = normalizeCase(data.name);
+    const featurePropertyId = await this.featurePropertyRepository.insertFeatureProperty({ ...data, name });
     return this.featurePropertyRepository.getFeatureProperty(featurePropertyId);
   }
 
