@@ -13,6 +13,7 @@
   },
   "scripts": {
     "setup": "npm-run-all -l -s migrate-latest seed",
+    "refresh-materialized-views": "ts-node src/cronjobs/index.ts",
     "migrate-latest": "knex migrate:latest --knexfile ./src/knexfile.ts",
     "migrate-rollback": "knex migrate:rollback --knexfile ./src/knexfile.ts",
     "migration-create": "./scripts/create-migration.sh",
