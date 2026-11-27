@@ -1,4 +1,4 @@
-import { mdiCheck, mdiClose, mdiHelpCircleOutline, mdiProgressClock } from '@mdi/js';
+import { mdiCheck, mdiClose, mdiFileDocumentEditOutline, mdiHelpCircleOutline, mdiProgressClock } from '@mdi/js';
 import appTheme from 'themes/appTheme';
 import { getSubmissionUploadJobStatusPresentation, isSubmissionUploadJobStatus } from './submission-upload-status';
 
@@ -13,6 +13,16 @@ describe('isSubmissionUploadJobStatus', () => {
 });
 
 describe('getSubmissionUploadJobStatusPresentation', () => {
+  it('presents draft as a known, non-terminal status', () => {
+    expect(getSubmissionUploadJobStatusPresentation('draft')).toEqual({
+      label: 'Draft',
+      iconPath: mdiFileDocumentEditOutline,
+      iconColor: appTheme.palette.text.secondary,
+      isKnown: true,
+      isTerminal: false
+    });
+  });
+
   it('resolves the shared label and icon for an in-progress stage', () => {
     expect(getSubmissionUploadJobStatusPresentation('indexing')).toEqual({
       label: 'Indexing',

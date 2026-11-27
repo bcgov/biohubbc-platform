@@ -6,6 +6,8 @@ import { TicketSubmissionValidation } from './submission-validation';
 import { UploadArtifactRoleEnum } from './upload-artifact';
 
 export const SubmissionUploadJobStatus = z.enum([
+  // Created but not yet submitted; processing never starts from it
+  'draft',
   'uploaded',
   'ingesting',
   'ingested',
@@ -44,7 +46,8 @@ export const SubmissionUpload = z.object({
   team_id: z.guid(),
   status: SubmissionUploadJobStatus,
   decision: SubmissionUploadDecision,
-  ticket_id: z.guid(),
+  /** Ticket opened when the upload is submitted; null only while the upload is a draft. */
+  ticket_id: z.guid().nullable(),
   blueprint_id: z.number(),
   successor_submission_upload_id: z.guid().nullable().optional(),
   comment: z.string().nullable().optional(),
@@ -95,7 +98,7 @@ export interface AdminSubmissionUploadListResponse {
 export const CreateSubmissionUpload = z.object({
   submission_id: z.number(),
   upload_id: z.guid(),
-  ticket_id: z.guid(),
+  ticket_id: z.guid().nullable(),
   status: SubmissionUploadJobStatus,
   blueprint_id: z.number(),
   comment: z.string().nullable().optional()
@@ -185,7 +188,6 @@ export interface StartSubmissionArchiveUploadInput {
   bytes: number;
   submissionId: number;
   submissionUuid: string;
-  systemUserIds: number[];
   submitterSystemUserIds: number[];
   comment: string | null;
   requestedBlueprintId?: number | null;

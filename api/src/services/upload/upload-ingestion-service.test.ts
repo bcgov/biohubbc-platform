@@ -116,7 +116,9 @@ describe('UploadIngestionService', () => {
 
   describe('startArchiveUpload', () => {
     for (const archiveFormat of [undefined, 'tar', 'tar.gz'] as const) {
-      it(`creates upload metadata and presigned URLs for ${archiveFormat ?? 'default tar'}`, async () => {
+      it(`creates a draft upload without a ticket and presigned URLs for ${
+        archiveFormat ?? 'default tar'
+      }`, async () => {
         const mockSubmissionId = 123;
         const mockUploadId = 'upload-456';
         const mockArtifactId = 'artifact-789';
@@ -131,10 +133,7 @@ describe('UploadIngestionService', () => {
           uuid: mockSubmission.uuid
         } as ISubmissionModel);
         sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
-        const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
-          ticket_id: '11111111-1111-1111-1111-111111111111',
-          team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-        } as any);
+        const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket');
         const insertSubmissionUploadStub = sinon
           .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
           .resolves({ submission_upload_id: 'submission-upload-id-1' });
@@ -178,20 +177,13 @@ describe('UploadIngestionService', () => {
           contentType: archiveFormat === 'tar.gz' ? 'application/gzip' : 'application/x-tar'
         });
         expect(insertSubmissionStub).to.have.been.calledWith(mockSubmission, [mockHumanSubmitterSystemUserId, 43]);
-        expect(createTicketStub).to.have.been.calledWith(
-          sinon.match({
-            subject: 'New Submission',
-            priority: 'medium',
-            description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`,
-            systemUserIds: [mockSubmission.system_user_id]
-          })
-        );
+        expect(createTicketStub).not.to.have.been.called;
         expect(insertSubmissionUploadStub).to.have.been.calledWith(
           sinon.match({
             submission_id: mockSubmissionId,
             upload_id: mockUploadId,
-            ticket_id: '11111111-1111-1111-1111-111111111111',
-            status: 'uploaded',
+            ticket_id: null,
+            status: 'draft',
             blueprint_id: mockBlueprintId,
             comment: mockSubmission.comment
           }),
@@ -222,7 +214,6 @@ describe('UploadIngestionService', () => {
         bytes: 5_000_000,
         submissionId: 123,
         submissionUuid: mockSubmission.uuid,
-        systemUserIds: [mockSubmission.system_user_id],
         submitterSystemUserIds: [],
         comment: mockSubmission.comment,
         requestedBlueprintId: undefined,
@@ -264,10 +255,6 @@ describe('UploadIngestionService', () => {
         uuid: mockSubmission.uuid
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
-      sinon.stub(TicketService.prototype, 'createTicket').resolves({
-        ticket_id: '11111111-1111-1111-1111-111111111111',
-        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-      } as any);
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
@@ -289,10 +276,6 @@ describe('UploadIngestionService', () => {
         uuid: mockSubmission.uuid
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
-      sinon.stub(TicketService.prototype, 'createTicket').resolves({
-        ticket_id: '11111111-1111-1111-1111-111111111111',
-        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-      } as any);
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
@@ -327,7 +310,7 @@ describe('UploadIngestionService', () => {
       ensureSystemUserStub.withArgs('43-guid', 'adoe', 'BCEIDBUSINESS').resolves({ system_user_id: 43 });
     });
 
-    it('should grant ticket visibility to the authenticated appending service account', async () => {
+    it('creates a draft upload without a ticket for the authenticated appending service account', async () => {
       const submissionUuid = mockSubmission.uuid;
       const existingSubmissionId = 456;
       const ownerSystemUserId = 99;
@@ -347,10 +330,7 @@ describe('UploadIngestionService', () => {
         comment: 'Append upload comment'
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
-      const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
-        ticket_id: '22222222-2222-2222-2222-222222222222',
-        team_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc'
-      } as any);
+      const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket');
       const insertSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-append-1' });
@@ -381,20 +361,13 @@ describe('UploadIngestionService', () => {
         appendingSystemUserId,
         43
       ]);
-      expect(createTicketStub).to.have.been.calledWith(
-        sinon.match({
-          subject: 'New Submission',
-          priority: 'medium',
-          description: `Submission ID: ${existingSubmissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${mockUploadId}`,
-          systemUserIds: [1]
-        })
-      );
+      expect(createTicketStub).not.to.have.been.called;
       expect(insertSubmissionUploadStub).to.have.been.calledWith(
         sinon.match({
           submission_id: existingSubmissionId,
           upload_id: mockUploadId,
-          ticket_id: '22222222-2222-2222-2222-222222222222',
-          status: 'uploaded',
+          ticket_id: null,
+          status: 'draft',
           comment: 'Append upload comment'
         }),
         1,
@@ -433,7 +406,6 @@ describe('UploadIngestionService', () => {
         bytes: 3_000_000,
         submissionId: existingSubmissionId,
         submissionUuid,
-        systemUserIds: [1],
         submitterSystemUserIds: [],
         comment: null,
         requestedBlueprintId: undefined,
@@ -466,7 +438,6 @@ describe('UploadIngestionService', () => {
         bytes: 3_000_000,
         submissionId: 456,
         submissionUuid: mockSubmission.uuid,
-        systemUserIds: [1],
         submitterSystemUserIds: [42],
         comment: null,
         requestedBlueprintId: 7,
@@ -547,13 +518,33 @@ describe('UploadIngestionService', () => {
       }
     ];
 
+    const mockSubmissionUploadId = 'submission-upload-id-1';
+    const mockTicketId = '11111111-1111-1111-1111-111111111111';
+    let createTicketStub: sinon.SinonStub;
+    let submitDraftStub: sinon.SinonStub;
+
     beforeEach(() => {
       sinon
         .stub(UploadIngestionService.dependencies, 'publishMalwareScanJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
+        submission_upload_id: mockSubmissionUploadId,
+        submission_id: 123,
+        upload_id: 'upload-456',
+        status: 'draft',
+        ticket_id: null
+      } as any);
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: mockSubmission.uuid
+      } as ISubmissionModel);
+      createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: mockTicketId,
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+      } as any);
+      submitDraftStub = sinon.stub(SubmissionUploadService.prototype, 'submitDraftSubmissionUpload').resolves();
     });
 
-    it('should complete upload successfully and enqueue security artifacts', async () => {
+    it('should complete upload successfully, submit the draft with a ticket, and enqueue security artifacts', async () => {
       sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
 
       sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
@@ -572,6 +563,15 @@ describe('UploadIngestionService', () => {
 
       await service.completeArchiveUpload(mockParams);
 
+      expect(createTicketStub).to.have.been.calledOnceWith({
+        subject: 'New Submission',
+        description: `Submission ID: 123. Submission UUID: ${mockSubmission.uuid}. Upload UUID: upload-456`,
+        priority: 'medium',
+        systemUserIds: [1]
+      });
+      expect(submitDraftStub).to.have.been.calledOnceWithExactly(mockSubmissionUploadId, mockTicketId);
+      expect(submitDraftStub).to.have.been.calledAfter(createTicketStub);
+
       const publishStub = UploadIngestionService.dependencies.publishMalwareScanJob as sinon.SinonStub;
       expect(publishStub.callCount).to.equal(mockSecurityRecords.length);
       expect(publishStub.firstCall.args[1]).to.deep.equal({ artifactSecurityId: 'artifact-security-1' });
@@ -579,7 +579,7 @@ describe('UploadIngestionService', () => {
       expect(s3ClientStub.send).to.have.been.calledOnce;
     });
 
-    it('should throw HTTP401 if upload s3_upload_id does not match', async () => {
+    it('should throw HTTP401 and leave the upload a draft if upload s3_upload_id does not match', async () => {
       const invalidUpload = {
         ...mockUpload,
         s3_upload_id: 'wrong-s3-id'
@@ -593,6 +593,9 @@ describe('UploadIngestionService', () => {
         expect(err).to.be.instanceOf(HTTP401);
         expect((err as HTTP401).message).to.equal('Access Denied');
       }
+
+      expect(createTicketStub).not.to.have.been.called;
+      expect(submitDraftStub).not.to.have.been.called;
     });
 
     it('should throw HTTP401 if upload is not in PENDING status', async () => {

@@ -835,6 +835,42 @@ describe('SubmissionUploadService', () => {
     });
   });
 
+  describe('submitDraftSubmissionUpload', () => {
+    const ticketId = '22222222-2222-2222-2222-222222222222';
+
+    it('attaches the ticket before moving the draft to uploaded', async () => {
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('draft', { ticket_id: null }));
+      const ticketStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload')
+        .resolves({ submission_upload_id: 'artifact-1' });
+      const { updateStub, insertStub } = stubTransitionWrites();
+
+      await service.submitDraftSubmissionUpload('artifact-1', ticketId);
+
+      expect(ticketStub).to.have.been.calledOnceWithExactly('artifact-1', { ticket_id: ticketId });
+      expect(updateStub).to.have.been.calledOnceWithExactly('artifact-1', 'uploaded');
+      expect(insertStub).to.have.been.calledOnceWithExactly('artifact-1', 'uploaded');
+      expect(updateStub).to.have.been.calledAfter(ticketStub);
+    });
+
+    it('throws ApiConflictError and writes nothing when the upload is not a draft', async () => {
+      sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('uploaded'));
+      const ticketStub = sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload');
+      const { updateStub, insertStub } = stubTransitionWrites();
+
+      try {
+        await service.submitDraftSubmissionUpload('artifact-1', ticketId);
+        expect.fail('Expected ApiConflictError not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiConflictError);
+      }
+
+      expect(ticketStub).not.to.have.been.called;
+      expect(updateStub).not.to.have.been.called;
+      expect(insertStub).not.to.have.been.called;
+    });
+  });
+
   describe('transitionSubmissionUploadToIngesting', () => {
     it('updates status from uploaded to ingesting', async () => {
       sinon.stub(service, 'getSubmissionUploadWithLock').resolves(buildUpload('uploaded'));

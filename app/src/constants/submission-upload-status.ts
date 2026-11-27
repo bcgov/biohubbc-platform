@@ -1,9 +1,17 @@
-import { mdiCheck, mdiClose, mdiCloudUploadOutline, mdiHelpCircleOutline, mdiProgressClock } from '@mdi/js';
+import {
+  mdiCheck,
+  mdiClose,
+  mdiCloudUploadOutline,
+  mdiFileDocumentEditOutline,
+  mdiHelpCircleOutline,
+  mdiProgressClock
+} from '@mdi/js';
 import { ChipProps } from '@mui/material/Chip';
 import { SubmissionUploadDecision, SubmissionUploadJobStatus } from 'interfaces/useTicketsApi.interface';
 import appTheme from 'themes/appTheme';
 
 export const SUBMISSION_UPLOAD_JOB_STATUS_LABELS: Record<SubmissionUploadJobStatus, string> = {
+  draft: 'Draft',
   uploaded: 'Uploaded',
   ingesting: 'Ingesting',
   ingested: 'Ingested',
@@ -24,6 +32,7 @@ export const TERMINAL_SUBMISSION_UPLOAD_JOB_STATUSES: SubmissionUploadJobStatus[
 ];
 
 export const SUBMISSION_UPLOAD_JOB_STATUS_ICONS: Record<SubmissionUploadJobStatus, string> = {
+  draft: mdiFileDocumentEditOutline,
   uploaded: mdiCloudUploadOutline,
   ingesting: mdiProgressClock,
   ingested: mdiCheck,
