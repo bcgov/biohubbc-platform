@@ -139,6 +139,12 @@ const appTheme = createTheme({
           '&.Mui-focusVisible': {
             outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
             outlineOffset: '2px'
+          },
+          // MUI hides a center-loading button's label behind its spinner by making the label transparent. A loading
+          // button is also disabled, and the variant overrides below give disabled buttons a label color, so this rule
+          // is one class more specific than theirs to keep the label hidden. The spinner sets its own color.
+          '&.MuiButton-loading.MuiButton-loadingPositionCenter': {
+            color: 'transparent'
           }
         }),
         startIcon: ({ theme }) => ({

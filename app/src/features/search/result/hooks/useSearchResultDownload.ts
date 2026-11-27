@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { refreshChangedQueries } from 'utils/query-client';
 import { changedQueryKeys } from 'utils/query-keys/changed-query-keys';
+import { PORTAL_DOWNLOAD_BASE_PATH, DOWNLOAD_BASE_PATH } from 'constants/download';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useCallback, useEffect, useId, useState } from 'react';
@@ -38,6 +40,7 @@ export const useSearchResultDownload = ({
   const api = useApi();
   const navigate = useNavigate();
   const dialogContext = useDialogContext();
+  const { auth } = useAuthStateContext();
   const queryClient = useQueryClient();
   // Scopes the in-flight check below to this hook instance.
   const createDownloadMutationKey = ['search-result', 'create-download', useId()];
@@ -60,19 +63,14 @@ export const useSearchResultDownload = ({
   }, [featureType]);
 
   /**
-   * Opens the create-download dialog for the currently applied search.
-   * Waits for the count before deciding whether to open the form or show the
-   * zero-results dialog.
+   * Opens the create-download dialog for the currently applied search. The action is always available: only a settled
+   * count of zero shows the zero-results dialog instead, so a click while results are still loading opens the form.
    */
   const handleOpenCreateDownload = useCallback(() => {
-    if (isLoading || totalCount === undefined) {
-      return;
-    }
-
-    if (totalCount === 0) {
+    if (!isLoading && totalCount === 0) {
       dialogContext.setOkDialog({
         open: true,
-        dialogTitle: 'Create Download',
+        dialogTitle: 'Save Download',
         dialogText: 'There are no features matching your current search to download.',
         onClose: () => dialogContext.setOkDialog({ open: false })
       });
@@ -85,9 +83,10 @@ export const useSearchResultDownload = ({
   /**
    * Submits the create-download form for the current expression search.
    * Ignored while a submission from this hook is in flight, so a double submit creates one download. On success the
-   * dialog closes and navigates to the download page at `/download/:downloadId`, where the user can monitor status
-   * and obtain exports. Failure keeps the dialog open and shows the API error. Neither runs once the page has
-   * unmounted.
+   * dialog closes and navigates to the download page, where the user can monitor status and obtain exports. A
+   * signed-in user's download is claimed by their team as it is created, so it opens under the portal; an anonymous
+   * download opens on the public page, where its UUID is the credential. Failure keeps the dialog open and shows
+   * the API error. Neither runs once the page has unmounted.
    *
    * @param {ICreateDownloadFormValues} values - User-provided download name and description.
    * @returns {void}
@@ -100,7 +99,13 @@ export const useSearchResultDownload = ({
     createDownload(values, {
       onSuccess: (response) => {
         setIsCreateDownloadDialogOpen(false);
-        navigate(`/download/${response.download_id}`);
+
+        if (auth.isAuthenticated) {
+          navigate(`${PORTAL_DOWNLOAD_BASE_PATH}/${response.download_id}`);
+          return;
+        }
+
+        navigate(`${DOWNLOAD_BASE_PATH}/${response.download_id}`);
       },
       onError: (error) => dialogContext.setSnackbar({ open: true, snackbarMessage: error.message })
     });

@@ -24,6 +24,7 @@ export const PortalPageLayout = (props: PropsWithChildren<IPortalPageLayoutProps
   return (
     <>
       <PageHeader
+        maxWidth="lg"
         label={title}
         breadcrumbs={
           <Breadcrumbs aria-label={`${title} breadcrumb`}>
@@ -37,7 +38,7 @@ export const PortalPageLayout = (props: PropsWithChildren<IPortalPageLayoutProps
         }
       />
 
-      <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 4, px: 3 }}>
         {children}
       </Container>
     </>

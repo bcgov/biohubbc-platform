@@ -19,7 +19,6 @@ const panel = (view: SEARCH_RESULT_VIEW) => (
     activeSort=""
     view={view}
     viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-    isCreateDownloadDisabled={false}
     onCreateDownloadClick={vi.fn()}
     onSortChange={vi.fn()}
     onViewChange={vi.fn()}
@@ -107,7 +106,6 @@ describe('SearchResultPanel', () => {
           activeSort=""
           view={SEARCH_RESULT_VIEW.TABLE}
           viewOptions={SEARCH_RESULT_VIEW_OPTIONS}
-          isCreateDownloadDisabled={false}
           onCreateDownloadClick={vi.fn()}
           onSortChange={vi.fn()}
           onViewChange={vi.fn()}

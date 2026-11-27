@@ -24,8 +24,8 @@ const PORTAL_SECTIONS = [
 export const PortalPage = () => {
   return (
     <>
-      <PageHeader label="Portal" />
-      <Container maxWidth="xl" sx={{ py: 4, px: 3 }}>
+      <PageHeader maxWidth="lg" label="Portal" />
+      <Container maxWidth="lg" sx={{ py: 4, px: 3 }}>
         <Grid container spacing={3}>
           {PORTAL_SECTIONS.map((section) => (
             <Grid key={section.to} size={{ xs: 12, sm: 6, md: 4 }}>

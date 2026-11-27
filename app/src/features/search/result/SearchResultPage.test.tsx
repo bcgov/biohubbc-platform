@@ -126,8 +126,7 @@ describe('SearchResultPage', () => {
     });
 
     mockGetAvailableUsers.mockResolvedValue({ users: [] });
-    // Default to authenticated; successful create-download behavior should still
-    // navigate to the download page.
+    // Default to authenticated; a successful create-download navigates to the portal download page.
     mockUseAuthStateContext.mockReturnValue({ auth: { isAuthenticated: true } });
     mockUseApi.mockReturnValue({
       download: { createDownload: mockCreateDownload },
@@ -152,10 +151,11 @@ describe('SearchResultPage', () => {
     });
   });
 
-  it('renders the toolbar with the "Create Download" label (not "Download All")', () => {
+  it('renders the toolbar with the "Download" label (not "Create Download" or "Download All")', () => {
     const { getByRole, queryByRole } = renderPage();
 
-    expect(getByRole('button', { name: /create download/i })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Download' })).toBeInTheDocument();
+    expect(queryByRole('button', { name: /create download/i })).not.toBeInTheDocument();
     expect(queryByRole('button', { name: /^download all$/i })).not.toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe('SearchResultPage', () => {
     expect(mockSetResultSearchParams).toHaveBeenCalledWith({ cursor: 'previous-token' });
   });
 
-  it('opens an OkDialog when Create Download is clicked with zero results', () => {
+  it('opens an OkDialog when Download is clicked with zero results', () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
       properties: [],
@@ -199,26 +199,27 @@ describe('SearchResultPage', () => {
 
     const { getByRole, queryByRole } = renderPage();
 
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
 
     expect(mockSetOkDialog).toHaveBeenCalledWith(
       expect.objectContaining({
         open: true,
-        dialogTitle: 'Create Download',
+        dialogTitle: 'Save Download',
         dialogText: expect.stringMatching(/no features matching/i)
       })
     );
-    expect(queryByRole('heading', { level: 2, name: /^create download$/i })).not.toBeInTheDocument();
+    expect(queryByRole('heading', { level: 2, name: /^save download$/i })).not.toBeInTheDocument();
   });
 
-  it('opens the form dialog when Create Download is clicked with results', async () => {
+  it('opens the Save Download dialog when Download is clicked with results', async () => {
     const { getByRole, getByLabelText } = renderPage();
 
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
 
     await waitFor(() => {
       expect(getByLabelText(/Name/i)).toBeInTheDocument();
     });
+    expect(getByRole('dialog', { name: 'Save Download' })).toBeVisible();
     expect(mockSetOkDialog).not.toHaveBeenCalled();
   });
 
@@ -227,7 +228,7 @@ describe('SearchResultPage', () => {
 
     fireEvent.click(getByRole('button', { name: /apply expression/i }));
     rerender(<SearchResultPage />);
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
 
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -239,7 +240,7 @@ describe('SearchResultPage', () => {
 
     const { getByRole, getByLabelText, getByTestId } = renderPage();
 
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
 
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
@@ -252,7 +253,7 @@ describe('SearchResultPage', () => {
         expression: null
       })
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/download/new-uuid');
+    expect(mockNavigate).toHaveBeenCalledWith('/portal/download/new-uuid');
     expect(mockSetSnackbar).not.toHaveBeenCalled();
   });
 
@@ -269,7 +270,7 @@ describe('SearchResultPage', () => {
 
     fireEvent.click(getByRole('button', { name: /apply expression/i }));
     rerender(<SearchResultPage />);
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
     const saveButton = getByTestId('edit-dialog-save-button');
@@ -280,11 +281,11 @@ describe('SearchResultPage', () => {
 
     resolveCreate({ download_id: 'new-uuid', download_url: 'https://example/new-uuid' });
 
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/download/new-uuid'));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/portal/download/new-uuid'));
     expect(mockCreateDownload).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Create Download while pagination is still loading (undefined → not zero)', () => {
+  it('opens the create-download form while results are still loading (undefined → not zero)', async () => {
     mockUseSearchResults.mockReturnValue({
       rows: [],
       properties: [],
@@ -295,19 +296,19 @@ describe('SearchResultPage', () => {
       cursor: defaultCursor
     });
 
-    const { getByRole } = renderPage();
+    const { getByRole, getByLabelText } = renderPage();
 
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    expect(getByRole('button', { name: 'Download' })).toBeEnabled();
+    fireEvent.click(getByRole('button', { name: 'Download' }));
 
-    expect(getByRole('button', { name: /create download/i })).toBeDisabled();
+    await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
     expect(mockSetOkDialog).not.toHaveBeenCalled();
-    expect(mockCreateDownload).not.toHaveBeenCalled();
   });
 
   it('closes the open create-download dialog when the URL :featureType changes', async () => {
     const { getByRole, getByLabelText, queryByLabelText, rerender } = renderPage();
 
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
     mockUseParams.mockReturnValue({ featureType: 'telemetry' });
@@ -364,7 +365,7 @@ describe('SearchResultPage', () => {
 
     fireEvent.click(getByRole('button', { name: /apply expression/i }));
     rerender(<SearchResultPage />);
-    fireEvent.click(getByRole('button', { name: /create download/i }));
+    fireEvent.click(getByRole('button', { name: 'Download' }));
     await waitFor(() => expect(getByLabelText(/Name/i)).toBeInTheDocument());
 
     fireEvent.click(getByTestId('edit-dialog-save-button'));

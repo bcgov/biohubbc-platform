@@ -1,6 +1,7 @@
 import { act, renderHook } from 'test-helpers/test-utils';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { Mock, vi } from 'vitest';
@@ -9,6 +10,7 @@ import { useSearchResultDownload } from './useSearchResultDownload';
 
 vi.mock('hooks/useApi');
 vi.mock('hooks/useContext');
+vi.mock('hooks/useAuthStateContext');
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async () => {
@@ -54,6 +56,8 @@ describe('useSearchResultDownload', () => {
       }
     });
 
+    (useAuthStateContext as Mock).mockReturnValue({ auth: { isAuthenticated: false } });
+
     (useDialogContext as Mock).mockReturnValue({
       setSnackbar: mockSetSnackbar,
       setOkDialog: mockSetOkDialog
@@ -64,7 +68,7 @@ describe('useSearchResultDownload', () => {
     vi.clearAllMocks();
   });
 
-  it('H1: success navigates to the download page without dialog or snackbar', async () => {
+  it('H1: success navigates an anonymous user to the public download page without dialog or snackbar', async () => {
     const { result } = renderHook(() =>
       useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
     );
@@ -84,6 +88,21 @@ describe('useSearchResultDownload', () => {
       description: 'a description',
       expression: expressionTree
     });
+  });
+
+  it('H1b: success navigates a signed-in user to the portal download page', async () => {
+    (useAuthStateContext as Mock).mockReturnValue({ auth: { isAuthenticated: true } });
+
+    const { result } = renderHook(() =>
+      useSearchResultDownload({ featureType: 'observation', expressionTree, isLoading: false, totalCount: 1 })
+    );
+
+    await act(async () => {
+      result.current.handleCreateDownload(formValues);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/portal/download/download-uuid');
   });
 
   it('H2: success navigates regardless of auth-state-specific response fields', async () => {

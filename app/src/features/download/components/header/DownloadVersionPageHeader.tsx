@@ -38,6 +38,7 @@ export const DownloadVersionPageHeader = ({
   onTabChange
 }: DownloadVersionPageHeaderProps) => (
   <PageHeader
+    maxWidth="lg"
     breadcrumbs={
       <Breadcrumbs aria-label="download version breadcrumb">
         {basePath === PORTAL_DOWNLOAD_BASE_PATH && (
