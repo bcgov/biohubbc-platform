@@ -59,6 +59,11 @@ describe('SecurityScopeService', () => {
     const scopeIdOne = '11111111-1111-1111-1111-111111111111';
     const scopeIdTwo = '22222222-2222-2222-2222-222222222222';
 
+    beforeEach(() => {
+      // Every statement scope is held, so no bitmap is cleared.
+      sinon.stub(SecurityScopeRepository.prototype, 'lockUnheldSecurityScopesForFeatureIdsUpdate').resolves([]);
+    });
+
     it('A1: materializes ALLOW statements then issues the team grant (effect gate + ordering)', async () => {
       const getStatementsStub = sinon
         .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
@@ -197,6 +202,54 @@ describe('SecurityScopeService', () => {
     const policyId = 'policy-1';
     const scopeIdOne = '11111111-1111-1111-1111-111111111111';
     const scopeIdTwo = '22222222-2222-2222-2222-222222222222';
+    let lockUnheldStub: sinon.SinonStub;
+    let clearUnheldStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      lockUnheldStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'lockUnheldSecurityScopesForFeatureIdsUpdate')
+        .resolves([]);
+      clearUnheldStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateUnheldSecurityScopeFeatureIdsToNull')
+        .resolves();
+    });
+
+    it('does not clear a bitmap when a team holds every statement scope', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ security_scope_id: scopeIdOne }, { security_scope_id: scopeIdTwo }]);
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
+
+      await service.materializePolicyStatementScopes(policyId);
+
+      expect(lockUnheldStub).to.have.been.calledOnceWithExactly([scopeIdOne, scopeIdTwo]);
+      expect(clearUnheldStub).not.to.have.been.called;
+    });
+
+    it('locks the unheld statement scopes, then clears their bitmaps, before any job is published', async () => {
+      lockUnheldStub.resolves([{ security_scope_id: scopeIdTwo }]);
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findActiveAllowStatementsForApprovedPolicy')
+        .resolves([{ security_scope_id: scopeIdOne }, { security_scope_id: scopeIdTwo }]);
+      const anchorPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
+
+      await service.materializePolicyStatementScopes(policyId);
+
+      expect(lockUnheldStub).to.have.been.calledOnceWithExactly([scopeIdOne, scopeIdTwo]);
+      expect(clearUnheldStub).to.have.been.calledOnceWithExactly([scopeIdTwo]);
+      expect(lockUnheldStub).to.have.been.calledBefore(clearUnheldStub);
+      expect(clearUnheldStub).to.have.been.calledBefore(anchorPublishStub);
+    });
 
     it("publishes a bitmap job for each statement scope, after that scope's anchor job", async () => {
       sinon
@@ -235,6 +288,8 @@ describe('SecurityScopeService', () => {
       expect(materialized).to.be.false;
       expect(anchorPublishStub).not.to.have.been.called;
       expect(bitmapPublishStub).not.to.have.been.called;
+      expect(lockUnheldStub).not.to.have.been.called;
+      expect(clearUnheldStub).not.to.have.been.called;
     });
 
     it('throws when the bitmap publish fails, before the next statement is reached', async () => {

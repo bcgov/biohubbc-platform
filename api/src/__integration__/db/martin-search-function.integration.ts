@@ -296,12 +296,25 @@ describe('Tile search function (integration)', function () {
   /**
    * Grant a user live access to a secured feature: anchor a scope on it, and put the user on a team
    * holding that scope. Returns the ids needed to revoke pieces of the chain.
+   *
+   * Tiles read the anchor; the search repository reads the scope's bitmap, so the bitmap the anchor
+   * grants (the anchor and its closure descendants) is written too.
    */
   const grantFeatureToUser = async (
     featureId: number,
     systemUserId: number
   ): Promise<{ scopeId: string; teamId: string }> => {
     const scopeId = await anchorScopeOnFeature(featureId);
+    await connection.sql(SQL`
+      UPDATE security_scope
+      SET feature_ids = (
+        SELECT rb_build_agg(c.source_submission_feature_id)
+        FROM submission_feature_closure c
+        WHERE c.target_submission_feature_id = ${featureId}
+          AND c.is_ancestor = true
+      )
+      WHERE security_scope_id = ${scopeId};
+    `);
     const teamId = await createTeam(connection, `tile-test-team-${featureId}`);
 
     await addTeamMember(connection, teamId, systemUserId);

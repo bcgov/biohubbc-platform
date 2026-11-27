@@ -481,6 +481,48 @@ describe('Security scope feature bitmap (integration)', function () {
       ).to.eql([securityScopeId]);
     });
 
+    /**
+     * Store a bitmap on the scope, standing in for one built while a team held it.
+     */
+    async function storeBitmap(securityScopeId: string): Promise<void> {
+      await connection.sql(SQL`
+        UPDATE security_scope
+        SET feature_ids = rb_build(ARRAY[1, 2, 3])
+        WHERE security_scope_id = ${securityScopeId};
+      `);
+    }
+
+    async function getBitmapIds(securityScopeId: string): Promise<number[] | null> {
+      const result = await connection.sql(SQL`
+        SELECT rb_to_array(feature_ids) AS ids
+        FROM security_scope
+        WHERE security_scope_id = ${securityScopeId};
+      `);
+
+      return result.rows[0].ids;
+    }
+
+    it('a statement scope that no team holds has its bitmap set to NULL, so it grants nothing until its build runs', async () => {
+      const { policyId, securityScopeId } = await createPolicyWithAllowStatement('approved');
+      await storeBitmap(securityScopeId);
+
+      await scopeService.materializePolicyStatementScopes(policyId);
+
+      expect(await getBitmapIds(securityScopeId)).to.equal(null);
+    });
+
+    it('a statement scope that a team holds keeps its bitmap', async () => {
+      const { policyId, securityScopeId } = await createPolicyWithAllowStatement('approved');
+      const teamId = await createTeam(connection, `Bitmap holder ${securityScopeId}`);
+      await createTeamPolicy(connection, teamId, policyId);
+      await scopeService.grantTeamAccessForPolicy(teamId, policyId);
+      await storeBitmap(securityScopeId);
+
+      await scopeService.materializePolicyStatementScopes(policyId);
+
+      expect(await getBitmapIds(securityScopeId)).to.eql([1, 2, 3]);
+    });
+
     it('an unapproved policy with an active ALLOW statement publishes neither job', async () => {
       const { policyId, securityScopeId } = await createPolicyWithAllowStatement('requested');
 

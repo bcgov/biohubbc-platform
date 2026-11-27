@@ -486,7 +486,8 @@ describe('Security scope search (integration)', function () {
 
   /**
    * Simulate the pg-boss anchor-refresh job (service-level):
-   * delete stale anchors → resolve URN → recompute new anchors.
+   * delete stale anchors → resolve URN → recompute new anchors → rebuild the scope's feature bitmap,
+   * as the bitmap job does after the anchor job, so both grant stores are current.
    */
   async function refreshAnchorsViaService(scopeId: string): Promise<void> {
     await deleteStaleAnchorsViaService(scopeId);
@@ -500,6 +501,7 @@ describe('Security scope search (integration)', function () {
         }
         lastId = batch.pageLastId;
       }
+      await scopeService.buildScopeFeatureBitmap(scopeId, urn);
     }
   }
 

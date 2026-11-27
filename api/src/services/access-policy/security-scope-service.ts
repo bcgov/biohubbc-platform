@@ -114,8 +114,11 @@ export class SecurityScopeService extends DBService {
   /**
    * Materialize the policy-wide access-cache rows for a policy's ALLOW statements.
    *
-   * Publishes one anchor-computation job and one feature-bitmap build job per
-   * active ALLOW statement scope on the policy. Scope rows are created when
+   * Clears the feature bitmap of each statement scope that no team holds, then
+   * publishes one anchor-computation job and one feature-bitmap build job per
+   * active ALLOW statement scope on the policy. A bitmap is refreshed only while
+   * its scope is held, so a scope that is picked up again grants nothing until
+   * its build has run, rather than granting from a bitmap that went out of date. Scope rows are created when
    * statements are written and are shared across every team that links to the
    * same policy.
    *
@@ -142,6 +145,19 @@ export class SecurityScopeService extends DBService {
 
     if (statements.length === 0) {
       return false;
+    }
+
+    // A scope no team holds has had no bitmap refresh while it was unheld. Clear its bitmap before the
+    // caller grants it, so it grants nothing until the build queued below has run.
+    // The lock and the clear are two statements: the clear re-checks for holders after the lock is held.
+    const unheldScopes = await this.securityScopeRepository.lockUnheldSecurityScopesForFeatureIdsUpdate(
+      statements.map((statement) => statement.security_scope_id)
+    );
+
+    if (unheldScopes.length > 0) {
+      await this.securityScopeRepository.updateUnheldSecurityScopeFeatureIdsToNull(
+        unheldScopes.map((scope) => scope.security_scope_id)
+      );
     }
 
     for (const statement of statements) {
@@ -349,6 +365,21 @@ export class SecurityScopeService extends DBService {
     submissionId: number | null
   ): Promise<AnchorBatchResult | null> {
     return this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, afterId, submissionId);
+  }
+
+  /**
+   * Lock a security scope's row for a write to its feature bitmap, until the transaction ends.
+   *
+   * The bitmap job takes this lock before it resolves the scope's URN. A request that gives the
+   * scope to a team holds the same lock from the moment it clears the bitmap until it commits, so
+   * the job waits for that commit and then resolves the URN from committed data. Resolved the other
+   * way round, a job that started inside a policy's approval would see the policy as not yet
+   * approved and skip the build, leaving the cleared bitmap NULL with no build queued.
+   *
+   * @param securityScopeId UUID of the security scope
+   */
+  async lockScopeFeatureBitmap(securityScopeId: string): Promise<void> {
+    await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
   }
 
   /**

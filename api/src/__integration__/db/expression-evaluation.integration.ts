@@ -380,7 +380,8 @@ describe('expression-evaluation (integration)', function () {
   /**
    * Grant the current API user read access to a SECURED feature by standing up the scope-grant chain the
    * security filter's Branch 2 walks: security_scope -> security_scope_anchor (on the feature) ->
-   * team_security_scope -> team -> team_member (for connection.systemUserId()). Without this chain a
+   * team_security_scope -> team -> team_member (for connection.systemUserId()), plus the scope's feature
+   * bitmap holding what that anchor grants. Without this chain a
    * plain DATABASE-type API user is NOT effectively privileged over an arbitrary secured feature.
    */
   async function grantPrivilegedAccess(anchorSubmissionFeatureId: number): Promise<void> {
@@ -396,6 +397,19 @@ describe('expression-evaluation (integration)', function () {
     await connection.sql(SQL`
       INSERT INTO security_scope_anchor (security_scope_id, anchor_submission_feature_id)
       VALUES (${securityScopeId}, ${anchorSubmissionFeatureId});
+    `);
+
+    // The bitmap the anchor grants: the anchor and its closure descendants. Written by SQL because the
+    // scope has no policy statement, so its URN does not resolve and the service cannot build it.
+    await connection.sql(SQL`
+      UPDATE security_scope
+      SET feature_ids = (
+        SELECT rb_build_agg(c.source_submission_feature_id)
+        FROM submission_feature_closure c
+        WHERE c.target_submission_feature_id = ${anchorSubmissionFeatureId}
+          AND c.is_ancestor = true
+      )
+      WHERE security_scope_id = ${securityScopeId};
     `);
 
     const team = await connection.sql(SQL`

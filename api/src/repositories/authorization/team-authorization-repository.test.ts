@@ -217,7 +217,9 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.include('terminal.terminal_submission_feature_id');
           expect(sql).to.include('successor.submission_id = chain.submission_id');
           expect(sql).to.include('submission_feature_closure');
-          expect(sql).to.include('security_scope_anchor');
+          expect(sql).to.include('rb_contains');
+          expect(sql).to.include('rb_or_agg');
+          expect(sql).to.not.include('security_scope_anchor');
           expect(sql).to.include('with recursive historical_ancestry');
           expect(sql).to.include('and not (sf.record_effective_date <= now()');
           expect(sql).to.include('parent.submission_id = child.submission_id');

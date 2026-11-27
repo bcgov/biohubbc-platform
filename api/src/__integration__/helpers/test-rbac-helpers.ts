@@ -10,6 +10,7 @@ import { IDBConnection } from '../../database/db';
 import { PolicyStatus } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
+import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { computeScopeHash } from '../../utils/scope-hash';
 
 /**
@@ -112,7 +113,12 @@ export async function createTeamPolicy(connection: IDBConnection, teamId: string
 }
 
 /**
- * Compute anchors for a scope using the split repo API (resolveUrn + batch loop).
+ * Build both grant stores of a scope: its anchors, using the split repo API (resolveUrn + batch loop),
+ * then its feature bitmap (`security_scope.feature_ids`) — the order the anchor and bitmap jobs run in.
+ * Map tiles read the anchors; search, counts and single-feature checks read the bitmap, so a fixture
+ * needs both to grant the same features through every reader.
+ *
+ * Builds nothing when the scope's URN does not resolve.
  * No commits between batches — stays in the test's wrapping transaction for rollback isolation.
  */
 export async function computeAnchors(scopeRepo: SecurityScopeRepository, scopeId: string): Promise<void> {
@@ -133,13 +139,15 @@ export async function computeAnchors(scopeRepo: SecurityScopeRepository, scopeId
 
     lastId = batch.pageLastId;
   }
+
+  await new SecurityScopeService(scopeRepo.connection).buildScopeFeatureBitmap(scopeId, urn);
 }
 
 /**
  * Set up the full scope chain for a policy statement, bypassing pg-boss:
  * 1. Create or get security_scope (deduped by scope_hash)
  * 2. Map policy_statement → security_scope
- * 3. Compute anchors synchronously
+ * 3. Compute anchors and the feature bitmap synchronously
  * Returns the security_scope_id.
  */
 export async function setupScopeChain(
