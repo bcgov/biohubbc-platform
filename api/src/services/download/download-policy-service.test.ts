@@ -209,4 +209,43 @@ describe('DownloadPolicyService', () => {
       expect(result).to.eql({ policy_id: 'p-returned' });
     });
   });
+  describe('createSubmissionDownloadPolicy', () => {
+    it('creates an approved policy covering every feature in the submission, with no expression', async () => {
+      const mockPolicy: Policy = {
+        policy_id: 'p1',
+        name: 'Boreal Moose',
+        description: null,
+        status: 'approved'
+      };
+      const mockStatement: PolicyStatement = {
+        policy_statement_id: 'ps-1',
+        policy_id: 'p1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:14:*:*',
+        security_scope_id: '55555555-5555-5555-5555-555555555555',
+        policy_expression_id: null
+      };
+
+      const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      const createStatementStub = sinon
+        .stub(PolicyStatementService.prototype, 'createPolicyStatement')
+        .resolves(mockStatement);
+      const ensurePolicyExpressionStub = sinon.stub(PolicyExpressionService.prototype, 'ensurePolicyExpression');
+
+      const result = await downloadPolicyService.createSubmissionDownloadPolicy({
+        name: 'Boreal Moose',
+        submissionId: 14
+      });
+
+      expect(insertPolicyStub).to.have.been.calledOnceWithExactly({ name: 'Boreal Moose', status: 'approved' });
+      expect(createStatementStub).to.have.been.calledOnceWithExactly({
+        policy_id: 'p1',
+        effect: PolicyEffect.ALLOW,
+        submission_feature_urn: 'urn:14:*:*',
+        policy_expression_id: null
+      });
+      expect(ensurePolicyExpressionStub).to.not.have.been.called;
+      expect(result).to.eql({ policy_id: 'p1' });
+    });
+  });
 });

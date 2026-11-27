@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
+import { SubmissionDownloadButton } from './download/SubmissionDownloadButton';
 
 interface SubmissionFeaturesProps {
   /** Submission whose features are searched. */
@@ -84,7 +85,10 @@ export const SubmissionFeatures = ({ submissionId, featureTypes }: SubmissionFea
   }
 
   return (
-    <PageSection id="submission-features" label="Features">
+    <PageSection
+      id="submission-features"
+      label="Features"
+      headerContent={<SubmissionDownloadButton submissionId={submissionId} />}>
       <Box sx={{ px: 2, py: 2 }}>
         <SearchResultSearch
           searchTerm={searchParams.get(URL_PARAMS.SEARCH_QUERY) || ''}

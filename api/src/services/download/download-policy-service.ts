@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { CreateSubmissionDownloadPolicyPayload } from '../../models/download';
 import { CreatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
@@ -68,6 +69,36 @@ export class DownloadPolicyService extends DBService {
       effect: PolicyEffect.ALLOW,
       submission_feature_urn: 'urn:*:*:*',
       policy_expression_id: policyExpression?.policy_expression_id ?? null
+    });
+
+    return { policy_id: policy.policy_id };
+  }
+
+  /**
+   * Create the owning policy of a submission download: one policy + one statement covering every feature of every
+   * type in the submission (`urn:<submissionId>:*:*`), with no expression.
+   *
+   * Like `createDownloadPolicy`, the policy defines the feature set to export, not who can read it, and is approved on
+   * insert. Because the statement names the submission rather than a fixed set of features, a later version of the
+   * download materializes the submission's features as they are at that time.
+   *
+   * @param {CreateSubmissionDownloadPolicyPayload} payload - Download name and the submission it covers.
+   * @return {Promise<{ policy_id: string }>} The new policy identifier.
+   * @memberof DownloadPolicyService
+   */
+  async createSubmissionDownloadPolicy(payload: CreateSubmissionDownloadPolicyPayload): Promise<{ policy_id: string }> {
+    const policyData: CreatePolicy = {
+      name: payload.name,
+      status: 'approved'
+    };
+
+    const policy = await this.policyRepository.insertPolicy(policyData);
+
+    await this.policyStatementService.createPolicyStatement({
+      policy_id: policy.policy_id,
+      effect: PolicyEffect.ALLOW,
+      submission_feature_urn: `urn:${payload.submissionId}:*:*`,
+      policy_expression_id: null
     });
 
     return { policy_id: policy.policy_id };

@@ -1000,6 +1000,7 @@ describe('Download Parquet pipeline (integration)', function () {
     const broadStatement = (urn_feature_type: string): ActivePolicyStatementWithExpression => ({
       policy_statement_id: '00000000-0000-0000-0000-000000000001',
       effect: PolicyEffect.ALLOW,
+      urn_submission_id: '*',
       urn_feature_type,
       expression_id: null
     });
@@ -1269,6 +1270,96 @@ describe('Download Parquet pipeline (integration)', function () {
       const ids = await selectedFeatureIds('survey', source.requested_by);
       expect(ids.has(unsecuredId)).to.equal(true);
       expect(ids.has(securedId)).to.equal(true);
+    });
+  });
+
+  describe('submission download — features limited to one submission', () => {
+    /** Features of the two-submission fixture. */
+    interface SubmissionDownloadFixture {
+      submissionA: number;
+      unsecuredA: number;
+      securedA: number;
+    }
+
+    /**
+     * Seed two submissions sharing the `survey` feature type: submission A holds one unsecured and one secured
+     * survey, submission B holds one survey. Closures are rebuilt after securing, so the secured survey reads as
+     * secured.
+     *
+     * @return {Promise<SubmissionDownloadFixture>} Submission A and its two surveys.
+     */
+    async function seedTwoSubmissions(): Promise<SubmissionDownloadFixture> {
+      const submissionA = await createTestSubmission(connection);
+      const uploadA = await createTestUpload(connection, submissionA);
+      const unsecuredA = await insertFeatureRow({
+        submissionId: submissionA,
+        submissionUploadId: uploadA,
+        featureTypeName: 'survey'
+      });
+      const securedA = await insertFeatureRow({
+        submissionId: submissionA,
+        submissionUploadId: uploadA,
+        featureTypeName: 'survey'
+      });
+      await secureFeature(connection, securedA);
+      const submissionB = await createTestSubmission(connection);
+      const uploadB = await createTestUpload(connection, submissionB);
+      await insertFeatureRow({ submissionId: submissionB, submissionUploadId: uploadB, featureTypeName: 'survey' });
+      const closureService = new SubmissionFeatureClosureService(connection);
+      await closureService.computeClosureForUpload(uploadA);
+      await closureService.computeClosureForUpload(uploadB);
+
+      return { submissionA, unsecuredA, securedA };
+    }
+
+    /**
+     * Create a submission download through the service, write its `survey` file, and return the ids of the surveys
+     * the file holds, by running the feature query the writer streams.
+     *
+     * @param {number} submissionId - Submission to download.
+     * @param {number | null} requestedBy - Requester the export is filtered for (null = anonymous).
+     * @return {Promise<number[]>} Exported survey ids, ascending.
+     */
+    async function exportedSurveyIds(submissionId: number, requestedBy: number | null): Promise<number[]> {
+      sinon
+        .stub(DownloadService.dependencies, 'publishProcessDownloadJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      const { download_id } = await downloadService.createSubmissionDownloadRequest({ submissionId, requestedBy });
+      const source = await downloadRepo.getDownloadSource(download_id);
+      const { statements } = await pipelineService.resolveParquetSchema(source);
+      const surveyStatement = statements.find((statement) => statement.urn_feature_type === 'survey');
+
+      expect(surveyStatement).to.include({ urn_submission_id: String(submissionId), expression_id: null });
+
+      stubParquetAndUpload();
+      const streamSpy = sinon.spy(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType');
+      const downloadVersionId = await createDownloadVersionFor(download_id);
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId: download_id,
+        downloadVersionId,
+        source,
+        properties: [],
+        featureTypeName: 'survey',
+        statement: surveyStatement!
+      });
+      const [, searchSql, searchBindings] = streamSpy.firstCall.args;
+      const selected = await connection.query<{ submission_feature_id: number }>(searchSql, searchBindings);
+
+      return selected.rows.map((row) => row.submission_feature_id).sort((a, b) => a - b);
+    }
+
+    it("exports only the submission's unsecured features to an anonymous requester", async () => {
+      const { submissionA, unsecuredA } = await seedTwoSubmissions();
+
+      expect(await exportedSurveyIds(submissionA, null)).to.deep.equal([unsecuredA]);
+    });
+
+    it("exports the submission's secured features to a requester granted access to them", async () => {
+      const { submissionA, unsecuredA, securedA } = await seedTwoSubmissions();
+      const userId = connection.systemUserId();
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionA}:*:*`, userId, 'pq-submission-download-team');
+
+      expect(await exportedSurveyIds(submissionA, userId)).to.deep.equal([unsecuredA, securedA].sort((a, b) => a - b));
     });
   });
 

@@ -9,6 +9,9 @@ import { Mock } from 'vitest';
 import { PortalSubmissionDetailPage } from './PortalSubmissionDetailPage';
 
 vi.mock('hooks/useApi');
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: () => ({ auth: { isAuthenticated: true } })
+}));
 
 const mockUseApi = useApi as Mock;
 const mockNavigate = vi.fn();
@@ -118,6 +121,15 @@ describe('PortalSubmissionDetailPage', () => {
     expect(await findByRole('link', { name: 'Submissions' })).toHaveAttribute('href', '/portal/submission');
     expect(await findByRole('link', { name: 'Portal' })).toHaveAttribute('href', '/portal');
     expect(within(breadcrumbNav).getByText('Test Submission')).toBeVisible();
+  });
+
+  it('offers a download of the submission beside the Features heading', async () => {
+    const { findByTestId } = renderPage();
+
+    const button = await findByTestId('submission-download-button');
+
+    expect(button).toHaveTextContent('Download');
+    expect(button.closest('.MuiToolbar-root')).toHaveTextContent('Features');
   });
 
   it('navigates to portal feature page when row is clicked', async () => {

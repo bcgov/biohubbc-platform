@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   updateDefaultBlueprint: vi.fn(),
   getBlueprints: vi.fn(),
   setSnackbar: vi.fn(),
+  createSubmissionDownload: vi.fn(),
   roleNames: [] as string[]
 }));
 vi.mock('hooks/useApi', () => ({
@@ -26,7 +27,8 @@ vi.mock('hooks/useApi', () => ({
       getSubmissionDefaultBlueprint: mocks.getDefaultBlueprint,
       updateSubmissionDefaultBlueprint: mocks.updateDefaultBlueprint
     },
-    blueprints: { getBlueprints: mocks.getBlueprints }
+    blueprints: { getBlueprints: mocks.getBlueprints },
+    download: { createSubmissionDownload: mocks.createSubmissionDownload }
   })
 }));
 vi.mock('hooks/useContext', () => ({
@@ -243,6 +245,15 @@ describe('AdminSubmissionPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Uploads' }));
     expect(screen.getByText('11–11 of 11')).toBeVisible();
     expect(mocks.listUploads).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers a download of the submission in the page header', async () => {
+    mocks.createSubmissionDownload.mockReturnValue(new Promise(() => undefined));
+    renderAt('/admin/submissions/7');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    await waitFor(() => expect(mocks.createSubmissionDownload).toHaveBeenCalledExactlyOnceWith(7));
   });
 
   it('supports opening the metadata tab directly', async () => {

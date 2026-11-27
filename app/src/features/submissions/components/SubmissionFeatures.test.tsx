@@ -11,6 +11,9 @@ vi.mock('react-router-dom', () => vi.importActual('react-router'));
 
 const mocks = vi.hoisted(() => ({ searchFeatures: vi.fn(), countFeatures: vi.fn(), setSnackbar: vi.fn() }));
 
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: () => ({ auth: { isAuthenticated: false } })
+}));
 vi.mock('hooks/useContext', () => ({
   useDialogContext: () => ({ setSnackbar: mocks.setSnackbar })
 }));

@@ -135,6 +135,7 @@ export interface ISubmissionModel {
   uuid: string;
   system_user_id: number;
   team_id: string;
+  name: string;
   comment?: string | null;
   default_blueprint_id?: number | null;
   security_review_timestamp?: string | null;
@@ -585,6 +586,7 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {number} submissionId
    * @returns {Promise<ISubmissionModel>}
+   * @throws {ApiNotFoundError} If no submission exists for the given id.
    * @memberof SubmissionRepository
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
@@ -600,9 +602,9 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
 
     if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission record', [
+      throw new ApiNotFoundError('Submission not found', [
         'SubmissionRepository->getSubmissionRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount != 0'
+        { submissionId }
       ]);
     }
 

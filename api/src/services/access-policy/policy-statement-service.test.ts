@@ -143,12 +143,14 @@ describe('PolicyStatementService', () => {
       const mockRows = [
         {
           policy_statement_id: '11111111-1111-1111-1111-111111111111',
+          urn_submission_id: '*',
           urn_feature_type: 'survey',
           effect: PolicyEffect.ALLOW,
           expression_id: null
         },
         {
           policy_statement_id: '22222222-2222-2222-2222-222222222222',
+          urn_submission_id: '*',
           urn_feature_type: 'observation',
           effect: PolicyEffect.ALLOW,
           expression_id: '33333333-3333-3333-3333-333333333333'

@@ -2,7 +2,7 @@ import { ParquetWriter } from '@dsnp/parquetjs';
 import { Knex } from 'knex';
 import { PassThrough } from 'node:stream';
 import { getKnex, IDBConnection } from '../../database/db';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import { DownloadSource, ParquetFeatureData } from '../../models/download';
@@ -242,7 +242,9 @@ export class DownloadPipelineService extends DBService {
    * Per-statement evaluation: `payload.statement` is the resolved policy statement
    * for this feature type. When `expression_id` is set, the expression tree drives
    * the feature-id subquery; when null, a broad subquery over the whole feature
-   * type is used. In both branches the security filter is applied for
+   * type is used. A statement limited to one submission (`urn_submission_id` other
+   * than `*`) uses the broad subquery over that submission's features. In every branch
+   * the security filter is applied for
    * `source.requested_by` so visibility is judged at export time against the
    * requesting user's authorization scope — not the audit `create_user` or the
    * worker's own connection grants.
@@ -282,7 +284,15 @@ export class DownloadPipelineService extends DBService {
       statement.expression_ids ?? (statement.expression_id === null ? [] : [statement.expression_id]);
 
     let subquery: Knex.QueryBuilder;
-    if (statement.expression_id === null) {
+    if (statement.urn_submission_id !== '*') {
+      // A submission download: every feature of the type in one submission. `resolveEffectiveDownloadStatements`
+      // only returns a submission-limited statement on its own and without an expression.
+      subquery = expressionEvaluation.buildSubmissionFeatureTypeSubquery(
+        featureTypeName,
+        Number(statement.urn_submission_id),
+        source.requested_by
+      );
+    } else if (statement.expression_id === null) {
       subquery = expressionEvaluation.buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by);
     } else {
       const expressionSubqueries = [];
@@ -544,6 +554,7 @@ export function resolveEffectiveDownloadStatements(
   featureTypes: string[]
 ): EffectiveDownloadStatement[] {
   const allowStatements = statements.filter((statement) => statement.effect === PolicyEffect.ALLOW);
+  assertSubmissionStatementStandsAlone(allowStatements);
   const sortedFeatureTypes = [...featureTypes].sort((a, b) => a.localeCompare(b));
   const broadWildcardAllow = allowStatements.find(
     (statement) => statement.urn_feature_type === '*' && statement.expression_id === null
@@ -587,6 +598,34 @@ export function resolveEffectiveDownloadStatements(
   return Array.from(statementsByFeatureType.entries()).map(([, featureStatements]) =>
     buildEffectiveDownloadStatement(featureStatements)
   );
+}
+
+/**
+ * Refuse a policy whose submission-limited ALLOW statement cannot be resolved on its own terms.
+ *
+ * A submission download's policy has one ALLOW statement, `urn:<submissionId>:*:*`, with no expression. The
+ * merging in `resolveEffectiveDownloadStatements` compares statements by feature type and expression only, so a
+ * submission-limited statement combined with other ALLOW statements, or with an expression, could have its
+ * submission limit dropped or applied to the other statements. Policies can gain statements through the policy
+ * administration endpoints, so this is checked rather than assumed.
+ *
+ * @param {ActivePolicyStatementWithExpression[]} allowStatements - The policy's active ALLOW statements.
+ * @return {void}
+ * @throws {ApiGeneralError} If a submission-limited statement has an expression or is not the only ALLOW statement.
+ */
+function assertSubmissionStatementStandsAlone(allowStatements: ActivePolicyStatementWithExpression[]): void {
+  const submissionStatement = allowStatements.find((statement) => statement.urn_submission_id !== '*');
+
+  if (submissionStatement === undefined) {
+    return;
+  }
+
+  if (allowStatements.length > 1 || submissionStatement.expression_id !== null) {
+    throw new ApiGeneralError('A download limited to one submission must have exactly one statement and no filter', [
+      'resolveEffectiveDownloadStatements',
+      `policy statement ${submissionStatement.policy_statement_id} is limited to submission ${submissionStatement.urn_submission_id}`
+    ]);
+  }
 }
 
 /**
