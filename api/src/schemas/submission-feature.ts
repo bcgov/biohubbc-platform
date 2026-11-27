@@ -19,7 +19,6 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         'successor_submission_feature_id',
         'terminal_submission_feature_id',
         'feature_type_name',
-        'submission_name',
         'contributor_name',
         'secured',
         'security_reasons'
@@ -71,10 +70,6 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
         feature_type_name: {
           type: 'string',
           description: 'Stable feature type identifier used for routing and frontend display labels.'
-        },
-        submission_name: {
-          type: 'string',
-          description: 'Name of the parent submission.'
         },
         contributor_name: {
           type: 'string',

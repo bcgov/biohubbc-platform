@@ -5,17 +5,17 @@ import {
   MARTIN_FEATURE_MIN_ZOOM,
   MARTIN_FEATURE_SOURCE_LAYER,
   MARTIN_SOURCE
-} from '../../../../../../constants/martin';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
-import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { martinExtentSessionResponseSchema } from '../../../../../../openapi/schemas/martin';
-import { martinTokenRateLimiter } from '../../../../../../request-handlers/rate-limit';
-import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
-import { MartinTokenService } from '../../../../../../services/martin-token-service';
-import { SubmissionFeaturePropertyGeometryService } from '../../../../../../services/submission-feature-property-geometry-service';
-import { getLogger } from '../../../../../../utils/logger';
+} from '../../../../constants/martin';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { martinExtentSessionResponseSchema } from '../../../../openapi/schemas/martin';
+import { martinTokenRateLimiter } from '../../../../request-handlers/rate-limit';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
+import { MartinTokenService } from '../../../../services/martin-token-service';
+import { SubmissionFeaturePropertyGeometryService } from '../../../../services/submission-feature-property-geometry-service';
+import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}/tile');
+const defaultLog = getLogger('paths/feature/{submissionFeatureId}/tile');
 
 export const POST: Operation = [
   martinTokenRateLimiter,
@@ -26,8 +26,7 @@ export const POST: Operation = [
       and: [
         {
           discriminator: 'Policy',
-          submissionFeatureId: Number(req.params.submissionFeatureId),
-          submissionId: Number(req.params.submissionId)
+          submissionFeatureId: Number(req.params.submissionFeatureId)
         }
       ]
     };
@@ -44,16 +43,6 @@ POST.apiDoc = {
     }
   ],
   parameters: [
-    {
-      description: 'Submission ID.',
-      in: 'path',
-      name: 'submissionId',
-      schema: {
-        type: 'integer',
-        minimum: 1
-      },
-      required: true
-    },
     {
       description: 'Submission Feature ID.',
       in: 'path',
@@ -80,10 +69,10 @@ POST.apiDoc = {
  * Create a tile session for a single submission feature.
  *
  * The token is scoped by construction rather than by validation: its `ctx` claim is built from the
- * two path parameters the authorization rule above just approved. A client that asks for a feature it
- * cannot read never reaches this handler, and a client that edits the identifiers is simply asking for
- * a different feature, which is authorized on its own merits. There is no client supplied input that
- * the token widens.
+ * feature id the authorization rule above just approved and the submission read from that feature's own
+ * record. A client that asks for a feature it cannot read never reaches this handler, and a client that
+ * edits the id is simply asking for a different feature, which is authorized on its own merits. There is
+ * no client supplied input that the token widens.
  *
  * This returns only what is needed to initialize a map. Geometry values are not included: they reach
  * the browser as vector tiles served by the Martin Gateway, so tile bytes never pass through this API.
@@ -93,17 +82,15 @@ POST.apiDoc = {
 export function createSubmissionFeatureTileSession(): RequestHandler {
   return async (req, res) => {
     // Unsecured features are readable anonymously (see the closure-based authorization rule on this
-    // route); fall back to the API user connection when there is no keycloak token, mirroring the
-    // feature detail endpoint.
+    // route); fall back to the API user connection when there is no keycloak token.
     const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
-    const submissionId = Number(req.params.submissionId);
     const submissionFeatureId = Number(req.params.submissionFeatureId);
 
     try {
       await connection.open();
 
       const geometryService = new SubmissionFeaturePropertyGeometryService(connection);
-      const extent = await geometryService.getActiveGeometryExtent(submissionId, submissionFeatureId);
+      const extent = await geometryService.getActiveGeometryExtentBySubmissionFeatureId(submissionFeatureId);
 
       await connection.commit();
 
@@ -122,7 +109,7 @@ export function createSubmissionFeatureTileSession(): RequestHandler {
         source: MARTIN_SOURCE.FEATURE,
         // Parsed back out by biohub.martin_feature. Carrying the identifiers in the signed token,
         // rather than letting the client send them, is what makes them trustworthy at serve time.
-        ctx: `sf:${submissionId}:${submissionFeatureId}`
+        ctx: `sf:${extent.submissionId}:${submissionFeatureId}`
       });
 
       return res.status(200).json({

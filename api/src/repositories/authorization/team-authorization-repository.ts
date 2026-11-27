@@ -178,14 +178,12 @@ export class TeamAuthorizationRepository extends BaseRepository {
    *
    * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
    * @param {number} submissionFeatureId
-   * @param {number} submissionId The submission the feature must belong to.
    * @return {Promise<boolean>} `true` if the feature is accessible to the user.
    * @memberof TeamAuthorizationRepository
    */
   async isSubmissionFeatureAccessibleToUser(
     systemUserId: number | null,
-    submissionFeatureId: number,
-    submissionId: number
+    submissionFeatureId: number
   ): Promise<boolean> {
     const knex = getKnex();
     const terminalFeatureId = 'terminal.terminal_submission_feature_id';
@@ -194,7 +192,6 @@ export class TeamAuthorizationRepository extends BaseRepository {
       .select(knex.raw('1'))
       .from('submission_feature as sf')
       .where('sf.submission_feature_id', submissionFeatureId)
-      .where('sf.submission_id', submissionId)
       .whereRaw(isSubmissionFeaturePublished('sf'))
       .joinRaw(`JOIN LATERAL ${buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id')} terminal ON true`)
       .limit(1);

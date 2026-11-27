@@ -12,12 +12,14 @@ import { Link as RouterLink, Navigate, useLocation, useParams } from 'react-rout
 import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { keepPreviousDataWithin } from 'utils/query-client';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
-import { buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
+import { buildSubmissionFeaturePath, buildSubmissionPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 
 /**
  * Portal submission feature detail page scoped to the current user's submission.
  *
- * Owns portal route parsing, feature loading, authorization error handling, and portal-scoped feature detail layout.
+ * Owns portal route parsing, submission and feature loading, authorization error handling, and portal-scoped feature
+ * detail layout. The page is for the submission's team: a caller who cannot read the submission is sent to the
+ * forbidden page, even when the feature itself is public.
  *
  * @returns {JSX.Element} Portal submission feature detail page.
  */
@@ -27,13 +29,22 @@ export const PortalSubmissionFeaturePage = () => {
   const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
   const submissionId = parseRouteId(params.submissionId);
   const submissionFeatureId = parseRouteId(params.submissionFeatureId);
+  const isValidRoute = submissionId !== null && submissionFeatureId !== null;
 
-  const featureQuery = useQuery({
-    queryKey: submissionQueryKeys.featureDetail(submissionId ?? 0, submissionFeatureId ?? 0),
+  // The submission names the breadcrumb; it is private to its team, so the feature itself does not carry it.
+  const submissionQuery = useQuery({
+    queryKey: submissionQueryKeys.record(submissionId ?? 0),
     queryFn:
-      submissionId === null || submissionFeatureId === null
+      !isValidRoute || submissionId === null
         ? skipToken
-        : ({ signal }) => api.features.getSubmissionFeatureById(submissionId, submissionFeatureId, { signal })
+        : ({ signal }) => api.submissions.getSubmissionRecordWithSecurity(submissionId, { signal })
+  });
+  const featureQuery = useQuery({
+    queryKey: submissionQueryKeys.featureDetail(submissionFeatureId ?? 0),
+    queryFn:
+      !isValidRoute || submissionFeatureId === null
+        ? skipToken
+        : ({ signal }) => api.features.getSubmissionFeatureById(submissionFeatureId, { signal })
   });
   const feature = featureQuery.data?.feature;
   const pathResolvers = useMemo(
@@ -44,21 +55,23 @@ export const PortalSubmissionFeaturePage = () => {
   const propertyGrid = useServerPaginatedGridState({ defaultSort: { field: 'property', sort: 'asc' } });
   const propertyParams = { search: propertyGrid.debouncedSearchTerm, ...propertyGrid.apiPagination };
   const propertiesQuery = useQuery({
-    queryKey: submissionQueryKeys.featureProperties(submissionId ?? 0, submissionFeatureId ?? 0, propertyParams),
+    queryKey: submissionQueryKeys.featureProperties(submissionFeatureId ?? 0, propertyParams),
     queryFn:
-      submissionId === null || submissionFeatureId === null
+      !isValidRoute || submissionFeatureId === null
         ? skipToken
-        : ({ signal }) =>
-            api.features.getSubmissionFeatureProperties(submissionId, submissionFeatureId, propertyParams, { signal }),
-    placeholderData: keepPreviousDataWithin(submissionQueryKeys.feature(submissionId ?? 0, submissionFeatureId ?? 0))
+        : ({ signal }) => api.features.getSubmissionFeatureProperties(submissionFeatureId, propertyParams, { signal }),
+    placeholderData: keepPreviousDataWithin(submissionQueryKeys.feature(submissionFeatureId ?? 0))
   });
 
+  // Portal pages belong to the submission's team, so access to the submission governs the page as well as the feature.
+  const submissionErrorStatus = (submissionQuery.error as APIError | null)?.status;
   const featureErrorStatus = (featureQuery.error as APIError | null)?.status;
-  if (featureErrorStatus === 401 || featureErrorStatus === 403) {
+  if ([submissionErrorStatus, featureErrorStatus].some((status) => status === 401 || status === 403)) {
     return <Navigate to="/forbidden" replace />;
   }
 
-  if (submissionId === null || submissionFeatureId === null) {
+  // The feature is loaded by id alone, so a route pairing it with another submission names no page.
+  if (submissionId === null || submissionFeatureId === null || (feature && feature.submission_id !== submissionId)) {
     return <Navigate to="/page-not-found" replace />;
   }
 
@@ -68,8 +81,9 @@ export const PortalSubmissionFeaturePage = () => {
       feature={feature}
       rootBreadcrumbLabel="Submissions"
       rootBreadcrumbTo="/portal/submission"
-      submissionDetailBasePath="/portal/submission"
-      queryString={location.search}
+      getFeaturePath={(featureId) =>
+        buildSubmissionFeaturePath('/portal/submission', submissionId, featureId, location.search)
+      }
       breadcrumbs={
         feature && (
           <Breadcrumbs aria-label="breadcrumb">
@@ -81,10 +95,10 @@ export const PortalSubmissionFeaturePage = () => {
             </Link>
             <Link
               component={RouterLink}
-              to={`/portal/submission/${feature.submission_id}${location.search}`}
+              to={`/portal/submission/${submissionId}${location.search}`}
               underline="hover"
               color="inherit">
-              {feature.submission_name}
+              {submissionQuery.data?.name ?? 'Submission'}
             </Link>
             <Typography color="text.primary">{getFeatureTypeDisplayLabel(feature.feature_type_name)}</Typography>
           </Breadcrumbs>

@@ -3,6 +3,7 @@ import NotFoundPage from 'features/404/NotFoundPage';
 import { DownloadPage } from 'features/download/DownloadPage';
 import { DownloadVersionPage } from 'features/download/DownloadVersionPage';
 import { SearchPage } from 'features/search/SearchPage';
+import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
 import { DOWNLOAD_BASE_PATH } from 'constants/download';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
@@ -11,7 +12,6 @@ import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 import { PortalRouter } from './portal/PortalRouter';
 import { SearchRouter } from './search/SearchRouter';
-import { SubmissionRouter } from './submission/SubmissionRouter';
 
 export const AppRouter = () => {
   return (
@@ -37,13 +37,13 @@ export const AppRouter = () => {
         }
       />
 
-      {/* Submission Routes */}
+      {/* Public feature detail, addressed by the feature alone: submissions are private to their teams. */}
       <Route
-        path="/submission/*"
+        path="/feature/:submissionFeatureId"
         element={
           <BaseLayout>
-            <PageTitle title="Submission Details" description="Details of a specific submission" />
-            <SubmissionRouter />
+            <PageTitle title="Feature Details" description="Details of a specific feature" />
+            <SubmissionFeaturePage />
           </BaseLayout>
         }
       />

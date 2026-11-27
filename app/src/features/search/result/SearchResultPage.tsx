@@ -7,7 +7,7 @@ import { useCodesQuery } from 'hooks/useCodesQuery';
 import { useMemo, useState } from 'react';
 import { Navigate, useLocation, useParams } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
-import { buildSubmissionPropertyValuePathResolvers, getSearchFeatureTypeRouteConfig } from 'utils/routes';
+import { buildPublicPropertyValuePathResolvers, getSearchFeatureTypeRouteConfig } from 'utils/routes';
 import { buildAllSearchFeatureTypeLinks } from '../utils/search-feature-type-links';
 import { SearchResultPanel } from './content/SearchResultPanel';
 import { SearchResultMapContainer } from './layout/map/SearchResultMapContainer';
@@ -43,10 +43,7 @@ export const SearchResultPage = () => {
     () => buildAllSearchFeatureTypeLinks(codesQuery.data?.feature_type_with_properties),
     [codesQuery.data?.feature_type_with_properties]
   );
-  const pathResolvers = useMemo(
-    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
-    [location.search]
-  );
+  const pathResolvers = useMemo(() => buildPublicPropertyValuePathResolvers(location.search), [location.search]);
   const { expressionTree, handleExpressionApply } = useSearchResultExpression();
   const {
     rows,

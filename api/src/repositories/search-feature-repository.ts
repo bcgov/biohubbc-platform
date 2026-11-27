@@ -115,7 +115,6 @@ export class SearchFeatureRepository extends BaseRepository {
       .from(featureIds.as('matches'))
       .join('submission_feature as sf', 'sf.submission_feature_id', 'matches.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .join('submission as s', 's.submission_id', 'sf.submission_id')
       .select(
         'sf.submission_feature_id',
         'sf.parent_submission_feature_id',
@@ -124,7 +123,6 @@ export class SearchFeatureRepository extends BaseRepository {
         'sf.feature_type_id',
         'ft.name as feature_type_name',
         'sf.create_date',
-        's.name as submission_name',
         knex.raw('1.0 AS relevancy_score'),
         knex.raw("'{}'::jsonb AS properties"),
         'security.provenance',
@@ -506,12 +504,10 @@ export class SearchFeatureRepository extends BaseRepository {
         'authorized_features.feature_type_id',
         'authorized_features.feature_type_name',
         knex.raw(`COALESCE(typed_properties.properties, '{}'::jsonb) as properties`),
-        's.name as submission_name',
         knex.raw(`${isEffectivelySecured('authorized_features.submission_feature_id')} AS is_secured`),
         'authorized_features.relevancy_score',
         'authorized_features.create_date'
       )
-      .join('submission as s', 'authorized_features.submission_id', 's.submission_id')
       .joinRaw('?', [propertiesJoin]);
 
     this.applyExpressionSearchOrder(finalQuery, 'authorized_features', queryOptions);

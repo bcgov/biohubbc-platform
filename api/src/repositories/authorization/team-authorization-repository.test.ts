@@ -189,7 +189,7 @@ describe('TeamAuthorizationRepository', () => {
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
+      const result = await repository.isSubmissionFeatureAccessibleToUser(1, 100);
 
       expect(result).to.be.true;
     });
@@ -199,7 +199,7 @@ describe('TeamAuthorizationRepository', () => {
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
+      const result = await repository.isSubmissionFeatureAccessibleToUser(1, 100);
 
       expect(result).to.be.false;
     });
@@ -210,7 +210,8 @@ describe('TeamAuthorizationRepository', () => {
           const compiled = query.toSQL();
           const sql = compiled.sql.toLowerCase();
           expect(sql).to.include('"sf"."submission_feature_id" = ?');
-          expect(sql).to.include('"sf"."submission_id" = ?');
+          // The feature id alone identifies the feature; no caller-supplied submission narrows it.
+          expect(sql).to.not.include('"sf"."submission_id" = ?');
           expect(sql).to.include('sf.record_effective_date <= now()');
           expect(sql).to.include('with recursive successor_chain');
           expect(sql.match(/with recursive successor_chain/g) || []).to.have.lengthOf(1);
@@ -228,14 +229,14 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.not.include('sf.record_end_date <= sfs.record_end_date');
           expect(sql).to.include('team_security_scope');
           expect(sql).to.include('tm.record_end_date is null');
-          expect(compiled.bindings).to.include.members([100, 200, 1]);
+          expect(compiled.bindings).to.include.members([100, 1]);
           expect(compiled.bindings.filter((binding: unknown) => binding === 1).length).to.be.at.least(2);
           return mockQueryResult([]);
         }
       });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      await repository.isSubmissionFeatureAccessibleToUser(1, 100, 200);
+      await repository.isSubmissionFeatureAccessibleToUser(1, 100);
     });
 
     it('requires both current and historical contexts to be unsecured for anonymous users', async () => {
@@ -243,7 +244,7 @@ describe('TeamAuthorizationRepository', () => {
         knex: async (query: any) => {
           const compiled = query.toSQL();
           const sql = compiled.sql.toLowerCase();
-          expect(sql).to.include('"sf"."submission_id" = ?');
+          expect(sql).to.not.include('"sf"."submission_id" = ?');
           expect(sql).to.include('sf.record_effective_date <= now()');
           expect(sql).to.include('with recursive successor_chain');
           expect(sql).to.include('with recursive historical_ancestry');
@@ -251,13 +252,13 @@ describe('TeamAuthorizationRepository', () => {
           expect(sql).to.not.include('security_scope_anchor');
           expect(sql).to.not.include('team_security_scope');
           expect(sql).to.not.match(/"?sf"?\."?record_end_date"? is not null/);
-          expect(compiled.bindings).to.include.members([100, 200]);
+          expect(compiled.bindings).to.include.members([100]);
           return { rowCount: 1, rows: [{ '1': 1 }] } as unknown as QueryResult<any>;
         }
       });
 
       const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.isSubmissionFeatureAccessibleToUser(null, 100, 200);
+      const result = await repository.isSubmissionFeatureAccessibleToUser(null, 100);
 
       expect(result).to.be.true;
     });

@@ -1,25 +1,38 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
 import { getActiveSystemUserId } from '../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/submission/{submissionId}');
 
-export const GET: Operation = [getSubmissionRecordWithSecurity()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    or: [
+      {
+        discriminator: 'Team',
+        entity: 'submission',
+        submissionId: Number(req.params.submissionId)
+      },
+      {
+        discriminator: 'SystemRole',
+        validSystemRoles: [SYSTEM_ROLE.DATA_ADMINISTRATOR]
+      }
+    ]
+  })),
+  getSubmissionRecordWithSecurity()
+];
 
 GET.apiDoc = {
   description:
-    'Public submission metadata is available by ID regardless of publication, upload decision, or end date. Returns identifiers, name, description, audit timestamps and user IDs, contributor identity, and feature/security summaries. Internal comments are excluded; feature content has separate access checks.',
+    "Submission metadata, available only to members of the submission's team and to data and system administrators, regardless of publication, upload decision, or end date. Returns identifiers, name, description, audit timestamps and user IDs, contributor identity, and feature/security summaries. Internal comments are excluded; feature content has separate access checks.",
   tags: ['meta'],
-  security: [
-    {
-      OptionalBearer: []
-    }
-  ],
+  security: [{ Bearer: [] }],
   parameters: [
     {
       description: 'Submission ID.',
@@ -157,7 +170,7 @@ GET.apiDoc = {
  */
 export function getSubmissionRecordWithSecurity(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token!);
 
     const submissionId = Number(req.params.submissionId);
 

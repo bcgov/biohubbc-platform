@@ -11,13 +11,14 @@ const mockUseApi = useApi as Mock;
 
 // The map owns its own data loading and is covered by its own suite; this one is about the page layout.
 vi.mock('features/submissions/page/features/components/map/SubmissionFeatureMap', () => ({
-  SubmissionFeatureMap: (props: { submissionId: number; submissionFeatureId: number }) => (
+  SubmissionFeatureMap: (props: { submissionFeatureId: number }) => (
     <div data-testid="submission-feature-map-stub" data-props={JSON.stringify(props)} />
   )
 }));
 
 const mockGetSubmissionFeatureById = vi.fn();
 const mockGetSubmissionFeatureProperties = vi.fn();
+const mockGetSubmissionRecordWithSecurity = vi.fn();
 
 const mockFeature = {
   submission_feature_id: 10,
@@ -27,7 +28,6 @@ const mockFeature = {
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'observation',
-  submission_name: 'Test Submission',
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
@@ -45,6 +45,7 @@ const renderPage = (initialPath = '/portal/submission/1/feature/10') =>
           element={<PortalSubmissionFeaturePage />}
         />
         <Route path="/page-not-found" element={<div>Page Not Found</div>} />
+        <Route path="/forbidden" element={<div>Forbidden</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -57,8 +58,13 @@ describe('PortalSubmissionFeaturePage', () => {
       features: {
         getSubmissionFeatureById: mockGetSubmissionFeatureById,
         getSubmissionFeatureProperties: mockGetSubmissionFeatureProperties
+      },
+      submissions: {
+        getSubmissionRecordWithSecurity: mockGetSubmissionRecordWithSecurity
       }
     });
+
+    mockGetSubmissionRecordWithSecurity.mockResolvedValue({ submission_id: 1, name: 'Test Submission' });
 
     mockGetSubmissionFeatureById.mockResolvedValue({
       feature: mockFeature
@@ -87,7 +93,7 @@ describe('PortalSubmissionFeaturePage', () => {
 
     expect(await findByText('Properties')).toBeVisible();
     await waitFor(() => {
-      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object), {
+      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(10, expect.any(Object), {
         signal: expect.any(AbortSignal)
       });
     });
@@ -147,8 +153,32 @@ describe('PortalSubmissionFeaturePage', () => {
     const stub = await findByTestId('submission-feature-map-stub');
 
     expect(JSON.parse(stub.dataset.props ?? '{}')).toEqual({
-      submissionId: mockFeature.submission_id,
       submissionFeatureId: mockFeature.submission_feature_id
     });
+  });
+
+  it("names the breadcrumb's submission from the submission record, which the team can read", async () => {
+    const { findByRole } = renderPage();
+
+    await findByRole('link', { name: 'Test Submission' });
+
+    expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledWith(1, { signal: expect.any(AbortSignal) });
+    expect(mockGetSubmissionFeatureById).toHaveBeenCalledWith(10, { signal: expect.any(AbortSignal) });
+  });
+
+  it("sends a caller outside the submission's team to the forbidden page, even for a public feature", async () => {
+    mockGetSubmissionRecordWithSecurity.mockRejectedValue({ status: 403, message: 'Access Denied' });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('Forbidden')).toBeVisible();
+  });
+
+  it('redirects to the not found page when the feature belongs to another submission', async () => {
+    mockGetSubmissionFeatureById.mockResolvedValue({ feature: { ...mockFeature, submission_id: 2 } });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('Page Not Found')).toBeVisible();
   });
 });

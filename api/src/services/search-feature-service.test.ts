@@ -85,7 +85,6 @@ describe('SearchFeatureService', () => {
       feature_type_id: 1,
       feature_type_name: 'survey',
       properties: {},
-      submission_name: 'Submission A',
       is_secured: false,
       relevancy_score: 1,
       create_date: '2026-05-11T00:00:00.000Z'

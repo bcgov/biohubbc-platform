@@ -19,7 +19,6 @@ import {
   SubmissionFeatureRecord,
   SubmissionMessageRecord,
   SubmissionRecord,
-  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRepository
 } from '../repositories/submission-repository';
@@ -392,18 +391,6 @@ export class SubmissionService extends DBService {
     systemUserId: number | null
   ): Promise<SubmissionRecordWithSecurity> {
     return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId, systemUserId);
-  }
-
-  /**
-   * Get all published submissions.
-   *
-   * Note: This method is used by the public API. Sensitive data should not be included in the response.
-   *
-   * @returns {Promise<SubmissionRecordPublishedForPublic[]>}
-   * @memberof SubmissionService
-   */
-  async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
-    return this.submissionRepository.getPublishedSubmissions();
   }
 
   /**

@@ -15,7 +15,6 @@ const mockFeature: ISubmissionFeature = {
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'observation',
-  submission_name: 'Test Submission',
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
@@ -33,7 +32,7 @@ const renderLayout = (feature?: ISubmissionFeature, isLoading = false) =>
         isLoading={isLoading}
         rootBreadcrumbLabel="Search"
         rootBreadcrumbTo="/search"
-        submissionDetailBasePath="/submission"
+        getFeaturePath={(submissionFeatureId) => `/feature/${submissionFeatureId}`}
         breadcrumbs={<nav aria-label="review breadcrumb">Validation</nav>}>
         <h2>Review properties</h2>
       </SubmissionFeatureLayout>

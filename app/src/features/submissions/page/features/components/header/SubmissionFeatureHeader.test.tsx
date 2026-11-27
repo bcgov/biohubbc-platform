@@ -11,7 +11,6 @@ const mockFeature: ISubmissionFeature = {
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'species_observation',
-  submission_name: 'Test Submission',
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
@@ -28,7 +27,6 @@ const renderHeader = (feature: ISubmissionFeature = mockFeature) =>
         feature={feature}
         rootBreadcrumbLabel="Submissions"
         rootBreadcrumbTo="/submissions"
-        submissionDetailBasePath="/submission"
         activeTab="details"
         onTabChange={vi.fn()}
       />
@@ -36,6 +34,14 @@ const renderHeader = (feature: ISubmissionFeature = mockFeature) =>
   );
 
 describe('SubmissionFeatureHeader', () => {
+  it('leads the default breadcrumb from the root to the feature type without naming the submission', () => {
+    const { getByRole, getAllByRole } = renderHeader();
+
+    const breadcrumb = getByRole('navigation', { name: 'breadcrumb' });
+    expect(breadcrumb).toHaveTextContent('Submissions/Species Observation');
+    expect(getAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain('/submission/1');
+  });
+
   it('renders the Details tab as selected', () => {
     const { getByRole } = renderHeader();
 

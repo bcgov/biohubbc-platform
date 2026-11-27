@@ -8,7 +8,7 @@ import { SearchResultMapContainer } from 'features/search/result/layout/map/Sear
 import { ExpressionTreeExpression } from 'interfaces/expression.interface';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
+import { buildFeaturePath, buildPublicPropertyValuePathResolvers } from 'utils/routes';
 
 interface AdminDataRequestFeatureTypeFeaturesProps {
   /** The requested feature type to search. */
@@ -32,10 +32,7 @@ export const AdminDataRequestFeatureTypeFeatures = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [view, setView] = useState<SEARCH_RESULT_VIEW>(SEARCH_RESULT_VIEW.TABLE);
-  const pathResolvers = useMemo(
-    () => buildSubmissionPropertyValuePathResolvers('/submission', location.search),
-    [location.search]
-  );
+  const pathResolvers = useMemo(() => buildPublicPropertyValuePathResolvers(location.search), [location.search]);
 
   const { rows, properties, isLoading, cursor, totalCount, setSearchParams } = useSearchResults(
     featureType,
@@ -73,9 +70,7 @@ export const AdminDataRequestFeatureTypeFeatures = ({
         toolbarPaddingY={2}
         onSortChange={handleSortChange}
         onViewChange={setView}
-        onResultClick={(result) =>
-          navigate(`/submission/${result.submission_id}/feature/${result.submission_feature_id}`)
-        }
+        onResultClick={(result) => navigate(buildFeaturePath(result.submission_feature_id))}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
         mapContent={

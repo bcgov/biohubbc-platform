@@ -194,10 +194,10 @@ describe('TeamAuthorizationService', () => {
         .resolves(true);
 
       const service = new TeamAuthorizationService(mockConnection);
-      const result = await service.isSubmissionFeatureAccessibleToUser(1, 2, 3);
+      const result = await service.isSubmissionFeatureAccessibleToUser(1, 2);
 
       expect(result).to.be.true;
-      expect(repoStub).to.have.been.calledOnceWith(1, 2, 3);
+      expect(repoStub).to.have.been.calledOnceWith(1, 2);
     });
 
     it('passes a null system user id through for anonymous users', async () => {
@@ -207,10 +207,10 @@ describe('TeamAuthorizationService', () => {
         .resolves(false);
 
       const service = new TeamAuthorizationService(mockConnection);
-      const result = await service.isSubmissionFeatureAccessibleToUser(null, 2, 3);
+      const result = await service.isSubmissionFeatureAccessibleToUser(null, 2);
 
       expect(result).to.be.false;
-      expect(repoStub).to.have.been.calledOnceWith(null, 2, 3);
+      expect(repoStub).to.have.been.calledOnceWith(null, 2);
     });
   });
 });

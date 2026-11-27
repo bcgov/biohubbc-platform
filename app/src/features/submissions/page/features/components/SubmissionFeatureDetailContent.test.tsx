@@ -19,7 +19,6 @@ const mockFeature: ISubmissionFeature = {
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'observation',
-  submission_name: 'Test Submission',
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
@@ -31,8 +30,7 @@ const mockFeature: ISubmissionFeature = {
 
 const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   feature: mockFeature,
-  submissionDetailBasePath: '/submission',
-  queryString: '?ft=observation',
+  getFeaturePath: (submissionFeatureId) => `/feature/${submissionFeatureId}?ft=observation`,
   children: <h2>Properties</h2>
 };
 
@@ -60,7 +58,7 @@ describe('SubmissionFeatureDetailContent', () => {
 
     expect(getByRole('link', { name: 'View the current version' })).toHaveAttribute(
       'href',
-      '/submission/1/feature/12?ft=observation'
+      '/feature/12?ft=observation'
     );
   });
 
@@ -107,7 +105,6 @@ describe('SubmissionFeatureDetailContent', () => {
       const { getByTestId } = renderComponent();
 
       expect(JSON.parse(getByTestId('submission-feature-map-stub').dataset.props ?? '{}')).toEqual({
-        submissionId: mockFeature.submission_id,
         submissionFeatureId: mockFeature.submission_feature_id
       });
     });

@@ -6,14 +6,17 @@ import {
   SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
 import { SubmissionFeaturePropertyGeometryRepository } from '../repositories/submission-feature-property-geometry-repository';
+import { SubmissionFeatureRepository } from '../repositories/submission-feature-repository';
 import { DBService } from './db-service';
 
 export class SubmissionFeaturePropertyGeometryService extends DBService {
   submissionFeaturePropertyGeometryRepository: SubmissionFeaturePropertyGeometryRepository;
+  submissionFeatureRepository: SubmissionFeatureRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionFeaturePropertyGeometryRepository = new SubmissionFeaturePropertyGeometryRepository(connection);
+    this.submissionFeatureRepository = new SubmissionFeatureRepository(connection);
   }
 
   /**
@@ -76,6 +79,27 @@ export class SubmissionFeaturePropertyGeometryService extends DBService {
     submissionFeatureId: number
   ): Promise<{ bbox: GeometryBoundingBox | null; geometry_count: number }> {
     return this.submissionFeaturePropertyGeometryRepository.getActiveGeometryExtent(submissionId, submissionFeatureId);
+  }
+
+  /**
+   * Get the combined extent and count of a submission feature's published spatial properties, with the submission
+   * the feature belongs to.
+   *
+   * The feature's own record supplies its submission, so callers identify the feature by id alone.
+   *
+   * @param {number} submissionFeatureId Feature to map.
+   * @return {Promise<{ submissionId: number; bbox: GeometryBoundingBox | null; geometry_count: number }>} The
+   * feature's submission, extent and geometry count.
+   * @throws {ApiExecuteSQLError} If the feature is not a published feature.
+   * @memberof SubmissionFeaturePropertyGeometryService
+   */
+  async getActiveGeometryExtentBySubmissionFeatureId(
+    submissionFeatureId: number
+  ): Promise<{ submissionId: number; bbox: GeometryBoundingBox | null; geometry_count: number }> {
+    const feature = await this.submissionFeatureRepository.getSubmissionFeatureById(submissionFeatureId);
+    const extent = await this.getActiveGeometryExtent(feature.submission_id, submissionFeatureId);
+
+    return { submissionId: feature.submission_id, ...extent };
   }
 
   /**

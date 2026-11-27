@@ -10,7 +10,6 @@ export const createMockSearchFeature = (
   uuid: `feature-${id}`,
   feature_type_id: 200 + id,
   feature_type_name: featureTypeName,
-  submission_name: `Submission ${id}`,
   properties: {},
   is_secured: isSecured,
   relevancy_score: 1,

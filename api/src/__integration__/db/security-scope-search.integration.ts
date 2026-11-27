@@ -2383,19 +2383,19 @@ describe('Security scope search (integration)', function () {
       await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:survey:*`, userId, 'Ancestry Gate Team');
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.true;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, parent, submissionId)).to.be.true;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, child, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, parent)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, child)).to.be.true;
     });
 
     it('denies a user with no matching scope access to the secured subtree', async () => {
-      const { submissionId, grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
+      const { grandparent, parent, child } = await seedSecuredGrandparentHierarchy();
       const userId = await createOtherUser();
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.false;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, parent, submissionId)).to.be.false;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, child, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, parent)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, child)).to.be.false;
     });
 
     it('grants any user access to an unsecured feature', async () => {
@@ -2410,22 +2410,11 @@ describe('Security scope search (integration)', function () {
       const userId = await createOtherUser();
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, openFeature, submissionId)).to.be.true;
-    });
-
-    it('denies when the feature does not belong to the given submission', async () => {
-      const { submissionId, grandparent } = await seedSecuredGrandparentHierarchy();
-      const userId = connection.systemUserId();
-      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:survey:*`, userId, 'Ancestry Gate Team 2');
-
-      const repo = new TeamAuthorizationRepository(connection);
-      // Accessible under its real submission, but the submission-integrity guard denies a mismatched id.
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId)).to.be.true;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, grandparent, submissionId + 100000)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, openFeature)).to.be.true;
     });
 
     it('reconstructs historical inherited security after closure drops the historical source', async () => {
-      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+      const { historicalFeatureId } = await seedHistoricalFeature({
         historicalSecured: true,
         currentSecured: false
       });
@@ -2437,66 +2426,66 @@ describe('Security scope search (integration)', function () {
       expect(closureRows.rowCount).to.equal(0);
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
     });
 
     it('evaluates security on stored historical ancestry as it exists now', async () => {
-      const { submissionId, historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
+      const { historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
         historicalSecured: true,
         currentSecured: false
       });
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
 
       await connection.sql(SQL`
         UPDATE submission_feature_security
         SET record_end_date = now() - interval '1 second'
         WHERE submission_feature_id = ${historicalParentId};
       `);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.true;
     });
 
     it('denies historical open content when its terminal current feature is secured', async () => {
-      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+      const { historicalFeatureId } = await seedHistoricalFeature({
         historicalSecured: false,
         currentSecured: true
       });
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
     });
 
     it('does not revoke direct-ID access solely because a feature is superseded', async () => {
-      const { submissionId, historicalFeatureId, currentFeatureId } = await seedHistoricalFeature({
+      const { historicalFeatureId, currentFeatureId } = await seedHistoricalFeature({
         historicalSecured: false,
         currentSecured: false
       });
       const repo = new TeamAuthorizationRepository(connection);
 
       // The caller still passes both the historical and terminal-current access checks.
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.true;
 
       // A later security change on the terminal current feature may legitimately revoke that access.
       await secureFeature(connection, currentFeatureId);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
     });
 
     it('reflects removal and reapplication of current security on historical ancestry', async () => {
-      const { submissionId, historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
+      const { historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
         historicalSecured: true,
         currentSecured: false
       });
       const repo = new TeamAuthorizationRepository(connection);
 
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
 
       await connection.sql(
         SQL`DELETE FROM submission_feature_security WHERE submission_feature_id = ${historicalParentId} AND security_rule_id = 1`
       );
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.true;
 
       await secureFeature(connection, historicalParentId);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
     });
 
     it('allows a superseded feature only when the caller passes historical and current access checks', async () => {
@@ -2514,7 +2503,7 @@ describe('Security scope search (integration)', function () {
       );
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId)).to.be.true;
     });
 
     it('evaluates historical entitlement against current team membership', async () => {
@@ -2532,7 +2521,7 @@ describe('Security scope search (integration)', function () {
       );
       const repo = new TeamAuthorizationRepository(connection);
 
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId)).to.be.true;
 
       await connection.sql(SQL`
         UPDATE team_member
@@ -2542,11 +2531,11 @@ describe('Security scope search (integration)', function () {
           AND record_end_date IS NULL;
       `);
 
-      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(userId, historicalFeatureId)).to.be.false;
     });
 
     it('walks a cyclic stored parent chain safely without leaving the submission', async () => {
-      const { submissionId, historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
+      const { historicalParentId, historicalFeatureId } = await seedHistoricalFeature({
         historicalSecured: false,
         currentSecured: false
       });
@@ -2557,11 +2546,11 @@ describe('Security scope search (integration)', function () {
       `);
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.true;
     });
 
     it('fails closed for a cross-submission successor', async () => {
-      const { submissionId, historicalFeatureId } = await seedHistoricalFeature({
+      const { historicalFeatureId } = await seedHistoricalFeature({
         historicalSecured: false,
         currentSecured: false
       });
@@ -2580,7 +2569,7 @@ describe('Security scope search (integration)', function () {
         SET successor_submission_feature_id = ${crossSubmissionFeatureId}
         WHERE submission_feature_id = ${historicalFeatureId};
       `);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
     });
 
     it('uses lifecycle state for the authorization branch and fails closed while successor closure is missing', async () => {
@@ -2620,13 +2609,13 @@ describe('Security scope search (integration)', function () {
       expect(lifecycleState.rows).to.deep.include({ submission_feature_id: currentFeatureId, current: true });
 
       const repo = new TeamAuthorizationRepository(connection);
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, currentFeatureId, submissionId)).to.be.false;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, currentFeatureId)).to.be.false;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.false;
 
       await rebuildClosureForSubmission(submissionId);
 
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, currentFeatureId, submissionId)).to.be.true;
-      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId, submissionId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, currentFeatureId)).to.be.true;
+      expect(await repo.isSubmissionFeatureAccessibleToUser(null, historicalFeatureId)).to.be.true;
     });
   });
 });

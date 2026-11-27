@@ -22,13 +22,9 @@ interface SubmissionFeatureHeaderProps {
   rootBreadcrumbLabel: string;
   /** Route for the first breadcrumb. */
   rootBreadcrumbTo: string;
-  /** Base route used to link to the feature's submission. */
-  submissionDetailBasePath: string;
-  /** Query string preserved when navigating back to the submission. */
-  queryString?: string;
   /** Optional page-level actions displayed in the header. */
   buttons?: ReactNode;
-  /** Optional breadcrumbs for review-scoped navigation. */
+  /** Optional breadcrumbs replacing the default root and feature type trail. */
   breadcrumbs?: ReactNode;
   /** Currently selected feature detail tab. */
   activeTab: SubmissionFeatureTab;
@@ -50,8 +46,6 @@ export const SubmissionFeatureHeader = ({
   feature,
   rootBreadcrumbLabel,
   rootBreadcrumbTo,
-  submissionDetailBasePath,
-  queryString = '',
   buttons,
   breadcrumbs,
   activeTab,
@@ -66,13 +60,6 @@ export const SubmissionFeatureHeader = ({
           <Breadcrumbs aria-label="breadcrumb">
             <Link component={RouterLink} to={rootBreadcrumbTo} underline="hover" color="inherit">
               {rootBreadcrumbLabel}
-            </Link>
-            <Link
-              component={RouterLink}
-              to={`${submissionDetailBasePath}/${feature.submission_id}${queryString}`}
-              underline="hover"
-              color="inherit">
-              {feature.submission_name}
             </Link>
             <Typography color="text.primary">{featureTypeLabel}</Typography>
           </Breadcrumbs>

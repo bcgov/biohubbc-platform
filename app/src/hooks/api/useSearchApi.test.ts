@@ -48,7 +48,6 @@ describe('useSearchApi', () => {
           feature_type_id: 1,
           feature_type_name: 'survey',
           properties: {},
-          submission_name: 'Wildlife Project',
           is_secured: false,
           relevancy_score: 0.75,
           create_date: '2026-05-01T12:00:00.000Z'
@@ -90,7 +89,6 @@ describe('useSearchApi', () => {
           feature_type_id: 2,
           feature_type_name: 'observation',
           properties: {},
-          submission_name: 'Species Census',
           is_secured: true,
           relevancy_score: 0.6,
           create_date: '2026-05-01T12:00:00.000Z'

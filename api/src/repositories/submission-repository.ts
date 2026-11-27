@@ -93,7 +93,6 @@ export const SubmissionFeature = z.object({
   successor_submission_feature_id: z.number().nullable(),
   terminal_submission_feature_id: z.number().nullable(),
   feature_type_name: z.string(),
-  submission_name: z.string(),
   contributor_name: z.string(),
   secured: z.boolean(),
   security_reasons: z.array(z.string())
@@ -251,17 +250,6 @@ export const SubmissionRecordWithSecurity = SubmissionRecord.omit({ comment: tru
 });
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
-
-export const SubmissionRecordPublishedForPublic = SubmissionRecord.extend({
-  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
-  root_feature_type_id: z.number(),
-  root_feature_type_name: z.string(),
-  root_feature_type_display_name: z.string()
-}).omit({
-  comment: true // Should not be included in public (non-admin) response
-});
-
-export type SubmissionRecordPublishedForPublic = z.infer<typeof SubmissionRecordPublishedForPublic>;
 
 export const SubmissionMessageRecord = z.object({
   submission_message_id: z.number(),
@@ -1180,111 +1168,6 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Get all published submissions.
-   *
-   * Note: Will only return the most recent published submission for each uuid.
-   *
-   * @returns {Promise<SubmissionRecordPublishedForPublic[]>}
-   * @memberof SubmissionRepository
-   */
-  async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
-    const sqlStatement = SQL`
-      WITH RankedRows AS (
-        SELECT
-          t1.*,
-          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.publish_timestamp DESC) AS rank
-        FROM 
-          submission t1
-        WHERE
-          t1.security_review_timestamp IS NOT NULL
-        AND
-          t1.publish_timestamp IS NOT NULL
-      ),
-      FilteredRows as (
-        SELECT
-          t2.*
-        FROM 
-          RankedRows t2
-        WHERE
-          t2.rank = 1
-      )
-      SELECT
-        FilteredRows.submission_id,
-        FilteredRows.uuid,
-        FilteredRows.system_user_id,
-        FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
-        FilteredRows.publish_timestamp,
-        FilteredRows.submitted_timestamp,
-        FilteredRows.name,
-        FilteredRows.description,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
-        FilteredRows.create_user,
-        FilteredRows.update_date,
-        FilteredRows.update_user,
-        FilteredRows.revision_count,
-        feature_type.feature_type_id as root_feature_type_id,
-        feature_type.name as root_feature_type_name,
-        feature_type.display_name as root_feature_type_display_name,
-        CASE
-          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
-          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
-	      ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-        END as security
-      FROM
-        FilteredRows
-      INNER JOIN
-        submission_feature
-      ON
-        submission_feature.submission_id = FilteredRows.submission_id
-      LEFT JOIN
-        submission_feature_security
-      ON
-        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
-      AND
-        submission_feature_security.record_effective_date <= now()
-      AND
-        (submission_feature_security.record_end_date IS NULL OR now() < submission_feature_security.record_end_date)
-      INNER JOIN
-        feature_type
-      ON
-        feature_type.feature_type_id = submission_feature.feature_type_id
-      WHERE
-        submission_feature.parent_submission_feature_id IS NULL
-      AND
-        FilteredRows.security_review_timestamp IS NOT NULL
-      AND
-        FilteredRows.publish_timestamp IS NOT NULL
-      GROUP BY
-        FilteredRows.submission_id,
-        FilteredRows.uuid,
-        FilteredRows.system_user_id,
-        FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
-        FilteredRows.publish_timestamp,
-        FilteredRows.submitted_timestamp,
-        FilteredRows.name,
-        FilteredRows.description,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
-        FilteredRows.create_user,
-        FilteredRows.update_date,
-        FilteredRows.update_user,
-        FilteredRows.revision_count,
-        feature_type.feature_type_id,
-        feature_type.name,
-        feature_type.display_name
-      ORDER BY
-        FilteredRows.publish_timestamp ASC;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublishedForPublic);
-
-    return response.rows;
   }
 
   /**

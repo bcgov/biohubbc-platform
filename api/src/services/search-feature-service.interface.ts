@@ -10,7 +10,6 @@ export const SearchFeatureResultWithRelevancy = z.object({
   feature_type_id: z.number(),
   feature_type_name: z.string(),
   properties: z.record(z.string(), z.unknown()),
-  submission_name: z.string(),
   is_secured: z.boolean(),
   relevancy_score: z.number(),
   create_date: z.string()

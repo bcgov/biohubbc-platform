@@ -135,8 +135,7 @@ describe('executeAuthorizeConfig', function () {
       },
       {
         discriminator: 'Policy',
-        submissionFeatureId: 1,
-        submissionId: 2
+        submissionFeatureId: 1
       }
     ];
     const mockDBConnection = getMockDBConnection();
@@ -754,7 +753,7 @@ describe('authorizeByPolicy', function () {
     role_names: []
   };
 
-  it('returns true when the feature is accessible, passing the authenticated user id and entity ids', async function () {
+  it('returns true when the feature is accessible, passing the authenticated user id and feature id', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
     const accessibleStub = sinon
@@ -765,12 +764,11 @@ describe('authorizeByPolicy', function () {
 
     const result = await authorizationService.authorizeByPolicy({
       discriminator: 'Policy',
-      submissionFeatureId: 2,
-      submissionId: 3
+      submissionFeatureId: 2
     });
 
     expect(result).to.be.true;
-    expect(accessibleStub).to.have.been.calledOnceWith(1, 2, 3);
+    expect(accessibleStub).to.have.been.calledOnceWith(1, 2);
   });
 
   it('returns false when the feature is not accessible to the user', async function () {
@@ -782,8 +780,7 @@ describe('authorizeByPolicy', function () {
 
     const result = await authorizationService.authorizeByPolicy({
       discriminator: 'Policy',
-      submissionFeatureId: 2,
-      submissionId: 3
+      submissionFeatureId: 2
     });
 
     expect(result).to.be.false;
@@ -800,12 +797,11 @@ describe('authorizeByPolicy', function () {
 
     const result = await authorizationService.authorizeByPolicy({
       discriminator: 'Policy',
-      submissionFeatureId: 2,
-      submissionId: 3
+      submissionFeatureId: 2
     });
 
     expect(result).to.be.true;
-    expect(accessibleStub).to.have.been.calledOnceWith(null, 2, 3);
+    expect(accessibleStub).to.have.been.calledOnceWith(null, 2);
   });
 });
 

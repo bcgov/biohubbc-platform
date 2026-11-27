@@ -4,8 +4,11 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as index from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getOperationHandler } from '../../../../__mocks__/operation';
 import * as db from '../../../../database/db';
+import { HTTP403 } from '../../../../errors/http-error';
 import { SubmissionFeatureForReview } from '../../../../models/submission';
+import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 import { UserService } from '../../../../services/user-service';
 
@@ -46,20 +49,44 @@ describe('getSubmissionFeatures', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue.features).to.eql(features);
   });
+});
 
-  it('uses the API system user security context for an anonymous request', async () => {
-    const connection = getMockDBConnection({ systemUserId: () => 2 });
-    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
-    sinon.stub(UserService.prototype, 'getUserById').resolves({} as never);
-    const featuresStub = sinon.stub(SubmissionService.prototype, 'getSubmissionFeatures').resolves([]);
-    sinon.stub(SubmissionService.prototype, 'getSubmissionFeaturesCount').resolves(0);
+describe('GET authorization', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
 
-    const requestHandler = index.getSubmissionFeatures();
-    const { mockReq, mockRes } = getRequestHandlerMocks();
-    mockReq.params = { submissionId: '1' };
+  it("authorizes only the submission's team", async () => {
+    sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: '7' };
 
-    await requestHandler(mockReq, mockRes, () => {});
+    await getOperationHandler(index.GET, 0)(mockReq, mockRes, mockNext);
 
-    expect(featuresStub).to.have.been.calledOnceWith(1, 2, sinon.match.object);
+    expect(mockReq.authorization_scheme).to.eql({
+      and: [{ discriminator: 'Team', entity: 'submission', submissionId: 7 }]
+    });
+    expect(mockNext).to.have.been.calledOnce;
+  });
+
+  it('rejects users outside the submission team before loading features', async () => {
+    sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
+    const featuresStub = sinon.stub(SubmissionService.prototype, 'getSubmissionFeatures');
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionId: '7' };
+
+    try {
+      await getOperationHandler(index.GET, 0)(mockReq, mockRes, mockNext);
+      expect.fail('Expected authorization failure');
+    } catch (error_) {
+      expect(error_).to.be.instanceOf(HTTP403);
+    }
+
+    expect(mockNext).not.to.have.been.called;
+    expect(featuresStub).not.to.have.been.called;
+  });
+
+  it('documents bearer authentication only, with no anonymous access', () => {
+    expect(index.GET.apiDoc?.security).to.eql([{ Bearer: [] }]);
   });
 });

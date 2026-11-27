@@ -13,8 +13,8 @@ interface SubmissionFeatureLayoutProps {
   feature?: ISubmissionFeature;
   rootBreadcrumbLabel: string;
   rootBreadcrumbTo: string;
-  submissionDetailBasePath: string;
-  queryString?: string;
+  /** Builds the detail page path of another feature, used to link to the current version of a superseded one. */
+  getFeaturePath: (submissionFeatureId: number) => string;
   buttons?: ReactNode;
   breadcrumbs?: ReactNode;
 }
@@ -23,6 +23,7 @@ interface SubmissionFeatureLayoutProps {
 export const SubmissionFeatureLayout = ({
   isLoading,
   feature,
+  getFeaturePath,
   children,
   ...headerProps
 }: PropsWithChildren<SubmissionFeatureLayoutProps>) => {
@@ -51,10 +52,7 @@ export const SubmissionFeatureLayout = ({
             switch={activeTab}
             components={{
               details: (
-                <SubmissionFeatureDetailContent
-                  feature={feature}
-                  submissionDetailBasePath={headerProps.submissionDetailBasePath}
-                  queryString={headerProps.queryString}>
+                <SubmissionFeatureDetailContent feature={feature} getFeaturePath={getFeaturePath}>
                   {children}
                 </SubmissionFeatureDetailContent>
               )

@@ -152,6 +152,7 @@ const uploadDecision = (ticketId: string) => [
  */
 const submissionSecurity = (submissionId: number) => [
   submissionQueryKeys.submission(submissionId),
+  submissionQueryKeys.allFeatures(),
   searchQueryKeys.features()
 ];
 

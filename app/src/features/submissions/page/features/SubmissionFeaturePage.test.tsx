@@ -1,6 +1,6 @@
 import { useApi } from 'hooks/useApi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { render } from 'test-helpers/test-utils';
+import { render, within } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { SubmissionFeaturePage } from './SubmissionFeaturePage';
 
@@ -19,7 +19,6 @@ const mockFeature = {
   submission_id: 1,
   feature_type_id: 100,
   feature_type_name: 'observation',
-  submission_name: 'Test Submission',
   contributor_name: 'SIMS',
   source_id: null,
   successor_submission_feature_id: null,
@@ -29,11 +28,11 @@ const mockFeature = {
   security_reasons: []
 };
 
-const renderPage = (initialPath = '/submission/1/feature/10') =>
+const renderPage = (initialPath = '/feature/10') =>
   render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
-        <Route path="/submission/:submissionId/feature/:submissionFeatureId" element={<SubmissionFeaturePage />} />
+        <Route path="/feature/:submissionFeatureId" element={<SubmissionFeaturePage />} />
         <Route path="/page-not-found" element={<div>Page Not Found</div>} />
       </Routes>
     </MemoryRouter>
@@ -74,9 +73,35 @@ describe('SubmissionFeaturePage', () => {
     expect(await findByText('Properties')).toBeVisible();
     expect(await findByText('Wolf')).toBeVisible();
     expect(await findByText('5')).toBeVisible();
-    expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(1, 10, expect.any(Object), {
+    expect(mockGetSubmissionFeatureById).toHaveBeenCalledWith(10, { signal: expect.any(AbortSignal) });
+    expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(10, expect.any(Object), {
       signal: expect.any(AbortSignal)
     });
+  });
+
+  it('leads the breadcrumb from search to the feature without naming or linking its submission', async () => {
+    const { findByRole } = renderPage('/feature/10?keywords=wolf');
+
+    const breadcrumb = await findByRole('navigation', { name: 'breadcrumb' });
+    expect(breadcrumb).toHaveTextContent('Search/Observation');
+    expect(
+      within(breadcrumb)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href'))
+    ).toEqual(['/search/?keywords=wolf']);
+  });
+
+  it('links a superseded feature to the public page of its current version', async () => {
+    mockGetSubmissionFeatureById.mockResolvedValue({
+      feature: { ...mockFeature, successor_submission_feature_id: 11, terminal_submission_feature_id: 12 }
+    });
+
+    const { findByRole } = renderPage('/feature/10?keywords=wolf');
+
+    expect(await findByRole('link', { name: 'View the current version' })).toHaveAttribute(
+      'href',
+      '/feature/12?keywords=wolf'
+    );
   });
 
   it('renders Details as the selected tab', async () => {
@@ -86,7 +111,7 @@ describe('SubmissionFeaturePage', () => {
   });
 
   it('links taxon property values to the taxon page under the submission', async () => {
-    const { findByRole } = renderPage('/submission/1/feature/10?view=table');
+    const { findByRole } = renderPage('/feature/10?view=table');
 
     expect(await findByRole('link', { name: 'Ursus americanus' })).toHaveAttribute(
       'href',
@@ -95,7 +120,7 @@ describe('SubmissionFeaturePage', () => {
   });
 
   it('redirects to the not found page when a route param is not a record id', async () => {
-    const { findByText } = renderPage('/submission/abc/feature/10');
+    const { findByText } = renderPage('/feature/abc');
 
     expect(await findByText('Page Not Found')).toBeVisible();
     expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();

@@ -3,7 +3,6 @@ import { SUBMISSION_FEATURE_MAP_SECTION_HEIGHT } from 'constants/spatial';
 import { useSubmissionFeatureTileSession } from './useSubmissionFeatureTileSession';
 
 export interface ISubmissionFeatureMapProps {
-  submissionId: number;
   submissionFeatureId: number;
 }
 
@@ -17,13 +16,13 @@ export interface ISubmissionFeatureMapProps {
  * @return {*}
  */
 export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
-  const { submissionId, submissionFeatureId } = props;
+  const { submissionFeatureId } = props;
 
-  const tileSession = useSubmissionFeatureTileSession(submissionId, submissionFeatureId);
+  const tileSession = useSubmissionFeatureTileSession(submissionFeatureId);
 
   return (
     <TileExtentMap
-      subjectKey={`${submissionId}:${submissionFeatureId}`}
+      subjectKey={String(submissionFeatureId)}
       tileSession={tileSession}
       emptyMessage="This feature has no spatial properties."
       testId="submission-feature-map"

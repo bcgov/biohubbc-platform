@@ -110,13 +110,6 @@ export type SubmissionSummary = Pick<
   regions: string[];
 };
 
-export type SubmissionRecordPublishedForPublic = Omit<SubmissionRecord, 'comment'> & {
-  security: SECURITY_APPLIED_STATUS;
-  root_feature_type_id: number;
-  root_feature_type_name: string;
-  root_feature_type_display_name: string;
-};
-
 export interface ISubmissionFeature {
   submission_id: number;
   uuid: string;

@@ -23,8 +23,8 @@ describe('changedQueryKeys', () => {
       const reads = [
         searchQueryKeys.featureCount('observation', undefined, null),
         searchQueryKeys.featureResults('observation', undefined, null, { limit: 10 }),
-        submissionQueryKeys.featureDetail(1, 2),
-        submissionQueryKeys.featureProperties(1, 2, { page: 1, limit: 10 }),
+        submissionQueryKeys.featureDetail(2),
+        submissionQueryKeys.featureProperties(2, { page: 1, limit: 10 }),
         downloadQueryKeys.detail('download'),
         ticketQueryKeys.detail('user', 'ticket')
       ];

@@ -46,7 +46,7 @@ describe('useRemoveTeamMemberMutation', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(teamQueryKeys.members('team-1'), members);
     const countKey = searchQueryKeys.featureCount('observation', undefined, null);
-    const featureKey = submissionQueryKeys.featureDetail(1, 2);
+    const featureKey = submissionQueryKeys.featureDetail(2);
     queryClient.setQueryData(countKey, { total: 3 });
     queryClient.setQueryData(featureKey, { feature: 'previously accessible' });
     const readCount = vi.fn().mockResolvedValue({ total: 0 });

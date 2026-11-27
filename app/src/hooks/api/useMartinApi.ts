@@ -49,18 +49,16 @@ export const useMartinApi = (axios: AxiosInstance) => {
    *
    * Returns a result with no token when the feature has no spatial properties to map.
    *
-   * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
    * @return {Promise<CreateTileExtentSessionResponse>}
    */
   const createSubmissionFeatureTileSession = async (
-    submissionId: number,
     submissionFeatureId: number,
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<CreateTileExtentSessionResponse> => {
     const { data } = await axios.post<CreateTileExtentSessionResponse>(
-      `/api/submission/${submissionId}/features/${submissionFeatureId}/tile`,
+      `/api/feature/${submissionFeatureId}/tile`,
       undefined,
       { signal: options?.signal }
     );
