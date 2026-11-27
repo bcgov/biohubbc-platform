@@ -5,8 +5,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadRepository } from './download-repository';
+import { DownloadVersionFeature } from '../../models/download-version';
+import { BaseFeatureRow, DownloadRepository } from './download-repository';
 
 chai.use(sinonChai);
 
@@ -437,59 +439,65 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('streamFeatureBaseBySearchQueryAndType', () => {
-    it('yields batches via cursor with search subquery bindings', async () => {
-      const queryStub = sinon.stub();
+  describe('streamFeatureBaseByFeatureIds', () => {
+    const DOWNLOAD_ID = 'dddd0000-0000-0000-0000-000000000001';
+    const FEATURE_IDS = Buffer.from('feature-type-bitmap');
 
-      // DECLARE
+    it('declares a cursor over the given feature-id bitmap alone, with no feature type or version predicate', async () => {
+      // Verifies: the cursor iterates the feature type's own part of the set, so it never walks the
+      // version's whole set to filter it by type
+
+      // Step 1: Setup the DECLARE, one FETCH with data, an empty FETCH and the CLOSE
+      const queryStub = sinon.stub();
       queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
-      // FETCH with data
-      queryStub.onCall(1).resolves({
-        rows: [
-          {
-            submission_feature_id: 5,
-            uuid: 'uuid-5',
-            feature_type_name: 'observation',
-            data: { properties: {} },
-            parent_uuid: 'parent-uuid-5'
-          }
-        ],
-        rowCount: 1
-      });
-      // FETCH empty
+      const row: BaseFeatureRow = {
+        submission_feature_id: 5,
+        uuid: 'uuid-5',
+        feature_type_name: 'observation',
+        data: {},
+        parent_uuid: 'parent-uuid-5'
+      };
+      queryStub.onCall(1).resolves({ rows: [row], rowCount: 1 });
       queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
-      // CLOSE
       queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
 
+      // Step 2: Create repository with mocked connection
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
-      const batches: any[][] = [];
-      for await (const batch of repo.streamFeatureBaseBySearchQueryAndType(
-        'dddd0000-0000-0000-0000-000000000001',
-        'SELECT submission_feature_id FROM search_results WHERE x = $1',
-        ['search-val'],
-        'observation'
-      )) {
+      // Step 3: Consume the stream
+      const batches: BaseFeatureRow[][] = [];
+      for await (const batch of repo.streamFeatureBaseByFeatureIds(DOWNLOAD_ID, 'observation', FEATURE_IDS, 50)) {
         batches.push(batch);
       }
 
+      // Step 4: The cursor iterates the bound bitmap (no array is built) and joins submission_feature
+      // by primary key; it reads no version row and filters by no feature type
+      const [declareSql, declareBindings] = queryStub.getCall(0).args;
+      expect(declareSql).to.include('DECLARE dl_pq_version_cursor_dddd0000_0000_0000_0000_000000000001_observation');
+      expect(declareSql).to.include('FROM rb_iterate($1::bytea::roaringbitmap)');
+      expect(declareSql).to.not.include('rb_to_array');
+      expect(declareSql).to.not.include('download_version');
+      expect(declareSql).to.not.include('ft.name =');
+      expect(declareSql).to.include('sf.submission_feature_id = version_feature.submission_feature_id');
+
+      // Step 5: The only binding is the feature type's bitmap
+      expect(declareBindings).to.deep.equal([FEATURE_IDS]);
+
+      // Step 6: The batch size drives FETCH, and the cursor is closed
+      expect(queryStub.getCall(1).args[0]).to.include('FETCH 50 FROM');
+      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
+
+      // Step 7: The fetched batch is yielded as it came from the cursor
       expect(batches).to.have.length(1);
       expect(batches[0][0]).to.have.property('submission_feature_id', 5);
-
-      // Verify DECLARE includes search SQL and feature type binding
-      const declareArgs = queryStub.getCall(0).args;
-      expect(declareArgs[0]).to.include('DECLARE');
-      expect(declareArgs[0]).to.include('submission_feature');
-      // Bindings include search value + feature type name
-      expect(declareArgs[1]).to.deep.equal(['search-val', 'observation']);
-
-      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
     });
 
     it('calls CLOSE even when FETCH throws', async () => {
-      const queryStub = sinon.stub();
+      // Verifies: a failed FETCH still closes the cursor before the error surfaces
 
+      // Step 1: DECLARE succeeds, the first FETCH rejects, CLOSE succeeds
+      const queryStub = sinon.stub();
       queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
       queryStub.onCall(1).rejects(new Error('Search cursor failure'));
       queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
@@ -497,23 +505,76 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ query: queryStub });
       const repo = new DownloadRepository(mockDBConnection);
 
+      // Step 2: Pull the first batch and capture the error
+      const stream = repo.streamFeatureBaseByFeatureIds(DOWNLOAD_ID, 'observation', FEATURE_IDS);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for await (const _batch of repo.streamFeatureBaseBySearchQueryAndType(
-          'dddd0000-0000-0000-0000-000000000001',
-          'SELECT sf_id FROM search WHERE x = $1',
-          ['val'],
-          'observation'
-        )) {
-          // should not reach here
-        }
+        await stream.next();
         expect.fail('Expected error');
       } catch (err: any) {
         expect(err.message).to.equal('Search cursor failure');
       }
 
+      // Step 3: The cursor was closed
+
       const closeCall = queryStub.getCalls().find((c) => String(c.args[0]).includes('CLOSE'));
       expect(closeCall).to.not.be.undefined;
+    });
+  });
+
+  describe('listFeaturesByFeatureIdsQuery', () => {
+    it('embeds the feature-id subquery and binds LIMIT and OFFSET after its bindings', async () => {
+      // Verifies: the page's parameters come after the subquery's own, the offset is that of the
+      // requested page, and the rows are validated against the feature model
+
+      // Step 1: Setup mock DB
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const repo = new DownloadRepository(getMockDBConnection({ knex: knexStub }));
+
+      // Step 2: Ask for page 3 at 10 per page of a subquery that has two bindings of its own
+      const featureIdsSql = 'SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = ? AND b = ?';
+      await repo.listFeaturesByFeatureIdsQuery(featureIdsSql, ['observation', 7], {
+        page: 3,
+        limit: 10,
+        sort: 'uuid',
+        order: 'desc'
+      });
+
+      // Step 3: The subquery is the id source, and LIMIT / OFFSET take the next two positions
+      const { sql: sqlText, bindings } = knexStub.firstCall.args[0].toSQL().toNative();
+      expect(sqlText).to.include(
+        'WHERE sf.submission_feature_id IN (SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = $1 AND b = $2)'
+      );
+      expect(sqlText).to.match(/ORDER BY sf\.submission_feature_id\s+LIMIT \$3\s+OFFSET \$4$/);
+
+      // Step 4: Bindings are the subquery's, then the limit, then the offset of page 3
+      expect(bindings).to.deep.equal(['observation', 7, 10, 20]);
+
+      // Step 5: The rows are validated against the feature model
+      expect(knexStub.firstCall.args[1]).to.equal(DownloadVersionFeature);
+    });
+  });
+
+  describe('getFeaturesByFeatureIdsQueryCount', () => {
+    it('counts the rows of the feature-id subquery with its own bindings, unpaged', async () => {
+      // Verifies: the count wraps the same subquery, adds no parameters of its own, and is validated
+
+      // Step 1: Setup mock DB to return a count row
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ count: 6 }], 1));
+      const repo = new DownloadRepository(getMockDBConnection({ knex: knexStub }));
+
+      // Step 2: Count a subquery that has two bindings
+      const featureIdsSql = 'SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = ? AND b = ?';
+      const result = await repo.getFeaturesByFeatureIdsQueryCount(featureIdsSql, ['observation', 7]);
+
+      // Step 3: The subquery is counted as a derived table, with exactly its bindings
+      expect(knexStub.firstCall.args[0].toSQL().toNative()).to.deep.equal({
+        sql: 'SELECT count(*)::integer AS count FROM (SELECT sf.submission_feature_id FROM submission_feature sf WHERE a = $1 AND b = $2) ids',
+        bindings: ['observation', 7]
+      });
+
+      // Step 4: The row is validated as a count, and its number (not the row) is returned
+      expect(knexStub.firstCall.args[1]).to.equal(CountResult);
+      expect(result).to.equal(6);
     });
   });
 

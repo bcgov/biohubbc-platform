@@ -238,6 +238,42 @@ export const DownloadVersionListResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Response schema for `GET /api/download/:downloadId/version/:downloadVersionId/features`.
+ *
+ * Each item mirrors `DownloadVersionFeature` (the model). `is_snapshot` is true when the list is
+ * the version's stored feature set, and false when the version has no stored set and the list is
+ * what the download's policy selects at read time.
+ */
+export const DownloadVersionFeatureListResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['features', 'is_snapshot', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    features: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['submission_feature_id', 'uuid', 'submission_id', 'feature_type_id', 'feature_type_name'],
+        additionalProperties: false,
+        properties: {
+          submission_feature_id: { type: 'integer' },
+          uuid: { type: 'string', format: 'uuid' },
+          submission_id: { type: 'integer' },
+          feature_type_id: { type: 'integer' },
+          feature_type_name: { type: 'string' }
+        }
+      }
+    },
+    is_snapshot: {
+      type: 'boolean',
+      description:
+        "True when the list is the version's stored feature set, fixed at build time; false when the version has no stored set and the list is evaluated at read time."
+    },
+    pagination: paginationResponseSchema
+  }
+};
+
+/**
  * Response schema for the detail endpoint. Adds `parts[]` populated only when
  * `status === 'ready'`; all other statuses return an empty array so clients
  * don't accidentally attempt to download from stale URLs.

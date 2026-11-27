@@ -1,8 +1,10 @@
+import { Knex } from 'knex';
 import { QueryResultRow } from 'pg';
 import SQL from 'sql-template-strings';
 import { DOWNLOAD_FEATURE_BATCH_SIZE } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { DATETIME_DATE_SUFFIX, DATETIME_TIME_SUFFIX } from '../../models/datetime-column';
 import {
   CreateDownload,
@@ -13,6 +15,7 @@ import {
   HasTeams,
   IsAuthorized
 } from '../../models/download';
+import { DownloadVersionFeature } from '../../models/download-version';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 import { isSubmissionFeatureCurrent } from '../sql-fragments';
@@ -371,31 +374,35 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Stream base feature rows for a filter-based download, filtered by feature type.
+   * Stream the base feature rows of one feature type of a download version, from that type's part
+   * of the version's stored feature set.
+   *
+   * `featureIds` is the serialized bitmap of the feature type's ids, as
+   * `DownloadVersionRepository.listDownloadVersionFeatureIdsByType` returns it. It is iterated with
+   * the set-returning `rb_iterate`, so it is never built as one `integer[]` value in the backend,
+   * and its ids are joined to `submission_feature` by primary key: the cost follows the number of
+   * features in the file, not the size of the version or of the table. Membership in the set is
+   * the only rule: no current, closure, security or feature type predicate is applied here,
+   * because the set was resolved under those rules when it was stored and split by type after.
+   * A null `featureIds` (a feature type with no features in the version) yields no rows.
    *
    * Must be called within an open transaction (cursors require tx context).
    *
    * @param {string} downloadId - The download ID (used for cursor naming).
-   * @param {string} searchSql - Raw SQL for the search subquery.
-   * @param {any[]} searchBindings - Parameterized bindings for the search SQL.
-   * @param {string} featureTypeName - The feature type to stream.
+   * @param {string} featureTypeName - The feature type being streamed (used for cursor naming).
+   * @param {(Buffer | null)} featureIds - The feature type's serialized feature-id bitmap, or null for none.
    * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
    * @yields {BaseFeatureRow[]} Batches of base feature rows.
    * @memberof DownloadRepository
    */
-  async *streamFeatureBaseBySearchQueryAndType(
+  async *streamFeatureBaseByFeatureIds(
     downloadId: string,
-    searchSql: string,
-    searchBindings: any[],
     featureTypeName: string,
+    featureIds: Buffer | null,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    // featureTypeName is the last positional parameter after all search bindings
-    const allBindings = [...searchBindings, featureTypeName];
-    const typeParamIndex = allBindings.length;
-
     yield* this.streamWithCursor<BaseFeatureRow>({
-      cursorName: `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
+      cursorName: `dl_pq_version_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
         /[^a-z0-9_]/gi,
         '_'
       )}`,
@@ -406,14 +413,76 @@ export class DownloadRepository extends BaseRepository {
           '{}'::jsonb AS data,
           ft.name AS feature_type_name,
           parent_sf.uuid AS parent_uuid
-        FROM submission_feature sf
+        FROM rb_iterate($1::bytea::roaringbitmap) AS version_feature(submission_feature_id)
+        INNER JOIN submission_feature sf ON sf.submission_feature_id = version_feature.submission_feature_id
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
-        WHERE sf.submission_feature_id IN (${searchSql}) AND ft.name = $${typeParamIndex}
         ORDER BY sf.submission_feature_id`,
-      bindings: allBindings,
+      bindings: [featureIds],
       batchSize
     });
+  }
+
+  /**
+   * List one page of the features a compiled feature-id subquery selects.
+   *
+   * Used for a download version that has no stored feature set: `featureIdsSql` is the download's
+   * feature-id query (current, closure self-loop, security filter for the requesting user), in
+   * knex's placeholder form (`?`, as `toSQL().sql` gives it), with its `bindings` in order. The page
+   * is cut with LIMIT / OFFSET, so nothing is loaded unbounded.
+   *
+   * The order is always ascending `submission_feature_id`; `sort` and `order` in `pagination` are
+   * ignored.
+   *
+   * @param {string} featureIdsSql - Subquery returning `submission_feature_id` rows, with `?` placeholders.
+   * @param {readonly Knex.Value[]} bindings - Bindings of `featureIdsSql`, in placeholder order.
+   * @param {ApiPaginationOptions} pagination - The page and page size.
+   * @return {Promise<DownloadVersionFeature[]>}
+   * @memberof DownloadRepository
+   */
+  async listFeaturesByFeatureIdsQuery(
+    featureIdsSql: string,
+    bindings: readonly Knex.Value[],
+    pagination: ApiPaginationOptions
+  ): Promise<DownloadVersionFeature[]> {
+    // LIMIT and OFFSET are the last two bindings, after the subquery's own.
+    const query = getKnex().raw(
+      `SELECT
+         sf.submission_feature_id,
+         sf.uuid,
+         sf.submission_id,
+         sf.feature_type_id,
+         ft.name AS feature_type_name
+       FROM submission_feature sf
+       INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+       WHERE sf.submission_feature_id IN (${featureIdsSql})
+       ORDER BY sf.submission_feature_id
+       LIMIT ?
+       OFFSET ?`,
+      [...bindings, pagination.limit, (pagination.page - 1) * pagination.limit]
+    );
+
+    const response = await this.connection.knex(query, DownloadVersionFeature);
+
+    return response.rows;
+  }
+
+  /**
+   * Count the features a compiled feature-id subquery selects.
+   *
+   * The count method of `listFeaturesByFeatureIdsQuery`.
+   *
+   * @param {string} featureIdsSql - Subquery returning `submission_feature_id` rows, with `?` placeholders.
+   * @param {readonly Knex.Value[]} bindings - Bindings of `featureIdsSql`, in placeholder order.
+   * @return {Promise<number>}
+   * @memberof DownloadRepository
+   */
+  async getFeaturesByFeatureIdsQueryCount(featureIdsSql: string, bindings: readonly Knex.Value[]): Promise<number> {
+    const query = getKnex().raw(`SELECT count(*)::integer AS count FROM (${featureIdsSql}) ids`, [...bindings]);
+
+    const response = await this.connection.knex(query, CountResult);
+
+    return response.rows[0].count;
   }
 
   /**

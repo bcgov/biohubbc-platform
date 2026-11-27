@@ -1,11 +1,19 @@
+import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { DownloadArtifactInfo } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadVersionRecord, DownloadVersionStatusRecord } from '../../models/download-version';
+import {
+  DownloadVersionFeature,
+  DownloadVersionFeatureTypeSet,
+  DownloadVersionRecord,
+  DownloadVersionStatusRecord
+} from '../../models/download-version';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
+import { isSubmissionFeaturePublished } from '../sql-fragments';
 
 /**
  * A repository class for accessing download version data.
@@ -101,6 +109,160 @@ export class DownloadVersionRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Store a download version's feature set, once.
+   *
+   * `featureIdsSql` is a subquery that returns `submission_feature_id` rows, in knex's placeholder
+   * form (`?`, as `toSQL().sql` gives it), with its `bindings` in order. The set is aggregated and
+   * run-optimised inside the database in one statement; no feature id is returned to the caller. A
+   * `null` subquery stores the empty set.
+   *
+   * The set is written only while `feature_ids` is NULL: the first writer wins, and a retry or a
+   * concurrent worker waits on the row lock and then updates nothing. A row count of 0 is therefore
+   * not an error — the set was already stored.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @param {(string | null)} featureIdsSql - Feature-id subquery with `?` placeholders, or null for the empty set.
+   * @param {readonly Knex.Value[]} bindings - Bindings of `featureIdsSql`, in placeholder order.
+   * @return {Promise<void>}
+   * @memberof DownloadVersionRepository
+   */
+  async updateDownloadVersionFeatureIds(
+    downloadVersionId: string,
+    featureIdsSql: string | null,
+    bindings: readonly Knex.Value[]
+  ): Promise<void> {
+    const featureIds =
+      featureIdsSql === null
+        ? `rb_build('{}'::integer[])`
+        : `COALESCE((
+             SELECT rb_build_agg(ids.submission_feature_id) FROM (${featureIdsSql}) ids
+           ), rb_build('{}'::integer[]))`;
+
+    // The version id is the last binding, after the subquery's own.
+    const query = getKnex().raw(
+      `UPDATE download_version
+       SET feature_ids = rb_runoptimize(${featureIds})
+       WHERE download_version_id = ?
+         AND record_end_date IS NULL
+         AND feature_ids IS NULL`,
+      [...bindings, downloadVersionId]
+    );
+
+    await this.connection.knex(query);
+  }
+
+  /**
+   * Find the size of a download version's stored feature set.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<number | null>} The number of features in the set, or null when the version
+   *   has no stored set (or does not exist).
+   * @memberof DownloadVersionRepository
+   */
+  async findDownloadVersionFeatureSetSize(downloadVersionId: string): Promise<number | null> {
+    const sql = SQL`
+      SELECT
+        rb_cardinality(feature_ids)::integer AS feature_set_size
+      FROM download_version
+      WHERE download_version_id = ${downloadVersionId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, z.object({ feature_set_size: z.number().int().nullable() }));
+
+    return response.rows[0]?.feature_set_size ?? null;
+  }
+
+  /**
+   * Split a download version's stored feature set by feature type.
+   *
+   * The set is read once, iterated with the set-returning `rb_iterate` (never built as one
+   * `integer[]` value) and joined to `submission_feature` by primary key; the ids of each feature
+   * type are aggregated back into a bitmap of their own. This is the one pass over the set that
+   * tells the build which feature each file holds: every Parquet file is then written from its
+   * own row, so the build's read cost follows the size of the set, not the size of the set times
+   * the number of feature types. A version with no stored set, or an empty one, has no rows.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @return {Promise<DownloadVersionFeatureTypeSet[]>} One row per feature type present in the
+   *   set, ordered by name, each with the serialized bitmap of that type's feature ids.
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersionFeatureIdsByType(downloadVersionId: string): Promise<DownloadVersionFeatureTypeSet[]> {
+    const sql = SQL`
+      SELECT
+        ft.name,
+        rb_runoptimize(rb_build_agg(version_feature.submission_feature_id))::bytea AS feature_ids
+      FROM rb_iterate((
+        SELECT dv.feature_ids
+        FROM download_version dv
+        WHERE dv.download_version_id = ${downloadVersionId}
+          AND dv.record_end_date IS NULL
+      )) AS version_feature(submission_feature_id)
+      INNER JOIN submission_feature sf ON sf.submission_feature_id = version_feature.submission_feature_id
+      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      GROUP BY ft.name
+      ORDER BY ft.name;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadVersionFeatureTypeSet);
+
+    return response.rows;
+  }
+
+  /**
+   * List one page of the features in a download version's stored feature set.
+   *
+   * The bitmap is read once per query and the page is cut from it with `rb_select`, so only the
+   * page's ids are expanded and the join to `submission_feature` (by primary key) is one page.
+   *
+   * The list reads by id with the published predicate (`isSubmissionFeaturePublished`), as the
+   * ticket specifies. Every member of a built set was current when the set was stored, so
+   * published, and nothing clears a publication date, so the predicate excludes no member. No
+   * current, closure or security predicate is applied: a feature stays listed after it is
+   * superseded or secured. A version with no stored set returns no rows.
+   *
+   * The order is always ascending `submission_feature_id` (the bitmap's own order); `sort` and
+   * `order` in `pagination` are ignored.
+   *
+   * @param {string} downloadVersionId - The download version ID.
+   * @param {ApiPaginationOptions} pagination - The page and page size.
+   * @return {Promise<DownloadVersionFeature[]>}
+   * @memberof DownloadVersionRepository
+   */
+  async listDownloadVersionFeatures(
+    downloadVersionId: string,
+    pagination: ApiPaginationOptions
+  ): Promise<DownloadVersionFeature[]> {
+    const sql = SQL`
+      SELECT
+        sf.submission_feature_id,
+        sf.uuid,
+        sf.submission_id,
+        sf.feature_type_id,
+        ft.name AS feature_type_name
+      FROM unnest(rb_to_array(rb_select(
+        (
+          SELECT dv.feature_ids
+          FROM download_version dv
+          WHERE dv.download_version_id = ${downloadVersionId}
+            AND dv.record_end_date IS NULL
+        ),
+        ${pagination.limit}::bigint,
+        ${(pagination.page - 1) * pagination.limit}::bigint
+      ))) AS page_feature(submission_feature_id)
+      INNER JOIN submission_feature sf ON sf.submission_feature_id = page_feature.submission_feature_id
+      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      WHERE `.append(isSubmissionFeaturePublished('sf')).append(SQL`
+      ORDER BY sf.submission_feature_id;
+    `);
+
+    const response = await this.connection.sql(sql, DownloadVersionFeature);
+
+    return response.rows;
   }
 
   /**

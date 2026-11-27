@@ -27,7 +27,8 @@ export interface IProcessDownloadJobData {
  * Parquet files on S3.
  *
  * Shape: terminal guard → start-status guard → transition-to-processing →
- * per-type Parquet write → transition-to-ready.
+ * store the version's feature set → per-type Parquet write from that set →
+ * transition-to-ready.
  *
  * The upfront status guard keeps spurious retries quiet (pg-boss re-firing a
  * completed job hits the terminal branch and exits silently, no throw, no
@@ -37,6 +38,9 @@ export interface IProcessDownloadJobData {
  * Retry semantics:
  * - Per-phase `withConnection` means completed phases survive retries — S3 overwrites
  *   are idempotent; artifact + download_artifact inserts use ON CONFLICT DO NOTHING.
+ * - The feature set is stored once, by the first attempt that reaches the store. A retry
+ *   reuses it and rewrites every file from it, so the files of all attempts hold the same
+ *   features.
  * - `PROCESSING` is in `PROCESS_START_STATUSES` and in the pending→processing
  *   transition's allowed sources, so mid-job retries re-enter cleanly after a
  *   worker crash.
@@ -105,41 +109,63 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         new DownloadRepository(connection).getDownloadSource(downloadId)
       );
 
-      const { schemaLookup, statements } = await withConnection(async (connection) =>
+      const { schemaLookup, featureTypes, statements } = await withConnection(async (connection) =>
         new DownloadPipelineService(connection).resolveParquetSchema(source)
       );
 
-      // Write one Parquet file per active policy statement. Each write runs in its own
-      // transaction so completed types survive retries — S3 overwrites are idempotent,
-      // and the artifact + download_artifact inserts use ON CONFLICT DO NOTHING. The
-      // statement is threaded in so the per-type evaluator (expression vs broad) is
-      // resolved up front and not re-queried per type.
+      // Resolve the version's feature set once and store it on the version, before any file is
+      // written. The policy expression, the current and closure rules and the security filter for
+      // `requested_by` are evaluated here and nowhere else. The set is stored only while the
+      // version has none: a mid-job retry (or a second worker on the same version) stores nothing
+      // and reads back the set of the first attempt, so `featureCount` is the same on every attempt.
       //
-      // The per-run accumulator sums the rows each write reports; a mid-job retry
-      // re-runs the whole loop, so the total is always re-accumulated from scratch
-      // (S3/DB idempotence makes the re-writes converge to the same state).
-      let totalFeatureCount = 0;
-      for (const statement of statements) {
+      // The files the version gets are read in the same transaction: one per feature type, for the
+      // statements' feature types plus every feature type present in the stored set, each with its
+      // own part of the set. The set is split by feature type once, here, so no file's write walks
+      // the whole set; the parts are compressed bitmaps, together about the size of the stored set.
+      // Statements are re-read on each attempt, so a retry can resolve fewer of them than the
+      // attempt that stored the set, and every feature in the set must still land in a file. A type
+      // with a statement and no features gets its empty file.
+      const { featureCount, fileFeatureSets } = await withConnection(async (connection) => {
+        const pipelineService = new DownloadPipelineService(connection);
+        const featureCount = await pipelineService.storeDownloadVersionFeatureSet({
+          downloadVersionId,
+          source,
+          statements
+        });
+        const fileFeatureSets = await pipelineService.listDownloadVersionFileFeatureSets(
+          downloadVersionId,
+          featureTypes
+        );
+
+        return { featureCount, fileFeatureSets };
+      });
+
+      // Write one Parquet file per feature type, each from its part of the stored set. Each write
+      // runs in its own transaction so completed types survive retries — S3 overwrites are
+      // idempotent, and the artifact + download_artifact inserts use ON CONFLICT DO NOTHING. A
+      // mid-job retry re-runs the whole loop and rewrites every file at the same key from the same
+      // stored set, so the re-writes converge to the same state.
+      for (const { featureTypeName, featureIds } of fileFeatureSets) {
         await withConnection(async (connection) => {
-          const featureTypeName = statement.urn_feature_type;
           const properties = schemaLookup.get(featureTypeName) ?? [];
-          totalFeatureCount += await new DownloadPipelineService(connection).writeFeatureTypeParquet({
+          await new DownloadPipelineService(connection).writeFeatureTypeParquet({
             downloadId,
             downloadVersionId,
-            source,
             properties,
             featureTypeName,
-            statement
+            featureIds
           });
         });
       }
 
+      // The version's feature count is the size of its stored set.
       await withConnection(async (connection) => {
         await new DownloadPipelineService(connection).transitionDownloadVersionStatus(
           downloadVersionId,
           DownloadStatusEnum.READY,
           [DownloadStatusEnum.PROCESSING],
-          { featureCount: totalFeatureCount }
+          { featureCount }
         );
       });
 

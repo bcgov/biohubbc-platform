@@ -2,9 +2,9 @@
 // cursor + hydration path that reads from submission_feature_property_* tables
 // and resolves code labels, taxon names, geometry GeoJSON, and JSONB fallback.
 //
-// Tests the search-query cursor + hydration helper that powers
+// Tests the stored-feature-set cursor + hydration helper that powers
 // `DownloadPipelineService.writeFeatureTypeParquet`:
-//   streamFeatureBaseBySearchQueryAndType  →  fetchTypedPropertyRows
+//   streamFeatureBaseByFeatureIds  →  fetchTypedPropertyRows
 //
 // Also covers: status transitions and the writeFeatureTypeParquet artifact contract
 // (one artifact + one download_version_artifact row per feature type, idempotent on retry).
@@ -439,13 +439,13 @@ describe('Download Parquet pipeline (integration)', function () {
   }
 
   /**
-   * Helper: stream base feature rows via the search-query path (filtered by
-   * submission_id), then hydrate with typed property values.
+   * Helper: stream base feature rows from a download version's stored feature set
+   * (the features of one submission), then hydrate with typed property values.
    *
-   * The legacy cursor is gone — every download flow now resolves features through
-   * an expression-evaluator subquery. For these tests we substitute a simple
-   * "all features for this submission" subquery so each test's fixture set is
-   * the unit under hydration; the typed-table joins are what we actually verify.
+   * Every file is written from the version's stored set. For these tests we store a
+   * simple "all features for this submission" set on a fresh version, as the build
+   * stores the policy's set, so each test's fixture set is the unit under hydration;
+   * the typed-table joins are what we actually verify.
    */
   async function streamAndHydrateBySubmission(
     submissionId: number,
@@ -453,17 +453,31 @@ describe('Download Parquet pipeline (integration)', function () {
     properties: CsvPropertyDefinition[],
     cursorScopeId: string
   ): Promise<ParquetFeatureData[]> {
-    const searchSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = $1';
+    const featureIdsSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = ?';
+    const downloadVersionId = await createDownloadVersionFor(await createPolicyDownload());
+    await downloadVersionRepo.updateDownloadVersionFeatureIds(downloadVersionId, featureIdsSql, [submissionId]);
+
     return hydrateFromStream(
-      downloadRepo.streamFeatureBaseBySearchQueryAndType(
+      downloadRepo.streamFeatureBaseByFeatureIds(
         cursorScopeId,
-        searchSql,
-        [submissionId],
         featureTypeName,
+        await featureIdsOfType(downloadVersionId, featureTypeName),
         100
       ),
       properties
     );
+  }
+
+  /**
+   * Helper: the part of a download version's stored feature set that holds one feature type, as
+   * the job reads it before writing that type's file. Null when the version has no such feature.
+   */
+  async function featureIdsOfType(downloadVersionId: string, featureTypeName: string): Promise<Buffer | null> {
+    const fileFeatureSets = await pipelineService.listDownloadVersionFileFeatureSets(downloadVersionId, [
+      featureTypeName
+    ]);
+
+    return fileFeatureSets.find((set) => set.featureTypeName === featureTypeName)?.featureIds ?? null;
   }
 
   /**
@@ -992,8 +1006,8 @@ describe('Download Parquet pipeline (integration)', function () {
 
     /**
      * Build an `ActivePolicyStatementWithExpression` row shape for the broad path —
-     * `expression_id: null` makes `writeFeatureTypeParquet` use
-     * `buildBroadFeatureTypeSubquery`, which projects every feature of the type.
+     * `expression_id: null` makes `storeDownloadVersionFeatureSet` use
+     * `buildBroadFeatureTypeSubquery`, which selects every feature of the type.
      * The stub policy_statement_id never lands in the database, so its value is
      * arbitrary as long as the type-checker accepts it.
      */
@@ -1013,13 +1027,18 @@ describe('Download Parquet pipeline (integration)', function () {
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
+      // Store the version's feature set first, as the job does: the file is written from it.
+      await pipelineService.storeDownloadVersionFeatureSet({
+        downloadVersionId,
+        source,
+        statements: [broadStatement('survey')]
+      });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         downloadVersionId,
-        source,
         properties: emptyProperties,
         featureTypeName: 'survey',
-        statement: broadStatement('survey')
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
 
       const artifactRows = await connection.sql(SQL`
@@ -1068,14 +1087,20 @@ describe('Download Parquet pipeline (integration)', function () {
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
+      // Store the version's feature set first, as the job does: both calls write from it.
+      await pipelineService.storeDownloadVersionFeatureSet({
+        downloadVersionId,
+        source,
+        statements: [broadStatement('survey')]
+      });
+
       // Call 1
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         downloadVersionId,
-        source,
         properties: emptyProperties,
         featureTypeName: 'survey',
-        statement: broadStatement('survey')
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
 
       const afterFirst = await connection.sql(SQL`
@@ -1094,10 +1119,9 @@ describe('Download Parquet pipeline (integration)', function () {
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         downloadVersionId,
-        source,
         properties: emptyProperties,
         featureTypeName: 'survey',
-        statement: broadStatement('survey')
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
       });
 
       const afterSecond = await connection.sql(SQL`
@@ -1124,21 +1148,25 @@ describe('Download Parquet pipeline (integration)', function () {
       const downloadVersionId = await createDownloadVersionFor(downloadId);
       const source = await downloadRepo.getDownloadSource(downloadId);
 
-      await pipelineService.writeFeatureTypeParquet({
-        downloadId,
+      // Store the version's feature set first, as the job does: both files are written from it.
+      await pipelineService.storeDownloadVersionFeatureSet({
         downloadVersionId,
         source,
-        properties: emptyProperties,
-        featureTypeName: 'survey',
-        statement: broadStatement('survey')
+        statements: [broadStatement('survey'), broadStatement('capture')]
       });
       await pipelineService.writeFeatureTypeParquet({
         downloadId,
         downloadVersionId,
-        source,
+        properties: emptyProperties,
+        featureTypeName: 'survey',
+        featureIds: await featureIdsOfType(downloadVersionId, 'survey')
+      });
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        downloadVersionId,
         properties: emptyProperties,
         featureTypeName: 'capture',
-        statement: broadStatement('capture')
+        featureIds: await featureIdsOfType(downloadVersionId, 'capture')
       });
 
       const artifactRows = await connection.sql(SQL`
@@ -1169,8 +1197,8 @@ describe('Download Parquet pipeline (integration)', function () {
      * Run the feature-selection subquery the broad (no-expression) parquet path
      * uses, and return the produced submission_feature_id set.
      *
-     * `writeFeatureTypeParquet` builds `buildBroadFeatureTypeSubquery(featureTypeName,
-     * source.requested_by)` and streams its rows into the Parquet file. Driving the
+     * The build stores `buildBroadFeatureTypeSubquery(featureTypeName, source.requested_by)`
+     * as the version's feature set and streams that set into the Parquet file. Driving the
      * same builder with `source.requested_by` is the load-bearing assertion: whatever
      * this set excludes never reaches the file. Asserting the id set directly avoids
      * stubbing the Parquet writer + S3 just to peek at what was streamed.
