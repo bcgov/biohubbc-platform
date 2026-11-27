@@ -528,6 +528,11 @@ async function createArtifacts(
  * set to now and `record_end_date` left null on every row: the fixture deliberately omits these dates,
  * and without them the pipeline's `record_effective_date <= now()` filter would exclude every feature —
  * making the seeded data invisible to search and leaving it unsecured (no anchors resolve).
+ *
+ * "Now" is the database's `now()` (the seed transaction's start), not the Node clock: a Node timestamp
+ * taken after the transaction began is later than `now()` for the rest of that transaction, so
+ * `buildScopeFeatureBitmaps`, which applies the same `record_effective_date <= now()` filter in this
+ * transaction, would see no current feature and build every bitmap empty.
  */
 async function insertFeatures(
   knex: Knex,
@@ -535,8 +540,6 @@ async function insertFeatures(
   chain: FkChain,
   context: SeedContext
 ): Promise<Map<string, number>> {
-  const effectiveDate = new Date().toISOString();
-
   const rows = fixture.features.map((feature) => ({
     uuid: feature.uuid,
     submission_id: chain.submissionId,
@@ -549,7 +552,7 @@ async function insertFeatures(
     parent_submission_feature_id: null,
     // Synthetic outcomes populate validation review without changing the captured feature data.
     reconciliation: faker.helpers.arrayElement(['new', 'unmodified', 'modified']),
-    record_effective_date: effectiveDate
+    record_effective_date: knex.fn.now()
   }));
 
   const inserted = await knex
