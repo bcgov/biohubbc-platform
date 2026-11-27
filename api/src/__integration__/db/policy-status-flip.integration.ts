@@ -44,6 +44,9 @@ describe('Policy status flip + lazy scope materialization (integration)', functi
     sinon
       .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
       .resolves({ status: 'published', jobId: 'stub-job-id' });
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
   });
 
   afterEach(async () => {

@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
+import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SecurityScopeRepository } from './security-scope-repository';
 
 chai.use(sinonChai);
@@ -345,6 +346,36 @@ describe('SecurityScopeRepository', () => {
       expect(queryStub.getCall(0).args[1]).to.eql([5000, '*', 'telemetry', '*', 5000]);
     });
 
+    it('applies the candidate rules to the batch and boundary scans and the ancestor rules to pruning', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).resolves({ rows: [{ last_id: null }], rowCount: 1 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
+
+      for (const call of [queryStub.getCall(0), queryStub.getCall(1)]) {
+        const sqlText: string = call.args[0];
+        expect(sqlText).to.include('candidate.successor_submission_feature_id IS NULL');
+        expect(sqlText).to.include('closure_ready.target_submission_feature_id = candidate.submission_feature_id');
+        expect(sqlText).to.include("($2 = candidate.submission_id::text OR $2 = '*')");
+        expect(sqlText).to.include("($3 = ft.name OR $3 = '*')");
+        expect(sqlText).to.include("($4 = candidate.submission_feature_id::text OR $4 = '*')");
+        expect(sqlText).to.include('c.source_submission_feature_id = candidate.submission_feature_id');
+      }
+
+      const batchSql: string = queryStub.getCall(0).args[0];
+      expect(batchSql).to.include("($2 = ancestor.submission_id::text OR $2 = '*')");
+      expect(batchSql).to.include("($4 = ancestor.submission_feature_id::text OR $4 = '*')");
+      expect(batchSql).to.include('c.source_submission_feature_id = ancestor.submission_feature_id');
+      // A pruning ancestor is not required to be current or to have a self-loop.
+      expect(batchSql).not.to.include('ancestor.successor_submission_feature_id');
+      expect(batchSql).not.to.include('closure_ready.target_submission_feature_id = ancestor.submission_feature_id');
+    });
+
     it('adds an indexable submission predicate to the batch and boundary scans when a submission is given', async () => {
       const queryStub = sinon.stub();
 
@@ -385,6 +416,123 @@ describe('SecurityScopeRepository', () => {
 
       try {
         await repository.computeAnchorBatch('scope-uuid-1', urn, 0, null);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('query failed');
+      }
+    });
+  });
+
+  describe('updateSecurityScopeFeatureIds', () => {
+    const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+
+    it('rebuilds the bitmap in one statement without returning feature ids', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIds('scope-uuid-1', urn, null);
+
+      expect(queryStub).to.have.been.calledOnce;
+      const sqlText: string = queryStub.firstCall.args[0];
+      expect(sqlText).to.include('UPDATE security_scope ss');
+      expect(sqlText).to.include('SET feature_ids = rb_runoptimize(COALESCE((');
+      expect(sqlText).to.include('rb_build_agg(member.submission_feature_id)');
+      expect(sqlText).to.include("rb_build('{}'::integer[])");
+      expect(sqlText).to.include('WHERE ss.security_scope_id = $1');
+      expect(sqlText).not.to.include('RETURNING');
+      expect(queryStub.firstCall.args[1]).to.eql(['scope-uuid-1', '*', 'telemetry', '*']);
+    });
+
+    it('derives anchors with the candidate and ancestor rules of computeAnchorBatch', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIds('scope-uuid-1', urn, null);
+
+      const sqlText: string = queryStub.firstCall.args[0];
+
+      // Anchor is a candidate: current, self-looped, URN match, effectively secured.
+      expect(sqlText).to.include('anchor.successor_submission_feature_id IS NULL');
+      expect(sqlText).to.include('closure_ready.target_submission_feature_id = anchor.submission_feature_id');
+      expect(sqlText).to.include("($2 = anchor.submission_id::text OR $2 = '*')");
+      expect(sqlText).to.include("($3 = anchor_ft.name OR $3 = '*')");
+      expect(sqlText).to.include("($4 = anchor.submission_feature_id::text OR $4 = '*')");
+      expect(sqlText).to.include('c.source_submission_feature_id = anchor.submission_feature_id');
+
+      // No candidate proper ancestor: URN match and effectively secured, with no lifecycle test.
+      expect(sqlText).to.include('ancestry.target_submission_feature_id <> anchor.submission_feature_id');
+      expect(sqlText).to.include('ancestry.is_ancestor = true');
+      expect(sqlText).to.include("($2 = ancestor.submission_id::text OR $2 = '*')");
+      expect(sqlText).to.include("($3 = ancestor_ft.name OR $3 = '*')");
+      expect(sqlText).to.include("($4 = ancestor.submission_feature_id::text OR $4 = '*')");
+      expect(sqlText).to.include('c.source_submission_feature_id = ancestor.submission_feature_id');
+      expect(sqlText).not.to.include('ancestor.successor_submission_feature_id');
+    });
+
+    it('collects the anchor and its descendants, limited to current features with a closure self-loop', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIds('scope-uuid-1', urn, null);
+
+      const sqlText: string = queryStub.firstCall.args[0];
+      expect(sqlText).to.include('reach.target_submission_feature_id = anchor.submission_feature_id');
+      expect(sqlText).to.include('reach.is_ancestor = true');
+      expect(sqlText).to.include('member.submission_feature_id = reach.source_submission_feature_id');
+      expect(sqlText).to.include('member.successor_submission_feature_id IS NULL');
+      expect(sqlText).to.include('member_ready.target_submission_feature_id = member.submission_feature_id');
+      // Members are granted by ancestry alone: no URN or security test on them.
+      expect(sqlText).not.to.include('= member.submission_id::text');
+      expect(sqlText).not.to.include('c.source_submission_feature_id = member.submission_feature_id');
+    });
+
+    it('adds an indexable submission predicate on the anchor when a submission is given', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIds('scope-uuid-1', { ...urn, urn_submission_id: '42' }, 42);
+
+      expect(queryStub.firstCall.args[0]).to.include('AND anchor.submission_id = $5::integer');
+      expect(queryStub.firstCall.args[1]).to.eql(['scope-uuid-1', '42', 'telemetry', '*', 42]);
+    });
+
+    it('omits the submission predicate when no submission is given', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 1 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.updateSecurityScopeFeatureIds('scope-uuid-1', urn, null);
+
+      expect(queryStub.firstCall.args[0]).not.to.include('anchor.submission_id = $5');
+    });
+
+    it('throws ApiExecuteSQLError when the scope row is not updated', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      try {
+        await repository.updateSecurityScopeFeatureIds('scope-uuid-1', urn, null);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update security scope feature ids');
+      }
+    });
+
+    it('propagates errors from the update', async () => {
+      const queryStub = sinon.stub().rejects(new Error('query failed'));
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      try {
+        await repository.updateSecurityScopeFeatureIds('scope-uuid-1', urn, null);
         expect.fail('Should have thrown');
       } catch (error) {
         expect((error as Error).message).to.equal('query failed');

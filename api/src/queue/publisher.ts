@@ -9,6 +9,7 @@ import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import { IApproveSubmissionUploadJobData } from './jobs/approve-submission-upload-job';
 import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
+import { IComputeScopeFeatureBitmapJobData } from './jobs/compute-scope-feature-bitmap-job';
 import { IComputeSubmissionFeatureClosureJobData } from './jobs/compute-submission-feature-closure-job';
 import { IEvaluateTicketTagRulesJobData } from './jobs/evaluate-ticket-tag-rules-job';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
@@ -735,6 +736,75 @@ export const publishComputeScopeAnchorsJob = async (
   } catch (error) {
     defaultLog.error({
       label: 'publishComputeScopeAnchorsJob',
+      message: 'Failed to publish job',
+      securityScopeId: data.securityScopeId,
+      error
+    });
+    throw error;
+  }
+};
+
+/**
+ * Options for compute scope feature bitmap jobs.
+ */
+const COMPUTE_SCOPE_FEATURE_BITMAP_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 30 // 30 minutes
+};
+
+/**
+ * Publish a compute scope feature bitmap job to the queue.
+ *
+ * Queues the async rebuild of a security scope's `feature_ids` bitmap. Each scope
+ * gets its own delayed singleton job, so a burst of policy edits coalesces into
+ * one queued rebuild without dropping rebuilds for other scopes.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IComputeScopeFeatureBitmapJobData} data Job data containing securityScopeId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success or duplicate
+ * @throws Rethrows any error from pg-boss (`boss.createQueue` / `boss.send`) after logging it;
+ *         callers' surrounding transaction rolls back automatically.
+ */
+export const publishComputeScopeFeatureBitmapJob = async (
+  connection: IDBConnection,
+  data: IComputeScopeFeatureBitmapJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const mergedOptions = { ...COMPUTE_SCOPE_FEATURE_BITMAP_OPTIONS, ...options };
+
+    const jobId = await sendDelayedRecomputeJob(
+      connection,
+      JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP,
+      data,
+      mergedOptions,
+      `scope-feature-bitmap-${data.securityScopeId}`
+    );
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishComputeScopeFeatureBitmapJob',
+        message: 'Compute scope feature bitmap job published',
+        jobId,
+        securityScopeId: data.securityScopeId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishComputeScopeFeatureBitmapJob',
+      message: 'Job not published; the queued job for this key was rescheduled',
+      securityScopeId: data.securityScopeId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this security scope' };
+  } catch (error) {
+    defaultLog.error({
+      label: 'publishComputeScopeFeatureBitmapJob',
       message: 'Failed to publish job',
       securityScopeId: data.securityScopeId,
       error

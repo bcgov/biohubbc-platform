@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import { JobQueues } from './jobs';
 import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
+import * as computeScopeFeatureBitmapJob from './jobs/compute-scope-feature-bitmap-job';
 import * as computeSubmissionFeatureClosureJob from './jobs/compute-submission-feature-closure-job';
 import * as deleteExpiredMartinContextsJob from './jobs/delete-expired-martin-contexts-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
@@ -31,7 +32,7 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(createQueueStub.callCount).to.equal(26);
+      expect(createQueueStub.callCount).to.equal(28);
       expect(createQueueStub.calledWith(JobQueues.PROCESS_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.RECONCILE_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.MALWARE_SCAN)).to.be.true;
@@ -39,6 +40,7 @@ describe('worker', () => {
       expect(createQueueStub.calledWith(JobQueues.PROCESS_DOWNLOAD_VERSION_EXPORT)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.INDEX_SUBMISSION_FEATURES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_ANCHORS)).to.be.true;
+      expect(createQueueStub.calledWith(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.POLL_DOWNLOAD_SCHEDULES)).to.be.true;
       expect(createQueueStub.calledWith(JobQueues.SUBMISSION_UPLOAD_SECURITY)).to.be.true;
@@ -107,6 +109,18 @@ describe('worker', () => {
       ).to.be.true;
       expect(
         workStub.calledWith(
+          JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP,
+          computeScopeFeatureBitmapJob.computeScopeFeatureBitmapJobHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
+          JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED,
+          computeScopeFeatureBitmapJob.computeScopeFeatureBitmapFailedHandler
+        )
+      ).to.be.true;
+      expect(
+        workStub.calledWith(
           JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE,
           computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureJobHandler
         )
@@ -166,14 +180,15 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 26 queues: PROCESS_SUBMISSION_FEATURES + FAILED, RECONCILE_SUBMISSION_FEATURES + FAILED,
+      // 28 queues: PROCESS_SUBMISSION_FEATURES + FAILED, RECONCILE_SUBMISSION_FEATURES + FAILED,
       // MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED,
       // PROCESS_DOWNLOAD_VERSION_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED,
-      // COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED,
+      // COMPUTE_SCOPE_ANCHORS + FAILED, COMPUTE_SCOPE_FEATURE_BITMAP + FAILED,
+      // COMPUTE_SUBMISSION_FEATURE_CLOSURE + FAILED,
       // POLL_DOWNLOAD_SCHEDULES + FAILED, SUBMISSION_UPLOAD_SECURITY + FAILED,
       // DELETE_EXPIRED_MARTIN_CONTEXTS + FAILED, EVALUATE_TICKET_TAG_RULES + FAILED,
       // APPROVE_SUBMISSION_UPLOAD + FAILED.
-      expect(createQueueStub.callCount).to.equal(26);
+      expect(createQueueStub.callCount).to.equal(28);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -188,15 +203,18 @@ describe('worker', () => {
       expect(createQueueStub.getCall(11).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
       expect(createQueueStub.getCall(12).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(createQueueStub.getCall(13).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      // Scope feature bitmap DLQ is created before its main queue
+      expect(createQueueStub.getCall(14).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED);
+      expect(createQueueStub.getCall(15).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
       // Recompute closure DLQ is created before its main queue
-      expect(createQueueStub.getCall(14).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
-      expect(createQueueStub.getCall(15).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      expect(createQueueStub.getCall(16).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(createQueueStub.getCall(17).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
       // Poll download schedules DLQ is created before its main queue
-      expect(createQueueStub.getCall(16).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
-      expect(createQueueStub.getCall(17).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(createQueueStub.getCall(18).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(createQueueStub.getCall(19).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
       // Automatic security screening DLQ is created before its main queue
-      expect(createQueueStub.getCall(18).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
-      expect(createQueueStub.getCall(19).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
+      expect(createQueueStub.getCall(20).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
+      expect(createQueueStub.getCall(21).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
 
       expect(createQueueStub.firstCall.calledBefore(workStub.firstCall)).to.be.true;
     });
@@ -384,6 +402,50 @@ describe('worker', () => {
       expect(queueConfig.policy).to.equal('short');
     });
 
+    it('registers the compute scope feature bitmap job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Compute scope feature bitmap handlers are registered after compute scope anchors handlers
+      expect(workStub.getCall(14).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+      expect(workStub.getCall(14).args[1]).to.equal(computeScopeFeatureBitmapJob.computeScopeFeatureBitmapJobHandler);
+
+      expect(workStub.getCall(15).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED);
+      expect(workStub.getCall(15).args[1]).to.equal(
+        computeScopeFeatureBitmapJob.computeScopeFeatureBitmapFailedHandler
+      );
+    });
+
+    it('configures dead letter queue + policy:short for compute-scope-feature-bitmap', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // policy: 'short' — without it pg-boss ignores singletonKey, so a burst of
+      // policy edits would queue one build per edit.
+      const bitmapQueueCall = createQueueStub
+        .getCalls()
+        .find((call) => call.args[0] === JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP);
+      expect(bitmapQueueCall).to.not.be.undefined;
+
+      const queueConfig = bitmapQueueCall?.args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SCOPE_FEATURE_BITMAP_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
+    });
+
     it('configures dead letter queue + policy:short for compute-submission-feature-closure', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
@@ -418,14 +480,14 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // Recompute closure handlers are registered after compute scope anchors handlers
-      expect(workStub.getCall(14).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
-      expect(workStub.getCall(14).args[1]).to.equal(
+      // Recompute closure handlers are registered after compute scope feature bitmap handlers
+      expect(workStub.getCall(16).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE);
+      expect(workStub.getCall(16).args[1]).to.equal(
         computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureJobHandler
       );
 
-      expect(workStub.getCall(15).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
-      expect(workStub.getCall(15).args[1]).to.equal(
+      expect(workStub.getCall(17).args[0]).to.equal(JobQueues.COMPUTE_SUBMISSION_FEATURE_CLOSURE_FAILED);
+      expect(workStub.getCall(17).args[1]).to.equal(
         computeSubmissionFeatureClosureJob.computeSubmissionFeatureClosureFailedHandler
       );
     });
@@ -441,11 +503,11 @@ describe('worker', () => {
       await registerWorkers();
 
       // Poll download schedules handlers are registered after recompute closure handlers
-      expect(workStub.getCall(16).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
-      expect(workStub.getCall(16).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesJobHandler);
+      expect(workStub.getCall(18).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES);
+      expect(workStub.getCall(18).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesJobHandler);
 
-      expect(workStub.getCall(17).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
-      expect(workStub.getCall(17).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler);
+      expect(workStub.getCall(19).args[0]).to.equal(JobQueues.POLL_DOWNLOAD_SCHEDULES_FAILED);
+      expect(workStub.getCall(19).args[1]).to.equal(pollDownloadSchedulesJob.pollDownloadSchedulesFailedHandler);
     });
 
     it('configures dead letter queue for poll-download-schedules', async () => {
@@ -533,12 +595,12 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // Screening handlers are registered after poll-download-schedules handlers (calls 16+17 out of 0-based indexing)
-      expect(workStub.getCall(18).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
-      expect(workStub.getCall(18).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityJobHandler);
+      // Screening handlers are registered after poll-download-schedules handlers (calls 18+19 out of 0-based indexing)
+      expect(workStub.getCall(20).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY);
+      expect(workStub.getCall(20).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityJobHandler);
 
-      expect(workStub.getCall(19).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
-      expect(workStub.getCall(19).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityFailedHandler);
+      expect(workStub.getCall(21).args[0]).to.equal(JobQueues.SUBMISSION_UPLOAD_SECURITY_FAILED);
+      expect(workStub.getCall(21).args[1]).to.equal(submissionUploadSecurityJob.submissionUploadSecurityFailedHandler);
     });
   });
 });

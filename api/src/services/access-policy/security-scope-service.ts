@@ -1,7 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { SecurityScope } from '../../models/security-scope';
-import { publishComputeScopeAnchorsJob } from '../../queue/publisher';
+import { publishComputeScopeAnchorsJob, publishComputeScopeFeatureBitmapJob } from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { getLogger } from '../../utils/logger';
@@ -43,6 +43,7 @@ export class SecurityScopeService extends DBService {
    */
   static readonly dependencies = {
     publishComputeScopeAnchorsJob,
+    publishComputeScopeFeatureBitmapJob,
     computeScopeHash
   };
 
@@ -113,16 +114,17 @@ export class SecurityScopeService extends DBService {
   /**
    * Materialize the policy-wide access-cache rows for a policy's ALLOW statements.
    *
-   * Publishes one anchor-computation job per active ALLOW statement scope on the
-   * policy. Scope rows are created when statements are written and are shared
-   * across every team that links to the same policy.
+   * Publishes one anchor-computation job and one feature-bitmap build job per
+   * active ALLOW statement scope on the policy. Scope rows are created when
+   * statements are written and are shared across every team that links to the
+   * same policy.
    *
    * Both access gates (`policy.status='approved'`, `policy_statement.effect='ALLOW'`)
    * live in the SQL that returns the statement list. When the repository
    * returns `[]` — either gate filtered everything out — the method
    * short-circuits and returns `false` so callers can skip the team-grant step.
    * Statements are processed sequentially (not via `Promise.all`) so a
-   * publish-anchor-job failure aborts before more work is queued.
+   * publish failure of either job aborts before more work is queued.
    *
    * This is the policy-wide half of the lazy-materialization entry point.
    * Callers that also need to grant team access for this policy should invoke
@@ -146,6 +148,9 @@ export class SecurityScopeService extends DBService {
       await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
         securityScopeId: statement.security_scope_id,
         submissionId: null
+      });
+      await SecurityScopeService.dependencies.publishComputeScopeFeatureBitmapJob(this.connection, {
+        securityScopeId: statement.security_scope_id
       });
     }
 
@@ -336,5 +341,20 @@ export class SecurityScopeService extends DBService {
     submissionId: number | null
   ): Promise<AnchorBatchResult | null> {
     return this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, afterId, submissionId);
+  }
+
+  /**
+   * Rebuild the feature bitmap of a security scope from the features its anchors grant.
+   *
+   * A scope URN naming one submission limits the build to that submission; a wildcard scope spans
+   * every submission. Rebuilding on unchanged data stores the same bitmap, so a retry is safe.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @param urn URN components resolved via `resolveUrnForScope`
+   */
+  async buildScopeFeatureBitmap(securityScopeId: string, urn: SecurityScopeUrn): Promise<void> {
+    const submissionId = SecurityScopeService.getAnchorSubmissionId(urn, null);
+
+    await this.securityScopeRepository.updateSecurityScopeFeatureIds(securityScopeId, urn, submissionId);
   }
 }
