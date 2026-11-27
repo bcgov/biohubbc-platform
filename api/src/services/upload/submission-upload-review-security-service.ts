@@ -19,7 +19,8 @@ import { SubmissionUploadReviewService } from './submission-upload-review-servic
  * Coordinates review validation and current feature-security operations through domain services.
  *
  * Security can be changed on already-published features, which can make existing scope anchors stale or create
- * new ones, so every assignment change queues anchor recomputation limited to the submission.
+ * new ones, so every assignment change queues anchor recomputation limited to the submission. Removing
+ * assignments also clears the submission's ids from every matching scope bitmap in the same transaction.
  */
 export class SubmissionUploadReviewSecurityService extends DBService {
   submissionUploadReviewService: SubmissionUploadReviewService;
@@ -134,8 +135,8 @@ export class SubmissionUploadReviewSecurityService extends DBService {
    * @param {number} securityRuleId Rule identifier.
    * @param {number[]} submissionFeatureIds Selected IDs; otherwise expression matches or all upload features.
    * @param {ExpressionTree} [expression] Applied expression used only without an explicit selection.
-   * @returns {Promise<void>} Resolves after the desired assignment state is established and anchor
-   *   recomputation for the submission is queued.
+   * @returns {Promise<void>} Resolves after the desired assignment state is established, the submission's
+   *   ids are removed from every matching scope bitmap, and anchor recomputation for the submission is queued.
    */
   async deleteSubmissionUploadReviewSecurityRuleAssignments(
     submissionId: number,
@@ -152,7 +153,7 @@ export class SubmissionUploadReviewSecurityService extends DBService {
       securityRuleIds: [securityRuleId],
       featureScope: { submissionFeatureIds, expression }
     });
-    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+    await this.securityScopeService.revokeSubmissionFromScopeFeatureBitmaps(submissionId);
   }
 
   /**
@@ -163,7 +164,8 @@ export class SubmissionUploadReviewSecurityService extends DBService {
    * @param {string} submissionUploadReviewId Review identifier.
    * @param {number[]} submissionFeatureIds Selected IDs; otherwise expression matches or all upload features.
    * @param {ExpressionTree} [expression] Applied expression used only without an explicit selection.
-   * @returns {Promise<void>} Resolves after reset and anchor recomputation for the submission is queued.
+   * @returns {Promise<void>} Resolves after reset, the submission's ids are removed from every matching
+   *   scope bitmap, and anchor recomputation for the submission is queued.
    * @throws {ApiNotFoundError} When the review does not belong to the submission/upload.
    * @throws {ApiValidationError} When the review is not security-scoped.
    */
@@ -180,7 +182,7 @@ export class SubmissionUploadReviewSecurityService extends DBService {
       submissionUploadId,
       featureScope: { submissionFeatureIds, expression }
     });
-    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+    await this.securityScopeService.revokeSubmissionFromScopeFeatureBitmaps(submissionId);
   }
 
   /**

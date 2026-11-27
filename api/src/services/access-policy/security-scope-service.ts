@@ -150,7 +150,8 @@ export class SecurityScopeService extends DBService {
         submissionId: null
       });
       await SecurityScopeService.dependencies.publishComputeScopeFeatureBitmapJob(this.connection, {
-        securityScopeId: statement.security_scope_id
+        securityScopeId: statement.security_scope_id,
+        submissionId: null
       });
     }
 
@@ -243,14 +244,17 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Find scopes matching a submission and trigger anchor recomputation.
+   * Find scopes matching a submission and trigger anchor recomputation and a feature bitmap refresh.
    *
-   * Called when security rules are applied to features in a submission.
+   * Called when a submission's feature graph is rebuilt or its security rule assignments change.
    * New secured features may become anchors for existing scopes that cover
-   * the affected submission's URN pattern. Each job is limited to the submission,
-   * so a wildcard scope does not rescan every other submission's features.
+   * the affected submission's URN pattern, and the features each scope grants in that
+   * submission may change. Each job is limited to the submission, so a wildcard scope
+   * does not rescan every other submission's features: the anchor job recomputes the
+   * submission's anchors, and the bitmap job refreshes the submission's part of the
+   * scope's `feature_ids`.
    *
-   * @param submissionId The submission whose features gained security rules
+   * @param submissionId The submission whose feature graph or security rule assignments changed
    */
   async triggerAnchorComputationForSubmission(submissionId: number): Promise<void> {
     const scopes = await this.securityScopeRepository.findScopeIdsMatchingSubmission(submissionId);
@@ -261,6 +265,10 @@ export class SecurityScopeService extends DBService {
 
     for (const scope of scopes) {
       await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
+        securityScopeId: scope.security_scope_id,
+        submissionId
+      });
+      await SecurityScopeService.dependencies.publishComputeScopeFeatureBitmapJob(this.connection, {
         securityScopeId: scope.security_scope_id,
         submissionId
       });
@@ -349,12 +357,73 @@ export class SecurityScopeService extends DBService {
    * A scope URN naming one submission limits the build to that submission; a wildcard scope spans
    * every submission. Rebuilding on unchanged data stores the same bitmap, so a retry is safe.
    *
+   * The scope's row is locked first, so a build that overlaps a per-submission refresh waits for it
+   * and then reads the data it committed, instead of overwriting it with an older view.
+   *
    * @param securityScopeId UUID of the security scope
    * @param urn URN components resolved via `resolveUrnForScope`
    */
   async buildScopeFeatureBitmap(securityScopeId: string, urn: SecurityScopeUrn): Promise<void> {
     const submissionId = SecurityScopeService.getAnchorSubmissionId(urn, null);
 
+    await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
     await this.securityScopeRepository.updateSecurityScopeFeatureIds(securityScopeId, urn, submissionId);
+  }
+
+  /**
+   * Refresh one submission's part of a security scope's feature bitmap, leaving the ids of every
+   * other submission as they are.
+   *
+   * The scope's row is locked first, so the refresh waits for any other writer of the bitmap (a full
+   * build, another refresh) and then works from what it committed. A bitmap that was never built
+   * stays NULL, and an unchanged bitmap is not rewritten, so a retry is safe.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @param urn URN components resolved via `resolveUrnForScope`
+   * @param submissionId Submission whose ids are replaced in the bitmap
+   */
+  async refreshScopeFeatureBitmapForSubmission(
+    securityScopeId: string,
+    urn: SecurityScopeUrn,
+    submissionId: number
+  ): Promise<void> {
+    await this.securityScopeRepository.lockSecurityScopeForFeatureIdsUpdate(securityScopeId);
+    await this.securityScopeRepository.updateSecurityScopeFeatureIdsForSubmission(securityScopeId, urn, submissionId);
+  }
+
+  /**
+   * Remove a submission's ids from the feature bitmap of every security scope whose URN matches it,
+   * then queue the recomputation that adds back what each scope still grants.
+   *
+   * Called in the transaction that removes rule assignments, after the rows are deleted, so no bitmap
+   * keeps granting a feature that was covered only through a removed rule once the removal commits.
+   * Every matching scope is cleared, with or without a linked team.
+   *
+   * The matching rows are locked first, so the clear waits for any other writer of those bitmaps (a
+   * full build, a refresh) and then works from what it committed. A scope committed while a lock
+   * pass was waiting is not seen by that pass, so the pass is repeated until it locks nothing new.
+   *
+   * @param submissionId The submission whose rule assignments were removed
+   */
+  async revokeSubmissionFromScopeFeatureBitmaps(submissionId: number): Promise<void> {
+    const lockedScopeIds = new Set<string>();
+    let lockedNewScope = true;
+
+    while (lockedNewScope) {
+      const scopes = await this.securityScopeRepository.lockSecurityScopesForSubmissionFeatureIdsUpdate(submissionId);
+
+      lockedNewScope = scopes.some((scope) => !lockedScopeIds.has(scope.security_scope_id));
+
+      for (const scope of scopes) {
+        lockedScopeIds.add(scope.security_scope_id);
+      }
+    }
+
+    // No matching scope means no bitmap to clear, so the scan of the submission's features is skipped.
+    if (lockedScopeIds.size > 0) {
+      await this.securityScopeRepository.updateSecurityScopeFeatureIdsWithoutSubmission(submissionId);
+    }
+
+    await this.triggerAnchorComputationForSubmission(submissionId);
   }
 }

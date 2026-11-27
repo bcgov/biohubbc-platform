@@ -19,11 +19,15 @@ describe('computeScopeFeatureBitmapJobHandler', () => {
     sinon.restore();
   });
 
-  const createMockJob = (securityScopeId: string, id = 'job-1'): PgBoss.Job<IComputeScopeFeatureBitmapJobData> =>
+  const createMockJob = (
+    securityScopeId: string,
+    id = 'job-1',
+    submissionId: number | null = null
+  ): PgBoss.Job<IComputeScopeFeatureBitmapJobData> =>
     ({
       id,
       name: 'compute-scope-feature-bitmap',
-      data: { securityScopeId }
+      data: { securityScopeId, submissionId }
     } as PgBoss.Job<IComputeScopeFeatureBitmapJobData>);
 
   it('should resolve the URN and build the bitmap in one transaction', async () => {
@@ -38,17 +42,67 @@ describe('computeScopeFeatureBitmapJobHandler', () => {
     const urn = { urn_submission_id: '10', urn_feature_type: 'survey', urn_feature_id: '*' };
     const resolveUrnStub = sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(urn);
     const buildStub = sinon.stub(SecurityScopeService.prototype, 'buildScopeFeatureBitmap').resolves();
+    const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshScopeFeatureBitmapForSubmission');
 
     await computeScopeFeatureBitmapJobHandler([createMockJob('scope-uuid-1')]);
 
     expect(resolveUrnStub).to.have.been.calledOnceWith('scope-uuid-1');
     expect(buildStub).to.have.been.calledOnceWith('scope-uuid-1', urn);
     expect(resolveUrnStub).to.have.been.calledBefore(buildStub);
+    expect(refreshStub).not.to.have.been.called;
 
     // The active-statement check and the write share one transaction: the build has no gate of its own.
     expect(openStub).to.have.been.calledOnce;
     expect(commitStub).to.have.been.calledOnce;
     expect(commitStub).to.have.been.calledAfter(buildStub);
+  });
+
+  it("should refresh only the submission's part of the bitmap when the job carries a submission", async () => {
+    const mockDBConnection = getMockDBConnection();
+    const openStub = sinon.stub().resolves();
+    const commitStub = sinon.stub().resolves();
+    mockDBConnection.open = openStub;
+    mockDBConnection.commit = commitStub;
+
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    const urn = { urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' };
+    const resolveUrnStub = sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(urn);
+    const buildStub = sinon.stub(SecurityScopeService.prototype, 'buildScopeFeatureBitmap');
+    const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshScopeFeatureBitmapForSubmission').resolves();
+
+    await computeScopeFeatureBitmapJobHandler([createMockJob('scope-uuid-1', 'job-1', 42)]);
+
+    expect(refreshStub).to.have.been.calledOnceWith('scope-uuid-1', urn, 42);
+    expect(resolveUrnStub).to.have.been.calledBefore(refreshStub);
+    expect(buildStub).not.to.have.been.called;
+
+    // The refresh shares the URN resolve's transaction, as the full build does.
+    expect(openStub).to.have.been.calledOnce;
+    expect(commitStub).to.have.been.calledOnce;
+    expect(commitStub).to.have.been.calledAfter(refreshStub);
+  });
+
+  it('should run a job queued without a submissionId field as a full build', async () => {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    const urn = { urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' };
+    sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(urn);
+    const buildStub = sinon.stub(SecurityScopeService.prototype, 'buildScopeFeatureBitmap').resolves();
+    const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshScopeFeatureBitmapForSubmission');
+
+    // The payload shape the previous api version queued.
+    const legacyJob = {
+      id: 'job-1',
+      name: 'compute-scope-feature-bitmap',
+      data: { securityScopeId: 'scope-uuid-1' }
+    } as PgBoss.Job<IComputeScopeFeatureBitmapJobData>;
+
+    await computeScopeFeatureBitmapJobHandler([legacyJob]);
+
+    expect(buildStub).to.have.been.calledOnceWith('scope-uuid-1', urn);
+    expect(refreshStub).not.to.have.been.called;
   });
 
   it('should leave the bitmap untouched when no active policy statements', async () => {
@@ -57,10 +111,15 @@ describe('computeScopeFeatureBitmapJobHandler', () => {
 
     sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(null);
     const buildStub = sinon.stub(SecurityScopeService.prototype, 'buildScopeFeatureBitmap');
+    const refreshStub = sinon.stub(SecurityScopeService.prototype, 'refreshScopeFeatureBitmapForSubmission');
 
-    await computeScopeFeatureBitmapJobHandler([createMockJob('scope-uuid-1')]);
+    await computeScopeFeatureBitmapJobHandler([
+      createMockJob('scope-uuid-1'),
+      createMockJob('scope-uuid-1', 'job-2', 42)
+    ]);
 
     expect(buildStub).not.to.have.been.called;
+    expect(refreshStub).not.to.have.been.called;
   });
 
   it('should roll back and throw on build failure', async () => {

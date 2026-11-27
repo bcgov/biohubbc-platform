@@ -214,10 +214,12 @@ describe('SecurityScopeService', () => {
       expect(materialized).to.be.true;
       expect(bitmapPublishStub).to.have.been.calledTwice;
       expect(bitmapPublishStub.firstCall).to.have.been.calledWithExactly(mockDBConnection, {
-        securityScopeId: scopeIdOne
+        securityScopeId: scopeIdOne,
+        submissionId: null
       });
       expect(bitmapPublishStub.secondCall).to.have.been.calledWithExactly(mockDBConnection, {
-        securityScopeId: scopeIdTwo
+        securityScopeId: scopeIdTwo,
+        submissionId: null
       });
       expect(anchorPublishStub.firstCall).to.have.been.calledBefore(bitmapPublishStub.firstCall);
       expect(bitmapPublishStub.firstCall).to.have.been.calledBefore(anchorPublishStub.secondCall);
@@ -295,6 +297,9 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
 
       await service.triggerAnchorComputationForSubmission(42);
 
@@ -310,18 +315,30 @@ describe('SecurityScopeService', () => {
       });
     });
 
-    it('does not publish a bitmap job: bitmaps are rebuilt on policy change only', async () => {
+    it("publishes a bitmap refresh job carrying the submission for each matching scope, after that scope's anchor job", async () => {
       sinon
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
-        .resolves([{ security_scope_id: 'scope-1' }]);
-      sinon
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      const anchorPublishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
-      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
+      const bitmapPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .resolves({ status: 'published', jobId: 'job-2' });
 
       await service.triggerAnchorComputationForSubmission(42);
 
-      expect(bitmapPublishStub).not.to.have.been.called;
+      expect(bitmapPublishStub).to.have.been.calledTwice;
+      expect(bitmapPublishStub.firstCall).to.have.been.calledWithExactly(mockDBConnection, {
+        securityScopeId: 'scope-1',
+        submissionId: 42
+      });
+      expect(bitmapPublishStub.secondCall).to.have.been.calledWithExactly(mockDBConnection, {
+        securityScopeId: 'scope-2',
+        submissionId: 42
+      });
+      expect(anchorPublishStub.firstCall).to.have.been.calledBefore(bitmapPublishStub.firstCall);
+      expect(bitmapPublishStub.firstCall).to.have.been.calledBefore(anchorPublishStub.secondCall);
     });
 
     it('does not publish when no scopes match the submission', async () => {
@@ -329,11 +346,13 @@ describe('SecurityScopeService', () => {
       const publishStub = sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
+      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
 
       await service.triggerAnchorComputationForSubmission(999);
 
       expect(findStub).to.have.been.calledOnceWith(999);
       expect(publishStub).not.to.have.been.called;
+      expect(bitmapPublishStub).not.to.have.been.called;
     });
 
     it('throws when publishComputeScopeAnchorsJob throws (trigger loop)', async () => {
@@ -343,6 +362,7 @@ describe('SecurityScopeService', () => {
       sinon
         .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .rejects(new Error('pg-boss unavailable'));
+      const bitmapPublishStub = sinon.stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob');
 
       try {
         await service.triggerAnchorComputationForSubmission(1);
@@ -350,6 +370,29 @@ describe('SecurityScopeService', () => {
       } catch (error) {
         expect((error as Error).message).to.equal('pg-boss unavailable');
       }
+
+      expect(bitmapPublishStub).not.to.have.been.called;
+    });
+
+    it('throws when the bitmap publish fails, before the next scope is reached', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      const anchorPublishStub = sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeFeatureBitmapJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.triggerAnchorComputationForSubmission(1);
+        expect.fail('expected triggerAnchorComputationForSubmission to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+
+      expect(anchorPublishStub).to.have.been.calledOnce;
     });
   });
 
@@ -445,6 +488,202 @@ describe('SecurityScopeService', () => {
       } catch (error) {
         expect((error as Error).message).to.equal('update failed');
       }
+    });
+
+    it("locks the scope's row before it rebuilds the bitmap", async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      const lockStub = sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      const updateStub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      await service.buildScopeFeatureBitmap('scope-1', urn);
+
+      expect(lockStub).to.have.been.calledOnceWith('scope-1');
+      expect(lockStub).to.have.been.calledBefore(updateStub);
+    });
+
+    it('does not rebuild the bitmap when the lock fails', async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate')
+        .rejects(new Error('lock failed'));
+      const updateStub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      try {
+        await service.buildScopeFeatureBitmap('scope-1', urn);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('lock failed');
+      }
+
+      expect(updateStub).not.to.have.been.called;
+    });
+  });
+
+  describe('refreshScopeFeatureBitmapForSubmission', () => {
+    const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+
+    it("locks the scope's row, then refreshes the submission's part of the bitmap", async () => {
+      const lockStub = sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      const refreshStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .resolves();
+      const buildStub = sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIds').resolves();
+
+      await service.refreshScopeFeatureBitmapForSubmission('scope-1', urn, 42);
+
+      expect(lockStub).to.have.been.calledOnceWith('scope-1');
+      expect(refreshStub).to.have.been.calledOnceWith('scope-1', urn, 42);
+      expect(lockStub).to.have.been.calledBefore(refreshStub);
+      expect(buildStub).not.to.have.been.called;
+    });
+
+    it('refreshes the triggering submission, not the one a scope URN names', async () => {
+      const namedUrn = { ...urn, urn_submission_id: '7' };
+      sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      const refreshStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .resolves();
+
+      await service.refreshScopeFeatureBitmapForSubmission('scope-1', namedUrn, 42);
+
+      expect(refreshStub).to.have.been.calledOnceWith('scope-1', namedUrn, 42);
+    });
+
+    it('does not refresh the bitmap when the lock fails', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate')
+        .rejects(new Error('lock failed'));
+      const refreshStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .resolves();
+
+      try {
+        await service.refreshScopeFeatureBitmapForSubmission('scope-1', urn, 42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('lock failed');
+      }
+
+      expect(refreshStub).not.to.have.been.called;
+    });
+
+    it('propagates a repository failure', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopeForFeatureIdsUpdate').resolves();
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsForSubmission')
+        .rejects(new Error('update failed'));
+
+      try {
+        await service.refreshScopeFeatureBitmapForSubmission('scope-1', urn, 42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('update failed');
+      }
+    });
+  });
+
+  describe('revokeSubmissionFromScopeFeatureBitmaps', () => {
+    it("locks the matching scopes, clears the submission's ids, then queues recomputation", async () => {
+      const lockStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopesForSubmissionFeatureIdsUpdate')
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      const clearStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsWithoutSubmission')
+        .resolves();
+      const triggerStub = sinon.stub(service, 'triggerAnchorComputationForSubmission').resolves();
+
+      await service.revokeSubmissionFromScopeFeatureBitmaps(42);
+
+      expect(lockStub).to.always.have.been.calledWithExactly(42);
+      expect(clearStub).to.have.been.calledOnceWithExactly(42);
+      expect(triggerStub).to.have.been.calledOnceWithExactly(42);
+      expect(lockStub).to.have.been.calledBefore(clearStub);
+      expect(clearStub).to.have.been.calledBefore(triggerStub);
+    });
+
+    it('repeats the lock until a pass locks no scope it had not already locked', async () => {
+      const lockStub = sinon.stub(SecurityScopeRepository.prototype, 'lockSecurityScopesForSubmissionFeatureIdsUpdate');
+      lockStub.onFirstCall().resolves([{ security_scope_id: 'scope-1' }]);
+      // A scope committed while the first pass was waiting shows up in the second.
+      lockStub.onSecondCall().resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      lockStub.onThirdCall().resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      const clearStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsWithoutSubmission')
+        .resolves();
+      sinon.stub(service, 'triggerAnchorComputationForSubmission').resolves();
+
+      await service.revokeSubmissionFromScopeFeatureBitmaps(42);
+
+      expect(lockStub).to.have.been.calledThrice;
+      expect(clearStub).to.have.been.calledOnce;
+      expect(lockStub.thirdCall).to.have.been.calledBefore(clearStub.firstCall);
+    });
+
+    it('locks twice when the second pass returns the scopes of the first', async () => {
+      const lockStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopesForSubmissionFeatureIdsUpdate')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      sinon.stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsWithoutSubmission').resolves();
+      sinon.stub(service, 'triggerAnchorComputationForSubmission').resolves();
+
+      await service.revokeSubmissionFromScopeFeatureBitmaps(42);
+
+      expect(lockStub).to.have.been.calledTwice;
+    });
+
+    it('locks once, skips the clear and still queues, when no scope matches', async () => {
+      const lockStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopesForSubmissionFeatureIdsUpdate')
+        .resolves([]);
+      const clearStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsWithoutSubmission')
+        .resolves();
+      const triggerStub = sinon.stub(service, 'triggerAnchorComputationForSubmission').resolves();
+
+      await service.revokeSubmissionFromScopeFeatureBitmaps(42);
+
+      expect(lockStub).to.have.been.calledOnce;
+      expect(clearStub).to.not.have.been.called;
+      expect(triggerStub).to.have.been.calledOnceWithExactly(42);
+    });
+
+    it('does not clear or queue when the lock fails', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopesForSubmissionFeatureIdsUpdate')
+        .rejects(new Error('lock failed'));
+      const clearStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsWithoutSubmission')
+        .resolves();
+      const triggerStub = sinon.stub(service, 'triggerAnchorComputationForSubmission').resolves();
+
+      try {
+        await service.revokeSubmissionFromScopeFeatureBitmaps(42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('lock failed');
+      }
+
+      expect(clearStub).not.to.have.been.called;
+      expect(triggerStub).not.to.have.been.called;
+    });
+
+    it('does not queue recomputation when the clear fails', async () => {
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'lockSecurityScopesForSubmissionFeatureIdsUpdate')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'updateSecurityScopeFeatureIdsWithoutSubmission')
+        .rejects(new Error('update failed'));
+      const triggerStub = sinon.stub(service, 'triggerAnchorComputationForSubmission').resolves();
+
+      try {
+        await service.revokeSubmissionFromScopeFeatureBitmaps(42);
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('update failed');
+      }
+
+      expect(triggerStub).not.to.have.been.called;
     });
   });
 
