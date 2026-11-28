@@ -162,4 +162,68 @@ describe('SubmissionFeaturePropertyIngestionService — property key case (integ
     ]);
     expect(await getStoredValues(featureId)).to.have.lengthOf(0);
   });
+
+  it('keeps every value when keys differing only by case supply a property that allows multiple values', async () => {
+    const scenario = await seedPropertyScenario();
+    await connection.sql(SQL`
+      UPDATE blueprint_feature_type_property
+      SET allow_multiple = true
+      WHERE blueprint_feature_type_property_id = ${scenario.assignmentId}
+    `);
+    const featureId = await insertFeature(scenario, {
+      [scenario.propertyName]: 'North fence',
+      [scenario.propertyName.toUpperCase()]: 'South fence'
+    });
+
+    const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
+      scenario.submissionId,
+      scenario.uploadId
+    );
+
+    expect(outcome.status).to.equal('ok');
+    expect(await getSubmissionFeatureErrors(connection, scenario.uploadId, true)).to.have.lengthOf(0);
+    expect((await getStoredValues(featureId)).map((row) => row.value).sort()).to.eql(['North fence', 'South fence']);
+  });
+
+  it('accepts a required property supplied under a key that differs from the property name by case', async () => {
+    const scenario = await seedPropertyScenario();
+    await connection.sql(SQL`
+      UPDATE blueprint_feature_type_property
+      SET required_value = true
+      WHERE blueprint_feature_type_property_id = ${scenario.assignmentId}
+    `);
+    const featureId = await insertFeature(scenario, { [scenario.propertyName.toUpperCase()]: 'North fence' });
+
+    const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
+      scenario.submissionId,
+      scenario.uploadId
+    );
+
+    expect(outcome.status).to.equal('ok');
+    expect(await getSubmissionFeatureErrors(connection, scenario.uploadId, true)).to.have.lengthOf(0);
+    expect(await getStoredValues(featureId)).to.eql([
+      { blueprint_feature_type_property_id: scenario.assignmentId, value: 'North fence' }
+    ]);
+  });
+
+  it('still records MISSING_REQUIRED_PROPERTY when a required property is not supplied under any key', async () => {
+    const scenario = await seedPropertyScenario();
+    await connection.sql(SQL`
+      UPDATE blueprint_feature_type_property
+      SET required_value = true
+      WHERE blueprint_feature_type_property_id = ${scenario.assignmentId}
+    `);
+    await insertFeature(scenario, { unrelated_key: 'North fence' });
+
+    const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
+      scenario.submissionId,
+      scenario.uploadId
+    );
+
+    expect(outcome.status).to.equal('invalid');
+    expect(await getSubmissionFeatureErrors(connection, scenario.uploadId, true)).to.deep.include({
+      error_code: 'MISSING_REQUIRED_PROPERTY',
+      count: 1
+    });
+  });
 });

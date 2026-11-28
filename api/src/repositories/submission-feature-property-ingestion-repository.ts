@@ -1013,7 +1013,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             FROM submission_upload_staging_resolved_property rsp
             WHERE rsp.submission_upload_id = ${submissionUploadId}::uuid
               AND rsp.submission_feature_id = sf.submission_feature_id
-              AND rsp.property_name = rp.property_name
+              -- Match the resolved assignment, not the key as submitted, which keeps its case.
+              AND rsp.blueprint_feature_type_property_id = rp.blueprint_feature_type_property_id
               AND rsp.value IS NOT NULL
               AND rsp.value <> 'null'::jsonb
               AND NOT (jsonb_typeof(rsp.value) = 'array' AND jsonb_array_length(rsp.value) = 0)

@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { PropertySearchRepository } from '../repositories/property-search-repository';
 import { getLogger } from '../utils/logger';
+import { normalizeCase } from '../utils/normalize';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { GroupedPropertyResults, ISearchPropertyFilters } from './property-search-service.interface';
@@ -40,7 +41,11 @@ export class PropertySearchService extends DBService {
   ): Promise<GroupedPropertyResults> {
     defaultLog.debug({ label: 'searchProperty', filters, pagination });
 
-    const results = await this.searchRepository.searchProperties(filters, pagination);
+    // Feature type names are stored lowercase, so a filter matches whatever case the caller sent.
+    const normalizedFilters = filters.feature_types
+      ? { ...filters, feature_types: filters.feature_types.map(normalizeCase) }
+      : filters;
+    const results = await this.searchRepository.searchProperties(normalizedFilters, pagination);
 
     return {
       string: results.filter((result) => result.feature_property_type === 'string'),
@@ -65,6 +70,10 @@ export class PropertySearchService extends DBService {
   async getSearchPropertyCount(filters: ISearchPropertyFilters): Promise<number> {
     defaultLog.debug({ label: 'getSearchPropertyCount', filters });
 
-    return this.searchRepository.searchPropertiesCount(filters);
+    const normalizedFilters = filters.feature_types
+      ? { ...filters, feature_types: filters.feature_types.map(normalizeCase) }
+      : filters;
+
+    return this.searchRepository.searchPropertiesCount(normalizedFilters);
   }
 }

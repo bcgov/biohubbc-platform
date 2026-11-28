@@ -635,6 +635,41 @@ describe('DataRequestService', () => {
     expect(createTeamMemberStub).to.have.callCount(0);
   });
 
+  it('createDataRequestForTicket matches requested feature types whatever their case', async () => {
+    const service = new DataRequestService(getMockDBConnection());
+    sinon
+      .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
+      .resolves([{ feature_type_id: 2, name: 'telemetry', display_name: 'Telemetry', description: null }]);
+    sinon
+      .stub(TeamService.prototype, 'createTeam')
+      .onFirstCall()
+      .resolves({ team_id: 'dr-team', name: 'dr', description: null, member_count: 0 })
+      .onSecondCall()
+      .resolves({ team_id: 'policy-team', name: 'policy', description: null, member_count: 0 });
+    const createPolicyStub = sinon
+      .stub(PolicyService.prototype, 'createPolicyWithStatements')
+      .resolves(buildMockPolicy(['st-1']));
+    sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
+      team_policy_id: 'tp-1',
+      team_id: 'policy-team',
+      policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345'
+    } as TeamPolicy);
+    sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
+    sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
+
+    await service.createDataRequestForTicket(mockDataRequest.ticket_id, {
+      requested_by: 1,
+      reason: 'r',
+      system_user_ids: [],
+      featureTypes: [' Telemetry '],
+      expression: null
+    });
+
+    expect(createPolicyStub.firstCall.args[1]).to.deep.equal([
+      { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:telemetry:*' }
+    ]);
+  });
+
   it('createDataRequestForTicket builds one ALLOW statement per featureType with URN urn:*:<ft>:* and status "requested"', async () => {
     // Verifies: the per-feature-type ALLOW statement projection produces the canonical URN shape
     // and the auto-generated policy starts life in the "requested" status.

@@ -562,7 +562,8 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlText).to.include('FROM submission_feature');
       expect(sqlText).to.include('rsp.submission_upload_id');
       expect(sqlText).to.include('rsp.submission_feature_id = sf.submission_feature_id');
-      expect(sqlText).to.include('rsp.property_name = rp.property_name');
+      expect(sqlText).to.include('rsp.blueprint_feature_type_property_id = rp.blueprint_feature_type_property_id');
+      expect(sqlText).to.not.include('rsp.property_name = rp.property_name');
       expect(sqlText).to.not.include('present_properties AS');
     });
   });
