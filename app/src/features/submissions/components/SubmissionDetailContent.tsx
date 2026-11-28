@@ -7,35 +7,38 @@ import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { AlertBanner } from 'components/notifications/AlertBanner';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useArtifactApi.interface';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { ReactNode } from 'react';
-import { SubmissionDownloadButton } from './download/SubmissionDownloadButton';
-import { SubmissionFeatureTable } from './SubmissionFeatureTable';
-import { SubmissionFeatureTableProps } from './SubmissionFeatureTable.interface';
+import { SubmissionFeatures } from './SubmissionFeatures';
 
-interface SubmissionDetailContentProps extends SubmissionFeatureTableProps {
+interface SubmissionDetailContentProps {
   isSubmissionLoading: boolean;
   submission?: SubmissionRecordWithSecurity;
   breadcrumbs: ReactNode;
   subheader: ReactNode;
-  hasSecuredFeatures: boolean;
+  /** Submission route base that feature links open under. */
+  basePath: string;
 }
 
+/**
+ * Renders a submission's header and its Features section, the same searchable feature results as the public
+ * submission page.
+ *
+ * @param {SubmissionDetailContentProps} props - The submission, its loading state, header content, and route base.
+ * @returns {JSX.Element} The submission header and Features section, or their loading and empty states.
+ */
 export const SubmissionDetailContent = ({
   isSubmissionLoading,
   submission,
   breadcrumbs,
   subheader,
-  hasSecuredFeatures,
-  rows,
-  rowCount,
-  onRowClick,
-  isLoading,
-  paginationModel,
-  onPaginationModelChange,
-  sortModel,
-  onSortModelChange
+  basePath
 }: SubmissionDetailContentProps) => {
+  const hasSecuredFeatures =
+    submission?.security !== SECURITY_APPLIED_STATUS.UNSECURED &&
+    submission?.security !== SECURITY_APPLIED_STATUS.PENDING;
+
   return (
     <LoadingGuard
       isLoading={isSubmissionLoading}
@@ -55,17 +58,13 @@ export const SubmissionDetailContent = ({
           </AlertBanner>
         )}
 
-        <SubmissionFeatureTable
-          rows={rows}
-          rowCount={rowCount}
-          isLoading={isLoading}
-          onRowClick={onRowClick}
-          paginationModel={paginationModel}
-          onPaginationModelChange={onPaginationModelChange}
-          sortModel={sortModel}
-          onSortModelChange={onSortModelChange}
-          headerContent={submission && <SubmissionDownloadButton submissionId={submission.submission_id} />}
-        />
+        {submission && (
+          <SubmissionFeatures
+            submissionId={submission.submission_id}
+            basePath={basePath}
+            featureTypes={submission.feature_types}
+          />
+        )}
       </Container>
     </LoadingGuard>
   );

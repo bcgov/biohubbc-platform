@@ -5,7 +5,6 @@ import {
   ICreateSubmission,
   AdminSubmissionUploadsResponse,
   IGetSubmissionsForUserResponse,
-  ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
   PresignedUploadUrlResponse,
   SubmissionFilters,
@@ -79,28 +78,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
       params: { ...filters, ...pagination },
       ...options
     });
-    return data;
-  };
-
-  /**
-   * Fetch the paginated submission features visible to the requesting user.
-   *
-   * @param {number} submissionId ID of the submission whose features should be returned.
-   * @param {ApiPaginationRequestOptions} [pagination] Optional pagination and sorting parameters.
-   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
-   * @returns {Promise<ISubmissionFeatureForReviewResponse>} Paginated visible submission features.
-   */
-  const getSubmissionFeatures = async (
-    submissionId: number,
-    pagination?: ApiPaginationRequestOptions,
-    options?: Pick<AxiosRequestConfig, 'signal'>
-  ): Promise<ISubmissionFeatureForReviewResponse> => {
-    const { data } = await axios.get(`/api/submission/${submissionId}/feature`, {
-      params: pagination,
-      paramsSerializer: (params) => qs.stringify(params),
-      ...options
-    });
-
     return data;
   };
 
@@ -193,7 +170,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     listAdminSubmissionUploads,
     getAdminSubmissionList,
     getAdminSubmissionUploadList,
-    getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
     getPublishedSubmissions,
     getSubmissionsForUser,

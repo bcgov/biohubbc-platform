@@ -160,21 +160,6 @@ export interface IGetSubmissionGroupedFeatureResponse {
   features: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
 
-export type ISubmissionFeatureForReview = {
-  submission_feature_id: number;
-  uuid: string;
-  submission_id: number;
-  feature_type_id: number;
-  feature_type_name: string;
-  secured: boolean;
-  submission_feature_security_ids: number[];
-};
-
-export interface ISubmissionFeatureForReviewResponse {
-  features: ISubmissionFeatureForReview[];
-  pagination: ApiPaginationResponseParams;
-}
-
 export interface IGetSubmissionsForUserResponse {
   submissions: SubmissionSummary[];
   pagination: ApiPaginationResponseParams;

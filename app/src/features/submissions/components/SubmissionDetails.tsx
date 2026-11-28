@@ -34,7 +34,11 @@ export const SubmissionDetails = ({ submission }: SubmissionDetailsProps) => {
           <AlertBanner icon={<Icon path={mdiLock} size={0.9} />}>Some of the features are secured.</AlertBanner>
         )}
         <Stack spacing={3}>
-          <SubmissionFeatures submissionId={submission.submission_id} featureTypes={submission.feature_types} />
+          <SubmissionFeatures
+            submissionId={submission.submission_id}
+            basePath="/submission"
+            featureTypes={submission.feature_types}
+          />
           <SubmissionAbout submission={submission} />
         </Stack>
       </Stack>

@@ -202,37 +202,34 @@ describe('SubmissionDetailPage', () => {
     expect(button.closest('.MuiToolbar-root')).toHaveTextContent('Features');
   });
 
-  it('renders feature type toggles in a sidebar and changes the searched feature type', async () => {
+  it('renders the feature types as tabs above the results and changes the searched feature type', async () => {
     const { findByRole, getByRole } = renderPage();
 
-    const featureTypeGroup = await findByRole('group', { name: 'Submission feature types' });
+    const featureTypeTabs = await findByRole('tablist', { name: 'Submission feature types' });
     const featuresHeading = getByRole('heading', { name: 'Features' });
-    const observationToggle = getByRole('button', { name: 'Observation' });
-    const surveyToggle = getByRole('button', { name: 'Survey' });
     const tableButton = getByRole('button', { name: 'Table' });
 
-    expect(featureTypeGroup).toHaveAttribute('aria-orientation', 'vertical');
     expect(featuresHeading).toBeVisible();
-    expect(observationToggle).toHaveAttribute('aria-pressed', 'true');
-    expect(featureTypeGroup.compareDocumentPosition(tableButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(getByRole('tab', { name: 'Observation' })).toHaveAttribute('aria-selected', 'true');
+    expect(featureTypeTabs.compareDocumentPosition(tableButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    fireEvent.click(surveyToggle);
+    fireEvent.click(getByRole('tab', { name: 'Survey' }));
 
     await waitFor(() => {
       expect(mockSearchResults.setSearchParams).toHaveBeenCalledWith({ feature_type: 'survey' });
     });
   });
 
-  it('renders the result search above the sort toolbar', async () => {
+  it('renders the feature-type tabs above the result search, and the search above the sort toolbar', async () => {
     const { findByPlaceholderText, getByRole } = renderPage();
 
     const search = await findByPlaceholderText('Search...');
     const featuresHeading = getByRole('heading', { name: 'Features' });
-    const featureTypeGroup = getByRole('group', { name: 'Submission feature types' });
+    const featureTypeTabs = getByRole('tablist', { name: 'Submission feature types' });
     const tableButton = getByRole('button', { name: 'Table' });
 
-    expect(featuresHeading.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(search.compareDocumentPosition(featureTypeGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(featuresHeading.compareDocumentPosition(featureTypeTabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(featureTypeTabs.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(search.compareDocumentPosition(tableButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
