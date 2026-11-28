@@ -246,28 +246,6 @@ describe('useDownloadExportApi', () => {
     });
   });
 
-  describe('getDownloadFeatureTypes', () => {
-    it('GETs /api/download/{downloadId}/feature-types and returns the typed feature types', async () => {
-      // Verifies: getDownloadFeatureTypes targets the feature-types sub-resource of a download
-      // and returns the typed DownloadFeatureType[] that drives the export config picker.
-
-      // Step 1: Build a typed mock response against the real interface.
-      const mockResponse: DownloadFeatureType[] = [
-        { feature_type: 'animal', columns: ['animal_id', 'sex'] },
-        { feature_type: 'telemetry', columns: ['lat', 'lon', 'timestamp'] }
-      ];
-
-      mock.onGet('/api/download/abc-123/feature-types').reply(200, mockResponse);
-
-      // Step 2: Invoke the hook.
-      const result = await useDownloadExportApi(axios).getDownloadFeatureTypes('abc-123');
-
-      // Step 3: Assert the request URL and the returned payload.
-      expect(mock.history.get[0].url).toBe('/api/download/abc-123/feature-types');
-      expect(result).toEqual(mockResponse);
-    });
-  });
-
   describe('getDownloadVersionFeatureTypes', () => {
     it('GETs the nested feature-types resource for a selected version', async () => {
       const mockResponse: DownloadFeatureType[] = [{ feature_type: 'animal', columns: ['uuid'] }];

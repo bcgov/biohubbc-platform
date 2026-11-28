@@ -1,13 +1,3 @@
-import { type DownloadExportStatus } from 'interfaces/useDownloadExportApi.interface';
-
-/**
- * Determine whether an export is ready to be downloaded.
- *
- * @param {DownloadExportStatus} status - Current export processing status.
- * @return {boolean} `true` when the export is ready; otherwise `false`.
- */
-export const isExportReady = (status: DownloadExportStatus): boolean => status === 'ready';
-
 /**
  * Trigger a browser download for a presigned URL without opening a new tab.
  *

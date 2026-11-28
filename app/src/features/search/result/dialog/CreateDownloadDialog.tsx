@@ -14,7 +14,7 @@ interface ICreateDownloadDialogProps {
  * Dialog wrapper for saving a download of the current search. Thin layer over `EditDialog` that wires the form +
  * Yup schema and seeds the initial display name from the search route.
  *
- * Submit lifecycle (in-flight flag, snackbars, sidebar switching) is owned by the parent page,
+ * Submit lifecycle (in-flight flag, snackbars, navigation) is owned by the parent page,
  * not this dialog.
  */
 export const CreateDownloadDialog = (props: ICreateDownloadDialogProps) => {

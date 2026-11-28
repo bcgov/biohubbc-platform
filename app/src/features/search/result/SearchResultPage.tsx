@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { URL_PARAMS } from 'constants/query-params';
 import { SEARCH_RESULT_VIEW, SEARCH_RESULT_VIEW_OPTIONS } from 'constants/search';
@@ -19,9 +20,7 @@ import { useSearchResultExpression } from './hooks/useSearchResultExpression';
 import { useSearchResultNavigation } from './hooks/useSearchResultNavigation';
 import { useSearchResultPagingSort } from './hooks/useSearchResultPagingSort';
 import { useSearchResults } from './hooks/useSearchResults';
-import { ResultPageContainer } from './layout/ResultPageContainer';
-import { CreateDownloadDialog } from './sidebar/download/CreateDownloadDialog';
-import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
+import { CreateDownloadDialog } from './dialog/CreateDownloadDialog';
 
 /**
  * Route-level coordinator for `/search/:featureType` result pages.
@@ -63,7 +62,6 @@ export const SearchResultPage = () => {
     useSearchResultPagingSort({ cursor, setSearchParams });
   const { handleResultClick, handleFeatureTypeTabChange } = useSearchResultNavigation(featureTypeLinks);
   const {
-    downloadView,
     isCreateDownloadDialogOpen,
     isSubmittingDownload,
     handleOpenCreateDownload,
@@ -85,7 +83,7 @@ export const SearchResultPage = () => {
   if (routeConfig) {
     return (
       <LoadingGuard>
-        <ResultPageContainer rightSidebarTitle={downloadView} rightSidebar={<DownloadSidebar />}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           <SearchResultPageHeader
             activeFeatureType={routeConfig.featureTypeName}
             featureTypeLinks={featureTypeLinks}
@@ -144,7 +142,7 @@ export const SearchResultPage = () => {
             onCancel={handleCancelCreateDataRequest}
             onSave={handleCreateDataRequest}
           />
-        </ResultPageContainer>
+        </Box>
       </LoadingGuard>
     );
   }

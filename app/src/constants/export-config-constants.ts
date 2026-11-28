@@ -1,11 +1,10 @@
 /**
  * Single source of truth for the export-recipe literals shared across the wire interface
- * (`ExportConfig` / `MergeStep`), the Formik form values, the Yup schema, and the one-click create
- * path.
+ * (`ExportConfig` / `MergeStep`) and the export actions that build a recipe.
  *
- * Centralizing them keeps the TypeScript unions and the runtime validators from drifting if a mode
- * or merge type is added or renamed, and keeps the recipe the client emits in lock-step with the
- * `version` / `export_type` literals the backend pins (`CreateDownloadVersionExportRequestSchema`).
+ * Centralizing them keeps the TypeScript unions from drifting if a mode or merge type is added or
+ * renamed, and keeps the recipe the client emits in lock-step with the `version` / `export_type`
+ * literals the backend pins (`CreateDownloadVersionExportRequestSchema`).
  */
 
 /** Recipe schema version the client emits. Pinned to 1 — the only version the backend accepts. */
@@ -15,8 +14,8 @@ export const EXPORT_CONFIG_VERSION = 1;
 export const EXPORT_TYPE = 'csv';
 
 /**
- * Export modes. `per_feature_type` writes one CSV per feature type (the one-click menu item);
- * `denormalized` flattens related feature types onto a root via merge steps (the combined-CSV dialog).
+ * Export modes. `per_feature_type` writes one CSV per feature type; `denormalized` flattens related
+ * feature types onto a root via merge steps.
  */
 export const EXPORT_MODES = ['per_feature_type', 'denormalized'] as const;
 export type ExportMode = (typeof EXPORT_MODES)[number];
