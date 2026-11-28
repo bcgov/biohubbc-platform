@@ -62,6 +62,7 @@ const renderPage = (queryClient?: QueryClient) =>
     <MemoryRouter initialEntries={['/portal/submission/1']}>
       <Routes>
         <Route path="/portal/submission/:submissionId" element={<PortalSubmissionDetailPage />} />
+        <Route path="/forbidden" element={<div>Forbidden</div>} />
       </Routes>
     </MemoryRouter>,
     { queryClient }
@@ -129,5 +130,15 @@ describe('PortalSubmissionDetailPage', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/portal/submission/1/feature/10');
     });
+  });
+
+  it("sends a caller outside the submission's team to the forbidden page", async () => {
+    mockGetSubmissionRecordWithSecurity.mockRejectedValue({ status: 403, message: 'Access Denied' });
+    mockGetSubmissionFeatures.mockRejectedValue({ status: 403, message: 'Access Denied' });
+
+    const { findByText, queryByText } = renderPage();
+
+    expect(await findByText('Forbidden')).toBeVisible();
+    expect(queryByText('Test Submission')).not.toBeInTheDocument();
   });
 });

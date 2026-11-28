@@ -386,8 +386,8 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[]): Parquet
   fields['parent_uuid'] = { type: 'UTF8', optional: true };
 
   // The DB integer PK for the row. Carried alongside `uuid` because it's the
-  // identifier the platform's UI exposes — the feature-detail route is
-  // `/submission/:submissionId/feature/:submissionFeatureId`. Downstream
+  // identifier the platform's UI exposes — the public feature-detail route is
+  // `/feature/:submissionFeatureId`. Downstream
   // consumers (CSV export, DuckDB, pandas) use it both to namespace artifact
   // filenames (avoiding `0_*.bin` collisions when many rows reference files)
   // and as a clickable trace back into the platform.

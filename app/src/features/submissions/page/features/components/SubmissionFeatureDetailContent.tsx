@@ -14,10 +14,8 @@ import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
 interface SubmissionFeatureDetailContentProps {
   /** Submission feature displayed by the page. */
   feature: ISubmissionFeature;
-  /** Base route used to link to the feature's submission and its features. */
-  submissionDetailBasePath: string;
-  /** Query string preserved when navigating to the current feature. */
-  queryString?: string;
+  /** Builds the detail page path of another feature, used to link to the current version of this one. */
+  getFeaturePath: (submissionFeatureId: number) => string;
 }
 
 /**
@@ -32,8 +30,7 @@ interface SubmissionFeatureDetailContentProps {
  */
 export const SubmissionFeatureDetailContent = ({
   feature,
-  submissionDetailBasePath,
-  queryString = '',
+  getFeaturePath,
   children
 }: PropsWithChildren<SubmissionFeatureDetailContentProps>) => {
   const terminalFeatureId = feature.terminal_submission_feature_id;
@@ -49,9 +46,7 @@ export const SubmissionFeatureDetailContent = ({
             {hasTerminalFeature && (
               <>
                 {' '}
-                <Link
-                  component={RouterLink}
-                  to={`${submissionDetailBasePath}/${feature.submission_id}/feature/${terminalFeatureId}${queryString}`}>
+                <Link component={RouterLink} to={getFeaturePath(terminalFeatureId)}>
                   View the current version
                 </Link>
               </>
@@ -62,10 +57,7 @@ export const SubmissionFeatureDetailContent = ({
       <Stack spacing={3} py={4}>
         {children}
         <PageSection id="submission-feature-map" label="Map">
-          <SubmissionFeatureMap
-            submissionId={feature.submission_id}
-            submissionFeatureId={feature.submission_feature_id}
-          />
+          <SubmissionFeatureMap submissionFeatureId={feature.submission_feature_id} />
         </PageSection>
         <SubmissionFeatureAbout feature={feature} />
       </Stack>

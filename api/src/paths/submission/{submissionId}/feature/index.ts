@@ -1,8 +1,9 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
@@ -10,12 +11,24 @@ import { getActiveSystemUserId } from '../../../../utils/system-user-context';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/feature');
 
-export const GET: Operation = [getSubmissionFeatures()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => ({
+    and: [
+      {
+        discriminator: 'Team',
+        entity: 'submission',
+        submissionId: Number(req.params.submissionId)
+      }
+    ]
+  })),
+  getSubmissionFeatures()
+];
 
 GET.apiDoc = {
-  description: 'Retrieves the submission features visible to the requesting user.',
+  description:
+    "Retrieves the submission features visible to the requesting user. Available only to active members of the submission's team and to system administrators.",
   tags: ['submission'],
-  security: [{ OptionalBearer: [] }],
+  security: [{ Bearer: [] }],
   parameters: [
     {
       description: 'Submission ID.',
@@ -74,7 +87,7 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token!);
     const submissionId = Number(req.params.submissionId);
     const paginationOptions = makePaginationOptionsFromRequest(req);
 

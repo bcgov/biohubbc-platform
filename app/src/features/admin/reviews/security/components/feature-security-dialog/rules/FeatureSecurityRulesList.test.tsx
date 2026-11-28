@@ -80,6 +80,7 @@ describe('FeatureSecurityRulesList', () => {
     expect(mocks.remove).toHaveBeenCalledWith(1, 'upload', 'review', [10], 4);
     expect(invalidatedKeys()).toEqual([
       submissionQueryKeys.submission(1),
+      submissionQueryKeys.allFeatures(),
       searchQueryKeys.features(),
       submissionUploadQueryKeys.securityRules(props),
       submissionUploadQueryKeys.featureSearchResultsAll(props)

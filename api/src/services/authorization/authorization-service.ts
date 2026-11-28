@@ -93,7 +93,6 @@ export type AuthorizeByTeam = TeamAuthorizationEntity & {
 export interface AuthorizeByPolicy {
   discriminator: 'Policy';
   submissionFeatureId: number;
-  submissionId: number;
 }
 
 /**
@@ -319,8 +318,7 @@ export class AuthorizationService extends DBService {
 
     return teamAuthorizationService.isSubmissionFeatureAccessibleToUser(
       user?.system_user_id ?? null,
-      authorizeRule.submissionFeatureId,
-      authorizeRule.submissionId
+      authorizeRule.submissionFeatureId
     );
   }
 

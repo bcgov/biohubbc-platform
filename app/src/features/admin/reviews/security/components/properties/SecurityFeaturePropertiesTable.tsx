@@ -8,7 +8,7 @@ import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { IFeaturePropertyRow } from 'interfaces/useFeaturesApi.interface';
 import { useMemo } from 'react';
-import { buildSubmissionPropertyValuePathResolvers } from 'utils/routes';
+import { buildPublicPropertyValuePathResolvers } from 'utils/routes';
 import { formatSubmissionPropertyValue } from 'utils/search-result-utils';
 
 interface SecurityFeaturePropertiesTableProps {
@@ -38,7 +38,7 @@ export const SecurityFeaturePropertiesTable = (props: SecurityFeaturePropertiesT
       ),
     placeholderData: keepPreviousData
   });
-  const paths = useMemo(() => buildSubmissionPropertyValuePathResolvers('/submission', ''), []);
+  const paths = useMemo(() => buildPublicPropertyValuePathResolvers(), []);
   const columns = useMemo<GridColDef<IFeaturePropertyRow>[]>(
     () => [
       {

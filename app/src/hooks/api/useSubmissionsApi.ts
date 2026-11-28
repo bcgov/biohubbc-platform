@@ -9,7 +9,6 @@ import {
   ISubmissionUploadPart,
   PresignedUploadUrlResponse,
   SubmissionFilters,
-  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity
 } from 'interfaces/useSubmissionsApi.interface';
 import qs from 'qs';
@@ -121,17 +120,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch all published submission records for public users.
-   *
-   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
-   */
-  const getPublishedSubmissions = async (): Promise<SubmissionRecordPublishedForPublic[]> => {
-    const { data } = await axios.get(`api/submission/published`);
-
-    return data;
-  };
-
-  /**
    * Fetch all submissions accessible to the currently authenticated user via their submission team membership.
    *
    * @param {SubmissionFilters} [filters]
@@ -195,7 +183,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getAdminSubmissionUploadList,
     getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
-    getPublishedSubmissions,
     getSubmissionsForUser,
     getSubmissionUploadUrls,
     completeSubmissionUpload

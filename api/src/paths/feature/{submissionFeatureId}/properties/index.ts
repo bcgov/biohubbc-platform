@@ -1,16 +1,16 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
-import { SubmissionFeaturePropertyFilters } from '../../../../../../models/submission-feature';
-import { SubmissionFeaturePropertiesListResponseSchema } from '../../../../../../openapi/schemas/feature-property';
-import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { paginationRequestQueryParamSchema } from '../../../../../../openapi/schemas/pagination';
-import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
-import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
-import { getLogger } from '../../../../../../utils/logger';
-import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../../../utils/pagination';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { SubmissionFeaturePropertyFilters } from '../../../../models/submission-feature';
+import { SubmissionFeaturePropertiesListResponseSchema } from '../../../../openapi/schemas/feature-property';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../../openapi/schemas/pagination';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
+import { SubmissionFeaturePropertyService } from '../../../../services/submission-feature-property-service';
+import { getLogger } from '../../../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}/properties');
+const defaultLog = getLogger('paths/feature/{submissionFeatureId}/properties');
 
 export const GET: Operation = [
   authorizeRequestHandler((req) => {
@@ -18,8 +18,7 @@ export const GET: Operation = [
       and: [
         {
           discriminator: 'Policy',
-          submissionFeatureId: Number(req.params.submissionFeatureId),
-          submissionId: Number(req.params.submissionId)
+          submissionFeatureId: Number(req.params.submissionFeatureId)
         }
       ]
     };
@@ -36,16 +35,6 @@ GET.apiDoc = {
     }
   ],
   parameters: [
-    {
-      description: 'Submission ID.',
-      in: 'path',
-      name: 'submissionId',
-      schema: {
-        type: 'integer',
-        minimum: 1
-      },
-      required: true
-    },
     {
       description: 'Submission Feature ID.',
       in: 'path',
@@ -89,8 +78,7 @@ GET.apiDoc = {
 export function getSubmissionFeatureProperties(): RequestHandler {
   return async (req, res) => {
     // Unsecured features are readable anonymously (see the closure-based authorization rule on this
-    // route); fall back to the API user connection when there is no keycloak token, mirroring the
-    // feature list endpoint.
+    // route); fall back to the API user connection when there is no keycloak token.
     const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
     const submissionFeatureId = Number(req.params.submissionFeatureId);
     const pagination = makePaginationOptionsFromRequest(req);

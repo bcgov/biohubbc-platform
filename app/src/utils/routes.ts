@@ -90,7 +90,7 @@ export const parseRouteId = (value: string | undefined): number | null => {
 /**
  * Builds the path of the taxon page for a taxon referenced from a submission's features.
  *
- * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {string} basePath - Submission route base, e.g. `/portal/submission`.
  * @param {number} submissionId - Submission the referencing feature belongs to.
  * @param {number} taxonId - BioHub taxon identifier.
  * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
@@ -108,7 +108,7 @@ export const buildSubmissionTaxonPath = (
  *
  * Codeset and code keys are contributor-supplied text, so each is URL-encoded as its own path segment.
  *
- * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {string} basePath - Submission route base, e.g. `/portal/submission`.
  * @param {number} submissionId - Submission the referencing feature belongs to.
  * @param {string} codesetKey - Machine-readable key of the codeset.
  * @param {string} codeKey - Machine-readable key of the code within the codeset.
@@ -127,7 +127,7 @@ export const buildSubmissionCodePath = (
 /**
  * Builds the path of a submission feature's detail page.
  *
- * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {string} basePath - Submission route base, e.g. `/portal/submission`.
  * @param {number} submissionId - Submission the feature belongs to.
  * @param {number} submissionFeatureId - The feature.
  * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
@@ -141,9 +141,19 @@ export const buildSubmissionFeaturePath = (
 ): string => `${basePath}/${submissionId}/feature/${submissionFeatureId}${search}`;
 
 /**
+ * Builds the path of a feature's public detail page, which is addressed by the feature alone.
+ *
+ * @param {number} submissionFeatureId - The feature.
+ * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
+ * @returns {string} Public feature detail page path.
+ */
+export const buildFeaturePath = (submissionFeatureId: number, search = ''): string =>
+  `/feature/${submissionFeatureId}${search}`;
+
+/**
  * Builds link target resolvers for submitted property values under a standard submission route base.
  *
- * @param {string} basePath - Submission route base, e.g. `/submission` or `/portal/submission`.
+ * @param {string} basePath - Submission route base, e.g. `/portal/submission`.
  * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
  * @returns {SubmissionPropertyValuePathResolvers} Link target resolvers for submitted property values.
  */
@@ -156,4 +166,16 @@ export const buildSubmissionPropertyValuePathResolvers = (
     buildSubmissionCodePath(basePath, submissionId, codesetKey, codeKey, search),
   getSubmissionFeaturePath: (submissionId, submissionFeatureId) =>
     buildSubmissionFeaturePath(basePath, submissionId, submissionFeatureId, search)
+});
+
+/**
+ * Builds link target resolvers for submitted property values shown on public pages, where a referenced feature links to
+ * its public detail page rather than through its submission.
+ *
+ * @param {string} [search=''] - Query string (including the leading `?`) to carry over, if any.
+ * @returns {SubmissionPropertyValuePathResolvers} Link target resolvers for submitted property values.
+ */
+export const buildPublicPropertyValuePathResolvers = (search = ''): SubmissionPropertyValuePathResolvers => ({
+  ...buildSubmissionPropertyValuePathResolvers('/submission', search),
+  getSubmissionFeaturePath: (_submissionId, submissionFeatureId) => buildFeaturePath(submissionFeatureId, search)
 });

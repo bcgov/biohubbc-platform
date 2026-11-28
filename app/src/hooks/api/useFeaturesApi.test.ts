@@ -32,10 +32,10 @@ describe('useFeaturesApi', () => {
         }
       };
 
-      mock.onGet('api/submission/1/features/10').reply(200, mockResponse);
+      mock.onGet('api/feature/10').reply(200, mockResponse);
 
       const api = useFeaturesApi(axios);
-      const result = await api.getSubmissionFeatureById(1, 10);
+      const result = await api.getSubmissionFeatureById(10);
 
       expect(result).toEqual(mockResponse);
     });
@@ -55,7 +55,7 @@ describe('useFeaturesApi', () => {
         }
       };
 
-      mock.onGet('api/submission/1/features/10/properties').reply((config) => {
+      mock.onGet('api/feature/10/properties').reply((config) => {
         expect(config.params).toEqual({
           search: 'wolf',
           page: 1,
@@ -68,7 +68,7 @@ describe('useFeaturesApi', () => {
       });
 
       const api = useFeaturesApi(axios);
-      const result = await api.getSubmissionFeatureProperties(1, 10, {
+      const result = await api.getSubmissionFeatureProperties(10, {
         search: 'wolf',
         page: 1,
         limit: 10,

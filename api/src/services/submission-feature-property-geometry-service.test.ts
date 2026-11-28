@@ -7,6 +7,7 @@ import {
   SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
 import { SubmissionFeaturePropertyGeometryRepository } from '../repositories/submission-feature-property-geometry-repository';
+import { SubmissionFeatureRepository } from '../repositories/submission-feature-repository';
 import { SubmissionFeaturePropertyGeometryService } from './submission-feature-property-geometry-service';
 
 chai.use(sinonChai);
@@ -62,6 +63,22 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
     const result = await service.getSubmissionFeaturePropertyGeometryBySubmissionFeatureId(10);
     expect(stub).to.have.been.calledOnceWith(10);
     expect(result).to.eql([mockRow]);
+  });
+  it("frames a feature by id with the extent of the feature's own submission", async () => {
+    const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());
+    const extent = { bbox: [-125.1, 49.1, -125.0, 49.2] as [number, number, number, number], geometry_count: 2 };
+    const featureStub = sinon
+      .stub(SubmissionFeatureRepository.prototype, 'getSubmissionFeatureById')
+      .resolves({ submission_feature_id: 34, submission_id: 12 } as any);
+    const extentStub = sinon
+      .stub(SubmissionFeaturePropertyGeometryRepository.prototype, 'getActiveGeometryExtent')
+      .resolves(extent);
+
+    const result = await service.getActiveGeometryExtentBySubmissionFeatureId(34);
+
+    expect(featureStub).to.have.been.calledOnceWithExactly(34);
+    expect(extentStub).to.have.been.calledOnceWithExactly(12, 34);
+    expect(result).to.eql({ submissionId: 12, ...extent });
   });
   it('delegates getSubmissionUploadGeometryExtent', async () => {
     const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());

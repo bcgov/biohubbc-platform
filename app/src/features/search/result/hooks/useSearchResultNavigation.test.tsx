@@ -27,24 +27,24 @@ describe('useSearchResultNavigation', () => {
 
       const { result } = renderHook(() => useSearchResultNavigation([]));
 
-      result.current.handleResultClick({ submission_id: 3, submission_feature_id: 42 });
+      result.current.handleResultClick({ submission_feature_id: 42 });
 
-      expect(mocks.navigate).toHaveBeenCalledWith('/submission/3/feature/42?keywords=moose&page=2');
+      expect(mocks.navigate).toHaveBeenCalledWith('/feature/42?keywords=moose&page=2');
     });
 
-    it('drops submission selection when opening a global search result', () => {
+    it('drops the feature type selection when opening a global search result', () => {
       mocks.search = '?feature_type=survey&page=5&expr=AbC';
       const { result } = renderHook(() => useSearchResultNavigation([]));
-      result.current.handleResultClick({ submission_id: 3, submission_feature_id: 42 });
-      expect(mocks.navigate).toHaveBeenCalledWith('/submission/3/feature/42?page=5&expr=AbC');
+      result.current.handleResultClick({ submission_feature_id: 42 });
+      expect(mocks.navigate).toHaveBeenCalledWith('/feature/42?page=5&expr=AbC');
     });
 
     it('navigates without a query string when none is active', () => {
       const { result } = renderHook(() => useSearchResultNavigation([]));
 
-      result.current.handleResultClick({ submission_id: 3, submission_feature_id: 42 });
+      result.current.handleResultClick({ submission_feature_id: 42 });
 
-      expect(mocks.navigate).toHaveBeenCalledWith('/submission/3/feature/42');
+      expect(mocks.navigate).toHaveBeenCalledWith('/feature/42');
     });
   });
 });

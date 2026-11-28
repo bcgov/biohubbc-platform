@@ -46,9 +46,9 @@ describe('useMartinApi', () => {
   });
 
   it('creates a tile session for a submission feature with an empty body', async () => {
-    mock.onPost('/api/submission/12/features/34/tile').reply(200, session);
+    mock.onPost('/api/feature/34/tile').reply(200, session);
 
-    const result = await useMartinApi(axios).createSubmissionFeatureTileSession(12, 34);
+    const result = await useMartinApi(axios).createSubmissionFeatureTileSession(34);
 
     expect(result).toEqual(session);
     expect(mock.history.post[0].data).toBeUndefined();

@@ -11,15 +11,17 @@ import { SECURITY_LABEL } from 'constants/security';
 import dayjs from 'dayjs';
 import { SubmissionDetailContent } from 'features/submissions/components/SubmissionDetailContent';
 import { SubmissionFeatureRow } from 'features/submissions/components/SubmissionFeatureTable.interface';
+import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
 import { useMemo } from 'react';
-import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { getDaysSinceDate } from 'utils/Utils';
 
 /**
- * Portal submission detail page for the current user's submission.
+ * Portal submission detail page for the current user's submission. Submissions are private to their team, so a
+ * caller outside the team is sent to the forbidden page.
  *
  * @returns {JSX.Element}
  */
@@ -59,6 +61,12 @@ export const PortalSubmissionDetailPage = () => {
   const handleRowClick = (params: GridRowParams<SubmissionFeatureRow>, _event: MuiEvent<React.MouseEvent>) => {
     navigate(`/portal/submission/${submissionId}/feature/${params.row.submission_feature_id}${location.search}`);
   };
+
+  const submissionErrorStatus = (submissionQuery.error as APIError | null)?.status;
+  const featuresErrorStatus = (featuresQuery.error as APIError | null)?.status;
+  if ([submissionErrorStatus, featuresErrorStatus].some((status) => status === 401 || status === 403)) {
+    return <Navigate to="/forbidden" replace />;
+  }
 
   return (
     <>

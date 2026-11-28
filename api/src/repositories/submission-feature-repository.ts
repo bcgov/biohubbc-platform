@@ -48,7 +48,6 @@ export class SubmissionFeatureRepository extends BaseRepository {
         sf.successor_submission_feature_id,
         terminal.terminal_submission_feature_id,
         ft.name AS feature_type_name,
-        s.name AS submission_name,
         c.client_id AS contributor_name,
         cardinality(upload_security.security_reasons) > 0 AS secured,
         upload_security.security_reasons
@@ -213,7 +212,6 @@ export class SubmissionFeatureRepository extends BaseRepository {
         sf.successor_submission_feature_id,
         terminal.terminal_submission_feature_id,
         ft.name as feature_type_name,
-        s.name as submission_name,
         c.client_id as contributor_name,
     `;
     // The security fragments are raw, zero-placeholder SQL and must be appended as text: interpolating

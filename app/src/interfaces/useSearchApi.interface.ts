@@ -44,7 +44,6 @@ export interface SearchFeatureResultWithRelevancy {
   feature_type_id: number;
   feature_type_name: string;
   properties: Record<string, JsonValue>;
-  submission_name: string;
   is_secured: boolean;
   relevancy_score: number;
   create_date: string;

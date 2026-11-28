@@ -110,10 +110,11 @@ describe('SelectedFeatureRulesContainer', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: 'Sensitive' }));
 
-      await waitFor(() => expect(invalidatedKeys()).toHaveLength(4));
+      await waitFor(() => expect(invalidatedKeys()).toHaveLength(5));
       expect(applied ? mocks.remove : mocks.apply).toHaveBeenCalledWith(15, 'upload', 'review', [10], 4, expression);
       expect(invalidatedKeys()).toEqual([
         submissionQueryKeys.submission(15),
+        submissionQueryKeys.allFeatures(),
         searchQueryKeys.features(),
         submissionUploadQueryKeys.featureSearchResultsAll(feature),
         submissionUploadQueryKeys.featureRulesAll(review)
@@ -235,15 +236,21 @@ describe('SelectedFeatureRulesContainer', () => {
     await waitFor(() => expect(mocks.apply).toHaveBeenCalledTimes(2));
     await act(async () => first.resolve());
 
-    expect(invalidatedKeys()).toEqual([submissionQueryKeys.submission(15), searchQueryKeys.features()]);
+    expect(invalidatedKeys()).toEqual([
+      submissionQueryKeys.submission(15),
+      submissionQueryKeys.allFeatures(),
+      searchQueryKeys.features()
+    ]);
 
     await act(async () => second.resolve());
 
     await waitFor(() =>
       expect(invalidatedKeys()).toEqual([
         submissionQueryKeys.submission(15),
+        submissionQueryKeys.allFeatures(),
         searchQueryKeys.features(),
         submissionQueryKeys.submission(15),
+        submissionQueryKeys.allFeatures(),
         searchQueryKeys.features(),
         submissionUploadQueryKeys.featureSearchResultsAll(feature),
         submissionUploadQueryKeys.featureRulesAll(review)
@@ -330,6 +337,7 @@ describe('SelectedFeatureRulesContainer', () => {
     expect(mocks.reset).toHaveBeenCalledWith(15, 'upload', 'review', ids, filter);
     expect(invalidatedKeys()).toEqual([
       submissionQueryKeys.submission(15),
+      submissionQueryKeys.allFeatures(),
       searchQueryKeys.features(),
       submissionUploadQueryKeys.securityRules(review),
       submissionUploadQueryKeys.featureSearchResultsAll(feature)

@@ -70,7 +70,6 @@ describe('searchFeatures', () => {
         feature_type_id: 1,
         feature_type_name: 'survey',
         properties: {},
-        submission_name: 'Wildlife Monitoring Project',
         is_secured: false,
         relevancy_score: 0.75,
         create_date: dayjs().toISOString()
@@ -135,7 +134,6 @@ describe('searchFeatures', () => {
         feature_type_id: 1,
         feature_type_name: 'survey',
         properties: {},
-        submission_name: 'Species Census 2024',
         is_secured: true,
         relevancy_score: 0.6,
         create_date: dayjs().toISOString()
@@ -223,7 +221,6 @@ describe('searchFeatures', () => {
         feature_type_id: 1,
         feature_type_name: 'survey',
         properties: {},
-        submission_name: 'Submission 1',
         is_secured: false,
         relevancy_score: 0.8,
         create_date: dayjs().toISOString()
@@ -384,7 +381,6 @@ describe('searchFeatures', () => {
         feature_type_id: 3,
         feature_type_name: 'telemetry',
         properties: {},
-        submission_name: 'Telemetry Submission',
         is_secured: false,
         relevancy_score: 1,
         create_date: dayjs().toISOString()
@@ -431,7 +427,6 @@ describe('searchFeatures', () => {
         feature_type_id: 1,
         feature_type_name: 'survey',
         properties: {},
-        submission_name: 'Submission',
         is_secured: false,
         relevancy_score: 0.9,
         create_date: dayjs().toISOString()

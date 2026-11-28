@@ -9,7 +9,6 @@ export interface ISubmissionFeature {
   submission_id: number;
   feature_type_id: number;
   feature_type_name: string;
-  submission_name: string;
   contributor_name: string;
   source_id: string | null;
   successor_submission_feature_id: number | null;

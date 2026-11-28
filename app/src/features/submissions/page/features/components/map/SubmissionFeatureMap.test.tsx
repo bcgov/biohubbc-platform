@@ -79,7 +79,7 @@ const buildSession = (overrides: Partial<ITileExtentSession> = {}): ITileExtentS
 });
 
 const renderMap = (props: Partial<React.ComponentProps<typeof SubmissionFeatureMap>> = {}) =>
-  render(<SubmissionFeatureMap submissionId={12} submissionFeatureId={34} {...props} />);
+  render(<SubmissionFeatureMap submissionFeatureId={34} {...props} />);
 
 /** The most recent props SlippyMap was rendered with. */
 const latestMapProps = () => mocks.slippyMapProps[mocks.slippyMapProps.length - 1];
@@ -112,7 +112,6 @@ describe('SubmissionFeatureMap', () => {
       await renderReadyMap();
 
       expect(mocks.createSubmissionFeatureTileSession).toHaveBeenCalledWith(
-        12,
         34,
         expect.objectContaining({ signal: expect.anything() })
       );
@@ -124,7 +123,7 @@ describe('SubmissionFeatureMap', () => {
       const source = latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID];
 
       expect(source.type).toBe('vector');
-      expect(source.tiles[0]).toBe('https://biohub.test/martin/feature/{z}/{x}/{y}?ctx=12%3A34');
+      expect(source.tiles[0]).toBe('https://biohub.test/martin/feature/{z}/{x}/{y}?ctx=34');
       expect(source.minzoom).toBe(0);
       expect(source.maxzoom).toBe(15);
     });
@@ -401,20 +400,20 @@ describe('SubmissionFeatureMap', () => {
     it('replaces the session and the tile source when another feature is viewed', async () => {
       const { rerender } = await renderReadyMap();
 
-      expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0]).toContain('ctx=12%3A34');
+      expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0]).toContain('ctx=34');
 
       mocks.createSubmissionFeatureTileSession.mockResolvedValue(buildSession({ token: 'token-2' }));
 
       await act(async () => {
-        rerender(<SubmissionFeatureMap submissionId={12} submissionFeatureId={56} />);
+        rerender(<SubmissionFeatureMap submissionFeatureId={56} />);
       });
 
       await waitFor(() => expect(mocks.createSubmissionFeatureTileSession).toHaveBeenCalledTimes(2));
 
-      expect(mocks.createSubmissionFeatureTileSession).toHaveBeenLastCalledWith(12, 56, expect.anything());
+      expect(mocks.createSubmissionFeatureTileSession).toHaveBeenLastCalledWith(56, expect.anything());
 
       await waitFor(() =>
-        expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0]).toContain('ctx=12%3A56')
+        expect(latestMapProps().tileSources[FEATURE_GEOMETRIES_SOURCE_ID].tiles[0]).toContain('ctx=56')
       );
 
       // The map is rebuilt rather than re-aimed, because the initial viewport is set at construction.
@@ -430,7 +429,7 @@ describe('SubmissionFeatureMap', () => {
       mocks.createSubmissionFeatureTileSession.mockReturnValue(new Promise(() => undefined));
 
       await act(async () => {
-        rerender(<SubmissionFeatureMap submissionId={12} submissionFeatureId={56} />);
+        rerender(<SubmissionFeatureMap submissionFeatureId={56} />);
       });
 
       // Showing the old feature's geometry under the new feature's heading would be a correctness bug,

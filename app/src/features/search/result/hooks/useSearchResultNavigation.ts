@@ -2,6 +2,7 @@ import { URL_PARAMS } from 'constants/query-params';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { buildFeaturePath } from 'utils/routes';
 import { ISearchContainerLink } from '../../container/tab/SearchTabs.interface';
 
 /**
@@ -24,17 +25,17 @@ export const useSearchResultNavigation = (featureTypeLinks: ISearchContainerLink
    * Accepts only the identifiers it needs, so a feature selected on the map (whose tiles carry ids and nothing else)
    * navigates through exactly the same path as a table row.
    *
-   * @param {Pick<SearchFeatureResultWithRelevancy, 'submission_id' | 'submission_feature_id'>} result - Selection.
+   * @param {Pick<SearchFeatureResultWithRelevancy, 'submission_feature_id'>} result - Selection.
    */
   const handleResultClick = useCallback(
-    (result: Pick<SearchFeatureResultWithRelevancy, 'submission_id' | 'submission_feature_id'>) => {
-      // Global search uses its route segment for the feature type. Do not carry a stale
-      // submission selection into a new submission's pagination context.
+    (result: Pick<SearchFeatureResultWithRelevancy, 'submission_feature_id'>) => {
+      // Global search uses its route segment for the feature type, so the parameter is not carried to the feature
+      // page, whose breadcrumb returns to this search.
       const params = new URLSearchParams(location.search);
       params.delete(URL_PARAMS.FEATURE_TYPE);
       const queryString = params.toString();
       const search = queryString ? `?${queryString}` : '';
-      navigate(`/submission/${result.submission_id}/feature/${result.submission_feature_id}${search}`);
+      navigate(buildFeaturePath(result.submission_feature_id, search));
     },
     [location.search, navigate]
   );

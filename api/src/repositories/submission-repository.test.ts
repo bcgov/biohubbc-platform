@@ -5,7 +5,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
-import { SECURITY_APPLIED_STATUS } from './security-repository';
 import { SubmissionFeatureRepository } from './submission-feature-repository';
 import {
   ISourceTransformModel,
@@ -14,7 +13,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
-  SubmissionRecordPublishedForPublic,
   SubmissionRepository
 } from './submission-repository';
 
@@ -693,46 +691,6 @@ describe('SubmissionRepository', () => {
       const response = await submissionFeatureRepository.getSubmissionFeatureByUuid(submissionUuid);
 
       expect(response).to.eql(submissionFeatureRecord);
-    });
-  });
-
-  describe('getPublishedSubmissions', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse: SubmissionRecordPublishedForPublic = {
-        submission_id: 1,
-        uuid: 'string',
-        security_review_timestamp: null,
-        publish_timestamp: 'string',
-        submitted_timestamp: 'string',
-        system_user_id: 3,
-        contributor_id: 1,
-        name: 'string',
-        description: null,
-        record_end_date: 'string',
-        create_date: 'string',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 1,
-        security: SECURITY_APPLIED_STATUS.SECURED,
-        root_feature_type_id: 1,
-        root_feature_type_name: 'type',
-        root_feature_type_display_name: 'Type'
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getPublishedSubmissions();
-
-      expect(response).to.eql([mockResponse]);
     });
   });
 

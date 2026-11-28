@@ -26,7 +26,6 @@ describe('getSubmissionUploadFeature', () => {
       successor_submission_feature_id: null,
       terminal_submission_feature_id: null,
       feature_type_name: 'animal',
-      submission_name: 'Test submission',
       contributor_name: 'Test contributor',
       secured: false,
       security_reasons: []

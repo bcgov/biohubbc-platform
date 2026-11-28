@@ -4,10 +4,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as index from '.';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
-import * as db from '../../../../../../database/db';
-import { HTTP400, HTTPError } from '../../../../../../errors/http-error';
-import { SubmissionFeaturePropertyService } from '../../../../../../services/submission-feature-property-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as db from '../../../../database/db';
+import { HTTP400, HTTPError } from '../../../../errors/http-error';
+import { SubmissionFeaturePropertyService } from '../../../../services/submission-feature-property-service';
 
 chai.use(sinonChai);
 

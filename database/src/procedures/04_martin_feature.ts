@@ -15,7 +15,7 @@ const DB_USER_API = process.env.DB_USER_API || 'biohub_api';
  * mint endpoint authorized it for, which is the same closure-based check the feature detail page runs.
  *
  * Serve time security is deliberately weaker here than for search, because there is nothing left to
- * protect: `GET /api/submission/{id}/features/{id}/properties` already returns these geometry values in
+ * protect: `GET /api/feature/{id}/properties` already returns these geometry values in
  * full to any caller that passes the same authorization. The exposure a stale token buys is one
  * feature's geometry for the remainder of the token TTL, on a page that was authorized when the token
  * was issued. Search is different — a context there is a standing query over the whole corpus, so it

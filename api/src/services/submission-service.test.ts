@@ -15,7 +15,6 @@ import {
   SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
   SubmissionRecord,
-  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRepository
 } from '../repositories/submission-repository';
@@ -407,89 +406,6 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnceWith(1, 42);
       expect(response).to.be.eql(mockResponse);
-    });
-  });
-
-  describe('getPublishedSubmissions', () => {
-    it('should return an array of submission records with security property', async () => {
-      const mockSubmissionRecords: SubmissionRecordPublishedForPublic[] = [
-        {
-          submission_id: 1,
-          uuid: '123-456-789',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          security: SECURITY_APPLIED_STATUS.SECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'type',
-          root_feature_type_display_name: 'Type'
-        },
-        {
-          submission_id: 2,
-          uuid: '789-456-123',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1,
-          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'type',
-          root_feature_type_display_name: 'Type'
-        },
-        {
-          submission_id: 3,
-          uuid: '999-456-123',
-          security_review_timestamp: '2023-12-12',
-          submitted_timestamp: '2023-12-12',
-          system_user_id: 3,
-          contributor_id: 1,
-          name: 'name',
-          description: 'description',
-          publish_timestamp: '2023-12-12',
-          record_end_date: '2023-12-12',
-          create_date: '2023-12-12',
-          create_user: 1,
-          update_date: '2023-12-12',
-          update_user: 1,
-          revision_count: 1,
-          security: SECURITY_APPLIED_STATUS.UNSECURED,
-          root_feature_type_id: 1,
-          root_feature_type_name: 'type',
-          root_feature_type_display_name: 'Type'
-        }
-      ];
-
-      const mockDBConnection = getMockDBConnection();
-
-      const getReviewedSubmissionsForAdminsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getPublishedSubmissions')
-        .resolves(mockSubmissionRecords);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getPublishedSubmissions();
-
-      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
-      expect(response).to.be.eql(mockSubmissionRecords);
     });
   });
 

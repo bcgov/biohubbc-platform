@@ -17,17 +17,15 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
   /**
    * Get a submission feature by its ID
    *
-   * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISubmissionFeatureResponse>}
    */
   const getSubmissionFeatureById = async (
-    submissionId: number,
     submissionFeatureId: number,
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeatureResponse> => {
-    const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}`, options);
+    const { data } = await axios.get(`api/feature/${submissionFeatureId}`, options);
 
     return data;
   };
@@ -35,19 +33,17 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
   /**
    * Get paginated submission feature properties by feature id.
    *
-   * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters} params
    * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
    * @return {Promise<ISubmissionFeaturePropertiesResponse>}
    */
   const getSubmissionFeatureProperties = async (
-    submissionId: number,
     submissionFeatureId: number,
     params: ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters,
     options?: Pick<AxiosRequestConfig, 'signal'>
   ): Promise<ISubmissionFeaturePropertiesResponse> => {
-    const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}/properties`, {
+    const { data } = await axios.get(`api/feature/${submissionFeatureId}/properties`, {
       params,
       paramsSerializer: (queryParams) => qs.stringify(queryParams),
       ...options

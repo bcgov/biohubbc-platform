@@ -11,20 +11,18 @@ import { useCallback } from 'react';
  * feature changes, refreshed before its token expires, and recovered from a rejected tile request within a bounded
  * budget. See the generic hook for the full behaviour.
  *
- * @param {number} submissionId
  * @param {number} submissionFeatureId
  * @return {UseTileSessionResult<ITileExtentSession>}
  */
 export const useSubmissionFeatureTileSession = (
-  submissionId: number,
   submissionFeatureId: number
 ): UseTileSessionResult<ITileExtentSession> => {
   const api = useApi();
 
   const createSession = useCallback<CreateTileExtentSession>(
-    (signal) => api.martin.createSubmissionFeatureTileSession(submissionId, submissionFeatureId, { signal }),
-    [api, submissionId, submissionFeatureId]
+    (signal) => api.martin.createSubmissionFeatureTileSession(submissionFeatureId, { signal }),
+    [api, submissionFeatureId]
   );
 
-  return useTileExtentSession(`${submissionId}:${submissionFeatureId}`, createSession);
+  return useTileExtentSession(String(submissionFeatureId), createSession);
 };

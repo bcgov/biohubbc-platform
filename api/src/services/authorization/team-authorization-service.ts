@@ -90,19 +90,13 @@ export class TeamAuthorizationService extends DBService {
    *
    * @param {number | null} systemUserId The authenticated user's id, or `null` for anonymous.
    * @param {number} submissionFeatureId
-   * @param {number} submissionId The submission the feature must belong to.
    * @return {Promise<boolean>}
    * @memberof TeamAuthorizationService
    */
   async isSubmissionFeatureAccessibleToUser(
     systemUserId: number | null,
-    submissionFeatureId: number,
-    submissionId: number
+    submissionFeatureId: number
   ): Promise<boolean> {
-    return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(
-      systemUserId,
-      submissionFeatureId,
-      submissionId
-    );
+    return this.teamAuthorizationRepository.isSubmissionFeatureAccessibleToUser(systemUserId, submissionFeatureId);
   }
 }

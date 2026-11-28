@@ -4,12 +4,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as index from '.';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
-import * as db from '../../../../../../database/db';
-import { HTTP400, HTTPError } from '../../../../../../errors/http-error';
-import { authorizationDependencies } from '../../../../../../request-handlers/security/authorization';
-import { MartinTokenService } from '../../../../../../services/martin-token-service';
-import { SubmissionFeaturePropertyGeometryService } from '../../../../../../services/submission-feature-property-geometry-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as db from '../../../../database/db';
+import { HTTP400, HTTPError } from '../../../../errors/http-error';
+import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
+import { MartinTokenService } from '../../../../services/martin-token-service';
+import { SubmissionFeaturePropertyGeometryService } from '../../../../services/submission-feature-property-geometry-service';
 
 chai.use(sinonChai);
 
@@ -29,10 +29,13 @@ describe('createSubmissionFeatureTileSession', () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
-    sinon.stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtent').resolves({
-      bbox: [-125.1, 49.1, -125.0, 49.2],
-      geometry_count: 3
-    });
+    sinon
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtentBySubmissionFeatureId')
+      .resolves({
+        submissionId: 12,
+        bbox: [-125.1, 49.1, -125.0, 49.2],
+        geometry_count: 3
+      });
 
     const mintTokenStub = stubMintToken();
     sinon.stub(MartinTokenService.prototype, 'getMartinUrlTemplate').returns('/martin/feature/{z}/{x}/{y}');
@@ -41,7 +44,7 @@ describe('createSubmissionFeatureTileSession', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = {};
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -61,13 +64,13 @@ describe('createSubmissionFeatureTileSession', () => {
     expect(mintTokenStub).to.have.been.calledOnce;
   });
 
-  it('scopes the token to the identifiers the route authorized', async () => {
+  it("scopes the token to the authorized feature and the feature's own submission", async () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const getActiveGeometryExtentStub = sinon
-      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtent')
-      .resolves({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtentBySubmissionFeatureId')
+      .resolves({ submissionId: 12, bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
 
     const mintTokenStub = stubMintToken();
     sinon.stub(MartinTokenService.prototype, 'getMartinUrlTemplate').returns('/martin/feature/{z}/{x}/{y}');
@@ -76,14 +79,14 @@ describe('createSubmissionFeatureTileSession', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = {};
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    // The claim is built from the path parameters the authorization rule checked, so a caller cannot
-    // name one feature to be authorized and receive a token for another.
+    // The feature is the path parameter the authorization rule checked and its submission comes from the
+    // feature's own record, so a caller cannot name one feature to be authorized and receive a token for another.
     expect(mintTokenStub).to.have.been.calledOnceWith({ source: 'feature', ctx: 'sf:12:34' });
-    expect(getActiveGeometryExtentStub).to.have.been.calledOnceWith(12, 34);
+    expect(getActiveGeometryExtentStub).to.have.been.calledOnceWithExactly(34);
   });
 
   it('issues no token when the feature has no spatial properties', async () => {
@@ -91,8 +94,8 @@ describe('createSubmissionFeatureTileSession', () => {
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon
-      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtent')
-      .resolves({ bbox: null, geometry_count: 0 });
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtentBySubmissionFeatureId')
+      .resolves({ submissionId: 12, bbox: null, geometry_count: 0 });
 
     const mintTokenStub = stubMintToken();
 
@@ -100,7 +103,7 @@ describe('createSubmissionFeatureTileSession', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = {};
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -114,8 +117,8 @@ describe('createSubmissionFeatureTileSession', () => {
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon
-      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtent')
-      .resolves({ bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtentBySubmissionFeatureId')
+      .resolves({ submissionId: 12, bbox: [-125.1, 49.1, -125.0, 49.2], geometry_count: 1 });
 
     stubMintToken();
     sinon.stub(MartinTokenService.prototype, 'getMartinUrlTemplate').returns('/martin/feature/{z}/{x}/{y}');
@@ -124,7 +127,7 @@ describe('createSubmissionFeatureTileSession', () => {
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = {};
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -137,14 +140,14 @@ describe('createSubmissionFeatureTileSession', () => {
     const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon
-      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtent')
-      .resolves({ bbox: null, geometry_count: 0 });
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtentBySubmissionFeatureId')
+      .resolves({ submissionId: 12, bbox: null, geometry_count: 0 });
 
     const requestHandler = index.createSubmissionFeatureTileSession();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     // No keycloak_token on the request => anonymous caller mapping an unsecured feature.
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -158,14 +161,14 @@ describe('createSubmissionFeatureTileSession', () => {
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon
-      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtent')
+      .stub(SubmissionFeaturePropertyGeometryService.prototype, 'getActiveGeometryExtentBySubmissionFeatureId')
       .throws(new HTTP400('Error', ['Error']));
 
     const requestHandler = index.createSubmissionFeatureTileSession();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.keycloak_token = {};
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -178,19 +181,19 @@ describe('createSubmissionFeatureTileSession', () => {
 
   it('authorizes the request with the same policy rule as the feature detail endpoint', async () => {
     // The route is authorized before the handler runs, so the handler itself never checks access. This
-    // asserts the rule is attached and carries both identifiers: without it the endpoint would mint
+    // asserts the rule is attached and carries the feature identifier: without it the endpoint would mint
     // tokens for features the caller cannot read.
     const authorizeRequestStub = sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
 
     const authorizeHandler = (index.POST as unknown as RequestHandler[])[1];
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.params = { submissionId: '12', submissionFeatureId: '34' };
+    mockReq.params = { submissionFeatureId: '34' };
 
     await authorizeHandler(mockReq, mockRes, mockNext);
 
     expect(mockReq.authorization_scheme).to.eql({
-      and: [{ discriminator: 'Policy', submissionFeatureId: 34, submissionId: 12 }]
+      and: [{ discriminator: 'Policy', submissionFeatureId: 34 }]
     });
     expect(authorizeRequestStub).to.have.been.calledOnce;
     expect(mockNext).to.have.been.calledOnce;
