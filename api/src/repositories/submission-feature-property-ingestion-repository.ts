@@ -137,7 +137,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    *
    * For each active `submission_feature` in the upload whose `data.properties` is a JSON object, every
    * key/value pair is expanded with `jsonb_each(...)` and written as one staging row, so property values
-   * are copied out of `submission_feature.data` once.
+   * are copied out of `submission_feature.data` once. A key matches the feature property whose name it equals
+   * once trimmed and lowercased, since property names are stored normalized; the staged `property_name` keeps
+   * the key as submitted.
    *
    * The selected Blueprint is the one pinned to the upload (`submission_upload.blueprint_id`), passed
    * in by the caller — it is not re-selected here. Property assignment, requiredness, and multiplicity
@@ -184,7 +186,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_feature sf
       CROSS JOIN LATERAL jsonb_each(sf.data -> 'properties') AS props
       LEFT JOIN feature_property fp
-        ON fp.name = props.key
+        ON fp.name = lower(btrim(props.key))
        AND fp.record_end_date IS NULL
       LEFT JOIN feature_property_type fpt
         ON fpt.feature_property_type_id = fp.feature_property_type_id
@@ -1011,7 +1013,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             FROM submission_upload_staging_resolved_property rsp
             WHERE rsp.submission_upload_id = ${submissionUploadId}::uuid
               AND rsp.submission_feature_id = sf.submission_feature_id
-              AND rsp.property_name = rp.property_name
+              -- Match the resolved assignment, not the key as submitted, which keeps its case.
+              AND rsp.blueprint_feature_type_property_id = rp.blueprint_feature_type_property_id
               AND rsp.value IS NOT NULL
               AND rsp.value <> 'null'::jsonb
               AND NOT (jsonb_typeof(rsp.value) = 'array' AND jsonb_array_length(rsp.value) = 0)
@@ -1055,7 +1058,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * Record primitive/cardinality validation errors for staged property values.
    *
    * This phase captures:
-   * - array cardinality violations when `allow_multiple = false`
+   * - array cardinality violations when `allow_multiple = false`, including a feature supplying the same property
+   *   under keys that differ only by case or whitespace
    * - JSON primitive type mismatches by logical property type
    * - string values longer than the 250-character `submission_feature_property_string.value` column, which
    *   would otherwise fail the string insert; longer text belongs in a `paragraph` property
@@ -1082,6 +1086,27 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND m.submission_upload_id = ${submissionUploadId}::uuid
           AND jsonb_typeof(m.value) = 'array'
           AND m.allow_multiple = FALSE
+        UNION ALL
+        -- Keys that differ only by case or whitespace resolve to the same property, so a feature supplying
+        -- several of them supplies several values.
+        SELECT
+          m.submission_upload_id,
+          m.property_name,
+          m.blueprint_feature_type_property_id,
+          'MULTIPLE_VALUES_NOT_ALLOWED'::text AS error_code,
+          'Property does not allow multiple values'::text AS error_message
+        FROM submission_upload_staging_resolved_property m
+        WHERE m.blueprint_feature_type_property_id IS NOT NULL
+          AND m.submission_upload_id = ${submissionUploadId}::uuid
+          AND m.allow_multiple = FALSE
+          AND EXISTS (
+            SELECT 1
+            FROM submission_upload_staging_resolved_property other
+            WHERE other.submission_upload_id = m.submission_upload_id
+              AND other.submission_feature_id = m.submission_feature_id
+              AND other.blueprint_feature_type_property_id = m.blueprint_feature_type_property_id
+              AND other.property_name <> m.property_name
+          )
       ),
       type_errors AS (
         SELECT

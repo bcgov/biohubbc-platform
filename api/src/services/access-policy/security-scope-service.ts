@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { parseFeatureUrn } from '../../database/urn-utils';
+import { normalizeFeatureUrn, parseFeatureUrn } from '../../database/urn-utils';
 import { SecurityScope } from '../../models/security-scope';
 import { publishComputeScopeAnchorsJob } from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
@@ -55,12 +55,16 @@ export class SecurityScopeService extends DBService {
   /**
    * Insert or reuse the canonical security scope for a statement URN.
    *
+   * The URN's feature type is normalized first, so a URN that differs only by the case of its feature type reuses the
+   * same scope and matches the stored feature type name.
+   *
    * @param urn The submission_feature_urn (e.g., 'urn:10:telemetry:*')
    * @returns The security scope row (new or existing)
    */
   async ensureSecurityScope(urn: string): Promise<SecurityScope> {
-    const scopeHash = SecurityScopeService.dependencies.computeScopeHash(urn);
-    const urnParts = parseFeatureUrn(urn);
+    const normalizedUrn = normalizeFeatureUrn(urn);
+    const scopeHash = SecurityScopeService.dependencies.computeScopeHash(normalizedUrn);
+    const urnParts = parseFeatureUrn(normalizedUrn);
     const scopeUrn: SecurityScopeUrn = {
       urn_submission_id: urnParts.submissionId,
       urn_feature_type: urnParts.featureTypeName,

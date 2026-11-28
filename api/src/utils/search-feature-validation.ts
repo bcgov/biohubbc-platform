@@ -1,5 +1,6 @@
 import { HTTP400 } from '../errors/http-error';
 import { ExpressionTree } from '../models/expression-tree';
+import { normalizeCase } from './normalize';
 
 /**
  * Validates and normalizes a feature type.
@@ -9,7 +10,7 @@ import { ExpressionTree } from '../models/expression-tree';
  * @throws {HTTP400} When the value is not a non-empty string.
  */
 export const validateSearchFeatureType = (featureType: unknown): string => {
-  const normalized = typeof featureType === 'string' ? featureType.trim().toLowerCase() : '';
+  const normalized = typeof featureType === 'string' ? normalizeCase(featureType) : '';
 
   if (!normalized) {
     throw new HTTP400('Feature type is required');

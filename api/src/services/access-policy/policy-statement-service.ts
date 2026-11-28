@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { normalizeFeatureUrn } from '../../database/urn-utils';
 import { ApiValidationError } from '../../errors/api-error';
 import { CreatePolicyStatement, PolicyStatement, UpdatePolicyStatement } from '../../models/policy-statement';
 import {
@@ -191,7 +192,7 @@ export class PolicyStatementService extends DBService {
       (policyStatementData.policy_id !== undefined && policyStatementData.policy_id !== existingStatement.policy_id) ||
       (policyStatementData.effect !== undefined && policyStatementData.effect !== existingStatement.effect) ||
       (policyStatementData.submission_feature_urn !== undefined &&
-        policyStatementData.submission_feature_urn !== existingStatement.submission_feature_urn) ||
+        normalizeFeatureUrn(policyStatementData.submission_feature_urn) !== existingStatement.submission_feature_urn) ||
       policyStatementData.record_end_date !== undefined
     );
   }

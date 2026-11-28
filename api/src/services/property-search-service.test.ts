@@ -132,4 +132,24 @@ describe('PropertySearchService', () => {
       expect(result).to.equal(0);
     });
   });
+
+  describe('feature type filter case', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('matches feature type filters whatever their case', async () => {
+      const service = new PropertySearchService(getMockDBConnection());
+      const searchStub = sinon.stub(PropertySearchRepository.prototype, 'searchProperties').resolves([]);
+      const countStub = sinon.stub(PropertySearchRepository.prototype, 'searchPropertiesCount').resolves(0);
+
+      await service.searchProperty({ keyword: 'depth', feature_types: [' Telemetry', 'SURVEY'] });
+      await service.getSearchPropertyCount({ feature_types: ['Telemetry'] });
+
+      expect(searchStub).to.have.been.calledOnceWith(
+        sinon.match({ keyword: 'depth', feature_types: ['telemetry', 'survey'] })
+      );
+      expect(countStub).to.have.been.calledOnceWith(sinon.match({ feature_types: ['telemetry'] }));
+    });
+  });
 });

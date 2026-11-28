@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { parseFeatureUrn } from './urn-utils';
+import { normalizeFeatureUrn, parseFeatureUrn } from './urn-utils';
 
 chai.use(sinonChai);
 
@@ -57,5 +57,15 @@ describe('parseFeatureUrn', () => {
         expect((error as Error).message).to.equal(`Invalid URN format: ${urn}`);
       }
     });
+  });
+});
+
+describe('normalizeFeatureUrn', () => {
+  it('trims and lowercases the feature type and keeps the other segments', () => {
+    expect(normalizeFeatureUrn('urn:12: Telemetry :*')).to.equal('urn:12:telemetry:*');
+  });
+
+  it('keeps a wildcard feature type', () => {
+    expect(normalizeFeatureUrn('urn:*:*:*')).to.equal('urn:*:*:*');
   });
 });

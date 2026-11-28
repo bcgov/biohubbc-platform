@@ -1,15 +1,21 @@
 import { expect } from 'chai';
+import crypto from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
+import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeaturePropertyRepository } from '../../repositories/feature-property-repository';
+import { FeatureTypeService } from '../../services/feature-type-service';
+import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
+import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionFeaturePropertyService } from '../../services/submission-feature-property-service';
+import { validateSearchFeatureType } from '../../utils/search-feature-validation';
 import {
   addPropertyValue,
   createAssignedFeatureProperty,
   createTestUpload,
   insertPendingFeature
 } from '../helpers/test-feature-property-helpers';
-import { createTestSubmission } from '../helpers/test-submission-helpers';
+import { createTestSubmission, getActiveDefaultBlueprintId } from '../helpers/test-submission-helpers';
 
 // Definitions and submitted values are rolled back after each test.
 describe('Submission upload feature-type property definitions (integration)', function () {
@@ -77,5 +83,46 @@ describe('Submission upload feature-type property definitions (integration)', fu
     expect(
       await service.getSubmissionUploadFeatureTypeProperties(submissionId, submissionUploadId, 'animal')
     ).to.deep.equal([]);
+  });
+
+  it('lists the properties of a feature type created and submitted in mixed case, by the name in the tab URL', async () => {
+    const featureTypeService = new FeatureTypeService(connection);
+    const submittedName = `Linework${crypto.randomInt(0, 1_000_000_000)}`;
+    const featureType = await featureTypeService.createFeatureType({ name: submittedName, display_name: 'Linework' });
+    const blueprintId = await getActiveDefaultBlueprintId(connection);
+    await connection.sql(SQL`
+      INSERT INTO blueprint_feature_type (blueprint_id, feature_type_id)
+      VALUES (${blueprintId}, ${featureType.feature_type_id})
+    `);
+    const property = await createAssignedFeatureProperty(connection, 'string', [featureType.name]);
+    const propertyName = await connection.sql(
+      SQL`SELECT name FROM feature_property WHERE feature_property_id = ${property.featurePropertyId}`
+    );
+    const feature: IFlattenedBlock = {
+      id: 'linework-1',
+      type: submittedName,
+      properties: { [propertyName.rows[0].name]: 'Fence line' },
+      content: [],
+      parent: null
+    };
+    const ingestionService = new SubmissionFeatureIngestionService(connection);
+    const knownFeatureTypeMap = await ingestionService.getKnownFeatureTypeMap();
+    await ingestionService.ingestFeatureBatch(submissionId, submissionUploadId, [feature], knownFeatureTypeMap);
+    const indexingService = new SubmissionFeaturePropertyIngestionService(connection);
+    const outcome = await indexingService.indexSubmissionPropertiesBySubmissionUploadId(
+      submissionId,
+      submissionUploadId
+    );
+
+    // The tab URL carries the stored name, which the endpoint normalizes before the lookup.
+    const service = new SubmissionFeaturePropertyService(connection);
+    const properties = await service.getSubmissionUploadFeatureTypeProperties(
+      submissionId,
+      submissionUploadId,
+      validateSearchFeatureType(featureType.name)
+    );
+
+    expect(outcome.status).to.equal('ok');
+    expect(properties.map((row) => row.feature_property_id)).to.eql([property.featurePropertyId]);
   });
 });

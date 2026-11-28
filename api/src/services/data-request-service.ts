@@ -17,6 +17,7 @@ import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { _generateDataRequestPolicyName, _generateDataRequestTeamName } from '../utils/data-request';
+import { normalizeCase } from '../utils/normalize';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { PolicyExpressionService } from './access-policy/policy-expression-service';
 import { PolicyService } from './access-policy/policy-service';
@@ -331,7 +332,8 @@ export class DataRequestService extends DBService {
       this._createTeamWithMembers(payload.system_user_ids)
     ]);
 
-    const featureTypes = payload.featureTypes ?? [];
+    // Feature type names are stored lowercase, so a requested type matches whatever case the caller sent.
+    const featureTypes = (payload.featureTypes ?? []).map(normalizeCase);
     const statements: CreatePolicyStatementPayload[] = [];
     let expressionId: string | null = null;
 

@@ -45,6 +45,28 @@ describe('FeaturePropertyService', () => {
       expect(service.featurePropertyRepository.getFeaturePropertyTypeById).to.have.been.calledOnceWith(2);
     });
 
+    it('stores the name trimmed and lowercased', async () => {
+      const service = new FeaturePropertyService(getMockDBConnection());
+
+      sinon
+        .stub(service.featurePropertyRepository, 'getFeaturePropertyTypeById')
+        .resolves({ feature_property_type_id: 2 });
+      const insertStub = sinon.stub(service.featurePropertyRepository, 'insertFeatureProperty').resolves(1);
+      sinon.stub(service.featurePropertyRepository, 'getFeatureProperty').resolves(mockFeatureProperty);
+
+      await service.createFeatureProperty({
+        feature_property_type_id: 2,
+        name: ' Line_Length ',
+        display_name: 'Length'
+      });
+
+      expect(insertStub).to.have.been.calledOnceWith({
+        feature_property_type_id: 2,
+        name: 'line_length',
+        display_name: 'Length'
+      });
+    });
+
     it('throws ApiNotFoundError when the feature_property_type_id does not exist', async () => {
       const mockConnection = getMockDBConnection();
       const service = new FeaturePropertyService(mockConnection);

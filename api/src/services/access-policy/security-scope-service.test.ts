@@ -351,4 +351,30 @@ describe('SecurityScopeService', () => {
       expect(SecurityScopeService.getAnchorSubmissionId(urn, null)).to.be.null;
     });
   });
+
+  describe('ensureSecurityScope feature type case', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('hashes and stores the URN with its feature type normalized', async () => {
+      const hashStub = sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns('hash');
+      const ensureStub = sinon.stub(SecurityScopeRepository.prototype, 'ensureSecurityScope').resolves({
+        security_scope_id: 'scope-1',
+        scope_hash: 'hash',
+        urn_submission_id: '*',
+        urn_feature_type: 'telemetry',
+        urn_feature_id: '*'
+      });
+
+      await new SecurityScopeService(getMockDBConnection()).ensureSecurityScope('urn:*:Telemetry:*');
+
+      expect(hashStub).to.have.been.calledOnceWithExactly('urn:*:telemetry:*');
+      expect(ensureStub).to.have.been.calledOnceWithExactly('hash', {
+        urn_submission_id: '*',
+        urn_feature_type: 'telemetry',
+        urn_feature_id: '*'
+      });
+    });
+  });
 });
