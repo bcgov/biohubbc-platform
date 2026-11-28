@@ -63,6 +63,22 @@ describe('useDownloadApi', () => {
     });
   });
 
+  describe('createSubmissionDownload', () => {
+    it('POSTs to the submission download resource with no body and returns the response', async () => {
+      const mockResponse: CreateDownloadResponse = {
+        download_id: 'download-1',
+        download_url: 'http://localhost/api/download/download-1'
+      };
+      mock.onPost('/api/submission/14/download').reply(201, mockResponse);
+
+      const result = await useDownloadApi(axios).createSubmissionDownload(14);
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.post[0].url).toBe('/api/submission/14/download');
+      expect(mock.history.post[0].data).toBeUndefined();
+    });
+  });
+
   describe('createDownload', () => {
     it('should POST payload to /api/download and return response', async () => {
       const mockRequest: CreateDownloadRequest = {

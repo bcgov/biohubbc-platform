@@ -179,3 +179,27 @@ export const ParquetFeatureData = z.object({
   parent_uuid: z.string().nullable()
 });
 export type ParquetFeatureData = z.infer<typeof ParquetFeatureData>;
+
+/** Input for creating the owning policy of a submission download. */
+export interface CreateSubmissionDownloadPolicyPayload {
+  /** Download name. */
+  name: string;
+  /** Submission whose features the download covers. */
+  submissionId: number;
+}
+
+/** Input for requesting a download of every feature in one submission. */
+export interface CreateSubmissionDownloadRequestPayload {
+  /** Submission to download. */
+  submissionId: number;
+  /** User the export is built for and who gets access, or null for an anonymous download. */
+  requestedBy: number | null;
+}
+
+/** Input for creating a download of an existing policy's features. */
+export interface CreateDownloadForPolicyPayload {
+  /** Policy defining the download's features. */
+  policyId: string;
+  /** User the export is built for and who gets access, or null for an anonymous download. */
+  requestedBy: number | null;
+}

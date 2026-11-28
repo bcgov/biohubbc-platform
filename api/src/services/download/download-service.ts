@@ -1,8 +1,10 @@
-import { SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD } from '../../constants/download';
+import { DOWNLOAD_NAME_MAX_LENGTH, SIGNED_URL_EXPIRY_PARQUET_DOWNLOAD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import {
   CreateDownload,
+  CreateDownloadForPolicyPayload,
+  CreateSubmissionDownloadRequestPayload,
   DownloadDetailRecord,
   DownloadId,
   DownloadListRecord,
@@ -22,6 +24,7 @@ import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SubmissionService } from '../submission-service';
 import { DownloadPolicyService } from './download-policy-service';
 
 const defaultLog = getLogger('services/download/download-service');
@@ -61,6 +64,7 @@ export class DownloadService extends DBService {
   teamService: TeamService;
   expressionTreeService: ExpressionTreeService;
   downloadPolicyService: DownloadPolicyService;
+  submissionService: SubmissionService;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -83,6 +87,7 @@ export class DownloadService extends DBService {
     this.teamService = new TeamService(connection);
     this.expressionTreeService = new ExpressionTreeService(connection);
     this.downloadPolicyService = new DownloadPolicyService(connection);
+    this.submissionService = new SubmissionService(connection);
   }
 
   /**
@@ -145,8 +150,48 @@ export class DownloadService extends DBService {
       expressionId
     });
 
+    return this.createDownloadForPolicy({ policyId: policy_id, requestedBy: payload.requestedBy });
+  }
+
+  /**
+   * Create a download of every feature in one submission, for an authenticated or anonymous user.
+   *
+   * The download is named after the submission and its policy covers the whole submission (`urn:<submissionId>:*:*`)
+   * with no expression, so it holds the same features as an unfiltered search limited to the submission. Like any
+   * download, the export is filtered by what `requestedBy` can see when it is built.
+   *
+   * @param {CreateSubmissionDownloadRequestPayload} payload - The submission and the requesting user.
+   * @return {Promise<CreateDownloadRequestResult>} The created download identifier.
+   * @memberof DownloadService
+   */
+  async createSubmissionDownloadRequest(
+    payload: CreateSubmissionDownloadRequestPayload
+  ): Promise<CreateDownloadRequestResult> {
+    const submission = await this.submissionService.getSubmissionRecordBySubmissionId(payload.submissionId);
+    // Submission names allow 200 characters; download (policy) names allow 100.
+    const name = submission.name.slice(0, DOWNLOAD_NAME_MAX_LENGTH);
+
+    const { policy_id } = await this.downloadPolicyService.createSubmissionDownloadPolicy({
+      name,
+      submissionId: payload.submissionId
+    });
+
+    return this.createDownloadForPolicy({ policyId: policy_id, requestedBy: payload.requestedBy });
+  }
+
+  /**
+   * Create a download of a policy's features, give the requester access, and queue its first version.
+   *
+   * Shared by every way of requesting a download once its policy exists. The caller (route handler) wraps this in a
+   * single transaction so a mid-flow failure leaves no orphan rows.
+   *
+   * @param {CreateDownloadForPolicyPayload} payload - The download's policy and the requesting user.
+   * @return {Promise<CreateDownloadRequestResult>} The created download identifier.
+   * @memberof DownloadService
+   */
+  async createDownloadForPolicy(payload: CreateDownloadForPolicyPayload): Promise<CreateDownloadRequestResult> {
     const { download_id } = await this.createDownload({
-      policyId: policy_id,
+      policyId: payload.policyId,
       format: 'parquet',
       requestedBy: payload.requestedBy
     });

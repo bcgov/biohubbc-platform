@@ -18,7 +18,8 @@ export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
     paginationModel,
     onPaginationModelChange,
     sortModel,
-    onSortModelChange
+    onSortModelChange,
+    headerContent
   } = props;
 
   const columns: GridColDef[] = [
@@ -29,6 +30,7 @@ export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
   return (
     <PageSection
       id="submission-features"
+      headerContent={headerContent}
       label={
         <>
           Features{' '}

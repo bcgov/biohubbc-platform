@@ -9,6 +9,7 @@ import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { AlertBanner } from 'components/notifications/AlertBanner';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { ReactNode } from 'react';
+import { SubmissionDownloadButton } from './download/SubmissionDownloadButton';
 import { SubmissionFeatureTable } from './SubmissionFeatureTable';
 import { SubmissionFeatureTableProps } from './SubmissionFeatureTable.interface';
 
@@ -63,6 +64,7 @@ export const SubmissionDetailContent = ({
           onPaginationModelChange={onPaginationModelChange}
           sortModel={sortModel}
           onSortModelChange={onSortModelChange}
+          headerContent={submission && <SubmissionDownloadButton submissionId={submission.submission_id} />}
         />
       </Container>
     </LoadingGuard>

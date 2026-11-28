@@ -24,6 +24,7 @@ import { BaseRepository } from '../base-repository';
 export const ActivePolicyStatementWithExpression = z.object({
   policy_statement_id: z.guid(),
   effect: z.nativeEnum(PolicyEffect),
+  urn_submission_id: z.string(),
   urn_feature_type: z.string(),
   expression_id: z.guid().nullable()
 });
@@ -171,6 +172,8 @@ export class PolicyStatementRepository extends BaseRepository {
    * legitimate, distinct semantic state — not a missing-row error. Returns `[]`
    * for a policy with no active statements.
    *
+   * `urn_submission_id` is `*` unless the statement is limited to one submission's features.
+   *
    * Ordered by `urn_feature_type` and statement id so the caller's downstream
    * loop produces a stable sequence of Parquet files.
    *
@@ -185,6 +188,7 @@ export class PolicyStatementRepository extends BaseRepository {
       .select<ActivePolicyStatementWithExpression[]>(
         'ps.policy_statement_id',
         'ps.effect',
+        'ss.urn_submission_id',
         'ss.urn_feature_type',
         'pe.expression_id'
       )

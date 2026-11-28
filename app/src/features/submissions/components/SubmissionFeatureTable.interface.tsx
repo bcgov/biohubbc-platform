@@ -1,4 +1,5 @@
 import { GridPaginationModel, GridRowParams, GridSortModel, MuiEvent } from '@mui/x-data-grid';
+import { ReactNode } from 'react';
 
 export type SubmissionFeatureRow = {
   submission_feature_id: number;
@@ -14,4 +15,6 @@ export interface SubmissionFeatureTableProps {
   onPaginationModelChange: (model: GridPaginationModel) => void;
   sortModel: GridSortModel;
   onSortModelChange: (model: GridSortModel) => void;
+  /** Actions shown beside the Features heading. */
+  headerContent?: ReactNode;
 }

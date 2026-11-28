@@ -126,7 +126,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when insert sql fails', async () => {
+    it('should throw a not-found error when no submission has the id', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -139,7 +139,8 @@ describe('SubmissionRepository', () => {
         await submissionRepository.getSubmissionRecordBySubmissionId(1);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission record');
+        expect(actualError).to.be.instanceOf(ApiNotFoundError);
+        expect((actualError as ApiNotFoundError).message).to.equal('Submission not found');
       }
     });
 
@@ -147,7 +148,8 @@ describe('SubmissionRepository', () => {
       const mockResponse: ISubmissionModel = {
         uuid: '123-456-789',
         system_user_id: 1,
-        team_id: '11111111-1111-1111-1111-111111111111'
+        team_id: '11111111-1111-1111-1111-111111111111',
+        name: 'Submission'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 

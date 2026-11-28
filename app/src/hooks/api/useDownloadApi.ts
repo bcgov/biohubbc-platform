@@ -43,6 +43,17 @@ export const useDownloadApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Create a download of every feature in one submission, named after the submission.
+   *
+   * @param {number} submissionId - Submission to download.
+   * @return {Promise<CreateDownloadResponse>} The new download's id and status URL.
+   */
+  const createSubmissionDownload = async (submissionId: number): Promise<CreateDownloadResponse> => {
+    const { data } = await axios.post<CreateDownloadResponse>(`/api/submission/${submissionId}/download`);
+    return data;
+  };
+
+  /**
    * Get the detail record for a single download by id. Powers the public
    * download page — status, header name, description, and lifecycle timestamps.
    *
@@ -98,5 +109,12 @@ export const useDownloadApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  return { getDownloads, createDownload, getDownload, listDownloadVersions, getDownloadVersion };
+  return {
+    getDownloads,
+    createDownload,
+    createSubmissionDownload,
+    getDownload,
+    listDownloadVersions,
+    getDownloadVersion
+  };
 };

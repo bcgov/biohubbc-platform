@@ -140,6 +140,29 @@ export function buildBroadFeatureTypeSubquery(
 }
 
 /**
+ * Build a Knex subquery that returns every closure-eligible submission_feature_id of the given feature type in one
+ * submission, with the security filter applied for the given user.
+ *
+ * The broad projection of `buildBroadFeatureTypeSubquery`, limited to the submission. The submission predicate sits
+ * inside the projection so the scan starts from the submission's features (`submission_feature_idx1`) rather than
+ * the whole feature type.
+ *
+ * @param {string} featureTypeName - Result type.
+ * @param {number} submissionId - Submission the features belong to.
+ * @param {number | null} systemUserId - Security context (null = anonymous, only unsecured features).
+ * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows.
+ */
+export function buildSubmissionFeatureTypeSubquery(
+  featureTypeName: string,
+  submissionId: number,
+  systemUserId: number | null
+): Knex.QueryBuilder {
+  const query = buildBroadFeatureTypeSubquery(featureTypeName, systemUserId);
+
+  return query.where('sf.submission_id', submissionId);
+}
+
+/**
  * Builds the current feature IDs used by the broad estimate path.
  *
  * Unlike the paginated broad search, this query resolves security as two small sets and removes
@@ -233,6 +256,7 @@ export function buildExpressionTreeCountFeatureIdsSubquery(
 export const dependencies = {
   buildExpressionTreeFeatureIdsSubquery,
   buildBroadFeatureTypeSubquery,
+  buildSubmissionFeatureTypeSubquery,
   buildBroadFeatureTypeCountSubquery,
   buildUnfilteredExpressionTreeFeatureIdsSubquery,
   buildExpressionTreeCountFeatureIdsSubquery

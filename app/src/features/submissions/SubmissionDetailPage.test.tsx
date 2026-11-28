@@ -6,6 +6,9 @@ import { Mock } from 'vitest';
 import { SubmissionDetailPage } from './SubmissionDetailPage';
 
 vi.mock('../../hooks/useApi');
+vi.mock('hooks/useAuthStateContext', () => ({
+  useAuthStateContext: () => ({ auth: { isAuthenticated: false } })
+}));
 vi.mock('features/search/result/hooks/useSearchResults');
 vi.mock('features/search/result/hooks/useSearchResultExpression', () => ({
   useSearchResultExpression: () => ({
@@ -188,6 +191,15 @@ describe('SubmissionDetailPage', () => {
     const { findByRole } = renderPage();
 
     expect(await findByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('offers a download of the submission beside the Features heading', async () => {
+    const { findByTestId } = renderPage();
+
+    const button = await findByTestId('submission-download-button');
+
+    expect(button).toHaveTextContent('Download');
+    expect(button.closest('.MuiToolbar-root')).toHaveTextContent('Features');
   });
 
   it('renders feature type toggles in a sidebar and changes the searched feature type', async () => {

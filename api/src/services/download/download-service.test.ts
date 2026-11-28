@@ -9,6 +9,7 @@ import {
   createMockDownloadVersionExportListRow,
   createMockDownloadVersionStatusRecord
 } from '../../__mocks__/download';
+import { DOWNLOAD_NAME_MAX_LENGTH } from '../../constants/download';
 import { HTTP400, HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { CreateDownload } from '../../models/download';
 import { ExpressionTree } from '../../models/expression-tree';
@@ -18,6 +19,7 @@ import { DownloadVersionRepository } from '../../repositories/download/download-
 import { TeamService } from '../access-policy/team-service';
 import { ExpressionTreeService } from '../expression-tree-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { SubmissionService } from '../submission-service';
 import { DownloadPolicyService } from './download-policy-service';
 import { DownloadService, groupExportsByDownloadId } from './download-service';
 
@@ -470,6 +472,42 @@ describe('DownloadService', () => {
         expect(linkStub).to.not.have.been.called;
         expect(publishStub).to.not.have.been.called;
       }
+    });
+  });
+
+  describe('createSubmissionDownloadRequest', () => {
+    it('creates a download of the submission policy, named after the submission', async () => {
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ submission_id: 14, uuid: 'uuid-14', system_user_id: 1, team_id: 'team-1', name: 'Boreal Moose' });
+      const createPolicyStub = sinon
+        .stub(DownloadPolicyService.prototype, 'createSubmissionDownloadPolicy')
+        .resolves({ policy_id: 'policy-uuid-1' });
+      const service = new DownloadService(getMockDBConnection());
+      const createForPolicyStub = sinon
+        .stub(service, 'createDownloadForPolicy')
+        .resolves({ download_id: 'download-uuid-1' });
+
+      const result = await service.createSubmissionDownloadRequest({ submissionId: 14, requestedBy: 42 });
+
+      expect(createPolicyStub).to.have.been.calledOnceWithExactly({ name: 'Boreal Moose', submissionId: 14 });
+      expect(createForPolicyStub).to.have.been.calledOnceWithExactly({ policyId: 'policy-uuid-1', requestedBy: 42 });
+      expect(result).to.eql({ download_id: 'download-uuid-1' });
+    });
+
+    it('shortens a submission name longer than a download name allows', async () => {
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ submission_id: 14, uuid: 'uuid-14', system_user_id: 1, team_id: 'team-1', name: 'a'.repeat(200) });
+      const createPolicyStub = sinon
+        .stub(DownloadPolicyService.prototype, 'createSubmissionDownloadPolicy')
+        .resolves({ policy_id: 'policy-uuid-1' });
+      const service = new DownloadService(getMockDBConnection());
+      sinon.stub(service, 'createDownloadForPolicy').resolves({ download_id: 'download-uuid-1' });
+
+      await service.createSubmissionDownloadRequest({ submissionId: 14, requestedBy: null });
+
+      expect(createPolicyStub.firstCall.args[0].name).to.equal('a'.repeat(DOWNLOAD_NAME_MAX_LENGTH));
     });
   });
 

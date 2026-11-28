@@ -2,6 +2,9 @@ import { getNumberEnv } from '../utils/env-utils';
 
 export const SIGNED_URL_EXPIRY_DOWNLOAD = 432000; // 5 days
 
+/** Longest download name, the length of the download policy's `name` column. */
+export const DOWNLOAD_NAME_MAX_LENGTH = 100;
+
 /**
  * Presigned URL expiry for the API-key presigned-URL endpoint (30 minutes).
  * Short-lived by design — scripts should re-request a fresh URL per download attempt.

@@ -6,7 +6,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadVersionStatusRecord } from '../../__mocks__/download';
 import { getKnex } from '../../database/db';
-import { ApiConflictError } from '../../errors/api-error';
+import { ApiConflictError, ApiGeneralError } from '../../errors/api-error';
 import { DownloadSource } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ExpressionTree } from '../../models/expression-tree';
@@ -275,6 +275,7 @@ describe('DownloadPipelineService', () => {
   ): ActivePolicyStatementWithExpression => ({
     policy_statement_id: '22222222-2222-2222-2222-222222222222',
     effect,
+    urn_submission_id: '*',
     urn_feature_type,
     expression_id
   });
@@ -313,6 +314,50 @@ describe('DownloadPipelineService', () => {
         ]
       }
     ];
+
+    it('expands a submission download statement to every feature type, keeping its submission limit', async () => {
+      const service = new DownloadPipelineService(getMockDBConnection());
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
+      const submissionStatement = { ...stmt('*'), urn_submission_id: '14' };
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([submissionStatement]);
+
+      const result = await service.resolveParquetSchema(TEST_SOURCE);
+
+      expect(result.featureTypes).to.deep.equal(['observation', 'survey']);
+      expect(result.statements.map((statement) => statement.urn_submission_id)).to.deep.equal(['14', '14']);
+    });
+
+    it('refuses a submission-limited statement that has an expression', async () => {
+      const service = new DownloadPipelineService(getMockDBConnection());
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([{ ...stmt('*', '33333333-3333-3333-3333-333333333333'), urn_submission_id: '14' }]);
+
+      try {
+        await service.resolveParquetSchema(TEST_SOURCE);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiGeneralError);
+      }
+    });
+
+    it('refuses a submission-limited statement combined with another allow statement', async () => {
+      const service = new DownloadPipelineService(getMockDBConnection());
+      sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(mockCodes);
+      sinon
+        .stub(PolicyStatementRepository.prototype, 'getActiveStatementsWithExpressionByPolicyId')
+        .resolves([{ ...stmt('*'), urn_submission_id: '14' }, stmt('survey', '33333333-3333-3333-3333-333333333333')]);
+
+      try {
+        await service.resolveParquetSchema(TEST_SOURCE);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiGeneralError);
+      }
+    });
 
     it('returns featureTypes from active policy statements alongside the schema lookup', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -590,6 +635,54 @@ describe('DownloadPipelineService', () => {
       expect(readTreeStub).to.not.have.been.called;
       expect(buildExprSubqueryStub).to.not.have.been.called;
       expect(buildBroadStub).to.have.been.calledOnceWith('observation', TEST_SOURCE.requested_by);
+    });
+
+    it('uses the submission subquery when the statement is limited to one submission', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
+
+      const buildBroadStub = sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery');
+      const buildSubmissionStub = sinon
+        .stub(expressionEvaluation, 'buildSubmissionFeatureTypeSubquery')
+        .returns(subqueryStub('SELECT submission', [14]));
+      const streamStub = sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: { ...stmt('observation', null), urn_submission_id: '14' }
+      });
+
+      expect(buildBroadStub).to.not.have.been.called;
+      expect(buildSubmissionStub).to.have.been.calledOnceWithExactly('observation', 14, TEST_SOURCE.requested_by);
+      expect(streamStub).to.have.been.calledOnceWith(TEST_DOWNLOAD_ID, 'SELECT submission', [14], 'observation');
+    });
+
+    it('does not limit the broad subquery to a submission when the statement covers every submission', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      stubParquetPipeline();
+
+      sinon.stub(expressionEvaluation, 'buildBroadFeatureTypeSubquery').returns(subqueryStub('SELECT broad', []));
+      const buildSubmissionStub = sinon.stub(expressionEvaluation, 'buildSubmissionFeatureTypeSubquery');
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        downloadVersionId: TEST_DOWNLOAD_VERSION_ID,
+        source: TEST_SOURCE,
+        properties: mockProperties,
+        featureTypeName: 'observation',
+        statement: stmt('observation', null)
+      });
+
+      expect(buildSubmissionStub).to.not.have.been.called;
     });
 
     it('passes source.requested_by (the requesting user) — NOT the worker identity — through to the security filter', async () => {

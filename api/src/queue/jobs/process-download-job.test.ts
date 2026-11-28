@@ -53,6 +53,7 @@ describe('process-download-job', () => {
   const createMockStatement = (urn_feature_type: string, expression_id: string | null = null) => ({
     policy_statement_id: `psid-${urn_feature_type}`,
     effect: PolicyEffect.ALLOW,
+    urn_submission_id: '*',
     urn_feature_type,
     expression_id
   });

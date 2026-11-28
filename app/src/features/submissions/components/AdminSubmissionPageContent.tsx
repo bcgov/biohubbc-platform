@@ -5,6 +5,7 @@ import { AdminPageLayout } from 'layouts/AdminPageLayout';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { AdminSubmissionMetadata } from './content/AdminSubmissionMetadata';
+import { SubmissionDownloadButton } from './download/SubmissionDownloadButton';
 import { AdminSubmissionUploads } from './content/AdminSubmissionUploads';
 
 interface AdminSubmissionPageContentProps {
@@ -44,6 +45,7 @@ export const AdminSubmissionPageContent = ({ submissionId }: AdminSubmissionPage
       }
       title={submissionQuery.isPending ? <Skeleton width={240} height={48} /> : (submission?.name ?? 'Submission')}
       description={submission?.description}
+      buttons={submission && <SubmissionDownloadButton submissionId={submissionId} />}
       tabs={[
         {
           value: 'uploads',
