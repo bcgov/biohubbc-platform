@@ -31,10 +31,6 @@ const mocks = vi.hoisted(() => ({
   } as Record<string, any>
 }));
 
-vi.mock('hooks/useApi', () => ({
-  useApi: () => ({ martin: { createSubmissionFeatureTileSession: mocks.createSubmissionFeatureTileSession } })
-}));
-
 vi.mock('hooks/useContext', () => ({
   useConfigContext: () => ({
     BASEMAP_URL: 'https://basemap.test/tile/{z}/{y}/{x}',
@@ -78,8 +74,12 @@ const buildSession = (overrides: Partial<ITileExtentSession> = {}): ITileExtentS
   ...overrides
 });
 
+/** Requests the session from the mocked feature tile endpoint, as the page that owns the map would. */
+const createTileSession = (submissionFeatureId: number, signal: AbortSignal) =>
+  mocks.createSubmissionFeatureTileSession(submissionFeatureId, { signal });
+
 const renderMap = (props: Partial<React.ComponentProps<typeof SubmissionFeatureMap>> = {}) =>
-  render(<SubmissionFeatureMap submissionFeatureId={34} {...props} />);
+  render(<SubmissionFeatureMap submissionFeatureId={34} createTileSession={createTileSession} {...props} />);
 
 /** The most recent props SlippyMap was rendered with. */
 const latestMapProps = () => mocks.slippyMapProps[mocks.slippyMapProps.length - 1];
@@ -405,7 +405,7 @@ describe('SubmissionFeatureMap', () => {
       mocks.createSubmissionFeatureTileSession.mockResolvedValue(buildSession({ token: 'token-2' }));
 
       await act(async () => {
-        rerender(<SubmissionFeatureMap submissionFeatureId={56} />);
+        rerender(<SubmissionFeatureMap submissionFeatureId={56} createTileSession={createTileSession} />);
       });
 
       await waitFor(() => expect(mocks.createSubmissionFeatureTileSession).toHaveBeenCalledTimes(2));
@@ -429,7 +429,7 @@ describe('SubmissionFeatureMap', () => {
       mocks.createSubmissionFeatureTileSession.mockReturnValue(new Promise(() => undefined));
 
       await act(async () => {
-        rerender(<SubmissionFeatureMap submissionFeatureId={56} />);
+        rerender(<SubmissionFeatureMap submissionFeatureId={56} createTileSession={createTileSession} />);
       });
 
       // Showing the old feature's geometry under the new feature's heading would be a correctness bug,

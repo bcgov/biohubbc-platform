@@ -6,6 +6,8 @@ import {
   AdminSubmissionUploadsResponse,
   IGetSubmissionsForUserResponse,
   ISubmissionFeatureForReviewResponse,
+  ISubmissionUploadResponse,
+  ISubmissionUploadsResponse,
   ISubmissionUploadPart,
   PresignedUploadUrlResponse,
   SubmissionFilters,
@@ -104,6 +106,72 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Fetch one page of a submission's active uploads for a member of the submission's team.
+   *
+   * @param {string} submissionUuid Submission whose uploads are listed.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @returns {Promise<ISubmissionUploadsResponse>} Uploads with server pagination totals.
+   */
+  const listSubmissionUploads = async (
+    submissionUuid: string,
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionUploadsResponse> => {
+    const { data } = await axios.get<ISubmissionUploadsResponse>(`api/submission/${submissionUuid}/upload`, {
+      params: pagination,
+      ...options
+    });
+
+    return data;
+  };
+
+  /**
+   * Fetch one of a submission's uploads for a member of the submission's team.
+   *
+   * @param {string} submissionUuid Submission that owns the upload.
+   * @param {string} submissionUploadId Upload to fetch.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @returns {Promise<ISubmissionUploadResponse>} The upload's identifier, status, decision and creation date.
+   */
+  const getSubmissionUpload = async (
+    submissionUuid: string,
+    submissionUploadId: string,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionUploadResponse> => {
+    const { data } = await axios.get<ISubmissionUploadResponse>(
+      `api/submission/${submissionUuid}/upload/${submissionUploadId}`,
+      options
+    );
+
+    return data;
+  };
+
+  /**
+   * Fetch one page of an upload's features at any lifecycle stage (unreviewed, current or superseded), for a member
+   * of the submission's team.
+   *
+   * @param {number} submissionId Submission that owns the upload.
+   * @param {string} submissionUploadId Upload whose features are listed.
+   * @param {ApiPaginationRequestOptions} pagination Page and sort options.
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @returns {Promise<ISubmissionFeatureForReviewResponse>} The upload's features with server pagination totals.
+   */
+  const getSubmissionUploadFeatures = async (
+    submissionId: number,
+    submissionUploadId: string,
+    pagination: ApiPaginationRequestOptions,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionFeatureForReviewResponse> => {
+    const { data } = await axios.get<ISubmissionFeatureForReviewResponse>(
+      `api/submission/${submissionId}/upload/${submissionUploadId}/feature`,
+      { params: pagination, paramsSerializer: (params) => qs.stringify(params), ...options }
+    );
+
+    return data;
+  };
+
+  /**
    * Fetch submission record with security data by submission id.
    *
    * @param {number} submissionId
@@ -182,6 +250,9 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getAdminSubmissionList,
     getAdminSubmissionUploadList,
     getSubmissionFeatures,
+    listSubmissionUploads,
+    getSubmissionUpload,
+    getSubmissionUploadFeatures,
     getSubmissionRecordWithSecurity,
     getSubmissionsForUser,
     getSubmissionUploadUrls,

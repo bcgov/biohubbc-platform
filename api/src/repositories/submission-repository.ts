@@ -13,13 +13,20 @@ import {
   AdminSubmissionListItem,
   SubmissionContributorMembership,
   SubmissionFeatureForReview,
+  SubmissionFeatureListFilters,
   SubmissionFilters,
   SubmissionSummary
 } from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-import { buildSecurityFilter, isEffectivelySecured, isSubmissionFeatureCurrent } from './sql-fragments';
+import {
+  buildSecurityFilter,
+  isEffectivelySecured,
+  isSubmissionFeatureCurrent,
+  isSubmissionFeatureGrantedToUser,
+  isSubmissionFeaturePublished
+} from './sql-fragments';
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -1279,54 +1286,80 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Build the base query for submission features.
+   * Build the query for a submission's features that the caller's policy grants reach.
    *
-   * @param {number} submissionId Submission whose current features are returned.
+   * The grant is matched against the feature rows themselves (`isSubmissionFeatureGrantedToUser`), without
+   * `submission_feature_closure`, so callers can add lifecycle predicates for features that are not in the closure.
+   *
    * @param {Knex} knex Knex instance used to construct the query.
-   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
-   * @returns {Knex.QueryBuilder} Query for distinct current submission features the caller can access.
+   * @param {number} submissionId Submission whose features are returned.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @returns {Knex.QueryBuilder} Unexecuted query over `submission_feature`, selecting the feature's identifiers and type.
    * @memberof SubmissionRepository
    */
-  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex, systemUserId: number | null) {
-    const baseQuery = knex('submission_feature')
+  private _getGrantedSubmissionFeaturesQuery(knex: Knex, submissionId: number, systemUserId: number) {
+    return knex('submission_feature')
       .select(
         'submission_feature.submission_id',
         'submission_feature.submission_feature_id',
         'submission_feature.feature_type_id',
-        knex.raw('feature_type.name AS feature_type_name'),
-        knex.raw(`${isEffectivelySecured('submission_feature.submission_feature_id')} AS secured`)
+        knex.raw('feature_type.name AS feature_type_name')
       )
-      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id');
-
-    baseQuery
-      .whereRaw(isSubmissionFeatureCurrent('submission_feature'))
-      .where('submission_feature.submission_id', submissionId);
-
-    const securityFilter = buildSecurityFilter(knex, systemUserId, 'submission_feature.submission_feature_id');
-    if (securityFilter) {
-      baseQuery.whereRaw(securityFilter);
-    }
-
-    return knex.with('base_features', baseQuery).distinct('*').from('base_features');
+      .join('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
+      .where('submission_feature.submission_id', submissionId)
+      .whereRaw(isSubmissionFeatureGrantedToUser('submission_feature'), [systemUserId]);
   }
 
   /**
-   * Get all submission features by submission id, paginated.
+   * Build the query for a submission's published features in a lifecycle that the caller's policy grants reach.
+   *
+   * @param {Knex} knex Knex instance used to construct the query.
+   * @param {number} submissionId Submission whose features are returned.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @param {SubmissionFeatureListFilters} filters Lifecycle of the published features returned.
+   * @returns {Knex.QueryBuilder} Query for the submission's published features in the requested lifecycle.
+   * @memberof SubmissionRepository
+   */
+  private _getSubmissionFeaturesBaseQuery(
+    knex: Knex,
+    submissionId: number,
+    systemUserId: number,
+    filters: SubmissionFeatureListFilters
+  ) {
+    const baseQuery = this._getGrantedSubmissionFeaturesQuery(knex, submissionId, systemUserId).whereRaw(
+      isSubmissionFeaturePublished('submission_feature')
+    );
+
+    if (filters.lifecycle === 'current') {
+      baseQuery.whereRaw(isSubmissionFeatureCurrent('submission_feature'));
+    }
+
+    if (filters.lifecycle === 'superseded') {
+      baseQuery.whereRaw(`NOT (${isSubmissionFeatureCurrent('submission_feature')})`);
+    }
+
+    return knex.with('base_features', baseQuery).select('*').from('base_features');
+  }
+
+  /**
+   * Get one page of a submission's published features in a lifecycle that the caller's policy grants reach.
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
-   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @param {SubmissionFeatureListFilters} filters Lifecycle of the published features returned.
    * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting options.
-   * @returns {Promise<SubmissionFeatureForReview[]>} Current submission features visible to the requesting user.
+   * @returns {Promise<SubmissionFeatureForReview[]>} The page of matching features.
    * @memberof SubmissionRepository
    */
   async getSubmissionFeatures(
     submissionId: number,
-    systemUserId: number | null,
+    systemUserId: number,
+    filters: SubmissionFeatureListFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SubmissionFeatureForReview[]> {
     const knex = getKnex();
 
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(knex, submissionId, systemUserId, filters);
 
     this.applyPagination(baseQuery, pagination);
 
@@ -1336,28 +1369,83 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get the total number of submission features for a given submission.
+   * Count a submission's published features in a lifecycle that the caller's policy grants reach.
    *
    * @param {number} submissionId ID of the submission whose features should be counted.
-   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
-   * @returns {Promise<number>} Number of current submission features visible to the requesting user.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @param {SubmissionFeatureListFilters} filters Lifecycle of the published features counted.
+   * @returns {Promise<number>} Number of matching features.
    * @memberof SubmissionRepository
    */
-  async getSubmissionFeaturesCount(submissionId: number, systemUserId: number | null): Promise<number> {
+  async getSubmissionFeaturesCount(
+    submissionId: number,
+    systemUserId: number,
+    filters: SubmissionFeatureListFilters
+  ): Promise<number> {
     const knex = getKnex();
 
-    // Wrap the base query as a subquery
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex, systemUserId);
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(knex, submissionId, systemUserId, filters);
     const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
 
-    const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
+    const response = await this.connection.knex(countQuery, CountResult);
 
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission feature count', [
-        'SubmissionRepository->getSubmissionFeaturesCount',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
+    return response.rows[0].count;
+  }
+
+  /**
+   * Get one page of an upload's features, at any lifecycle stage, that the caller's policy grants reach.
+   *
+   * @param {number} submissionId Submission the upload belongs to.
+   * @param {string} submissionUploadId Upload whose features are returned.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting options.
+   * @returns {Promise<SubmissionFeatureForReview[]>} The page of the upload's features.
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionUploadFeatures(
+    submissionId: number,
+    submissionUploadId: string,
+    systemUserId: number,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    const knex = getKnex();
+
+    const featuresQuery = this._getGrantedSubmissionFeaturesQuery(knex, submissionId, systemUserId).where(
+      'submission_feature.submission_upload_id',
+      submissionUploadId
+    );
+    const baseQuery = knex.with('base_features', featuresQuery).select('*').from('base_features');
+
+    this.applyPagination(baseQuery, pagination);
+
+    const response = await this.connection.knex(baseQuery, SubmissionFeatureForReview);
+
+    return response.rows;
+  }
+
+  /**
+   * Count an upload's features, at any lifecycle stage, that the caller's policy grants reach.
+   *
+   * @param {number} submissionId Submission the upload belongs to.
+   * @param {string} submissionUploadId Upload whose features are counted.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @returns {Promise<number>} Number of the upload's features the caller can see.
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionUploadFeaturesCount(
+    submissionId: number,
+    submissionUploadId: string,
+    systemUserId: number
+  ): Promise<number> {
+    const knex = getKnex();
+
+    const featuresQuery = this._getGrantedSubmissionFeaturesQuery(knex, submissionId, systemUserId).where(
+      'submission_feature.submission_upload_id',
+      submissionUploadId
+    );
+    const countQuery = knex.from(featuresQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(countQuery, CountResult);
 
     return response.rows[0].count;
   }

@@ -89,3 +89,58 @@ describe('SubmissionFeatureRepository feature lookup', () => {
     expect(text).to.not.match(/\bsf\.data\b/);
   });
 });
+
+describe('SubmissionFeatureRepository.getSubmissionFeatureBySubmissionId', () => {
+  const row = {
+    submission_feature_id: 20,
+    uuid: '11111111-1111-1111-1111-111111111111',
+    urn: 'urn:7:observation:20',
+    create_date: '2026-01-01',
+    submission_id: 7,
+    feature_type_id: 3,
+    source_id: null,
+    successor_submission_feature_id: null,
+    terminal_submission_feature_id: null,
+    feature_type_name: 'observation',
+    contributor_name: 'contributor',
+    secured: false,
+    security_reasons: []
+  };
+
+  it('reads the feature within the submission at any lifecycle stage', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([row], 1));
+    const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));
+
+    expect(await repository.getSubmissionFeatureBySubmissionId(7, 20)).to.eql(row);
+
+    const { text, values } = sql.firstCall.args[0];
+    expect(text).to.include('LEFT JOIN LATERAL');
+    expect(text).to.include('sf.submission_id =');
+    expect(text).not.to.include(isSubmissionFeaturePublished('sf') + ';');
+    expect(values).to.include.members([20, 7]);
+  });
+
+  it('throws not found when the submission has no such feature', async () => {
+    const repository = new SubmissionFeatureRepository(
+      getMockDBConnection({ sql: sinon.stub().resolves(mockQueryResult([], 0)) })
+    );
+
+    try {
+      await repository.getSubmissionFeatureBySubmissionId(7, 99);
+      expect.fail('Expected not found');
+    } catch (error_) {
+      expect((error_ as Error).message).to.equal('Submission feature not found');
+    }
+  });
+
+  it('keeps the public read limited to published features that resolve to a current feature', async () => {
+    const sql = sinon.stub().resolves(mockQueryResult([row], 1));
+    const repository = new SubmissionFeatureRepository(getMockDBConnection({ sql }));
+
+    await repository.getSubmissionFeatureById(20);
+
+    const { text } = sql.firstCall.args[0];
+    expect(text).not.to.include('LEFT JOIN LATERAL');
+    expect(text).to.include(`AND ${isSubmissionFeaturePublished('sf')};`);
+  });
+});

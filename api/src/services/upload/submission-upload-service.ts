@@ -9,6 +9,7 @@ import {
   AdminSubmissionUploadListResponse,
   AdminSubmissionUploadsResponse,
   CreateSubmissionUpload,
+  SubmissionTeamUploadsResponse,
   SubmissionUpload,
   SubmissionUploadFilters,
   SubmissionUploadScope,
@@ -106,6 +107,35 @@ export class SubmissionUploadService extends DBService {
     const total = await this.submissionUploadRepository.countAdminSubmissionUploads(submissionId);
 
     return { uploads, pagination: makePaginationResponse(total, pagination) };
+  }
+
+  /**
+   * Retrieve a bounded page of a submission's active uploads for members of the submission's team.
+   *
+   * Each upload carries only its identifier, status, decision and creation date; the reviewer comment, ticket and
+   * uploader details of the administrative list are left out.
+   *
+   * @param {string} submissionUuid Submission whose uploads are listed.
+   * @param {ApiPaginationOptions} pagination Validated pagination and sorting options.
+   * @returns {Promise<SubmissionTeamUploadsResponse>} Uploads and pagination totals, including empty pages.
+   * @throws {ApiNotFoundError} If no submission has the UUID.
+   * @memberof SubmissionUploadService
+   */
+  async listSubmissionUploadsBySubmissionUuid(
+    submissionUuid: string,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionTeamUploadsResponse> {
+    const { submission_id: submissionId } = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
+    const page = await this.listAdminSubmissionUploads(submissionId, pagination);
+
+    const uploads = page.uploads.map((upload) => ({
+      submission_upload_id: upload.submission_upload_id,
+      status: upload.status,
+      decision: upload.decision,
+      create_date: upload.create_date
+    }));
+
+    return { uploads, pagination: page.pagination };
   }
 
   /**

@@ -23,6 +23,7 @@ vi.mock('react-router-dom', async () => {
 
 const mockGetSubmissionRecordWithSecurity = vi.fn();
 const mockGetSubmissionFeatures = vi.fn();
+const mockListSubmissionUploads = vi.fn();
 
 const mockSubmission = {
   submission_id: 1,
@@ -57,9 +58,9 @@ const mockFeaturesResponse = {
   pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
 };
 
-const renderPage = (queryClient?: QueryClient) =>
+const renderPage = (queryClient?: QueryClient, initialPath = '/portal/submission/1') =>
   render(
-    <MemoryRouter initialEntries={['/portal/submission/1']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/portal/submission/:submissionId" element={<PortalSubmissionDetailPage />} />
         <Route path="/forbidden" element={<div>Forbidden</div>} />
@@ -74,7 +75,8 @@ describe('PortalSubmissionDetailPage', () => {
     mockUseApi.mockReturnValue({
       submissions: {
         getSubmissionRecordWithSecurity: mockGetSubmissionRecordWithSecurity,
-        getSubmissionFeatures: mockGetSubmissionFeatures
+        getSubmissionFeatures: mockGetSubmissionFeatures,
+        listSubmissionUploads: mockListSubmissionUploads
       }
     });
 
@@ -140,5 +142,68 @@ describe('PortalSubmissionDetailPage', () => {
 
     expect(await findByText('Forbidden')).toBeVisible();
     expect(queryByText('Test Submission')).not.toBeInTheDocument();
+  });
+
+  it('shows the Features tab by default, without loading uploads', async () => {
+    const { findByText, getByRole } = renderPage();
+
+    expect(await findByText('Observation')).toBeVisible();
+    expect(getByRole('tab', { name: 'Features' })).toHaveAttribute('aria-selected', 'true');
+    expect(mockListSubmissionUploads).not.toHaveBeenCalled();
+  });
+
+  it("lists the submission's uploads on the Uploads tab, addressed by the submission's UUID", async () => {
+    mockListSubmissionUploads.mockResolvedValue({
+      uploads: [],
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+    });
+
+    const { findByText, getByRole } = renderPage(undefined, '/portal/submission/1?tab=uploads');
+
+    expect(await findByText('No uploads found.')).toBeVisible();
+    expect(getByRole('tab', { name: 'Uploads' })).toHaveAttribute('aria-selected', 'true');
+    expect(mockListSubmissionUploads).toHaveBeenCalledWith('uuid-1', expect.any(Object), {
+      signal: expect.any(AbortSignal)
+    });
+  });
+
+  it('shows no chips in the header, only the description', async () => {
+    const { findByText, queryByText } = renderPage();
+
+    expect(await findByText('A test submission')).toBeVisible();
+    expect(queryByText(/^Submitted/)).not.toBeInTheDocument();
+    expect(queryByText('Unsecured')).not.toBeInTheDocument();
+  });
+
+  it('shows the secured banner without an access request when some features are secured', async () => {
+    mockGetSubmissionRecordWithSecurity.mockResolvedValue({ ...mockSubmission, security: 'PARTIALLY SECURED' });
+
+    const { findByText, queryByRole } = renderPage();
+
+    expect(await findByText('Some features are secured')).toBeVisible();
+    expect(queryByRole('button', { name: 'Request Access' })).not.toBeInTheDocument();
+  });
+
+  it('shows no secured banner when no features are secured', async () => {
+    const { findByText, queryByText } = renderPage();
+
+    await findByText('Observation');
+
+    expect(queryByText('Some features are secured')).not.toBeInTheDocument();
+  });
+
+  it("lists the submission's metadata on the About tab", async () => {
+    mockGetSubmissionRecordWithSecurity.mockResolvedValue({
+      ...mockSubmission,
+      contributor_name: 'SIMS',
+      last_approved_upload_date: null
+    });
+
+    const { findByText, getByRole } = renderPage(undefined, '/portal/submission/1?tab=about');
+
+    expect(await findByText('Submitted')).toBeVisible();
+    expect(getByRole('tab', { name: 'About' })).toHaveAttribute('aria-selected', 'true');
+    expect(await findByText('SIMS')).toBeVisible();
+    expect(await findByText('uuid-1')).toBeVisible();
   });
 });

@@ -3,12 +3,13 @@ import { SubmissionFeaturePropertiesSection } from 'components/property/Submissi
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { keepPreviousDataWithin } from 'utils/query-client';
 import { submissionQueryKeys } from 'utils/query-keys/submission-query-keys';
 import { buildFeaturePath, buildPublicPropertyValuePathResolvers, parseRouteId } from 'utils/routes';
 import { SubmissionFeatureLayout } from './components/SubmissionFeatureLayout';
+import { CreateSubmissionFeatureTileSession } from './components/map/useSubmissionFeatureTileSession';
 
 /**
  * Render a public submission feature detail page, addressed by the feature alone.
@@ -47,6 +48,11 @@ export const SubmissionFeaturePage = () => {
     placeholderData: keepPreviousDataWithin(submissionQueryKeys.feature(submissionFeatureId ?? 0))
   });
 
+  const createTileSession = useCallback<CreateSubmissionFeatureTileSession>(
+    (featureId, signal) => biohubApi.martin.createSubmissionFeatureTileSession(featureId, { signal }),
+    [biohubApi]
+  );
+
   const featureErrorStatus = (featureQuery.error as APIError | null)?.status;
   if (featureErrorStatus === 401 || featureErrorStatus === 403) {
     return <Navigate to="/forbidden" replace />;
@@ -62,7 +68,8 @@ export const SubmissionFeaturePage = () => {
       feature={feature}
       rootBreadcrumbLabel="Search"
       rootBreadcrumbTo={`/search/${location.search}`}
-      getFeaturePath={(featureId) => buildFeaturePath(featureId, location.search)}>
+      getFeaturePath={(featureId) => buildFeaturePath(featureId, location.search)}
+      createTileSession={createTileSession}>
       <SubmissionFeaturePropertiesSection
         submissionId={feature?.submission_id ?? 0}
         pathResolvers={pathResolvers}

@@ -43,15 +43,30 @@ export interface SubmissionSummary {
   regions: string[];
 }
 
+/** Lifecycle of the published features a submission's feature list returns. */
+export type SubmissionFeatureLifecycle = 'current' | 'superseded' | 'all';
+
+/** Filters of a submission's feature list. */
+export interface SubmissionFeatureListFilters {
+  /** `current` (not ended or superseded), `superseded` (ended or superseded), or `all` published features. */
+  lifecycle: SubmissionFeatureLifecycle;
+}
+
+/** One of a submission's features, identified by id and type, as its team's feature lists show it. */
 export const SubmissionFeatureForReview = z.object({
   submission_id: z.number().int(),
   submission_feature_id: z.number().int(),
   feature_type_name: z.string(),
-  feature_type_id: z.number().int(),
-  secured: z.boolean()
+  feature_type_id: z.number().int()
 });
 
 export type SubmissionFeatureForReview = z.infer<typeof SubmissionFeatureForReview>;
+
+/** One page of a submission's features, with its pagination totals. */
+export interface SubmissionFeaturePage {
+  features: SubmissionFeatureForReview[];
+  pagination: ApiPaginationResults;
+}
 
 /** Submission owner and the requesting user's active contributor membership. */
 export const SubmissionContributorMembership = z.object({

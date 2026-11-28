@@ -48,6 +48,7 @@ export const SubmissionUpload = z.object({
   blueprint_id: z.number(),
   successor_submission_upload_id: z.guid().nullable().optional(),
   comment: z.string().nullable().optional(),
+  create_date: z.string().optional(),
   record_end_date: z.coerce.date().nullable().optional()
 });
 export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
@@ -69,6 +70,17 @@ export type AdminSubmissionUpload = z.infer<typeof AdminSubmissionUpload>;
 
 export interface AdminSubmissionUploadsResponse {
   uploads: AdminSubmissionUpload[];
+  pagination: ApiPaginationResults;
+}
+
+/** One of a submission's uploads as its team sees it: no reviewer comment, ticket or uploader details. */
+export type SubmissionTeamUpload = Pick<
+  AdminSubmissionUpload,
+  'submission_upload_id' | 'status' | 'decision' | 'create_date'
+>;
+
+export interface SubmissionTeamUploadsResponse {
+  uploads: SubmissionTeamUpload[];
   pagination: ApiPaginationResults;
 }
 

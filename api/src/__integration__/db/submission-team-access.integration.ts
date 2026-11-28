@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SubmissionRepository } from '../../repositories/submission-repository';
+import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { SubmissionService } from '../../services/submission-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getActiveDefaultBlueprintId, getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
@@ -17,11 +19,17 @@ describe('submission team access (integration)', function () {
   });
 
   beforeEach(async () => {
+    // Creating a submission grants its team an access policy, which queues anchor computation; the queue is not
+    // running here, and these tests do not depend on anchors.
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
     connection = getAPIUserDBConnection();
     await connection.open();
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });

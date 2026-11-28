@@ -81,6 +81,28 @@ export class TeamAuthorizationService extends DBService {
   }
 
   /**
+   * Determine whether a feature belongs to a submission and one of a user's teams holds a policy grant whose URN
+   * matches the feature, at any lifecycle stage and without reading `submission_feature_closure`.
+   *
+   * @param {number} systemUserId The authenticated user's id.
+   * @param {number} submissionId Submission the feature must belong to.
+   * @param {number} submissionFeatureId
+   * @return {Promise<boolean>}
+   * @memberof TeamAuthorizationService
+   */
+  async isSubmissionFeatureGrantedToUser(
+    systemUserId: number,
+    submissionId: number,
+    submissionFeatureId: number
+  ): Promise<boolean> {
+    return this.teamAuthorizationRepository.isSubmissionFeatureGrantedToUser(
+      systemUserId,
+      submissionId,
+      submissionFeatureId
+    );
+  }
+
+  /**
    * Determine whether a submission feature is accessible to a user, using the ancestry-aware,
    * closure-based security check shared with the search/download read paths: the feature is
    * unsecured, or the user's team holds a security scope anchored on the feature or one of its

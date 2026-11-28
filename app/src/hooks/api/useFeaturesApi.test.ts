@@ -41,6 +41,29 @@ describe('useFeaturesApi', () => {
     });
   });
 
+  describe('submission-scoped feature reads', () => {
+    it("reads one of a submission's features through the submission's endpoint", async () => {
+      mock.onGet('api/submission/7/feature/10').reply(200, { feature: { submission_feature_id: 10 } });
+
+      const result = await useFeaturesApi(axios).getSubmissionFeatureBySubmissionId(7, 10);
+
+      expect(result).toEqual({ feature: { submission_feature_id: 10 } });
+    });
+
+    it("reads a page of a submission feature's properties through the submission's endpoint", async () => {
+      const response = { properties: [], pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 } };
+      mock.onGet('api/submission/7/feature/10/properties').reply(200, response);
+
+      const result = await useFeaturesApi(axios).getSubmissionFeaturePropertiesBySubmissionId(7, 10, {
+        page: 1,
+        limit: 10
+      });
+
+      expect(result).toEqual(response);
+      expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
+    });
+  });
+
   describe('getSubmissionFeatureProperties', () => {
     it('should return paginated submission feature properties', async () => {
       const mockResponse = {

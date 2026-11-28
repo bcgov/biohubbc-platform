@@ -74,6 +74,38 @@ export class SubmissionFeaturePropertyService extends DBService {
   }
 
   /**
+   * Get paginated, searchable properties for one of a submission's features at any lifecycle stage, including an
+   * unreviewed feature.
+   *
+   * @param {number} submissionId Submission the feature belongs to.
+   * @param {number} submissionFeatureId ID of the submission feature whose properties should be returned.
+   * @param {ApiPaginationOptions} pagination Pagination and sorting parameters.
+   * @param {SubmissionFeaturePropertyFilters} [filters] Optional property search filters.
+   * @returns {Promise<{ properties: SubmissionFeatureProperty[]; total: number }>} Paginated properties and total count.
+   * @memberof SubmissionFeaturePropertyService
+   */
+  async getSubmissionFeaturePropertiesBySubmissionId(
+    submissionId: number,
+    submissionFeatureId: number,
+    pagination: ApiPaginationOptions,
+    filters?: SubmissionFeaturePropertyFilters
+  ): Promise<{ properties: SubmissionFeatureProperty[]; total: number }> {
+    const properties = await this.submissionFeaturePropertyRepository.getSubmissionFeaturePropertiesBySubmissionId(
+      submissionId,
+      submissionFeatureId,
+      pagination,
+      filters
+    );
+    const total = await this.submissionFeaturePropertyRepository.getSubmissionFeaturePropertiesCountBySubmissionId(
+      submissionId,
+      submissionFeatureId,
+      filters
+    );
+
+    return { properties, total };
+  }
+
+  /**
    * Get paginated, searchable properties for a feature belonging to a submission upload.
    *
    * @param {string} submissionUploadId UUID of the submission upload that owns the feature.

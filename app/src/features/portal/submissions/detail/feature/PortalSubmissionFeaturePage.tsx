@@ -4,10 +4,11 @@ import Typography from '@mui/material/Typography';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { SubmissionFeaturePropertiesSection } from 'components/property/SubmissionFeaturePropertiesSection';
 import { SubmissionFeatureLayout } from 'features/submissions/page/features/components/SubmissionFeatureLayout';
+import { CreateSubmissionFeatureTileSession } from 'features/submissions/page/features/components/map/useSubmissionFeatureTileSession';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useServerPaginatedGridState } from 'hooks/useServerPaginatedGridState';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link as RouterLink, Navigate, useLocation, useParams } from 'react-router-dom';
 import { getFeatureTypeDisplayLabel } from 'utils/feature-type';
 import { keepPreviousDataWithin } from 'utils/query-client';
@@ -18,8 +19,10 @@ import { buildSubmissionFeaturePath, buildSubmissionPropertyValuePathResolvers, 
  * Portal submission feature detail page scoped to the current user's submission.
  *
  * Owns portal route parsing, submission and feature loading, authorization error handling, and portal-scoped feature
- * detail layout. The page is for the submission's team: a caller who cannot read the submission is sent to the
- * forbidden page, even when the feature itself is public.
+ * detail layout. The page is for the submission's team and reads through the submission's own feature routes, so it
+ * also shows unreviewed and superseded features (a superseded one carries the superseded banner). A caller outside the
+ * team, or whose team policy grants do not reach the feature within this submission, is sent to the forbidden page; a
+ * feature the submission does not have is not found.
  *
  * @returns {JSX.Element} Portal submission feature detail page.
  */
@@ -29,22 +32,21 @@ export const PortalSubmissionFeaturePage = () => {
   const params = useParams<{ submissionId: string; submissionFeatureId: string }>();
   const submissionId = parseRouteId(params.submissionId);
   const submissionFeatureId = parseRouteId(params.submissionFeatureId);
-  const isValidRoute = submissionId !== null && submissionFeatureId !== null;
 
   // The submission names the breadcrumb; it is private to its team, so the feature itself does not carry it.
   const submissionQuery = useQuery({
     queryKey: submissionQueryKeys.record(submissionId ?? 0),
     queryFn:
-      !isValidRoute || submissionId === null
+      submissionId === null || submissionFeatureId === null
         ? skipToken
         : ({ signal }) => api.submissions.getSubmissionRecordWithSecurity(submissionId, { signal })
   });
   const featureQuery = useQuery({
-    queryKey: submissionQueryKeys.featureDetail(submissionFeatureId ?? 0),
+    queryKey: submissionQueryKeys.submissionFeatureDetail(submissionId ?? 0, submissionFeatureId ?? 0),
     queryFn:
-      !isValidRoute || submissionFeatureId === null
+      submissionId === null || submissionFeatureId === null
         ? skipToken
-        : ({ signal }) => api.features.getSubmissionFeatureById(submissionFeatureId, { signal })
+        : ({ signal }) => api.features.getSubmissionFeatureBySubmissionId(submissionId, submissionFeatureId, { signal })
   });
   const feature = featureQuery.data?.feature;
   const pathResolvers = useMemo(
@@ -55,13 +57,33 @@ export const PortalSubmissionFeaturePage = () => {
   const propertyGrid = useServerPaginatedGridState({ defaultSort: { field: 'property', sort: 'asc' } });
   const propertyParams = { search: propertyGrid.debouncedSearchTerm, ...propertyGrid.apiPagination };
   const propertiesQuery = useQuery({
-    queryKey: submissionQueryKeys.featureProperties(submissionFeatureId ?? 0, propertyParams),
+    queryKey: submissionQueryKeys.submissionFeatureProperties(
+      submissionId ?? 0,
+      submissionFeatureId ?? 0,
+      propertyParams
+    ),
     queryFn:
-      !isValidRoute || submissionFeatureId === null
+      submissionId === null || submissionFeatureId === null
         ? skipToken
-        : ({ signal }) => api.features.getSubmissionFeatureProperties(submissionFeatureId, propertyParams, { signal }),
-    placeholderData: keepPreviousDataWithin(submissionQueryKeys.feature(submissionFeatureId ?? 0))
+        : ({ signal }) =>
+            api.features.getSubmissionFeaturePropertiesBySubmissionId(
+              submissionId,
+              submissionFeatureId,
+              propertyParams,
+              {
+                signal
+              }
+            ),
+    placeholderData: keepPreviousDataWithin(
+      submissionQueryKeys.submissionFeature(submissionId ?? 0, submissionFeatureId ?? 0)
+    )
   });
+
+  const createTileSession = useCallback<CreateSubmissionFeatureTileSession>(
+    (featureId, signal) =>
+      api.martin.createSubmissionFeatureTileSessionBySubmissionId(submissionId ?? 0, featureId, { signal }),
+    [api, submissionId]
+  );
 
   // Portal pages belong to the submission's team, so access to the submission governs the page as well as the feature.
   const submissionErrorStatus = (submissionQuery.error as APIError | null)?.status;
@@ -70,8 +92,9 @@ export const PortalSubmissionFeaturePage = () => {
     return <Navigate to="/forbidden" replace />;
   }
 
-  // The feature is loaded by id alone, so a route pairing it with another submission names no page.
-  if (submissionId === null || submissionFeatureId === null || (feature && feature.submission_id !== submissionId)) {
+  // A member pairing the feature with another submission is refused by the route's grant check (forbidden above); a
+  // feature id that does not exist in the submission is not found.
+  if (submissionId === null || submissionFeatureId === null || featureErrorStatus === 404) {
     return <Navigate to="/page-not-found" replace />;
   }
 
@@ -84,6 +107,7 @@ export const PortalSubmissionFeaturePage = () => {
       getFeaturePath={(featureId) =>
         buildSubmissionFeaturePath('/portal/submission', submissionId, featureId, location.search)
       }
+      createTileSession={createTileSession}
       breadcrumbs={
         feature && (
           <Breadcrumbs aria-label="breadcrumb">

@@ -54,6 +54,15 @@ describe('useMartinApi', () => {
     expect(mock.history.post[0].data).toBeUndefined();
   });
 
+  it("creates a tile session for one of a submission's features through the submission's endpoint", async () => {
+    mock.onPost('/api/submission/7/feature/34/tile').reply(200, session);
+
+    const result = await useMartinApi(axios).createSubmissionFeatureTileSessionBySubmissionId(7, 34);
+
+    expect(result).toEqual(session);
+    expect(mock.history.post[0].data).toBeUndefined();
+  });
+
   it('creates a tile session for a submission upload through the administrative endpoint', async () => {
     const submissionUploadId = '11111111-1111-4111-8111-111111111111';
     const uploadSession = { ...session, source: 'upload', martin_url_template: '/martin/upload/{z}/{x}/{y}' };

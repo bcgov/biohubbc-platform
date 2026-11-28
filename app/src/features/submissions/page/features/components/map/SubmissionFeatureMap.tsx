@@ -1,9 +1,11 @@
 import { TileExtentMap } from 'components/map/TileExtentMap';
 import { SUBMISSION_FEATURE_MAP_SECTION_HEIGHT } from 'constants/spatial';
-import { useSubmissionFeatureTileSession } from './useSubmissionFeatureTileSession';
+import { CreateSubmissionFeatureTileSession, useSubmissionFeatureTileSession } from './useSubmissionFeatureTileSession';
 
 export interface ISubmissionFeatureMapProps {
   submissionFeatureId: number;
+  /** Requests the feature's tile session from the endpoint that serves the page. */
+  createTileSession: CreateSubmissionFeatureTileSession;
 }
 
 /**
@@ -16,9 +18,9 @@ export interface ISubmissionFeatureMapProps {
  * @return {*}
  */
 export const SubmissionFeatureMap = (props: ISubmissionFeatureMapProps) => {
-  const { submissionFeatureId } = props;
+  const { submissionFeatureId, createTileSession } = props;
 
-  const tileSession = useSubmissionFeatureTileSession(submissionFeatureId);
+  const tileSession = useSubmissionFeatureTileSession(submissionFeatureId, createTileSession);
 
   return (
     <TileExtentMap

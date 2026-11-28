@@ -92,6 +92,91 @@ const features = (submissionId: number, pagination: ApiPaginationRequestOptions)
   [...submission(submissionId), 'features', { pagination }] as const;
 
 /**
+ * Key prefix of every page of a submission's uploads as its team sees them.
+ *
+ * @param {number} submissionId The submission.
+ * @returns The submission uploads key prefix.
+ */
+const uploadLists = (submissionId: number) => [...submission(submissionId), 'uploads'] as const;
+
+/**
+ * Key of one page of a submission's uploads as its team sees them.
+ *
+ * @param {number} submissionId The submission.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The submission uploads key.
+ */
+const uploads = (submissionId: number, pagination: ApiPaginationRequestOptions) =>
+  [...uploadLists(submissionId), { pagination }] as const;
+
+/**
+ * Key prefix of everything cached for one of a submission's uploads as its team sees it.
+ *
+ * @param {number} submissionId The submission that owns the upload.
+ * @param {string} submissionUploadId The upload.
+ * @returns The submission upload key prefix.
+ */
+const uploadDetail = (submissionId: number, submissionUploadId: string) =>
+  [...submission(submissionId), 'upload', submissionUploadId] as const;
+
+/**
+ * Key of one of a submission's uploads as its team sees it.
+ *
+ * @param {number} submissionId The submission that owns the upload.
+ * @param {string} submissionUploadId The upload.
+ * @returns The submission upload key.
+ */
+const upload = (submissionId: number, submissionUploadId: string) =>
+  [...uploadDetail(submissionId, submissionUploadId), 'record'] as const;
+
+/**
+ * Key of one page of an upload's features, at any lifecycle stage, as the submission's team sees them.
+ *
+ * @param {number} submissionId The submission that owns the upload.
+ * @param {string} submissionUploadId The upload.
+ * @param {ApiPaginationRequestOptions} pagination The page and sort.
+ * @returns The upload features key.
+ */
+const uploadFeatures = (submissionId: number, submissionUploadId: string, pagination: ApiPaginationRequestOptions) =>
+  [...uploadDetail(submissionId, submissionUploadId), 'features', { pagination }] as const;
+
+/**
+ * Key prefix of everything cached for one of a submission's features as the submission's team sees it, at any
+ * lifecycle stage. Kept under the submission, apart from the public feature keys, because the team's routes also
+ * serve unreviewed and superseded features.
+ *
+ * @param {number} submissionId The submission.
+ * @param {number} submissionFeatureId The feature.
+ * @returns The submission feature key prefix.
+ */
+const submissionFeature = (submissionId: number, submissionFeatureId: number) =>
+  [...submission(submissionId), 'feature', submissionFeatureId] as const;
+
+/**
+ * Key of one of a submission's features' detail as the submission's team sees it.
+ *
+ * @param {number} submissionId The submission.
+ * @param {number} submissionFeatureId The feature.
+ * @returns The submission feature detail key.
+ */
+const submissionFeatureDetail = (submissionId: number, submissionFeatureId: number) =>
+  [...submissionFeature(submissionId, submissionFeatureId), 'detail'] as const;
+
+/**
+ * Key of one page of a submission's feature's properties as the submission's team sees them.
+ *
+ * @param {number} submissionId The submission.
+ * @param {number} submissionFeatureId The feature.
+ * @param {ApiPaginationRequestOptions & { search?: string }} params The search, page and sort sent.
+ * @returns The submission feature properties key.
+ */
+const submissionFeatureProperties = (
+  submissionId: number,
+  submissionFeatureId: number,
+  params: ApiPaginationRequestOptions & { search?: string }
+) => [...submissionFeature(submissionId, submissionFeatureId), 'properties', params] as const;
+
+/**
  * Key prefix of everything cached for every submission feature. Features are addressed by their own id alone, since
  * the public feature page has no submission in its route.
  *
@@ -140,6 +225,13 @@ export const submissionQueryKeys = {
   adminUploadLists,
   adminUploads,
   features,
+  uploads,
+  uploadDetail,
+  upload,
+  uploadFeatures,
+  submissionFeature,
+  submissionFeatureDetail,
+  submissionFeatureProperties,
   allFeatures,
   feature,
   featureDetail,

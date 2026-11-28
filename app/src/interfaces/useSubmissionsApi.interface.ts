@@ -153,14 +153,12 @@ export interface IGetSubmissionGroupedFeatureResponse {
   features: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
 
+/** One of a submission's features, identified by id and type, as its team's feature lists show it. */
 export type ISubmissionFeatureForReview = {
   submission_feature_id: number;
-  uuid: string;
   submission_id: number;
   feature_type_id: number;
   feature_type_name: string;
-  secured: boolean;
-  submission_feature_security_ids: number[];
 };
 
 export interface ISubmissionFeatureForReviewResponse {
@@ -200,4 +198,18 @@ export interface ICreateSubmission {
   name: string;
   description: string;
   comment: string;
+}
+
+/** One of a submission's uploads, as its team sees it. */
+export interface ISubmissionUploadResponse {
+  submission_upload_id: string;
+  status: SubmissionUploadJobStatus;
+  decision: SubmissionUploadDecision;
+  create_date: string;
+}
+
+/** One page of a submission's uploads, as its team sees them. */
+export interface ISubmissionUploadsResponse {
+  uploads: ISubmissionUploadResponse[];
+  pagination: ApiPaginationResponseParams;
 }

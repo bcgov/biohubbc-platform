@@ -183,6 +183,36 @@ describe('TeamAuthorizationRepository', () => {
     });
   });
 
+  describe('isSubmissionFeatureGrantedToUser', () => {
+    it("matches the caller's grants against the feature in the submission, without the closure", async () => {
+      const mockConnection = getMockDBConnection({
+        knex: async (query: any) => {
+          const compiled = query.toSQL();
+          expect(compiled.sql).to.include('"sf"."submission_feature_id" = ?');
+          expect(compiled.sql).to.include('"sf"."submission_id" = ?');
+          expect(compiled.sql).to.include('FROM team_member grant_tm');
+          expect(compiled.sql).to.include('JOIN team_security_scope grant_tss');
+          expect(compiled.sql).not.to.include('submission_feature_closure');
+          expect(compiled.sql).not.to.include('record_effective_date');
+          expect(compiled.bindings).to.include.members([20, 7, 1]);
+          return mockQueryResult([{ '?column?': 1 }]);
+        }
+      });
+
+      const result = await new TeamAuthorizationRepository(mockConnection).isSubmissionFeatureGrantedToUser(1, 7, 20);
+
+      expect(result).to.be.true;
+    });
+
+    it('returns false when no grant matches', async () => {
+      const mockConnection = getMockDBConnection({ knex: async () => mockQueryResult([]) });
+
+      const result = await new TeamAuthorizationRepository(mockConnection).isSubmissionFeatureGrantedToUser(1, 7, 20);
+
+      expect(result).to.be.false;
+    });
+  });
+
   describe('isSubmissionFeatureAccessibleToUser', () => {
     it('returns true when an accessible matching feature row exists', async () => {
       const mockResponse = { rowCount: 1, rows: [{ '1': 1 }] } as unknown as Promise<QueryResult<any>>;

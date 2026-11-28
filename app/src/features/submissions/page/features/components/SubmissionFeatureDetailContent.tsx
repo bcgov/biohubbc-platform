@@ -10,12 +10,15 @@ import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { PropsWithChildren } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { SubmissionFeatureMap } from './map/SubmissionFeatureMap';
+import { CreateSubmissionFeatureTileSession } from './map/useSubmissionFeatureTileSession';
 
 interface SubmissionFeatureDetailContentProps {
   /** Submission feature displayed by the page. */
   feature: ISubmissionFeature;
   /** Builds the detail page path of another feature, used to link to the current version of this one. */
   getFeaturePath: (submissionFeatureId: number) => string;
+  /** Requests the feature's map tile session from the endpoint that serves the page. */
+  createTileSession: CreateSubmissionFeatureTileSession;
 }
 
 /**
@@ -31,13 +34,14 @@ interface SubmissionFeatureDetailContentProps {
 export const SubmissionFeatureDetailContent = ({
   feature,
   getFeaturePath,
+  createTileSession,
   children
 }: PropsWithChildren<SubmissionFeatureDetailContentProps>) => {
   const terminalFeatureId = feature.terminal_submission_feature_id;
   const hasTerminalFeature = terminalFeatureId !== null && terminalFeatureId !== feature.submission_feature_id;
 
   return (
-    <Container maxWidth="xl">
+    <Container maxWidth="lg">
       {feature.successor_submission_feature_id && (
         <AlertBanner severity="warning" variant="standard" sx={{ mt: 4 }}>
           <AlertTitle sx={{ mb: 0 }}>This feature has been superseded</AlertTitle>
@@ -57,7 +61,10 @@ export const SubmissionFeatureDetailContent = ({
       <Stack spacing={3} py={4}>
         {children}
         <PageSection id="submission-feature-map" label="Map">
-          <SubmissionFeatureMap submissionFeatureId={feature.submission_feature_id} />
+          <SubmissionFeatureMap
+            submissionFeatureId={feature.submission_feature_id}
+            createTileSession={createTileSession}
+          />
         </PageSection>
         <SubmissionFeatureAbout feature={feature} />
       </Stack>

@@ -106,6 +106,23 @@ export interface AuthorizeByContributor {
   clientId: string;
 }
 
+/**
+ * Authorization rule that requires the feature to belong to the submission and one of the caller's teams to hold a
+ * policy grant whose URN matches the feature, at any lifecycle stage.
+ *
+ * Unlike `Policy`, it does not read `submission_feature_closure`, so it also authorizes unreviewed and superseded
+ * features, and it never admits anonymous callers. It serves the submission's own feature routes, alongside a `Team`
+ * rule on the submission.
+ *
+ * @export
+ * @interface AuthorizeBySubmissionFeatureGrant
+ */
+export interface AuthorizeBySubmissionFeatureGrant {
+  discriminator: 'SubmissionFeatureGrant';
+  submissionId: number;
+  submissionFeatureId: number;
+}
+
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
@@ -113,7 +130,8 @@ export type AuthorizeRule =
   | AuthorizeByUpload
   | AuthorizeByContributor
   | AuthorizeByTeam
-  | AuthorizeByPolicy;
+  | AuthorizeByPolicy
+  | AuthorizeBySubmissionFeatureGrant;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -192,6 +210,8 @@ export class AuthorizationService extends DBService {
             return this.authorizeByTeam(authorizeRule);
           case 'Policy':
             return this.authorizeByPolicy(authorizeRule);
+          case 'SubmissionFeatureGrant':
+            return this.authorizeBySubmissionFeatureGrant(authorizeRule);
         }
       })
     );
@@ -318,6 +338,32 @@ export class AuthorizationService extends DBService {
 
     return teamAuthorizationService.isSubmissionFeatureAccessibleToUser(
       user?.system_user_id ?? null,
+      authorizeRule.submissionFeatureId
+    );
+  }
+
+  /**
+   * Check whether a feature belongs to a submission and one of the current user's teams holds a policy grant whose URN
+   * matches the feature.
+   *
+   * @param {AuthorizeBySubmissionFeatureGrant} authorizeRule
+   * @returns {Promise<boolean>} `true` if an authenticated user holds a matching grant.
+   */
+  async authorizeBySubmissionFeatureGrant(authorizeRule: AuthorizeBySubmissionFeatureGrant): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
+    }
+
+    const user = await this.getCachedSystemUser();
+    if (!user) {
+      return false;
+    }
+
+    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
+
+    return teamAuthorizationService.isSubmissionFeatureGrantedToUser(
+      user.system_user_id,
+      authorizeRule.submissionId,
       authorizeRule.submissionFeatureId
     );
   }

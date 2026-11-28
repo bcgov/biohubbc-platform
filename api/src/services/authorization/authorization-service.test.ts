@@ -1021,3 +1021,50 @@ describe('getSystemUserWithRoles', function () {
     expect(result).to.equal(userObjectMock);
   });
 });
+
+describe('authorizeBySubmissionFeatureGrant', function () {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  const systemUser = { system_user_id: 1, role_names: [] } as unknown as SystemUserExtended;
+
+  it('checks the grant for the authenticated user, submission and feature', async function () {
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    const grantStub = sinon.stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureGrantedToUser').resolves(true);
+
+    const result = await new AuthorizationService(getMockDBConnection()).authorizeBySubmissionFeatureGrant({
+      discriminator: 'SubmissionFeatureGrant',
+      submissionId: 7,
+      submissionFeatureId: 20
+    });
+
+    expect(result).to.be.true;
+    expect(grantStub).to.have.been.calledOnceWith(1, 7, 20);
+  });
+
+  it('denies anonymous callers without checking grants', async function () {
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+    const grantStub = sinon.stub(TeamAuthorizationService.prototype, 'isSubmissionFeatureGrantedToUser');
+
+    const result = await new AuthorizationService(getMockDBConnection()).authorizeBySubmissionFeatureGrant({
+      discriminator: 'SubmissionFeatureGrant',
+      submissionId: 7,
+      submissionFeatureId: 20
+    });
+
+    expect(result).to.be.false;
+    expect(grantStub).not.to.have.been.called;
+  });
+
+  it('is dispatched by the authorization scheme', async function () {
+    const grantStub = sinon.stub(AuthorizationService.prototype, 'authorizeBySubmissionFeatureGrant').resolves(false);
+
+    const result = await new AuthorizationService(getMockDBConnection()).executeAuthorizationScheme({
+      and: [{ discriminator: 'SubmissionFeatureGrant', submissionId: 7, submissionFeatureId: 20 }]
+    });
+
+    expect(result).to.be.false;
+    expect(grantStub).to.have.been.calledOnce;
+  });
+});

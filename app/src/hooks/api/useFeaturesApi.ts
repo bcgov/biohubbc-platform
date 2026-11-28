@@ -52,8 +52,54 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Get one of a submission's features by its ID at any lifecycle stage (unreviewed, current or superseded), for a
+   * member of the submission's team.
+   *
+   * @param {number} submissionId Submission the feature belongs to.
+   * @param {number} submissionFeatureId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {Promise<ISubmissionFeatureResponse>}
+   */
+  const getSubmissionFeatureBySubmissionId = async (
+    submissionId: number,
+    submissionFeatureId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionFeatureResponse> => {
+    const { data } = await axios.get(`api/submission/${submissionId}/feature/${submissionFeatureId}`, options);
+
+    return data;
+  };
+
+  /**
+   * Get paginated properties of one of a submission's features at any lifecycle stage, for a member of the
+   * submission's team.
+   *
+   * @param {number} submissionId Submission the feature belongs to.
+   * @param {number} submissionFeatureId
+   * @param {ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters} params
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options] Request cancellation.
+   * @return {Promise<ISubmissionFeaturePropertiesResponse>}
+   */
+  const getSubmissionFeaturePropertiesBySubmissionId = async (
+    submissionId: number,
+    submissionFeatureId: number,
+    params: ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<ISubmissionFeaturePropertiesResponse> => {
+    const { data } = await axios.get(`api/submission/${submissionId}/feature/${submissionFeatureId}/properties`, {
+      params,
+      paramsSerializer: (queryParams) => qs.stringify(queryParams),
+      ...options
+    });
+
+    return data;
+  };
+
   return {
     getSubmissionFeatureById,
-    getSubmissionFeatureProperties
+    getSubmissionFeatureProperties,
+    getSubmissionFeatureBySubmissionId,
+    getSubmissionFeaturePropertiesBySubmissionId
   };
 };

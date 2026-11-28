@@ -3,10 +3,12 @@ import { IDBConnection } from '../database/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { HTTP400, HTTP403 } from '../errors/http-error';
 import { Blueprint } from '../models/blueprint';
+import { PolicyEffect } from '../models/policy-statement';
 import {
   AdminSubmissionListFilters,
   AdminSubmissionListResponse,
-  SubmissionFeatureForReview,
+  SubmissionFeatureListFilters,
+  SubmissionFeaturePage,
   SubmissionFilters,
   SubmissionSummary
 } from '../models/submission';
@@ -22,8 +24,11 @@ import {
   SubmissionRecordWithSecurity,
   SubmissionRepository
 } from '../repositories/submission-repository';
+import { SubmissionUploadRepository } from '../repositories/upload/submission-upload-repository';
 import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { PolicyService } from './access-policy/policy-service';
+import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { BlueprintService } from './blueprint-service';
 import { DBService } from './db-service';
@@ -32,8 +37,11 @@ import { UserService } from './user-service';
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
   blueprintRepository: BlueprintRepository;
+  submissionUploadRepository: SubmissionUploadRepository;
   blueprintService: BlueprintService;
   teamService: TeamService;
+  policyService: PolicyService;
+  teamPolicyService: TeamPolicyService;
   userService: UserService;
 
   constructor(connection: IDBConnection) {
@@ -41,8 +49,11 @@ export class SubmissionService extends DBService {
 
     this.submissionRepository = new SubmissionRepository(connection);
     this.blueprintRepository = new BlueprintRepository(connection);
+    this.submissionUploadRepository = new SubmissionUploadRepository(connection);
     this.blueprintService = new BlueprintService(connection);
     this.teamService = new TeamService(connection);
+    this.policyService = new PolicyService(connection);
+    this.teamPolicyService = new TeamPolicyService(connection);
     this.userService = new UserService(connection);
   }
 
@@ -82,7 +93,11 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Insert a new submission record.
+   * Insert a new submission record with its team and the team's access policy.
+   *
+   * The submitter and the additional users form the submission's team, which can read and upload to the submission.
+   * Team membership does not reach feature content: an approved policy linked to the team grants it access to every
+   * feature in the submission, so the team's feature access is managed like any other policy grant.
    *
    * @param {ICreateSubmission} submissionData
    * @param {number[]} [additionalSystemUserIds] Additional users to add to the submission team
@@ -99,10 +114,23 @@ export class SubmissionService extends DBService {
       system_user_ids: [...new Set([submissionData.system_user_id, ...additionalSystemUserIds])]
     });
 
-    return this.submissionRepository.insertSubmissionRecord({
+    const submission = await this.submissionRepository.insertSubmissionRecord({
       ...submissionData,
       team_id: team.team_id
     });
+
+    const policy = await this.policyService.createPolicyWithStatements(
+      {
+        name: `Submission Policy ${submissionData.uuid}`,
+        description: `Auto-generated policy granting the team of submission ${submissionData.uuid} access to its features.`,
+        status: 'approved'
+      },
+      [{ effect: PolicyEffect.ALLOW, submission_feature_urn: `urn:${submission.submission_id}:*:*` }]
+    );
+
+    await this.teamPolicyService.createTeamPolicy({ team_id: team.team_id, policy_id: policy.policy_id });
+
+    return submission;
   }
 
   /**
@@ -394,32 +422,69 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Fetch the flattened array of features in the given submission with optional pagination
+   * Get one page of a submission's published (approved) features in a lifecycle, with the total.
+   *
+   * Only features reached by one of the caller's team policy grants are returned. Unreviewed features are not
+   * published, so they appear only in their upload's feature list until the upload is approved.
    *
    * @param {number} submissionId ID of the submission whose features should be returned.
-   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
-   * @param {ApiPaginationOptions} [pagination] Optional pagination and sorting options.
-   * @returns {Promise<SubmissionFeatureForReview[]>} Current submission features visible to the requesting user.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @param {SubmissionFeatureListFilters} filters Lifecycle of the published features returned.
+   * @param {ApiPaginationOptions} pagination Page, page size and sort.
+   * @returns {Promise<SubmissionFeaturePage>} The page of features and its pagination totals.
    * @memberof SubmissionService
    */
-  async getSubmissionFeatures(
+  async getSubmissionFeaturePage(
     submissionId: number,
-    systemUserId: number | null,
-    pagination?: ApiPaginationOptions
-  ): Promise<SubmissionFeatureForReview[]> {
-    return this.submissionRepository.getSubmissionFeatures(submissionId, systemUserId, pagination);
+    systemUserId: number,
+    filters: SubmissionFeatureListFilters,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionFeaturePage> {
+    const features = await this.submissionRepository.getSubmissionFeatures(
+      submissionId,
+      systemUserId,
+      filters,
+      pagination
+    );
+    const total = await this.submissionRepository.getSubmissionFeaturesCount(submissionId, systemUserId, filters);
+
+    return { features, pagination: makePaginationResponse(total, pagination) };
   }
 
   /**
-   * Fetch the total count of features in the given submission
+   * Get one page of an upload's features at any lifecycle stage (unreviewed, current or superseded), with the total.
    *
-   * @param {number} submissionId ID of the submission whose features should be counted.
-   * @param {number | null} systemUserId Caller identity, or null for anonymous (unsecured features only).
-   * @returns {Promise<number>} Number of current submission features visible to the requesting user.
+   * Only features reached by one of the caller's team policy grants are returned.
+   *
+   * @param {number} submissionId Submission the upload belongs to.
+   * @param {string} submissionUploadId Upload whose features are returned.
+   * @param {number} systemUserId Caller whose team policy grants select the features.
+   * @param {ApiPaginationOptions} pagination Page, page size and sort.
+   * @returns {Promise<SubmissionFeaturePage>} The page of the upload's features and its pagination totals.
+   * @throws {ApiNotFoundError} If the submission has no active upload with the ID.
    * @memberof SubmissionService
    */
-  async getSubmissionFeaturesCount(submissionId: number, systemUserId: number | null): Promise<number> {
-    return this.submissionRepository.getSubmissionFeaturesCount(submissionId, systemUserId);
+  async getSubmissionUploadFeaturePage(
+    submissionId: number,
+    submissionUploadId: string,
+    systemUserId: number,
+    pagination: ApiPaginationOptions
+  ): Promise<SubmissionFeaturePage> {
+    await this.submissionUploadRepository.getSubmissionUploadBySubmissionId(submissionId, submissionUploadId);
+
+    const features = await this.submissionRepository.getSubmissionUploadFeatures(
+      submissionId,
+      submissionUploadId,
+      systemUserId,
+      pagination
+    );
+    const total = await this.submissionRepository.getSubmissionUploadFeaturesCount(
+      submissionId,
+      submissionUploadId,
+      systemUserId
+    );
+
+    return { features, pagination: makePaginationResponse(total, pagination) };
   }
 
   /**

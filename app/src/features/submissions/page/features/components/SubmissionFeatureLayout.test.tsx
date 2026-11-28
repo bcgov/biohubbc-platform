@@ -33,6 +33,7 @@ const renderLayout = (feature?: ISubmissionFeature, isLoading = false) =>
         rootBreadcrumbLabel="Search"
         rootBreadcrumbTo="/search"
         getFeaturePath={(submissionFeatureId) => `/feature/${submissionFeatureId}`}
+        createTileSession={vi.fn()}
         breadcrumbs={<nav aria-label="review breadcrumb">Validation</nav>}>
         <h2>Review properties</h2>
       </SubmissionFeatureLayout>

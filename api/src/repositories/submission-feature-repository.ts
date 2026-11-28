@@ -1,5 +1,5 @@
-import SQL from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import SQL, { SQLStatement } from 'sql-template-strings';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CountResult } from '../models/count';
 import { BaseRepository } from './base-repository';
 import {
@@ -184,21 +184,21 @@ export class SubmissionFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Get a published submission feature by ID.
+   * Build the point-read query of one submission feature's metadata, ending in an open `WHERE` for the caller's
+   * predicates.
    *
-   * Returns metadata for the exact requested feature. Current means published, not ended, and without a successor.
    * Current security metadata comes from the optimized closure path. Because the closure contains only current
-   * features, security metadata for a superseded feature uses a minimal walk of its immutable parent links.
-   * Only the relationship graph is historical: security assignments are evaluated as they exist now. The terminal
-   * join ensures the feature still resolves to a current feature; authorization itself is enforced by the route gate.
-   * The recursive CTE is seeded only for a specific non-current ID, so current point reads remain closure-backed and
-   * perform no parent traversal. Bulk feature reads must never reuse this point-read query.
+   * features, security metadata for any other feature uses a minimal walk of its immutable parent links. Only the
+   * relationship graph is historical: security assignments are evaluated as they exist now. The recursive CTE is seeded
+   * only for a specific non-current ID, so current point reads remain closure-backed and perform no parent traversal.
+   * Bulk feature reads must never reuse this point-read query.
    *
-   * @param {number} submissionFeatureId Submission feature ID.
-   * @returns {Promise<SubmissionFeature>} Published submission feature.
+   * @param {'JOIN LATERAL' | 'LEFT JOIN LATERAL'} terminalJoin `JOIN LATERAL` requires the feature to still resolve to a
+   * current feature; `LEFT JOIN LATERAL` also reads features that do not, with a null terminal feature.
+   * @returns {SQLStatement} The query up to and including `WHERE`.
    * @memberof SubmissionFeatureRepository
    */
-  async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
+  private _buildSubmissionFeatureSql(terminalJoin: 'JOIN LATERAL' | 'LEFT JOIN LATERAL'): SQLStatement {
     const terminalFeatureId = 'terminal.terminal_submission_feature_id';
     const sqlStatement = SQL`
       SELECT
@@ -242,7 +242,7 @@ export class SubmissionFeatureRepository extends BaseRepository {
         submission s ON s.submission_id = sf.submission_id
       JOIN
         contributor c ON c.contributor_id = s.contributor_id
-      JOIN LATERAL
+      ${terminalJoin}
         ${buildSubmissionFeatureTerminalSubquery('sf.submission_feature_id')} terminal ON true
       JOIN LATERAL (
         WITH RECURSIVE historical_ancestry AS (
@@ -284,9 +284,25 @@ export class SubmissionFeatureRepository extends BaseRepository {
             ARRAY[]::varchar[]
           ) AS security_reasons
       ) historical_security ON true
-      WHERE
-        sf.submission_feature_id =`);
-    sqlStatement.append(SQL` ${submissionFeatureId}`);
+      WHERE`);
+
+    return sqlStatement;
+  }
+
+  /**
+   * Get a published submission feature by ID.
+   *
+   * Returns metadata for the exact requested feature. Current means published, not ended, and without a successor.
+   * The terminal join ensures the feature still resolves to a current feature; authorization itself is enforced by the
+   * route gate. See `_buildSubmissionFeatureSql` for how security metadata is read.
+   *
+   * @param {number} submissionFeatureId Submission feature ID.
+   * @returns {Promise<SubmissionFeature>} Published submission feature.
+   * @memberof SubmissionFeatureRepository
+   */
+  async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
+    const sqlStatement = this._buildSubmissionFeatureSql('JOIN LATERAL');
+    sqlStatement.append(SQL` sf.submission_feature_id = ${submissionFeatureId}`);
     sqlStatement.append(` AND ${isSubmissionFeaturePublished('sf')};`);
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeature);
@@ -295,6 +311,40 @@ export class SubmissionFeatureRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to get submission feature record', [
         'SubmissionFeatureRepository->getSubmissionFeatureById',
         `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a submission's feature by ID at any lifecycle stage: unreviewed, current or superseded.
+   *
+   * Serves the submission's own feature routes. Unlike `getSubmissionFeatureById`, the feature need not be published or
+   * still resolve to a current feature, in which case `terminal_submission_feature_id` is null. A superseded feature
+   * carries its `successor_submission_feature_id`. Authorization is enforced by the caller.
+   *
+   * @param {number} submissionId Submission the feature must belong to.
+   * @param {number} submissionFeatureId Submission feature ID.
+   * @returns {Promise<SubmissionFeature>} The submission feature.
+   * @throws {ApiNotFoundError} If the submission has no feature with the ID.
+   * @memberof SubmissionFeatureRepository
+   */
+  async getSubmissionFeatureBySubmissionId(
+    submissionId: number,
+    submissionFeatureId: number
+  ): Promise<SubmissionFeature> {
+    const sqlStatement = this._buildSubmissionFeatureSql('LEFT JOIN LATERAL');
+    sqlStatement.append(
+      SQL` sf.submission_feature_id = ${submissionFeatureId} AND sf.submission_id = ${submissionId};`
+    );
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeature);
+
+    if (response.rowCount !== 1) {
+      throw new ApiNotFoundError('Submission feature not found', [
+        'SubmissionFeatureRepository->getSubmissionFeatureBySubmissionId',
+        `submission_feature_id ${submissionFeatureId} does not belong to submission_id ${submissionId}`
       ]);
     }
 

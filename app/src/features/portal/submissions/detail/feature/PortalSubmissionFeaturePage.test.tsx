@@ -11,13 +11,25 @@ const mockUseApi = useApi as Mock;
 
 // The map owns its own data loading and is covered by its own suite; this one is about the page layout.
 vi.mock('features/submissions/page/features/components/map/SubmissionFeatureMap', () => ({
-  SubmissionFeatureMap: (props: { submissionFeatureId: number }) => (
-    <div data-testid="submission-feature-map-stub" data-props={JSON.stringify(props)} />
+  SubmissionFeatureMap: (props: {
+    submissionFeatureId: number;
+    createTileSession: (submissionFeatureId: number, signal: AbortSignal) => Promise<unknown>;
+  }) => (
+    <div
+      data-testid="submission-feature-map-stub"
+      data-props={JSON.stringify({ submissionFeatureId: props.submissionFeatureId })}>
+      <button
+        type="button"
+        onClick={() => props.createTileSession(props.submissionFeatureId, new AbortController().signal)}>
+        Request tiles
+      </button>
+    </div>
   )
 }));
 
-const mockGetSubmissionFeatureById = vi.fn();
-const mockGetSubmissionFeatureProperties = vi.fn();
+const mockGetSubmissionFeatureBySubmissionId = vi.fn();
+const mockGetSubmissionFeaturePropertiesBySubmissionId = vi.fn();
+const mockCreateTileSession = vi.fn();
 const mockGetSubmissionRecordWithSecurity = vi.fn();
 
 const mockFeature = {
@@ -56,8 +68,11 @@ describe('PortalSubmissionFeaturePage', () => {
 
     mockUseApi.mockReturnValue({
       features: {
-        getSubmissionFeatureById: mockGetSubmissionFeatureById,
-        getSubmissionFeatureProperties: mockGetSubmissionFeatureProperties
+        getSubmissionFeatureBySubmissionId: mockGetSubmissionFeatureBySubmissionId,
+        getSubmissionFeaturePropertiesBySubmissionId: mockGetSubmissionFeaturePropertiesBySubmissionId
+      },
+      martin: {
+        createSubmissionFeatureTileSessionBySubmissionId: mockCreateTileSession
       },
       submissions: {
         getSubmissionRecordWithSecurity: mockGetSubmissionRecordWithSecurity
@@ -66,11 +81,11 @@ describe('PortalSubmissionFeaturePage', () => {
 
     mockGetSubmissionRecordWithSecurity.mockResolvedValue({ submission_id: 1, name: 'Test Submission' });
 
-    mockGetSubmissionFeatureById.mockResolvedValue({
+    mockGetSubmissionFeatureBySubmissionId.mockResolvedValue({
       feature: mockFeature
     });
 
-    mockGetSubmissionFeatureProperties.mockResolvedValue({
+    mockGetSubmissionFeaturePropertiesBySubmissionId.mockResolvedValue({
       properties: [
         { id: 'species_name', property: 'species name', value: 'Wolf' },
         {
@@ -93,7 +108,7 @@ describe('PortalSubmissionFeaturePage', () => {
 
     expect(await findByText('Properties')).toBeVisible();
     await waitFor(() => {
-      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith(10, expect.any(Object), {
+      expect(mockGetSubmissionFeaturePropertiesBySubmissionId).toHaveBeenCalledWith(1, 10, expect.any(Object), {
         signal: expect.any(AbortSignal)
       });
     });
@@ -113,7 +128,7 @@ describe('PortalSubmissionFeaturePage', () => {
     const { findByText } = renderPage('/portal/submission/abc/feature/10');
 
     expect(await findByText('Page Not Found')).toBeVisible();
-    expect(mockGetSubmissionFeatureById).not.toHaveBeenCalled();
+    expect(mockGetSubmissionFeatureBySubmissionId).not.toHaveBeenCalled();
   });
 
   it('renders portal as the breadcrumb root', async () => {
@@ -147,13 +162,17 @@ describe('PortalSubmissionFeaturePage', () => {
     expect(await findByText('feat-uuid-1')).toBeVisible();
   });
 
-  it('maps the feature being viewed', async () => {
-    const { findByTestId } = renderPage();
+  it("maps the feature being viewed through the submission's own tile endpoint", async () => {
+    const { findByTestId, getByRole } = renderPage();
 
     const stub = await findByTestId('submission-feature-map-stub');
+    getByRole('button', { name: 'Request tiles' }).click();
 
     expect(JSON.parse(stub.dataset.props ?? '{}')).toEqual({
       submissionFeatureId: mockFeature.submission_feature_id
+    });
+    expect(mockCreateTileSession).toHaveBeenCalledWith(1, mockFeature.submission_feature_id, {
+      signal: expect.any(AbortSignal)
     });
   });
 
@@ -163,7 +182,29 @@ describe('PortalSubmissionFeaturePage', () => {
     await findByRole('link', { name: 'Test Submission' });
 
     expect(mockGetSubmissionRecordWithSecurity).toHaveBeenCalledWith(1, { signal: expect.any(AbortSignal) });
-    expect(mockGetSubmissionFeatureById).toHaveBeenCalledWith(10, { signal: expect.any(AbortSignal) });
+    expect(mockGetSubmissionFeatureBySubmissionId).toHaveBeenCalledWith(1, 10, { signal: expect.any(AbortSignal) });
+  });
+
+  it('shows a superseded feature with the banner linking to its current version in the submission', async () => {
+    mockGetSubmissionFeatureBySubmissionId.mockResolvedValue({
+      feature: { ...mockFeature, successor_submission_feature_id: 11, terminal_submission_feature_id: 12 }
+    });
+
+    const { findByText, getByRole } = renderPage();
+
+    expect(await findByText('This feature has been superseded')).toBeVisible();
+    expect(getByRole('link', { name: 'View the current version' })).toHaveAttribute(
+      'href',
+      '/portal/submission/1/feature/12'
+    );
+  });
+
+  it('sends a caller whose team policy grants do not reach the feature to the forbidden page', async () => {
+    mockGetSubmissionFeatureBySubmissionId.mockRejectedValue({ status: 403, message: 'Access Denied' });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('Forbidden')).toBeVisible();
   });
 
   it("sends a caller outside the submission's team to the forbidden page, even for a public feature", async () => {
@@ -174,8 +215,8 @@ describe('PortalSubmissionFeaturePage', () => {
     expect(await findByText('Forbidden')).toBeVisible();
   });
 
-  it('redirects to the not found page when the feature belongs to another submission', async () => {
-    mockGetSubmissionFeatureById.mockResolvedValue({ feature: { ...mockFeature, submission_id: 2 } });
+  it('redirects to the not found page when the submission has no such feature', async () => {
+    mockGetSubmissionFeatureBySubmissionId.mockRejectedValue({ status: 404, message: 'Submission feature not found' });
 
     const { findByText } = renderPage();
 

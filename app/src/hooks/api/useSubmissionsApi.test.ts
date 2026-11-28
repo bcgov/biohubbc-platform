@@ -58,6 +58,42 @@ describe('useSubmissionApi', () => {
     });
   });
 
+  describe('submission uploads', () => {
+    const pagination = { total: 0, current_page: 1, last_page: 1, per_page: 10 };
+
+    it("lists a submission's uploads through the team endpoint", async () => {
+      mock.onGet('api/submission/uuid-1/upload').reply(200, { uploads: [], pagination });
+
+      const result = await useSubmissionsApi(axios).listSubmissionUploads('uuid-1', { page: 1, limit: 10 });
+
+      expect(result).toEqual({ uploads: [], pagination });
+      expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
+    });
+
+    it("reads one of a submission's uploads through the team endpoint", async () => {
+      const upload = {
+        submission_upload_id: 'upload-1',
+        status: 'indexed',
+        decision: 'pending',
+        create_date: '2026-11-27'
+      };
+      mock.onGet('api/submission/uuid-1/upload/upload-1').reply(200, upload);
+
+      const result = await useSubmissionsApi(axios).getSubmissionUpload('uuid-1', 'upload-1');
+
+      expect(result).toEqual(upload);
+    });
+
+    it("lists an upload's features through the submission's endpoint", async () => {
+      mock.onGet('api/submission/7/upload/upload-1/feature').reply(200, { features: [], pagination });
+
+      const result = await useSubmissionsApi(axios).getSubmissionUploadFeatures(7, 'upload-1', { page: 1, limit: 10 });
+
+      expect(result).toEqual({ features: [], pagination });
+      expect(mock.history.get[0].params).toEqual({ page: 1, limit: 10 });
+    });
+  });
+
   describe('getSubmissionFeatures', () => {
     it('uses the user-scoped submission-feature endpoint', async () => {
       const mockResponse = {

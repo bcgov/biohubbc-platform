@@ -341,6 +341,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.ticket_id,
         su.blueprint_id,
         su.comment,
+        su.create_date,
         su.record_end_date
       FROM
         submission_upload su

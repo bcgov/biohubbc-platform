@@ -1,9 +1,11 @@
 import { expect } from 'chai';
 import { randomUUID } from 'node:crypto';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { HTTP403 } from '../../errors/http-error';
+import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { TeamAuthorizationService } from '../../services/authorization/team-authorization-service';
 import { ContributorService } from '../../services/contributor-service';
 import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
@@ -26,6 +28,11 @@ describe('multiple contributor memberships (integration)', function () {
 
   before(() => initDBPool(defaultPoolConfig));
   beforeEach(async () => {
+    // Creating a submission grants its team an access policy, which queues anchor computation; the queue is not
+    // running here, and these tests do not depend on anchors.
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
     connection = getAPIUserDBConnection();
     await connection.open();
     systemUserId = connection.systemUserId();
@@ -37,6 +44,7 @@ describe('multiple contributor memberships (integration)', function () {
     secondContributorId = await contributorService.ensureContributor(secondClientId);
   });
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });

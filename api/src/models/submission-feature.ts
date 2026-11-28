@@ -77,3 +77,9 @@ export const SubmissionRecordSchema = z.object({
 });
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecordSchema>;
+
+/**
+ * Scope of a feature properties read that also admits unpublished features: the upload or the submission the feature
+ * belongs to. Public reads take no scope and require published features.
+ */
+export type SubmissionFeaturePropertyScope = { submissionUploadId: string } | { submissionId: number };

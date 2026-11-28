@@ -9,6 +9,7 @@ import { PortalPage } from 'features/portal/PortalPage';
 import { PortalSubmissionsPage } from 'features/portal/submissions/PortalSubmissionsPage';
 import { PortalSubmissionDetailPage } from 'features/portal/submissions/detail/PortalSubmissionDetailPage';
 import { PortalSubmissionFeaturePage } from 'features/portal/submissions/detail/feature/PortalSubmissionFeaturePage';
+import { PortalSubmissionUploadPage } from 'features/portal/submissions/detail/upload/PortalSubmissionUploadPage';
 import { PortalTicketsPage } from 'features/portal/tickets/PortalTicketsPage';
 import { PortalTicketDetailPage } from 'features/portal/tickets/detail/PortalTicketDetailPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
@@ -126,6 +127,15 @@ export const PortalRouter = () => {
           <>
             <PageTitle title="Submission Feature Details" description="View submission feature details" />
             <PortalSubmissionFeaturePage />
+          </>
+        }
+      />
+      <Route
+        path="/submission/:submissionId/upload/:submissionUploadId"
+        element={
+          <>
+            <PageTitle title="Submission Upload" description="View the features of a submission upload" />
+            <PortalSubmissionUploadPage />
           </>
         }
       />

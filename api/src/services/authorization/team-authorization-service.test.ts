@@ -186,6 +186,23 @@ describe('TeamAuthorizationService', () => {
     });
   });
 
+  describe('isSubmissionFeatureGrantedToUser', () => {
+    it('passes the user, submission and feature to the repository', async () => {
+      const repoStub = sinon
+        .stub(TeamAuthorizationRepository.prototype, 'isSubmissionFeatureGrantedToUser')
+        .resolves(true);
+
+      const result = await new TeamAuthorizationService(getMockDBConnection()).isSubmissionFeatureGrantedToUser(
+        1,
+        7,
+        20
+      );
+
+      expect(result).to.be.true;
+      expect(repoStub).to.have.been.calledOnceWith(1, 7, 20);
+    });
+  });
+
   describe('isSubmissionFeatureAccessibleToUser', () => {
     it('delegates to the repository and returns its result, passing the ids through', async () => {
       const mockConnection = getMockDBConnection();

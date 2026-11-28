@@ -6,6 +6,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
 import { Blueprint } from '../models/blueprint';
+import { PolicyEffect } from '../models/policy-statement';
 import { SubmissionSummary } from '../models/submission';
 import { BlueprintRepository } from '../repositories/blueprint-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
@@ -18,7 +19,10 @@ import {
   SubmissionRecordWithSecurity,
   SubmissionRepository
 } from '../repositories/submission-repository';
+import { SubmissionUploadRepository } from '../repositories/upload/submission-upload-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { PolicyService } from './access-policy/policy-service';
+import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { BlueprintService } from './blueprint-service';
 import { SubmissionService } from './submission-service';
@@ -31,6 +35,49 @@ describe('SubmissionService', () => {
   });
 
   describe('insertSubmissionRecord', () => {
+    const teamId = '11111111-1111-1111-1111-111111111111';
+    const policyId = '22222222-2222-2222-2222-222222222222';
+
+    const stubPolicyCreation = () => ({
+      createPolicy: sinon
+        .stub(PolicyService.prototype, 'createPolicyWithStatements')
+        .resolves({ policy_id: policyId } as Awaited<ReturnType<PolicyService['createPolicyWithStatements']>>),
+      createTeamPolicy: sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({
+        team_policy_id: '33333333-3333-3333-3333-333333333333',
+        team_id: teamId,
+        policy_id: policyId,
+        record_end_date: null
+      })
+    });
+
+    it("grants the submission's team an approved policy over every feature in the submission", async () => {
+      const submissionService = new SubmissionService(getMockDBConnection());
+      sinon.stub(TeamService.prototype, 'createTeam').resolves({
+        team_id: teamId,
+        name: 'Submission Team',
+        description: null,
+        member_count: 1
+      });
+      sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 7 });
+      const { createPolicy, createTeamPolicy } = stubPolicyCreation();
+
+      await submissionService.insertSubmissionRecord({
+        uuid: 'submission-uuid',
+        comment: 'comment',
+        description: 'description',
+        name: 'name',
+        contributor_id: 1,
+        system_user_id: 1,
+        default_blueprint_id: 4
+      });
+
+      expect(createPolicy).to.have.been.calledOnceWithExactly(sinon.match({ status: 'approved' }), [
+        { effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:7:*:*' }
+      ]);
+      expect(createTeamPolicy).to.have.been.calledOnceWithExactly({ team_id: teamId, policy_id: policyId });
+      expect(createTeamPolicy).to.have.been.calledAfter(createPolicy);
+    });
+
     it('should return submission_id on insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
@@ -42,6 +89,7 @@ describe('SubmissionService', () => {
         member_count: 1
       });
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
+      stubPolicyCreation();
 
       const response = await submissionService.insertSubmissionRecord(
         {
@@ -69,6 +117,71 @@ describe('SubmissionService', () => {
       );
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('submission feature pages', () => {
+    const pagination: ApiPaginationOptions = { page: 2, limit: 10 };
+
+    it("returns a page of the submission's published features in the lifecycle with its total", async () => {
+      const features = [
+        {
+          submission_id: 7,
+          submission_feature_id: 20,
+          feature_type_name: 'observation',
+          feature_type_id: 3,
+          secured: false
+        }
+      ];
+      const listStub = sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeatures').resolves(features);
+      const countStub = sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesCount').resolves(11);
+
+      const page = await new SubmissionService(getMockDBConnection()).getSubmissionFeaturePage(
+        7,
+        1000,
+        { lifecycle: 'superseded' },
+        pagination
+      );
+
+      expect(listStub).to.have.been.calledOnceWith(7, 1000, { lifecycle: 'superseded' }, pagination);
+      expect(countStub).to.have.been.calledOnceWith(7, 1000, { lifecycle: 'superseded' });
+      expect(page.features).to.eql(features);
+      expect(page.pagination.total).to.equal(11);
+    });
+
+    it("returns a page of an upload's features after checking the upload belongs to the submission", async () => {
+      const uploadStub = sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId')
+        .resolves({} as Awaited<ReturnType<SubmissionUploadRepository['getSubmissionUploadBySubmissionId']>>);
+      const listStub = sinon.stub(SubmissionRepository.prototype, 'getSubmissionUploadFeatures').resolves([]);
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionUploadFeaturesCount').resolves(0);
+
+      const page = await new SubmissionService(getMockDBConnection()).getSubmissionUploadFeaturePage(
+        7,
+        'upload-id',
+        1000,
+        pagination
+      );
+
+      expect(uploadStub).to.have.been.calledOnceWith(7, 'upload-id');
+      expect(listStub).to.have.been.calledOnceWith(7, 'upload-id', 1000, pagination);
+      expect(page.pagination.total).to.equal(0);
+    });
+
+    it("does not read an upload's features when the submission has no such upload", async () => {
+      sinon
+        .stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadBySubmissionId')
+        .rejects(new ApiNotFoundError('Submission upload not found'));
+      const listStub = sinon.stub(SubmissionRepository.prototype, 'getSubmissionUploadFeatures');
+
+      try {
+        await new SubmissionService(getMockDBConnection()).getSubmissionUploadFeaturePage(7, 'other', 1000, pagination);
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error_) {
+        expect(error_).to.be.instanceOf(ApiNotFoundError);
+      }
+
+      expect(listStub).not.to.have.been.called;
     });
   });
 

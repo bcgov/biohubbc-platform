@@ -19,7 +19,7 @@ export const SubmissionFeatureSkeleton = () => {
   return (
     <Box data-testid="feature-skeleton">
       <PageHeader
-        maxWidth="xl"
+        maxWidth="lg"
         breadcrumbs={<Skeleton variant="text" width={220} height={24} />}
         label={<Skeleton variant="text" width={320} height={44} />}
         subheader={
@@ -31,7 +31,7 @@ export const SubmissionFeatureSkeleton = () => {
         tabs={<Skeleton variant="text" width={72} height={48} />}
       />
 
-      <Container maxWidth="xl">
+      <Container maxWidth="lg">
         <Stack spacing={3} py={4}>
           <PageSection
             id="submission-feature-properties-skeleton"

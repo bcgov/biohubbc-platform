@@ -41,6 +41,24 @@ export class SubmissionFeatureService extends DBService {
   }
 
   /**
+   * Get a submission's feature by id at any lifecycle stage: unreviewed, current or superseded.
+   *
+   * A superseded feature carries its `successor_submission_feature_id`.
+   *
+   * @param {number} submissionId Submission the feature must belong to.
+   * @param {number} submissionFeatureId
+   * @returns {Promise<SubmissionFeature>}
+   * @throws {ApiNotFoundError} If the submission has no feature with the id.
+   * @memberof SubmissionFeatureService
+   */
+  async getSubmissionFeatureBySubmissionId(
+    submissionId: number,
+    submissionFeatureId: number
+  ): Promise<SubmissionFeature> {
+    return this.submissionFeatureRepository.getSubmissionFeatureBySubmissionId(submissionId, submissionFeatureId);
+  }
+
+  /**
    * Get any feature row owned by an upload for administrative review.
    *
    * @param {number} submissionId ID of the submission that owns the upload.

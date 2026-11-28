@@ -742,30 +742,84 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSubmissionFeaturesCount', () => {
-    it('should return the correct submission feature count', async () => {
-      const mockQueryResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
-      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+  describe('submission feature lists', () => {
+    const captureKnex = (rows: unknown[] = []) => {
+      const queries: { sql: string; bindings: readonly unknown[] }[] = [];
+      const connection = getMockDBConnection({
+        knex: async (query: any) => {
+          const compiled = query.toSQL();
+          queries.push({ sql: compiled.sql, bindings: compiled.bindings });
+          return { rows, rowCount: rows.length } as any;
+        }
+      });
+      return { connection, queries };
+    };
 
-      const repository = new SubmissionRepository(dbConnection);
+    it("lists only the submission's published current features that the caller's grants reach", async () => {
+      const { connection, queries } = captureKnex();
 
-      const count = await repository.getSubmissionFeaturesCount(123, null);
+      await new SubmissionRepository(connection).getSubmissionFeatures(7, 1000, { lifecycle: 'current' });
 
-      expect(count).to.equal(42);
+      const { sql, bindings } = queries[0];
+      expect(sql).to.include('"submission_feature"."submission_id" = ?');
+      expect(sql).to.include('submission_feature.record_effective_date <= now()');
+      expect(sql).to.include('submission_feature.successor_submission_feature_id IS NULL');
+      expect(sql).to.include('FROM team_member grant_tm');
+      expect(bindings).to.include.members([7, 1000]);
     });
 
-    it('should throw an error when count query fails', async () => {
-      const mockQueryResponse = { rows: [], rowCount: 0 } as any;
-      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+    it('lists only superseded or ended published features for the superseded lifecycle', async () => {
+      const { connection, queries } = captureKnex();
 
-      const repository = new SubmissionRepository(dbConnection);
+      await new SubmissionRepository(connection).getSubmissionFeatures(7, 1000, { lifecycle: 'superseded' });
 
-      try {
-        await repository.getSubmissionFeaturesCount(123, null);
-        expect.fail();
-      } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
-      }
+      expect(queries[0].sql).to.include('submission_feature.record_effective_date <= now()');
+      expect(queries[0].sql).to.include('NOT (submission_feature.record_effective_date <= now() AND');
+    });
+
+    it('lists every published feature for the all lifecycle', async () => {
+      const { connection, queries } = captureKnex();
+
+      await new SubmissionRepository(connection).getSubmissionFeatures(7, 1000, { lifecycle: 'all' });
+
+      expect(queries[0].sql).to.include('submission_feature.record_effective_date <= now()');
+      expect(queries[0].sql).not.to.include('successor_submission_feature_id IS NULL');
+    });
+
+    it('counts with the same lifecycle and grant predicates', async () => {
+      const { connection, queries } = captureKnex([{ count: 42 }]);
+
+      const count = await new SubmissionRepository(connection).getSubmissionFeaturesCount(7, 1000, {
+        lifecycle: 'current'
+      });
+
+      expect(count).to.equal(42);
+      expect(queries[0].sql).to.include('submission_feature.successor_submission_feature_id IS NULL');
+      expect(queries[0].sql).to.include('FROM team_member grant_tm');
+      expect(queries[0].bindings).to.include.members([7, 1000]);
+    });
+
+    it("lists an upload's features at any lifecycle stage without reading the closure", async () => {
+      const { connection, queries } = captureKnex();
+
+      await new SubmissionRepository(connection).getSubmissionUploadFeatures(7, 'upload-id', 1000);
+
+      const { sql, bindings } = queries[0];
+      expect(sql).to.include('"submission_feature"."submission_upload_id" = ?');
+      expect(sql).to.include('FROM team_member grant_tm');
+      expect(sql).not.to.include('record_effective_date');
+      expect(sql).not.to.include('submission_feature_closure');
+      expect(bindings).to.include.members([7, 'upload-id', 1000]);
+    });
+
+    it("counts an upload's features with the same predicates", async () => {
+      const { connection, queries } = captureKnex([{ count: 3 }]);
+
+      const count = await new SubmissionRepository(connection).getSubmissionUploadFeaturesCount(7, 'upload-id', 1000);
+
+      expect(count).to.equal(3);
+      expect(queries[0].sql).not.to.include('submission_feature_closure');
+      expect(queries[0].bindings).to.include.members([7, 'upload-id', 1000]);
     });
   });
 

@@ -267,6 +267,37 @@ export function isAccessibleToUser(featureIdExpr: string): string {
 }
 
 /**
+ * Whether one of the caller's teams holds a policy grant whose URN matches a submission feature.
+ *
+ * Matches the grant's URN (`team_security_scope` -> `security_scope`) against the feature row itself, with no
+ * `submission_feature_closure` or scope anchor lookup, so it applies to features at any lifecycle stage: unreviewed,
+ * current or superseded. It is used by the submission routes, which serve the submission's team, and is not a
+ * replacement for `isAccessibleToUser`: search and the public feature routes only serve features that are in the
+ * closure. Like search access, it matches the URN alone; a statement's policy expression does not narrow it.
+ *
+ * Returns an `EXISTS (...)` SQL expression with a single `?` placeholder for `systemUserId`.
+ *
+ * @param featureAlias Alias of the candidate `submission_feature` row.
+ */
+export function isSubmissionFeatureGrantedToUser(featureAlias: string): string {
+  return `EXISTS (
+    SELECT 1
+    FROM team_member grant_tm
+    JOIN team grant_team
+      ON grant_team.team_id = grant_tm.team_id
+      AND grant_team.record_end_date IS NULL
+    JOIN team_security_scope grant_tss ON grant_tss.team_id = grant_tm.team_id
+    JOIN security_scope grant_ss ON grant_ss.security_scope_id = grant_tss.security_scope_id
+    JOIN feature_type grant_ft ON grant_ft.feature_type_id = ${featureAlias}.feature_type_id
+    WHERE grant_tm.system_user_id = ?  -- bound by caller
+      AND grant_tm.record_end_date IS NULL
+      AND (grant_ss.urn_submission_id = ${featureAlias}.submission_id::text OR grant_ss.urn_submission_id = '*')
+      AND (grant_ss.urn_feature_type = grant_ft.name OR grant_ss.urn_feature_type = '*')
+      AND (grant_ss.urn_feature_id = ${featureAlias}.submission_feature_id::text OR grant_ss.urn_feature_id = '*')
+  )`;
+}
+
+/**
  * Builds a single security filter, applied per candidate feature, that checks:
  *   1. Unsecured — no ancestor has an active submission_feature_security row → visible
  *   2. Secured + granted — any ancestor is a scope anchor the user's team can reach → visible

@@ -31,6 +31,7 @@ const mockFeature: ISubmissionFeature = {
 const defaultProps: ComponentProps<typeof SubmissionFeatureDetailContent> = {
   feature: mockFeature,
   getFeaturePath: (submissionFeatureId) => `/feature/${submissionFeatureId}?ft=observation`,
+  createTileSession: vi.fn(),
   children: <h2>Properties</h2>
 };
 

@@ -57,6 +57,73 @@ describe('SubmissionUploadService', () => {
     sinon.restore();
   });
 
+  describe('listSubmissionUploadsBySubmissionUuid', () => {
+    it('lists the uploads of the submission the UUID identifies', async () => {
+      const lookup = sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 17 });
+      const list = sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([]);
+      const count = sinon.stub(SubmissionUploadRepository.prototype, 'countAdminSubmissionUploads').resolves(0);
+      const pagination = { page: 1, limit: 10, sort: 'create_date', order: 'desc' as const };
+
+      const result = await service.listSubmissionUploadsBySubmissionUuid('submission-uuid', pagination);
+
+      expect(lookup).to.have.been.calledOnceWithExactly('submission-uuid');
+      expect(list).to.have.been.calledOnceWithExactly(17, pagination);
+      expect(count).to.have.been.calledOnceWithExactly(17);
+      expect(result.uploads).to.eql([]);
+      expect(result.pagination.total).to.equal(0);
+    });
+
+    it("returns each upload's identifier, status, decision and creation date only", async () => {
+      sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 17 });
+      sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([
+        {
+          submission_upload_id: '11111111-1111-1111-1111-111111111111',
+          upload_id: '22222222-2222-2222-2222-222222222222',
+          status: 'indexed',
+          decision: 'pending',
+          ticket_id: '33333333-3333-3333-3333-333333333333',
+          comment: 'reviewer note',
+          create_date: '2026-11-27T12:00:00.000Z',
+          create_user: 4,
+          submitted_by_identifier: 'submitter'
+        }
+      ]);
+      sinon.stub(SubmissionUploadRepository.prototype, 'countAdminSubmissionUploads').resolves(1);
+
+      const result = await service.listSubmissionUploadsBySubmissionUuid('submission-uuid', { page: 1, limit: 10 });
+
+      expect(result.uploads).to.eql([
+        {
+          submission_upload_id: '11111111-1111-1111-1111-111111111111',
+          status: 'indexed',
+          decision: 'pending',
+          create_date: '2026-11-27T12:00:00.000Z'
+        }
+      ]);
+    });
+
+    it('lists nothing when no submission has the UUID', async () => {
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .rejects(new ApiNotFoundError('Submission not found'));
+      const list = sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads');
+
+      try {
+        await service.listSubmissionUploadsBySubmissionUuid('missing-uuid', {
+          page: 1,
+          limit: 10,
+          sort: 'create_date',
+          order: 'desc'
+        });
+        expect.fail('Expected ApiNotFoundError');
+      } catch (error_) {
+        expect(error_).to.be.instanceOf(ApiNotFoundError);
+      }
+
+      expect(list).not.to.have.been.called;
+    });
+  });
+
   describe('listAdminSubmissionUploads', () => {
     it('preserves totals for a requested page beyond the last upload', async () => {
       const list = sinon.stub(SubmissionUploadRepository.prototype, 'listAdminSubmissionUploads').resolves([]);

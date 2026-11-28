@@ -67,6 +67,31 @@ export const useMartinApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Create a tile session for one of a submission's features, for a member of the submission's team.
+   *
+   * Only published features are drawn; an unreviewed feature reports no spatial properties until its upload is
+   * approved.
+   *
+   * @param {number} submissionId Submission the feature belongs to.
+   * @param {number} submissionFeatureId
+   * @param {Pick<AxiosRequestConfig, 'signal'>} [options]
+   * @return {Promise<CreateTileExtentSessionResponse>}
+   */
+  const createSubmissionFeatureTileSessionBySubmissionId = async (
+    submissionId: number,
+    submissionFeatureId: number,
+    options?: Pick<AxiosRequestConfig, 'signal'>
+  ): Promise<CreateTileExtentSessionResponse> => {
+    const { data } = await axios.post<CreateTileExtentSessionResponse>(
+      `/api/submission/${submissionId}/feature/${submissionFeatureId}/tile`,
+      undefined,
+      { signal: options?.signal }
+    );
+
+    return data;
+  };
+
+  /**
    * Create a tile session for the spatial properties of every active feature of a submission upload, or only those
    * with one reconciliation outcome when `options.reconciliation` is given.
    *
@@ -100,6 +125,7 @@ export const useMartinApi = (axios: AxiosInstance) => {
   return {
     createMartinSession,
     createSubmissionFeatureTileSession,
+    createSubmissionFeatureTileSessionBySubmissionId,
     createSubmissionUploadTileSession
   };
 };

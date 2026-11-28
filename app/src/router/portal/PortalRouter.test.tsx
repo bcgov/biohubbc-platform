@@ -39,6 +39,10 @@ vi.mock('features/portal/submissions/detail/PortalSubmissionDetailPage', () => (
   PortalSubmissionDetailPage: () => <div data-testid="portal-submission-detail-page">Portal Submission Detail</div>
 }));
 
+vi.mock('features/portal/submissions/detail/upload/PortalSubmissionUploadPage', () => ({
+  PortalSubmissionUploadPage: () => <div data-testid="portal-submission-upload-page">Portal Submission Upload</div>
+}));
+
 vi.mock('features/portal/submissions/detail/feature/PortalSubmissionFeaturePage', () => ({
   PortalSubmissionFeaturePage: () => <div data-testid="portal-submission-feature-page">Portal Submission Feature</div>
 }));
@@ -94,6 +98,14 @@ describe('PortalRouter routes', () => {
 
     await waitFor(() => {
       expect(getByTestId('portal-submission-feature-page')).toBeVisible();
+    });
+  });
+
+  it('renders portal submission upload route', async () => {
+    const { getByTestId } = renderPortalRouter('/portal/submission/7/upload/11111111-1111-4111-8111-111111111111');
+
+    await waitFor(() => {
+      expect(getByTestId('portal-submission-upload-page')).toBeVisible();
     });
   });
 

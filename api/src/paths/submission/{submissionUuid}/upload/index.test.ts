@@ -2,12 +2,13 @@ import chai, { expect } from 'chai';
 import { afterEach, describe, it } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { createSubmissionUpload, POST } from '.';
+import { createSubmissionUpload, GET, listSubmissionUploads, POST } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { getOperationHandler } from '../../../../__mocks__/operation';
 import * as db from '../../../../database/db';
 import { HTTP403 } from '../../../../errors/http-error';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
+import { SubmissionUploadService } from '../../../../services/upload/submission-upload-service';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
 import { PresignedUploadUrlResponse } from '../../../../services/upload/upload-ingestion-service.interface';
 
@@ -155,5 +156,80 @@ describe('append submission upload handler', () => {
       expect(dbConnectionObj.rollback).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
     }
+  });
+});
+
+describe('list submission uploads handler', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('authorizes the submission team before listing uploads', async () => {
+    sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(true);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionUuid };
+
+    await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
+
+    expect(mockReq.authorization_scheme).to.eql({
+      and: [{ discriminator: 'Team', entity: 'submission', submissionUuid }]
+    });
+    expect(mockNext).to.have.been.calledOnce;
+  });
+
+  it('rejects users outside the submission team before listing uploads', async () => {
+    sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
+    const listStub = sinon.stub(SubmissionUploadService.prototype, 'listSubmissionUploadsBySubmissionUuid');
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { submissionUuid };
+
+    try {
+      await getOperationHandler(GET, 0)(mockReq, mockRes, mockNext);
+      expect.fail('Expected authorization failure');
+    } catch (error_) {
+      expect(error_).to.be.instanceOf(HTTP403);
+    }
+
+    expect(listStub).not.to.have.been.called;
+  });
+
+  it("returns a page of the submission's uploads", async () => {
+    const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    const page = { uploads: [], pagination: { total: 0, current_page: 2, last_page: 1, per_page: 10 } };
+    const listStub = sinon
+      .stub(SubmissionUploadService.prototype, 'listSubmissionUploadsBySubmissionUuid')
+      .resolves(page as any);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.keycloak_token = {};
+    mockReq.params = { submissionUuid };
+    mockReq.query = { page: '2', limit: '10', sort: 'create_date', order: 'desc' };
+
+    await listSubmissionUploads()(mockReq, mockRes, mockNext);
+
+    expect(listStub).to.have.been.calledOnceWith(submissionUuid, sinon.match({ page: 2, limit: 10 }));
+    expect(dbConnectionObj.commit).to.have.been.calledOnce;
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.equal(page);
+  });
+
+  it('rolls back and rethrows when listing fails', async () => {
+    const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
+    const error = new Error('list failed');
+    sinon.stub(SubmissionUploadService.prototype, 'listSubmissionUploadsBySubmissionUuid').rejects(error);
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.keycloak_token = {};
+    mockReq.params = { submissionUuid };
+
+    try {
+      await listSubmissionUploads()(mockReq, mockRes, mockNext);
+      expect.fail('Expected listing failure');
+    } catch (error_) {
+      expect(error_).to.equal(error);
+    }
+
+    expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+    expect(dbConnectionObj.release).to.have.been.calledOnce;
   });
 });

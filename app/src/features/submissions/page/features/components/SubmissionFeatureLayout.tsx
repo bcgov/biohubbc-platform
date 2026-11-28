@@ -6,6 +6,7 @@ import { ISubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { PropsWithChildren, ReactNode, useState } from 'react';
 import { SubmissionFeatureDetailContent } from './SubmissionFeatureDetailContent';
 import { SubmissionFeatureHeader, SubmissionFeatureTab } from './header/SubmissionFeatureHeader';
+import { CreateSubmissionFeatureTileSession } from './map/useSubmissionFeatureTileSession';
 import { SubmissionFeatureSkeleton } from './skeleton/SubmissionFeatureSkeleton';
 
 interface SubmissionFeatureLayoutProps {
@@ -15,6 +16,8 @@ interface SubmissionFeatureLayoutProps {
   rootBreadcrumbTo: string;
   /** Builds the detail page path of another feature, used to link to the current version of a superseded one. */
   getFeaturePath: (submissionFeatureId: number) => string;
+  /** Requests the feature's map tile session from the endpoint that serves the page. */
+  createTileSession: CreateSubmissionFeatureTileSession;
   buttons?: ReactNode;
   breadcrumbs?: ReactNode;
 }
@@ -24,6 +27,7 @@ export const SubmissionFeatureLayout = ({
   isLoading,
   feature,
   getFeaturePath,
+  createTileSession,
   children,
   ...headerProps
 }: PropsWithChildren<SubmissionFeatureLayoutProps>) => {
@@ -52,7 +56,10 @@ export const SubmissionFeatureLayout = ({
             switch={activeTab}
             components={{
               details: (
-                <SubmissionFeatureDetailContent feature={feature} getFeaturePath={getFeaturePath}>
+                <SubmissionFeatureDetailContent
+                  feature={feature}
+                  getFeaturePath={getFeaturePath}
+                  createTileSession={createTileSession}>
                   {children}
                 </SubmissionFeatureDetailContent>
               )

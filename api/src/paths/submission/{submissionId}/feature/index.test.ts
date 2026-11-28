@@ -10,7 +10,6 @@ import { HTTP403 } from '../../../../errors/http-error';
 import { SubmissionFeatureForReview } from '../../../../models/submission';
 import { authorizationDependencies } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
-import { UserService } from '../../../../services/user-service';
 
 chai.use(sinonChai);
 
@@ -19,22 +18,22 @@ describe('getSubmissionFeatures', () => {
     sinon.restore();
   });
 
-  it('passes the active system user ID and pagination to the service', async () => {
+  const features: SubmissionFeatureForReview[] = [
+    {
+      submission_id: 1,
+      submission_feature_id: 2,
+      feature_type_name: 'observation',
+      feature_type_id: 3
+    }
+  ];
+  const pagination = { total: 1, current_page: 2, last_page: 1, per_page: 10, sort: undefined, order: undefined };
+
+  it('returns the current features page for the authenticated user by default', async () => {
     const connection = getMockDBConnection({ systemUserId: () => 1000 });
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
-    sinon.stub(UserService.prototype, 'getUserById').resolves({} as never);
-
-    const features: SubmissionFeatureForReview[] = [
-      {
-        submission_id: 1,
-        submission_feature_id: 2,
-        feature_type_name: 'observation',
-        feature_type_id: 3,
-        secured: true
-      }
-    ];
-    const featuresStub = sinon.stub(SubmissionService.prototype, 'getSubmissionFeatures').resolves(features);
-    const countStub = sinon.stub(SubmissionService.prototype, 'getSubmissionFeaturesCount').resolves(1);
+    const pageStub = sinon
+      .stub(SubmissionService.prototype, 'getSubmissionFeaturePage')
+      .resolves({ features, pagination });
 
     const requestHandler = index.getSubmissionFeatures();
     const { mockReq, mockRes } = getRequestHandlerMocks();
@@ -44,10 +43,40 @@ describe('getSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, () => {});
 
-    expect(featuresStub).to.have.been.calledOnceWith(1, 1000, sinon.match({ page: 2, limit: 10 }));
-    expect(countStub).to.have.been.calledOnceWith(1, 1000);
+    expect(pageStub).to.have.been.calledOnceWith(
+      1,
+      1000,
+      { lifecycle: 'current' },
+      sinon.match({ page: 2, limit: 10 })
+    );
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue.features).to.eql(features);
+    expect(mockRes.jsonValue).to.eql({ features, pagination });
+  });
+
+  it('passes the requested lifecycle to the service', async () => {
+    const connection = getMockDBConnection({ systemUserId: () => 1000 });
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
+    const pageStub = sinon
+      .stub(SubmissionService.prototype, 'getSubmissionFeaturePage')
+      .resolves({ features, pagination });
+
+    const requestHandler = index.getSubmissionFeatures();
+    const { mockReq, mockRes } = getRequestHandlerMocks();
+    mockReq.keycloak_token = {};
+    mockReq.params = { submissionId: '1' };
+    mockReq.query = { lifecycle: 'superseded' };
+
+    await requestHandler(mockReq, mockRes, () => {});
+
+    expect(pageStub).to.have.been.calledOnceWith(1, 1000, { lifecycle: 'superseded' }, sinon.match.object);
+  });
+
+  it('documents the lifecycle query parameter with current as the default', () => {
+    const lifecycle = (index.GET.apiDoc?.parameters as { name: string; schema: unknown }[]).find(
+      (parameter) => parameter.name === 'lifecycle'
+    );
+
+    expect(lifecycle?.schema).to.eql({ type: 'string', enum: ['current', 'superseded', 'all'], default: 'current' });
   });
 });
 
@@ -71,7 +100,7 @@ describe('GET authorization', () => {
 
   it('rejects users outside the submission team before loading features', async () => {
     sinon.stub(authorizationDependencies, 'authorizeRequest').resolves(false);
-    const featuresStub = sinon.stub(SubmissionService.prototype, 'getSubmissionFeatures');
+    const featuresStub = sinon.stub(SubmissionService.prototype, 'getSubmissionFeaturePage');
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionId: '7' };
 

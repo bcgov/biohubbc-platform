@@ -11,6 +11,7 @@ import {
   buildSecurityFilter,
   buildSubmissionFeatureTerminalSubquery,
   isSubmissionFeatureCurrent,
+  isSubmissionFeatureGrantedToUser,
   isSubmissionFeaturePublished
 } from '../sql-fragments';
 
@@ -164,6 +165,39 @@ export class TeamAuthorizationRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, SubmissionRecord);
     return response.rows[0] ?? null;
+  }
+
+  /**
+   * Determine whether a feature belongs to a submission and one of a user's teams holds a policy grant whose URN
+   * matches the feature.
+   *
+   * Matches the grant against the feature row at any lifecycle stage, without `submission_feature_closure` or scope
+   * anchors. See `isSubmissionFeatureGrantedToUser` in `sql-fragments.ts`.
+   *
+   * @param {number} systemUserId The authenticated user's id.
+   * @param {number} submissionId Submission the feature must belong to.
+   * @param {number} submissionFeatureId
+   * @return {Promise<boolean>} `true` if the feature is in the submission and a matching grant exists.
+   * @memberof TeamAuthorizationRepository
+   */
+  async isSubmissionFeatureGrantedToUser(
+    systemUserId: number,
+    submissionId: number,
+    submissionFeatureId: number
+  ): Promise<boolean> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select(knex.raw('1'))
+      .from('submission_feature as sf')
+      .where('sf.submission_feature_id', submissionFeatureId)
+      .where('sf.submission_id', submissionId)
+      .whereRaw(isSubmissionFeatureGrantedToUser('sf'), [systemUserId])
+      .limit(1);
+
+    const response = await this.connection.knex(query);
+
+    return response.rowCount === 1;
   }
 
   /**

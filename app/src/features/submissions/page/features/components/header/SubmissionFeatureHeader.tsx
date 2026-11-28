@@ -54,6 +54,7 @@ export const SubmissionFeatureHeader = ({
   const featureTypeLabel = getFeatureTypeDisplayLabel(feature.feature_type_name);
   return (
     <PageHeader
+      maxWidth="lg"
       buttons={buttons}
       breadcrumbs={
         breadcrumbs ?? (
